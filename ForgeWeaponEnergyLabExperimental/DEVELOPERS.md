@@ -10,9 +10,40 @@ Player documentation is in [README.md](README.md). This file covers how the guns
 - Orbs, discs and gravity cores launch during their firing call. The host simulates their contacts, explosions, bounces and pulses after that call has returned, so these delayed hits do not count towards hit rate. Damage statistics follow each stats mod's normal attribution rules for hits outside a firing call, including after weapon switches. A client spends its round locally and sends one launch command; the host never bills it again or fires a gun to report a later hit. Bots launch on the host through their vanilla synced firing calls.
 - On join, a compatibility check compares registered definitions, effective tuning, native IDs, model keys, bundle contents and the mod build.
 
+## Gameplay rules
+
+- Friendly fire and lock breaking follow vanilla rules: direct hits behave like bullets, and explosions behave like mines.
+- Beam, Chain Arc, Flamethrower, Blast Gun, Ricochet Disc and Gravity Core use vanilla full-auto timing. Charged orbs reach full power after 1.1 seconds, stay fully charged while the trigger is held, and fire on release, with at least 0.85 seconds between shots. Active-projectile limits pause further launches until a slot is free.
+- A per-shot hit rate counts each discharge once; a per-hit rate counts every beam hit, chain hop, flame target, Blast Gun contact and explosion hit, so it can pass 100% with these guns.
+- Stock tracers, gunfire sounds, muzzle flashes and casings are disabled for all eight guns; their energy effects and sounds remain.
+- Explosions hit each enemy once, on the first limb reached by a ray from the blast centre toward its nearest surface, with distance falloff. Mother and Tank spore pods in range can burst.
+- Chain hops, shock pulses and the gravity pull select enemies only.
+- Shots alert sleepers like vanilla gunfire, using energy-weapon sounds; explosions also use vanilla mine noise.
+
+## Full default stats
+
+Ammo costs are magazine rounds. Damage is the base value before vanilla receiver modifiers; explosions have distance falloff. Range describes aiming or direct hits; projectile travel follows its flight limits. Charged ranges run from minimum to full charge. Effect duration is the explosion's lifetime, not repeated damage. The Blast Gun's contact adds no separate damage; its damage comes from the explosion. Both orbs use 16 reserve units per round, at any charge power.
+
+| Weapon | Slot | Magazine | Ammo / shot | Interval / charge (s) | Damage | Range (m) | Radius / duration | Bounces / targets |
+| --- | --- | ---: | --- | --- | --- | --- | --- | --- |
+| Forge Beam | Main | 40 | 1 | 0.1 | 4.35 / tick | 45 | - | 1 / tick |
+| Forge Chain Arc | Main | 7 | 1 | 0.7 | 15.9 first hit; 80% retained / hop | 16 first hit; 6 / hop | - | 4 total |
+| Forge Flamethrower | Main | 50 | 1 | 0.1 | 2.695 / tick / receiver | 8 | 0.15-1.43 m cone radius | All visible receivers in cone |
+| Forge Charge Orb | Special | 4 | 1 (every charge power) | 0.85; charge 0.3-1.1 | 12-62.7 / explosion | 75 aim; 18-42 travel | 1.5-2.5 m blast; 0.8 s effect | All in blast |
+| Forge Shock Orb | Special | 5 | 1 (every charge power) | 0.85; charge 0.3-1.1 | 12-62.7 / contact; 0.96-5.016 / pulse | 75 aim; 18-42 travel | 2-3.5 m pulse; every 0.4 s | Pierces actors; 3 enemies / pulse |
+| Forge Blast Gun | Special | 6 | 1 | 0.45 | 30.13 / explosion | 40 | 2.2 m blast; 0.4 s effect | All in blast |
+| Forge Ricochet Disc | Special | 16 | 1 | 0.55 | 23.95 / hit | 60 | 0.3 m disc; 1.6 s flight | 4 wall bounces; 1 hit / actor between bounces |
+| Forge Gravity Core | Special | 2 | 1 | 2 | 6.75 core / 1.6875 edge / pulse | 60 | 5 m field (0.8 m core); 3.5 s incl. 0.35 s harmless collapse; pulse every 0.4 s | Visible enemies in field |
+
+## tuning.json rules
+
+Keep all eight entries under `weapons` and all their numeric fields. The optional `_descriptions` object explains the fields. Distances are metres, times are seconds, and shot costs are whole magazine rounds; `ammoPerRound` controls the native reserve-ammo cost of one magazine round. Keep `ammoCost` at 1 for every weapon: each native discharge spends one round, including a fully charged orb.
+
+Invalid JSON, missing, duplicate or unknown fields, incorrect number types, non-finite or out-of-range values, and inconsistent charge, ammo, or radius settings reject the whole file. The error identifies the field, and Energy Lab stays disabled until the file is corrected. There is no partial application or live reload. Formatting and `_descriptions` do not affect the multiplayer compatibility check; gameplay values do.
+
 ## Extension API
 
-Reference `ForgeWeaponEnergyLabExperimental.dll` and declare `[BepInDependency(EnergyLab.PluginId, EnergyLab.Version)]`. The plugin GUID is **`NAinfini.ForgeWeaponEnergyLabExperimental`**, and the current version is **`0.0.1`**.
+Reference `ForgeWeaponEnergyLabExperimental.dll` and declare `[BepInDependency(EnergyLab.PluginId, EnergyLab.Version)]`. The plugin GUID is **`NAinfini.ForgeWeaponEnergyLabExperimental`**.
 
 The public namespace is `ForgeEnergyLab.Api`:
 
