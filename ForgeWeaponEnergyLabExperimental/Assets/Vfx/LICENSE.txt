@@ -1,0 +1,16 @@
+Forge Weapon Energy Lab experimental effect assets
+=================================================
+
+forge-energy-disc.bundle
+------------------------
+Copyright (c) 2026 NAinfini. Licensed under MIT; see ../../LICENSE.
+The projectile disc is a native Unity prefab baked from the mod's rotor
+geometry, four materials and trail settings.
+
+forge-vfx.bundle
+----------------
+CC0 1.0 (public domain dedication): https://creativecommons.org/publicdomain/zero/1.0/
+Forge's shared effect bundle, built with Unity 2019.4.21f1. It holds only
+Forge's own effect prefabs, particle shaders and self-made textures,
+materials and meshes; no third-party file is inside. forge-vfx.manifest.json
+lists every asset with its SHA-256, source, author, license and modifications.
