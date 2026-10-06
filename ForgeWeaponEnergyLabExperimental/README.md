@@ -58,24 +58,34 @@ Fires a core that opens a gravity field, pulling enemies in and damaging them.
 
 ## Stats
 
-| Weapon | Slot | Magazine | Damage | Range / area |
-| --- | --- | ---: | --- | --- |
-| Beam | Main | 40 | 4.35 per tick | 45 m |
-| Chain Arc | Main | 7 | 15.9, -20% per hop | 16 m |
-| Flamethrower | Main | 50 | 2.7 per tick | 8 m |
-| Charge Orb | Special | 4 | 12-62.7 | 1.5-2.5 m blast |
-| Shock Orb | Special | 5 | 12-62.7 on contact | 2-3.5 m shock |
-| Blast Gun | Special | 6 | 30.1 | 2.2 m blast |
-| Ricochet Disc | Special | 16 | 23.95 | 60 m |
-| Gravity Core | Special | 2 | up to 6.75 per pulse | 5 m field |
+| Weapon | Slot | Magazine | Damage | Range | Area |
+| --- | --- | ---: | --- | --- | --- |
+| Beam | Main | 40 | 4.35 per tick | Unlimited | - |
+| Chain Arc | Main | 7 | 15.9, -20% per hop | 16 m | Hops up to 6 m |
+| Flamethrower | Main | 50 | 2.7 per tick | 8 m | Cone |
+| Charge Orb | Special | 4 | 12-62.7 | Flies 18-42 m | 1.5-2.5 m blast |
+| Shock Orb | Special | 5 | 12-62.7 on contact | Flies 18-42 m | 2-3.5 m shock |
+| Blast Gun | Special | 6 | 30.1 | Unlimited | 2.2 m blast |
+| Ricochet Disc | Special | 16 | 23.95 | Flies 1.6 s, 4 bounces | - |
+| Gravity Core | Special | 2 | up to 6.75 per pulse | Flies up to 3 s | 5 m field |
 
 ## Installation
 
-Install with r2modman; it also installs BepInExPack_GTFO. Everyone in the lobby needs the same version and the same `tuning.json`.
+Install with r2modman; it also installs BepInExPack_GTFO. Everyone in the lobby needs the same version and the same tuning changes.
 
 ## Tuning
 
-Numbers can be changed in `BepInEx/config/ForgeEnergyLab/tuning.json`, which is created on the first launch. Restart the game after editing. If the file has a mistake, the mod stays off and the log names the field.
+Every number is listed in `BepInEx/config/ForgeEnergyLab/tuning-defaults.json`. To change one, copy only that value into `tuning-overrides.json` in the same folder, for example:
+
+```json
+{
+  "weapons": {
+    "forge.energylab.blast": { "damage": 40, "blastRadius": 3 }
+  }
+}
+```
+
+Restart the game after editing. Values you did not copy follow each update's defaults. If the file has a mistake, the mod stays off and the log names the field.
 
 ## Known issues
 

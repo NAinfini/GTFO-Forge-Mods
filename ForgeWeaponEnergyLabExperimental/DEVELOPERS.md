@@ -22,24 +22,26 @@ Player documentation is in [README.md](README.md). This file covers how the guns
 
 ## Full default stats
 
-Ammo costs are magazine rounds. Damage is the base value before vanilla receiver modifiers; explosions have distance falloff. Range describes aiming or direct hits; projectile travel follows its flight limits. Charged ranges run from minimum to full charge. Effect duration is the explosion's lifetime, not repeated damage. The Blast Gun's contact adds no separate damage; its damage comes from the explosion. Both orbs use 16 reserve units per round, at any charge power.
+Ammo costs are magazine rounds. Damage is the base value before vanilla receiver modifiers; explosions have distance falloff. Range describes aiming or direct hits: only the Chain Arc's first hit and the flame have a tuned range, every other shot reaches 1000 m, farther than any level sightline, with no distance falloff. Projectile travel follows its flight limits. Charged ranges run from minimum to full charge. Effect duration is the explosion's lifetime, not repeated damage. The Blast Gun's contact adds no separate damage; its damage comes from the explosion. Both orbs use 16 reserve units per round, at any charge power.
 
 | Weapon | Slot | Magazine | Ammo / shot | Interval / charge (s) | Damage | Range (m) | Radius / duration | Bounces / targets |
 | --- | --- | ---: | --- | --- | --- | --- | --- | --- |
-| Forge Beam | Main | 40 | 1 | 0.1 | 4.35 / tick | 45 | - | 1 / tick |
+| Forge Beam | Main | 40 | 1 | 0.1 | 4.35 / tick | Unlimited | - | 1 / tick |
 | Forge Chain Arc | Main | 7 | 1 | 0.7 | 15.9 first hit; 80% retained / hop | 16 first hit; 6 / hop | - | 4 total |
 | Forge Flamethrower | Main | 50 | 1 | 0.1 | 2.695 / tick / receiver | 8 | 0.15-1.43 m cone radius | All visible receivers in cone |
-| Forge Charge Orb | Special | 4 | 1 (every charge power) | 0.85; charge 0.3-1.1 | 12-62.7 / explosion | 75 aim; 18-42 travel | 1.5-2.5 m blast; 0.8 s effect | All in blast |
-| Forge Shock Orb | Special | 5 | 1 (every charge power) | 0.85; charge 0.3-1.1 | 12-62.7 / contact; 0.96-5.016 / pulse | 75 aim; 18-42 travel | 2-3.5 m pulse; every 0.4 s | Pierces actors; 3 enemies / pulse |
-| Forge Blast Gun | Special | 6 | 1 | 0.45 | 30.13 / explosion | 40 | 2.2 m blast; 0.4 s effect | All in blast |
-| Forge Ricochet Disc | Special | 16 | 1 | 0.55 | 23.95 / hit | 60 | 0.3 m disc; 1.6 s flight | 4 wall bounces; 1 hit / actor between bounces |
-| Forge Gravity Core | Special | 2 | 1 | 2 | 6.75 core / 1.6875 edge / pulse | 60 | 5 m field (0.8 m core); 3.5 s incl. 0.35 s harmless collapse; pulse every 0.4 s | Visible enemies in field |
+| Forge Charge Orb | Special | 4 | 1 (every charge power) | 0.85; charge 0.3-1.1 | 12-62.7 / explosion | Unlimited aim; 18-42 travel | 1.5-2.5 m blast; 0.8 s effect | All in blast |
+| Forge Shock Orb | Special | 5 | 1 (every charge power) | 0.85; charge 0.3-1.1 | 12-62.7 / contact; 0.96-5.016 / pulse | Unlimited aim; 18-42 travel | 2-3.5 m pulse; every 0.4 s | Pierces actors; 3 enemies / pulse |
+| Forge Blast Gun | Special | 6 | 1 | 0.45 | 30.13 / explosion | Unlimited | 2.2 m blast; 0.4 s effect | All in blast |
+| Forge Ricochet Disc | Special | 16 | 1 | 0.55 | 23.95 / hit | Unlimited aim | 0.3 m disc; 1.6 s flight | 4 wall bounces; 1 hit / actor between bounces |
+| Forge Gravity Core | Special | 2 | 1 | 2 | 6.75 core / 1.6875 edge / pulse | Unlimited aim | 5 m field (0.8 m core); 3.5 s incl. 0.35 s harmless collapse; pulse every 0.4 s | Visible enemies in field |
 
-## tuning.json rules
+## Tuning files
 
-Keep all eight entries under `weapons` and all their numeric fields. The optional `_descriptions` object explains the fields. Distances are metres, times are seconds, and shot costs are whole magazine rounds; `ammoPerRound` controls the native reserve-ammo cost of one magazine round. Keep `ammoCost` at 1 for every weapon: each native discharge spends one round, including a fully charged orb.
+`BepInEx/config/ForgeEnergyLab/tuning-defaults.json` is rewritten on every launch with this build's values and a `_descriptions` object explaining each field; it is never read. `tuning-overrides.json` holds only changed values: a `weapons` object keyed by weapon ID, each entry naming any subset of that weapon's fields. Every value it does not name follows the current defaults, so a new version's default changes reach players who tuned other values. Earlier versions' `tuning.json` is no longer read.
 
-Invalid JSON, missing, duplicate or unknown fields, incorrect number types, non-finite or out-of-range values, and inconsistent charge, ammo, or radius settings reject the whole file. The error identifies the field, and Energy Lab stays disabled until the file is corrected. There is no partial application or live reload. Formatting and `_descriptions` do not affect the multiplayer compatibility check; gameplay values do.
+Distances are metres, times are seconds, and shot costs are whole magazine rounds; `ammoPerRound` controls the native reserve-ammo cost of one magazine round. Keep `ammoCost` at 1 for every weapon: each native discharge spends one round, including a fully charged orb.
+
+Invalid JSON, unknown weapon IDs, duplicate or unknown fields, incorrect number types, non-finite or out-of-range values, and inconsistent charge, ammo, or radius settings reject the whole file. The error identifies the field, and Energy Lab stays disabled until the file is corrected. There is no partial application or live reload. Formatting does not affect the multiplayer compatibility check; the effective gameplay values do.
 
 ## Extension API
 
@@ -88,7 +90,7 @@ public sealed class ExamplePlugin : BasePlugin
             "example.energylab.longbeam", "Example Long Beam", WeaponSlot.Special,
             EnergyMode.Beam,
             defaults with { Magazine = 24, AmmoPerRound = 4f,
-                Range = 60f, Interval = 0.2, Damage = 18f, Stagger = 0.25f,
+                Interval = 0.2, Damage = 18f, Stagger = 0.25f,
                 ReloadTime = 3.3f, AimTime = 0.35f },
             EnergyLab.GetModel("beam")));
     }
