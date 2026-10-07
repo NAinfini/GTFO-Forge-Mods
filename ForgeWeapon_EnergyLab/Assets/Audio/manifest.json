@@ -1,0 +1,538 @@
+{
+  "format": "signed little-endian PCM16 mono 48000 Hz, one recording per runtime cue",
+  "generator": "tools/import_audio.py",
+  "source": "original recordings (not published); cues listed in cues.md",
+  "rights": "Original audio for Forge Weapon Energy Lab experimental; MIT, copyright 2026 NAinfini",
+  "pendingFromOldLibrary": [
+    "energy-dryfire"
+  ],
+  "outputs": [
+    {
+      "cue": "beam-start",
+      "file": "Variants/beam-start.bin",
+      "sources": [
+        "energy-weapons/beam-start-1.wav"
+      ],
+      "tableSeconds": 0.4,
+      "loop": false,
+      "sourceSha256": [
+        "057136a949ade05a7e6e037b5c54fa35d593af9116cba36b38fc7fbecd6ec2b5"
+      ],
+      "sha256": "14b4961c186b5198ff3d533ffc209901194e0a237d756d2b72808dee11a74466",
+      "seconds": 0.7
+    },
+    {
+      "cue": "beam-loop",
+      "file": "Variants/beam-loop.bin",
+      "sources": [
+        "energy-weapons/beam-loop-1.wav"
+      ],
+      "tableSeconds": 4.0,
+      "loop": true,
+      "sourceSha256": [
+        "94bb90c86fc25c9f6eb5378aecc7958ac0211fdf02357d4c9fb701b1589e9ce6"
+      ],
+      "sha256": "d65e1d304b88c655b22daa64b625fbac98b3e5ab965089fe86f61eee4c6b964b",
+      "seconds": 3.75
+    },
+    {
+      "cue": "beam-stop",
+      "file": "Variants/beam-stop.bin",
+      "sources": [
+        "energy-weapons/beam-stop-1.wav"
+      ],
+      "tableSeconds": 0.7,
+      "loop": false,
+      "sourceSha256": [
+        "01472e9acaef972792b4a324fe9e2dafd34bc5d75a542fb388f465844a47f1cd"
+      ],
+      "sha256": "ab4a20734e032e69e0523e46acb0de5c07abcf50e2c3e9a60f309d89f52a20c7",
+      "seconds": 0.9762
+    },
+    {
+      "cue": "beam-hit",
+      "file": "Variants/beam-hit.bin",
+      "sources": [
+        "energy-weapons/beam-hit-1.wav"
+      ],
+      "tableSeconds": 0.5,
+      "loop": false,
+      "sourceSha256": [
+        "e668a2a1600de07b28ef8ed83d32152b4e1050b3e38c49488e0e41ee06218f73"
+      ],
+      "sha256": "b19af5b3910b3d26062c8d4a47e47d763294e075b23d58d8d6317103de7e5ddf",
+      "seconds": 0.8
+    },
+    {
+      "cue": "arc-fire",
+      "file": "Variants/arc-fire.bin",
+      "sources": [
+        "energy-weapons/arc-fire-1.wav"
+      ],
+      "tableSeconds": 0.4,
+      "loop": false,
+      "sourceSha256": [
+        "1444e21b6fb4adac835dcef0111169934e70bbd5c81aad6ba5f409d75f04c919"
+      ],
+      "sha256": "fb3ad9645ce6ca81a191aaf23eab01f992155c062face9a210a9d5296830a05d",
+      "seconds": 0.7
+    },
+    {
+      "cue": "arc-loop",
+      "file": "Variants/arc-loop.bin",
+      "sources": [
+        "energy-weapons/arc-loop-1.wav"
+      ],
+      "tableSeconds": 4.0,
+      "loop": true,
+      "sourceSha256": [
+        "46a822c6988dbdb2cbff8fb4d25e7ced066146d1ce19f8090d010b6fedf0cc10"
+      ],
+      "sha256": "543e79ba1a050822c6566fb90514e799e26c5c74451bd98f17ca8266a343e80c",
+      "seconds": 0.762
+    },
+    {
+      "cue": "arc-hit",
+      "file": "Variants/arc-hit.bin",
+      "sources": [
+        "energy-weapons/arc-hit-1.wav"
+      ],
+      "tableSeconds": 0.4,
+      "loop": false,
+      "sourceSha256": [
+        "f625d60ada9d54f2f357bb3ac8b2b7800a95b44ace801a2299f310cd962bdae1"
+      ],
+      "sha256": "4b0f8d8324bf7b88c5ae22c54007131cddfdd5c46c3f03078d01fa95c6f14ba2",
+      "seconds": 0.7
+    },
+    {
+      "cue": "plasma-charge-rise",
+      "file": "Variants/plasma-charge-rise.bin",
+      "sources": [
+        "energy-weapons/plasma-charge-rise-1.wav"
+      ],
+      "tableSeconds": 1.4,
+      "loop": false,
+      "sourceSha256": [
+        "4a87d2b4eb76bd6ad8a08ebc5cb68154f5484ce89549eab9c54d23ad178f1f49"
+      ],
+      "sha256": "0c7bd28a457a373ac4d23ab33338bc17fb041de481b749fe13f9410151e13475",
+      "seconds": 1.2329
+    },
+    {
+      "cue": "plasma-charge-loop",
+      "file": "Variants/plasma-charge-loop.bin",
+      "sources": [
+        "energy-weapons/plasma-charge-loop-1.wav"
+      ],
+      "tableSeconds": 4.0,
+      "loop": true,
+      "sourceSha256": [
+        "9051a6cab440d094e3590653a4a6ac2f66bd2cf26fc62942cf081f072d3fd87d"
+      ],
+      "sha256": "3b3a48cc19255738c5e6eca8cfcf7751681abd5bde4c713ff6c2d852a0e825e1",
+      "seconds": 3.75
+    },
+    {
+      "cue": "plasma-charge-full",
+      "file": "Variants/plasma-charge-full.bin",
+      "sources": [
+        "energy-weapons/plasma-charge-full-1.wav"
+      ],
+      "tableSeconds": 0.4,
+      "loop": false,
+      "sourceSha256": [
+        "d60cdbe9d30dd3078506a7e489206196fe331f06353a8078e9fa498d17185da4"
+      ],
+      "sha256": "483a26d8c27c7fc1c76c3c5150c0fa8afb0f810d23aa1b8301965d37fac9500e",
+      "seconds": 0.7
+    },
+    {
+      "cue": "plasma-charge-cancel",
+      "file": "Variants/plasma-charge-cancel.bin",
+      "sources": [
+        "energy-weapons/plasma-charge-cancel-1.wav"
+      ],
+      "tableSeconds": 0.6,
+      "loop": false,
+      "sourceSha256": [
+        "2005e817eeda43126caccb4202b29fd4536c2506a2ab864b3cbc36096a7b1b2d"
+      ],
+      "sha256": "0557e8f654640327f41e0e22b5cb3fb3346df6e392bcba6ebeb375f85aff5021",
+      "seconds": 0.7919
+    },
+    {
+      "cue": "orb-fire",
+      "file": "Variants/orb-fire.bin",
+      "sources": [
+        "energy-weapons/orb-fire-1.wav"
+      ],
+      "tableSeconds": 0.7,
+      "loop": false,
+      "sourceSha256": [
+        "f89399c108920d0a5d658d3aaf3900ec1f3749b2aa8cf47669b2e8bf4f0b6c45"
+      ],
+      "sha256": "2238b9afcb0782e0d27f92c996359ed213f6a9d8119b7d9277b8bb5a6808235b",
+      "seconds": 0.6743
+    },
+    {
+      "cue": "orb-fly-loop",
+      "file": "Variants/orb-fly-loop.bin",
+      "sources": [
+        "energy-weapons/orb-fly-loop-1.wav"
+      ],
+      "tableSeconds": 3.0,
+      "loop": true,
+      "sourceSha256": [
+        "94942c0fdd17ed9751b083a03d7902b2239d52c9e1594b83d1373771ecc6b228"
+      ],
+      "sha256": "d10aa03c36660799fc7c56b48ad05e6841af8acbdb1041e49747cd0e8fbc7161",
+      "seconds": 2.5522
+    },
+    {
+      "cue": "shock-fly-loop",
+      "file": "Variants/shock-fly-loop.bin",
+      "sources": [
+        "energy-weapons/shock-fly-loop-1.wav"
+      ],
+      "tableSeconds": 3.0,
+      "loop": true,
+      "sourceSha256": [
+        "024805805bc421573db04fc33888a99f6f53d85ec1571bc9b42e0fea98a3d5bd"
+      ],
+      "sha256": "418937094828cea3d5ef00cedddad88ff9cec06902af7d88b0634b176ad2bca1",
+      "seconds": 1.9464
+    },
+    {
+      "cue": "orb-explode",
+      "file": "Variants/orb-explode.bin",
+      "sources": [
+        "energy-weapons/orb-explode-1.wav"
+      ],
+      "tableSeconds": 1.5,
+      "loop": false,
+      "sourceSha256": [
+        "0bd6df21ba61575e69817a1fd7f53d01401c369ba39062f0d03018bb7b569f8a"
+      ],
+      "sha256": "f87091f5b50fe52cafd79064d0aea6d6fa7dee6d98a2fc1324c025c304caa4ff",
+      "seconds": 1.2503
+    },
+    {
+      "cue": "shock-fire",
+      "file": "Variants/shock-fire.bin",
+      "sources": [
+        "energy-weapons/shock-fire-1.wav"
+      ],
+      "tableSeconds": 0.7,
+      "loop": false,
+      "sourceSha256": [
+        "2e970d2ba5e4bdc43f7c67707c239079e798dd068b3ffbedc69bdf3f0e896e5a"
+      ],
+      "sha256": "a644e86b6d29a473391ea465bcd4213cdbbbc321e333f9fa859a9db289878f61",
+      "seconds": 0.8065
+    },
+    {
+      "cue": "shock-fade",
+      "file": "Variants/shock-fade.bin",
+      "sources": [
+        "energy-weapons/shock-fade-1.wav"
+      ],
+      "tableSeconds": 1.0,
+      "loop": false,
+      "sourceSha256": [
+        "f84e059b043d5b42fca3d4e2ed9d6b993553edf294db96405e2ee536d9f71d76"
+      ],
+      "sha256": "bc241d0f6d44b95a48ae224b3ddfef719d9179d003a4802dac9995c4918710ae",
+      "seconds": 0.9957
+    },
+    {
+      "cue": "shock-hit",
+      "file": "Variants/shock-hit.bin",
+      "sources": [
+        "energy-weapons/shock-hit-1.wav"
+      ],
+      "tableSeconds": 0.5,
+      "loop": false,
+      "sourceSha256": [
+        "6f4b237e6c5b3fe42eea49f0d76c36ed4da9c5a4e3a76bd15d6486f10ecdad12"
+      ],
+      "sha256": "f53d49e07c47039e9fa141abd5c8db711d4253b9251da0029ec90843d738bfad",
+      "seconds": 0.8
+    },
+    {
+      "cue": "shock-pulse",
+      "file": "Variants/shock-pulse.bin",
+      "sources": [
+        "energy-weapons/shock-pulse-1.wav"
+      ],
+      "tableSeconds": 0.6,
+      "loop": false,
+      "sourceSha256": [
+        "ac1ac600a7556f699587f1d1a4d2ee449f275a62632924d759da6be09ccb0b7b"
+      ],
+      "sha256": "398d4505fbf1e507c852895dd0c8a617e27b6b1edefe028bcd92b39064b4db5f",
+      "seconds": 0.9
+    },
+    {
+      "cue": "blast-fire",
+      "file": "Variants/blast-fire.bin",
+      "sources": [
+        "energy-weapons/blast-fire-1.wav"
+      ],
+      "tableSeconds": 0.6,
+      "loop": false,
+      "sourceSha256": [
+        "e85340591ef6f55f4c010f98fd8f2219fb504e66fa7691a2b27b8cd44e9118b0"
+      ],
+      "sha256": "db475e10b5e472093f6b75c91b6cd52b691faabda258c8cf2f583b0c70e45a4a",
+      "seconds": 0.6643
+    },
+    {
+      "cue": "blast-cycle",
+      "file": "Variants/blast-cycle.bin",
+      "sources": [
+        "energy-weapons/blast-cycle-1.wav"
+      ],
+      "tableSeconds": 0.5,
+      "loop": false,
+      "sourceSha256": [
+        "0dfc1aad409eea87cc5a85011f89ea7aadd85e0f35446533240fe6818d94b54d"
+      ],
+      "sha256": "954a4305a89b0f4f1cd2b2d22cb57dff6b8c33a07be0d305549945aae3176ad6",
+      "seconds": 0.7484
+    },
+    {
+      "cue": "blast-explode",
+      "file": "Variants/blast-explode.bin",
+      "sources": [
+        "energy-weapons/blast-explode-1.wav"
+      ],
+      "tableSeconds": 1.2,
+      "loop": false,
+      "sourceSha256": [
+        "1236b50e1677e51c05cfc69fc922eaf1198635520407655a10919d28e7f9c313"
+      ],
+      "sha256": "062f54cccd2bc51f0f9dd1dcf2587e3aa684e50b01a6876c8bee6d3ce38bd6c8",
+      "seconds": 0.9646
+    },
+    {
+      "cue": "disc-fire",
+      "file": "Variants/disc-fire.bin",
+      "sources": [
+        "energy-weapons/disc-fire-1.wav"
+      ],
+      "tableSeconds": 0.7,
+      "loop": false,
+      "sourceSha256": [
+        "78a7768b5acd26e070a887b793b83c667cf3b0e995aef566ee3ec33fe93519e2"
+      ],
+      "sha256": "8c453299eca399124213cdac9367584ab11c29ffdb95eb73cf0f551f8a0d5a39",
+      "seconds": 0.8482
+    },
+    {
+      "cue": "disc-fly-loop",
+      "file": "Variants/disc-fly-loop.bin",
+      "sources": [
+        "energy-weapons/disc-fly-loop-1.wav",
+        "energy-weapons/disc-rotor-loop-1.wav"
+      ],
+      "tableSeconds": 3.0,
+      "loop": true,
+      "sourceSha256": [
+        "7a59f3f658ad8fc2cefe8dd3d28750bfe553ae47c8dc7294a59fa05609149c4d",
+        "11916af6de316f65645e86c579a6476b72f1091a95d53b9469456c6a86433e9e"
+      ],
+      "sha256": "cb320687870c9b3bbe2ae9637f1ae2213ede6d8f51b31abf37e8339c58fed4c2",
+      "seconds": 3.5222
+    },
+    {
+      "cue": "disc-bounce",
+      "file": "Variants/disc-bounce.bin",
+      "sources": [
+        "energy-weapons/disc-bounce-1.wav"
+      ],
+      "tableSeconds": 0.4,
+      "loop": false,
+      "sourceSha256": [
+        "8acdf32704c06fe647b55ccac08808e56718b5310d7c3fb2c31698e81375e878"
+      ],
+      "sha256": "b2b4201cc84fde11e8c050c854bc1015ce1994cee4dd5e5e807629ae58cfffe2",
+      "seconds": 0.7
+    },
+    {
+      "cue": "disc-drop",
+      "file": "Variants/disc-drop.bin",
+      "sources": [
+        "energy-weapons/disc-drop-1.wav"
+      ],
+      "tableSeconds": 0.6,
+      "loop": false,
+      "sourceSha256": [
+        "3aeffcfe49d6affd209615721c9a75d72e36d32e01f749a6efef75c00bb07b08"
+      ],
+      "sha256": "26b13b7595c80d8ab7e0c290a8a3c356f7d22229b03581f3ade86a1ff0e318c6",
+      "seconds": 0.8572
+    },
+    {
+      "cue": "flame-start",
+      "file": "Variants/flame-start.bin",
+      "sources": [
+        "energy-weapons/flame-start-1.wav"
+      ],
+      "tableSeconds": 0.6,
+      "loop": false,
+      "sourceSha256": [
+        "4dce50df6bb2d9e3e5b70bc9fe4ce13f7470b6eaddf2caee8a895696784d9ad3"
+      ],
+      "sha256": "a25c62c0eec12a42090ffbdcd9d864404e76e08a7eb6533600d49500dbc23e34",
+      "seconds": 0.792
+    },
+    {
+      "cue": "flame-loop",
+      "file": "Variants/flame-loop.bin",
+      "sources": [
+        "energy-weapons/flame-loop-1.wav"
+      ],
+      "tableSeconds": 4.0,
+      "loop": true,
+      "sourceSha256": [
+        "d31c8453a455527dc8d8c99df72306af571aa6888220fc6c969a32d54c8e7521"
+      ],
+      "sha256": "4a7af23e2d33faa4d7d6c126995fa96144d2d88545c6355479a26a9ef4f7b73b",
+      "seconds": 3.75
+    },
+    {
+      "cue": "flame-stop",
+      "file": "Variants/flame-stop.bin",
+      "sources": [
+        "energy-weapons/flame-stop-1.wav"
+      ],
+      "tableSeconds": 0.8,
+      "loop": false,
+      "sourceSha256": [
+        "9ccf755443f498776d90dbe71641d52ed608c040e12e9a1678e85a32784a31ef"
+      ],
+      "sha256": "e76c5f23ac0f8f301422a594d6e1593afaeb140084241d0759e1540ef088a895",
+      "seconds": 0.9013
+    },
+    {
+      "cue": "flame-hit",
+      "file": "Variants/flame-hit.bin",
+      "sources": [
+        "energy-weapons/flame-hit-1.wav"
+      ],
+      "tableSeconds": 1.0,
+      "loop": false,
+      "sourceSha256": [
+        "d51c437fef10becf3249e220969d6ae677f553591bd6010d550183f48a2834ef"
+      ],
+      "sha256": "315404f491e84571d33b2a3029a8cbe7addaab52ba35ea3d9b5d79886f37967d",
+      "seconds": 0.9847
+    },
+    {
+      "cue": "flame-crackle",
+      "file": "Variants/flame-crackle.bin",
+      "sources": [
+        "energy-weapons/flame-crackle-1.wav"
+      ],
+      "tableSeconds": 1.0,
+      "loop": false,
+      "sourceSha256": [
+        "ef801254878af85c024da2787b04025d3abda584ef8cf3e4587cef9e9616f5eb"
+      ],
+      "sha256": "4dcfe971f52cdaaee2e84dbdf9718ab388cec99c53d93a20acc0ae3b0bc30647",
+      "seconds": 0.8135
+    },
+    {
+      "cue": "gravity-fire",
+      "file": "Variants/gravity-fire.bin",
+      "sources": [
+        "energy-weapons/gravity-fire-1.wav"
+      ],
+      "tableSeconds": 0.8,
+      "loop": false,
+      "sourceSha256": [
+        "b990892293f93728fe088f2674b09912dfbe7b1e16ca137e650415e3a1d28313"
+      ],
+      "sha256": "c99b0e8f04cf60e37fd62d16ef6233c27fee93c5aaf7328fb7c70eea963ac900",
+      "seconds": 0.8484
+    },
+    {
+      "cue": "gravity-fly-loop",
+      "file": "Variants/gravity-fly-loop.bin",
+      "sources": [
+        "energy-weapons/gravity-fly-loop-1.wav"
+      ],
+      "tableSeconds": 3.0,
+      "loop": true,
+      "sourceSha256": [
+        "89878ec6dd2e0ad10d9b9938ae80d7688393e16218b7b50c2b531c3c420d99b6"
+      ],
+      "sha256": "64cccb652e0945cc31b3e87dce89c1f9eab45823a41d83787d1113d208d2c695",
+      "seconds": 2.0861
+    },
+    {
+      "cue": "gravity-open",
+      "file": "Variants/gravity-open.bin",
+      "sources": [
+        "energy-weapons/gravity-open-1.wav"
+      ],
+      "tableSeconds": 2.5,
+      "loop": false,
+      "sourceSha256": [
+        "d30217bafd583f5c77a0789fed9d86d24f45f5c4534f6df5891ae156c76100e2"
+      ],
+      "sha256": "7c79202c1b0a3a9fbe9e71b40f77cefd946f4b6c9ddcc2cc9b2b8518998e0db9",
+      "seconds": 2.4597
+    },
+    {
+      "cue": "gravity-close",
+      "file": "Variants/gravity-close.bin",
+      "sources": [
+        "energy-weapons/gravity-close-1.wav"
+      ],
+      "tableSeconds": 0.8,
+      "loop": false,
+      "sourceSha256": [
+        "21ccb651c5e0f74448ea27def4cf10fe3d6298a71f00ba8777b15e8eb2c7e82d"
+      ],
+      "sha256": "f1dea5509768da62bcd73c74b961a9b500b27b693358348f251d4387b91f7a08",
+      "seconds": 0.4704
+    },
+    {
+      "cue": "gravity-field-loop",
+      "file": "Variants/gravity-field-loop.bin",
+      "sources": [
+        "energy-weapons/gravity-field-loop-1.wav"
+      ],
+      "tableSeconds": 4.0,
+      "loop": true,
+      "sourceSha256": [
+        "61d47518ebaf18d80e190fab97677305241db56d12992277a5ba8c4a6facff27"
+      ],
+      "sha256": "8923f69d940e356233d8741abab77fb33e1db4c4ed7d47f452a2157b6eca110c",
+      "seconds": 3.75
+    },
+    {
+      "cue": "energy-dryfire",
+      "file": "Variants/v0170.bin",
+      "sourceSha256": "e1e88cb516798230bca12959fd0752717a5d1aa42e7bebc2118e382f6661225f",
+      "sha256": "d3843fa7edbea20516a5508a2a4295c1ab88c31d708133cc75ff5e34055937b1",
+      "seconds": 1.0
+    },
+    {
+      "cue": "mech-dryfire",
+      "file": "Variants/mech-dryfire.bin",
+      "sources": [
+        "energy-weapons/mech-dryfire-1.wav"
+      ],
+      "tableSeconds": 0.4,
+      "loop": false,
+      "sourceSha256": [
+        "fe8261fa398c697f98ade96b9ba35f7b17334489c45ebf8675dc0f14db9c6ce8"
+      ],
+      "sha256": "912b19b0c8e366c0f5fe50658daf94873c39f6329f4e86cc01d4706fa50c140b",
+      "seconds": 0.4584
+    }
+  ]
+}

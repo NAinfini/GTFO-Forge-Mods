@@ -1,0 +1,7 @@
+Forge Weapon Energy Lab experimental model assets
+Copyright (c) 2026 NAinfini. Licensed under MIT; see ../../LICENSE.
+
+Derivation: CAD rebuild -> independent weapon parts -> Unity 2019.4.21f1
+bundle format 4, one bundle per weapon. Local source and geometry manifests
+retain source hashes; weapon-models-manifest.json records each release
+bundle's SHA-256, size and contents.

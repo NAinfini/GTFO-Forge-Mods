@@ -1,0 +1,1673 @@
+{
+    "unity": "2019.4.21f1",
+    "format": 4,
+    "bundles": [
+        {
+            "bundle": "forge-energy-model-beam.bundle",
+            "sha256": "edc26c7488eb2ebede4720829dba1625294d1665c7ae4d4a8cedea6632188dd9",
+            "bytes": 7451665,
+            "weapon": {
+                "mode": "beam",
+                "sight": "holo-wedge",
+                "rail": "picatinny-21",
+                "length": 0.8414999842643738,
+                "triangles": 77518,
+                "parts": [
+                    {
+                        "name": "Receiver",
+                        "surface": "body",
+                        "textureSet": "beam-Receiver",
+                        "triangles": 22466
+                    },
+                    {
+                        "name": "Rail",
+                        "surface": "body",
+                        "textureSet": "rail-picatinny-21",
+                        "triangles": 3748
+                    },
+                    {
+                        "name": "Front",
+                        "surface": "body",
+                        "textureSet": "beam-Front",
+                        "triangles": 23968
+                    },
+                    {
+                        "name": "Stock",
+                        "surface": "body",
+                        "textureSet": "beam-Stock",
+                        "triangles": 10366
+                    },
+                    {
+                        "name": "Magazine",
+                        "surface": "body",
+                        "textureSet": "beam-Magazine",
+                        "triangles": 12818
+                    },
+                    {
+                        "name": "Sight",
+                        "surface": "body",
+                        "textureSet": "sight-holo-wedge",
+                        "triangles": 3672
+                    },
+                    {
+                        "name": "SightGlass",
+                        "surface": "glass",
+                        "textureSet": "",
+                        "triangles": 4
+                    },
+                    {
+                        "name": "SightReticle1",
+                        "surface": "reticle",
+                        "textureSet": "",
+                        "triangles": 476
+                    }
+                ]
+            },
+            "textures": [
+                {
+                    "asset": "beam-Front-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "beam-Front-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "beam-Front-emission",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "beam-Front-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "beam-Magazine-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "beam-Magazine-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "beam-Magazine-emission",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "beam-Magazine-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "beam-Receiver-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "beam-Receiver-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "beam-Receiver-emission",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "beam-Receiver-normal",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "beam-Stock-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "beam-Stock-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "beam-Stock-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "rail-picatinny-21-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 512,
+                    "height": 512,
+                    "mipCount": 10
+                },
+                {
+                    "asset": "rail-picatinny-21-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 512,
+                    "height": 512,
+                    "mipCount": 10
+                },
+                {
+                    "asset": "sight-holo-wedge-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-holo-wedge-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-holo-wedge-emission",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-holo-wedge-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                }
+            ]
+        },
+        {
+            "bundle": "forge-energy-model-arc.bundle",
+            "sha256": "23417e9195d36874879609a4980c3ffcff6ce9198ae1876a955b376db08d1255",
+            "bytes": 9416671,
+            "weapon": {
+                "mode": "arc",
+                "sight": "holo-hood",
+                "rail": "picatinny-17",
+                "length": 0.8200899958610535,
+                "triangles": 141336,
+                "parts": [
+                    {
+                        "name": "Receiver",
+                        "surface": "body",
+                        "textureSet": "arc-Receiver",
+                        "triangles": 20298
+                    },
+                    {
+                        "name": "Rail",
+                        "surface": "body",
+                        "textureSet": "rail-picatinny-17",
+                        "triangles": 3332
+                    },
+                    {
+                        "name": "Front",
+                        "surface": "body",
+                        "textureSet": "arc-Front",
+                        "triangles": 93626
+                    },
+                    {
+                        "name": "Stock",
+                        "surface": "body",
+                        "textureSet": "arc-Stock",
+                        "triangles": 14830
+                    },
+                    {
+                        "name": "Magazine",
+                        "surface": "body",
+                        "textureSet": "arc-Magazine",
+                        "triangles": 4280
+                    },
+                    {
+                        "name": "Sight",
+                        "surface": "body",
+                        "textureSet": "sight-holo-hood",
+                        "triangles": 4896
+                    },
+                    {
+                        "name": "SightGlass",
+                        "surface": "glass",
+                        "textureSet": "",
+                        "triangles": 6
+                    },
+                    {
+                        "name": "SightReticle1",
+                        "surface": "reticle",
+                        "textureSet": "",
+                        "triangles": 68
+                    }
+                ]
+            },
+            "textures": [
+                {
+                    "asset": "arc-Front-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "arc-Front-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "arc-Front-emission",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "arc-Front-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "arc-Magazine-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "arc-Magazine-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "arc-Magazine-emission",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "arc-Magazine-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "arc-Receiver-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "arc-Receiver-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "arc-Receiver-emission",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "arc-Receiver-normal",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "arc-Stock-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "arc-Stock-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "arc-Stock-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "rail-picatinny-17-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 512,
+                    "height": 512,
+                    "mipCount": 10
+                },
+                {
+                    "asset": "rail-picatinny-17-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 512,
+                    "height": 512,
+                    "mipCount": 10
+                },
+                {
+                    "asset": "sight-holo-hood-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-holo-hood-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-holo-hood-emission",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-holo-hood-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                }
+            ]
+        },
+        {
+            "bundle": "forge-energy-model-plasma-blast.bundle",
+            "sha256": "2de2e5593790848e85cfda6547f31b0cf1dd63094c8aead03d07d0c6bf3212c1",
+            "bytes": 7508113,
+            "weapon": {
+                "mode": "plasma-blast",
+                "sight": "reflex-low",
+                "rail": "picatinny-17",
+                "length": 0.8007799983024597,
+                "triangles": 70062,
+                "parts": [
+                    {
+                        "name": "Receiver",
+                        "surface": "body",
+                        "textureSet": "plasma-blast-Receiver",
+                        "triangles": 18220
+                    },
+                    {
+                        "name": "Rail",
+                        "surface": "body",
+                        "textureSet": "rail-picatinny-17",
+                        "triangles": 3332
+                    },
+                    {
+                        "name": "Front",
+                        "surface": "body",
+                        "textureSet": "plasma-blast-Front",
+                        "triangles": 29536
+                    },
+                    {
+                        "name": "Stock",
+                        "surface": "body",
+                        "textureSet": "plasma-blast-Stock",
+                        "triangles": 10578
+                    },
+                    {
+                        "name": "Magazine",
+                        "surface": "body",
+                        "textureSet": "plasma-blast-Magazine",
+                        "triangles": 4616
+                    },
+                    {
+                        "name": "Sight",
+                        "surface": "body",
+                        "textureSet": "sight-reflex-low",
+                        "triangles": 3370
+                    },
+                    {
+                        "name": "SightGlass",
+                        "surface": "glass",
+                        "textureSet": "",
+                        "triangles": 6
+                    },
+                    {
+                        "name": "SightReticle1",
+                        "surface": "reticle",
+                        "textureSet": "",
+                        "triangles": 404
+                    }
+                ]
+            },
+            "textures": [
+                {
+                    "asset": "plasma-blast-Front-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "plasma-blast-Front-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "plasma-blast-Front-emission",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "plasma-blast-Front-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "plasma-blast-Magazine-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "plasma-blast-Magazine-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "plasma-blast-Magazine-emission",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "plasma-blast-Magazine-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "plasma-blast-Receiver-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "plasma-blast-Receiver-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "plasma-blast-Receiver-emission",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "plasma-blast-Receiver-normal",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "plasma-blast-Stock-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "plasma-blast-Stock-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "plasma-blast-Stock-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "rail-picatinny-17-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 512,
+                    "height": 512,
+                    "mipCount": 10
+                },
+                {
+                    "asset": "rail-picatinny-17-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 512,
+                    "height": 512,
+                    "mipCount": 10
+                },
+                {
+                    "asset": "sight-reflex-low-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-reflex-low-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-reflex-low-emission",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-reflex-low-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                }
+            ]
+        },
+        {
+            "bundle": "forge-energy-model-plasma-arc.bundle",
+            "sha256": "22d9e2b60fea22fef5f9acb7c35d607a01974c1950b365e037b114844743075c",
+            "bytes": 7458883,
+            "weapon": {
+                "mode": "plasma-arc",
+                "sight": "holo-trap",
+                "rail": "picatinny-07",
+                "length": 0.8200200200080872,
+                "triangles": 78722,
+                "parts": [
+                    {
+                        "name": "Receiver",
+                        "surface": "body",
+                        "textureSet": "plasma-arc-Receiver",
+                        "triangles": 16216
+                    },
+                    {
+                        "name": "Rail",
+                        "surface": "body",
+                        "textureSet": "rail-picatinny-07",
+                        "triangles": 1596
+                    },
+                    {
+                        "name": "Front",
+                        "surface": "body",
+                        "textureSet": "plasma-arc-Front",
+                        "triangles": 43758
+                    },
+                    {
+                        "name": "Stock",
+                        "surface": "body",
+                        "textureSet": "plasma-arc-Stock",
+                        "triangles": 10346
+                    },
+                    {
+                        "name": "Magazine",
+                        "surface": "body",
+                        "textureSet": "plasma-arc-Magazine",
+                        "triangles": 2784
+                    },
+                    {
+                        "name": "Sight",
+                        "surface": "body",
+                        "textureSet": "sight-holo-trap",
+                        "triangles": 3924
+                    },
+                    {
+                        "name": "SightGlass",
+                        "surface": "glass",
+                        "textureSet": "",
+                        "triangles": 6
+                    },
+                    {
+                        "name": "SightReticle1",
+                        "surface": "reticle",
+                        "textureSet": "",
+                        "triangles": 92
+                    }
+                ]
+            },
+            "textures": [
+                {
+                    "asset": "plasma-arc-Front-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "plasma-arc-Front-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "plasma-arc-Front-emission",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "plasma-arc-Front-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "plasma-arc-Magazine-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "plasma-arc-Magazine-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "plasma-arc-Magazine-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "plasma-arc-Receiver-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "plasma-arc-Receiver-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "plasma-arc-Receiver-emission",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "plasma-arc-Receiver-normal",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "plasma-arc-Stock-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "plasma-arc-Stock-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "plasma-arc-Stock-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "rail-picatinny-07-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 512,
+                    "height": 512,
+                    "mipCount": 10
+                },
+                {
+                    "asset": "rail-picatinny-07-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 512,
+                    "height": 512,
+                    "mipCount": 10
+                },
+                {
+                    "asset": "sight-holo-trap-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-holo-trap-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-holo-trap-emission",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-holo-trap-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                }
+            ]
+        },
+        {
+            "bundle": "forge-energy-model-blast.bundle",
+            "sha256": "c8dd80ae1eb0f85324dabaa769fbd073ff0615d216c731849b73e6beee3c53e6",
+            "bytes": 6619534,
+            "weapon": {
+                "mode": "blast",
+                "sight": "blast-reflex",
+                "rail": "picatinny-17",
+                "length": 0.8405439853668213,
+                "triangles": 53602,
+                "parts": [
+                    {
+                        "name": "Receiver",
+                        "surface": "body",
+                        "textureSet": "blast-Receiver",
+                        "triangles": 15302
+                    },
+                    {
+                        "name": "Rail",
+                        "surface": "body",
+                        "textureSet": "rail-picatinny-17",
+                        "triangles": 3332
+                    },
+                    {
+                        "name": "Front",
+                        "surface": "body",
+                        "textureSet": "blast-Front",
+                        "triangles": 20364
+                    },
+                    {
+                        "name": "Stock",
+                        "surface": "body",
+                        "textureSet": "blast-Stock",
+                        "triangles": 5752
+                    },
+                    {
+                        "name": "Magazine",
+                        "surface": "body",
+                        "textureSet": "blast-Magazine",
+                        "triangles": 6124
+                    },
+                    {
+                        "name": "Sight",
+                        "surface": "body",
+                        "textureSet": "sight-blast-reflex",
+                        "triangles": 2632
+                    },
+                    {
+                        "name": "SightGlass",
+                        "surface": "glass",
+                        "textureSet": "",
+                        "triangles": 4
+                    },
+                    {
+                        "name": "SightReticle1",
+                        "surface": "reticle",
+                        "textureSet": "",
+                        "triangles": 92
+                    }
+                ]
+            },
+            "textures": [
+                {
+                    "asset": "blast-Front-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "blast-Front-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "blast-Front-emission",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "blast-Front-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "blast-Magazine-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "blast-Magazine-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "blast-Magazine-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "blast-Receiver-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "blast-Receiver-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "blast-Receiver-emission",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "blast-Receiver-normal",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "blast-Stock-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "blast-Stock-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "blast-Stock-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "rail-picatinny-17-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 512,
+                    "height": 512,
+                    "mipCount": 10
+                },
+                {
+                    "asset": "rail-picatinny-17-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 512,
+                    "height": 512,
+                    "mipCount": 10
+                },
+                {
+                    "asset": "sight-blast-reflex-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-blast-reflex-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-blast-reflex-emission",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-blast-reflex-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                }
+            ]
+        },
+        {
+            "bundle": "forge-energy-model-disc.bundle",
+            "sha256": "b535d33e2bd94a06789ea7b4ed49067b401a0c00374a6a263701dcdf33278a03",
+            "bytes": 6990957,
+            "weapon": {
+                "mode": "disc",
+                "sight": "disc-delta",
+                "rail": "picatinny-17",
+                "length": 0.8859000205993652,
+                "triangles": 50962,
+                "parts": [
+                    {
+                        "name": "Receiver",
+                        "surface": "body",
+                        "textureSet": "disc-Receiver",
+                        "triangles": 18194
+                    },
+                    {
+                        "name": "Rail",
+                        "surface": "body",
+                        "textureSet": "rail-picatinny-17",
+                        "triangles": 3332
+                    },
+                    {
+                        "name": "Front",
+                        "surface": "body",
+                        "textureSet": "disc-Front",
+                        "triangles": 16638
+                    },
+                    {
+                        "name": "Stock",
+                        "surface": "body",
+                        "textureSet": "disc-Stock",
+                        "triangles": 7930
+                    },
+                    {
+                        "name": "Magazine",
+                        "surface": "body",
+                        "textureSet": "disc-Magazine",
+                        "triangles": 856
+                    },
+                    {
+                        "name": "Sight",
+                        "surface": "body",
+                        "textureSet": "sight-disc-delta",
+                        "triangles": 3868
+                    },
+                    {
+                        "name": "SightGlass",
+                        "surface": "glass",
+                        "textureSet": "",
+                        "triangles": 4
+                    },
+                    {
+                        "name": "SightReticle1",
+                        "surface": "reticle",
+                        "textureSet": "",
+                        "triangles": 140
+                    }
+                ]
+            },
+            "textures": [
+                {
+                    "asset": "disc-Front-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "disc-Front-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "disc-Front-emission",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "disc-Front-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "disc-Magazine-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "disc-Magazine-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "disc-Magazine-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "disc-Receiver-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "disc-Receiver-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "disc-Receiver-emission",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "disc-Receiver-normal",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "disc-Stock-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "disc-Stock-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "disc-Stock-emission",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "disc-Stock-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "rail-picatinny-17-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 512,
+                    "height": 512,
+                    "mipCount": 10
+                },
+                {
+                    "asset": "rail-picatinny-17-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 512,
+                    "height": 512,
+                    "mipCount": 10
+                },
+                {
+                    "asset": "sight-disc-delta-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-disc-delta-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-disc-delta-emission",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-disc-delta-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                }
+            ]
+        },
+        {
+            "bundle": "forge-energy-model-flame.bundle",
+            "sha256": "8237a9e4d0bf6a6a01cb615008a721f0db2c19007cf2a9f92034f3ffb9689c30",
+            "bytes": 6810858,
+            "weapon": {
+                "mode": "flame",
+                "sight": "flame-ring",
+                "rail": "picatinny-13",
+                "length": 0.8604999780654907,
+                "triangles": 50232,
+                "parts": [
+                    {
+                        "name": "Receiver",
+                        "surface": "body",
+                        "textureSet": "flame-Receiver",
+                        "triangles": 23080
+                    },
+                    {
+                        "name": "Rail",
+                        "surface": "body",
+                        "textureSet": "rail-picatinny-13",
+                        "triangles": 2916
+                    },
+                    {
+                        "name": "Front",
+                        "surface": "body",
+                        "textureSet": "flame-Front",
+                        "triangles": 7580
+                    },
+                    {
+                        "name": "Stock",
+                        "surface": "body",
+                        "textureSet": "flame-Stock",
+                        "triangles": 5178
+                    },
+                    {
+                        "name": "Magazine",
+                        "surface": "body",
+                        "textureSet": "flame-Magazine",
+                        "triangles": 7450
+                    },
+                    {
+                        "name": "Sight",
+                        "surface": "body",
+                        "textureSet": "sight-flame-ring",
+                        "triangles": 3766
+                    },
+                    {
+                        "name": "SightGlass",
+                        "surface": "glass",
+                        "textureSet": "",
+                        "triangles": 14
+                    },
+                    {
+                        "name": "SightReticle1",
+                        "surface": "reticle",
+                        "textureSet": "",
+                        "triangles": 248
+                    }
+                ]
+            },
+            "textures": [
+                {
+                    "asset": "flame-Front-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "flame-Front-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "flame-Front-emission",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "flame-Front-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "flame-Magazine-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "flame-Magazine-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "flame-Magazine-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "flame-Receiver-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "flame-Receiver-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "flame-Receiver-emission",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "flame-Receiver-normal",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "flame-Stock-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "flame-Stock-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "flame-Stock-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "rail-picatinny-13-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 512,
+                    "height": 512,
+                    "mipCount": 10
+                },
+                {
+                    "asset": "rail-picatinny-13-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 512,
+                    "height": 512,
+                    "mipCount": 10
+                },
+                {
+                    "asset": "sight-flame-ring-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-flame-ring-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-flame-ring-emission",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-flame-ring-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                }
+            ]
+        },
+        {
+            "bundle": "forge-energy-model-hole.bundle",
+            "sha256": "1c5c0ad611507ecaf40956cd77f8e44aa93faa3514164284f36202b450a15486",
+            "bytes": 6924574,
+            "weapon": {
+                "mode": "hole",
+                "sight": "hole-octa",
+                "rail": "picatinny-17",
+                "length": 0.8610000014305115,
+                "triangles": 54222,
+                "parts": [
+                    {
+                        "name": "Receiver",
+                        "surface": "body",
+                        "textureSet": "hole-Receiver",
+                        "triangles": 15674
+                    },
+                    {
+                        "name": "Rail",
+                        "surface": "body",
+                        "textureSet": "rail-picatinny-17",
+                        "triangles": 3332
+                    },
+                    {
+                        "name": "Front",
+                        "surface": "body",
+                        "textureSet": "hole-Front",
+                        "triangles": 19072
+                    },
+                    {
+                        "name": "Stock",
+                        "surface": "body",
+                        "textureSet": "hole-Stock",
+                        "triangles": 7158
+                    },
+                    {
+                        "name": "Magazine",
+                        "surface": "body",
+                        "textureSet": "hole-Magazine",
+                        "triangles": 5492
+                    },
+                    {
+                        "name": "Sight",
+                        "surface": "body",
+                        "textureSet": "sight-hole-octa",
+                        "triangles": 3276
+                    },
+                    {
+                        "name": "SightGlass",
+                        "surface": "glass",
+                        "textureSet": "",
+                        "triangles": 6
+                    },
+                    {
+                        "name": "SightReticle1",
+                        "surface": "reticle",
+                        "textureSet": "",
+                        "triangles": 212
+                    }
+                ]
+            },
+            "textures": [
+                {
+                    "asset": "hole-Front-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "hole-Front-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "hole-Front-emission",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "hole-Front-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "hole-Magazine-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "hole-Magazine-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "hole-Magazine-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "hole-Receiver-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "hole-Receiver-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "hole-Receiver-emission",
+                    "format": "DXT1Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "hole-Receiver-normal",
+                    "format": "DXT5Crunched",
+                    "width": 2048,
+                    "height": 2048,
+                    "mipCount": 12
+                },
+                {
+                    "asset": "hole-Stock-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "hole-Stock-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "hole-Stock-emission",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "hole-Stock-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "rail-picatinny-17-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 512,
+                    "height": 512,
+                    "mipCount": 10
+                },
+                {
+                    "asset": "rail-picatinny-17-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 512,
+                    "height": 512,
+                    "mipCount": 10
+                },
+                {
+                    "asset": "sight-hole-octa-albedo",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-hole-octa-metallic",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-hole-octa-emission",
+                    "format": "DXT1Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                },
+                {
+                    "asset": "sight-hole-octa-normal",
+                    "format": "DXT5Crunched",
+                    "width": 1024,
+                    "height": 1024,
+                    "mipCount": 11
+                }
+            ]
+        }
+    ]
+}

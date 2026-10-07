@@ -1,0 +1,9 @@
+Forge Weapon Energy Lab experimental audio
+Copyright (c) 2026 NAinfini
+
+The audio in this directory is original to this mod and licensed under the
+MIT License in ../../LICENSE. manifest.json preserves source filenames and
+SHA-256 hashes; variants.tsv maps each runtime cue to its PCM recording.
+
+Draw, holster, reload and disc hits on flesh use GTFO's installed sounds.
+Those game sounds are not included in this directory.

@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>ForgeWeaponEnergyLabExperimental</AssemblyName>
+    <Version>0.0.4</Version>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- Line numbers in error logs without the builder's local paths. -->
+    <DebugType>embedded</DebugType>
+    <PathMap>$(MSBuildProjectDirectory)=/ForgeWeaponEnergyLabExperimental</PathMap>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <Target Name="RequireGameReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(GTFOBepInExPath)/core/BepInEx.Unity.IL2CPP.dll') or !Exists('$(GTFOBepInExPath)/interop/Modules-ASM.dll') or !Exists('$(GTFOBepInExPath)/plugins/GTFO-API.dll')"
+           Text="Set GTFOBepInExPath to a GTFO BepInEx IL2CPP profile with generated interop assemblies and GTFO-API." />
+  </Target>
+  <Target Name="CompressEnergyAudio" BeforeTargets="AssignTargetPaths">
+    <PropertyGroup>
+      <EnergyAudioResourceDir>$(IntermediateOutputPath)energy-audio</EnergyAudioResourceDir>
+    </PropertyGroup>
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)/tools/compress_audio.py&quot; --source &quot;$(MSBuildProjectDirectory)/Assets/Audio/Variants&quot; --out &quot;$(EnergyAudioResourceDir)&quot;" />
+    <ItemGroup>
+      <_EnergyAudioResource Include="$(EnergyAudioResourceDir)/*.bin.gz" />
+      <!-- The intermediate .bin suffix is a valid culture name; these are neutral binary resources. -->
+      <EmbeddedResource Include="@(_EnergyAudioResource)" WithCulture="false" LogicalName="ForgeWeaponEnergyLabExperimental.Audio.Variants.%(_EnergyAudioResource.Filename)%(_EnergyAudioResource.Extension)" />
+    </ItemGroup>
+  </Target>
+  <ItemGroup>
+    <Compile Include="Core/*.cs;Audio/*.cs;Native/**/*.cs;Presentation/*.cs" />
+    <EmbeddedResource Include="Assets/Icons/*.png" LogicalName="ForgeWeaponEnergyLabExperimental.Icons.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Assets/Audio/variants.tsv" LogicalName="ForgeWeaponEnergyLabExperimental.Audio.variants.tsv" />
+    <!-- Forge's shared effect bundle (CC0, see Assets/Vfx/LICENSE.txt); other Forge mods embed the same file. -->
+    <EmbeddedResource Include="Assets/Vfx/forge-vfx.bundle" LogicalName="ForgeWeaponEnergyLabExperimental.Vfx.forge-vfx.bundle" />
+    <EmbeddedResource Include="Assets/Vfx/forge-energy-disc.bundle" LogicalName="ForgeWeaponEnergyLabExperimental.Vfx.forge-energy-disc.bundle" />
+    <Reference Include="BepInEx.Core" HintPath="$(GTFOBepInExPath)/core/BepInEx.Core.dll" Private="false" />
+    <Reference Include="GTFO-API" HintPath="$(GTFOBepInExPath)/plugins/GTFO-API.dll" Private="false" />
+    <Reference Include="BepInEx.Unity.IL2CPP" HintPath="$(GTFOBepInExPath)/core/BepInEx.Unity.IL2CPP.dll" Private="false" />
+    <Reference Include="BepInEx.Unity.Common" HintPath="$(GTFOBepInExPath)/core/BepInEx.Unity.Common.dll" Private="false" />
+    <Reference Include="0Harmony" HintPath="$(GTFOBepInExPath)/core/0Harmony.dll" Private="false" />
+    <Reference Include="Il2CppInterop.Runtime" HintPath="$(GTFOBepInExPath)/core/Il2CppInterop.Runtime.dll" Private="false" />
+    <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" Private="false" />
+    <Reference Include="Modules-ASM" HintPath="$(GTFOBepInExPath)/interop/Modules-ASM.dll" Private="false" />
+    <Reference Include="Plugins-ASM" HintPath="$(GTFOBepInExPath)/interop/Plugins-ASM.dll" Private="false" />
+    <Reference Include="GameData-ASM" HintPath="$(GTFOBepInExPath)/interop/GameData-ASM.dll" Private="false" />
+    <Reference Include="SNet_ASM" HintPath="$(GTFOBepInExPath)/interop/SNet_ASM.dll" Private="false" />
+    <Reference Include="Utils-ASM" HintPath="$(GTFOBepInExPath)/interop/Utils-ASM.dll" Private="false" />
+    <Reference Include="GlobalFramework-ASM" HintPath="$(GTFOBepInExPath)/interop/GlobalFramework-ASM.dll" Private="false" />
+    <Reference Include="CellSound-ASM" HintPath="$(GTFOBepInExPath)/interop/CellSound-ASM.dll" Private="false" />
+    <Reference Include="Wwise-ASM" HintPath="$(GTFOBepInExPath)/interop/Wwise-ASM.dll" Private="false" />
+    <Reference Include="UnityEngine.ImageConversionModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.ImageConversionModule.dll" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AnimationModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.AnimationModule.dll" Private="false" />
+    <Reference Include="UnityEngine.PhysicsModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.PhysicsModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AudioModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.AudioModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AssetBundleModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.AssetBundleModule.dll" Private="false" />
+    <Reference Include="UnityEngine.ParticleSystemModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.ParticleSystemModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AIModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.AIModule.dll" Private="false" />
+    <Reference Include="UnityEngine.InputLegacyModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.InputLegacyModule.dll" Private="false" />
+  </ItemGroup>
+</Project>
