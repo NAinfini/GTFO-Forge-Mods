@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>ForgeCore.Tests</RootNamespace>
+    <AssemblyName>ForgeCore.Core.Tests</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(GTFOBepInExPath)' != ''">
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>Interop</_Parameter1>
+      <_Parameter2>$([System.IO.Path]::Combine('$(GTFOBepInExPath)', 'interop'))</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Core references no game or Unity assembly; Native/Colliders.cs, Enemies.cs, Level.cs, LevelNavigation.cs and Il2CppArrays.cs run against the doubles in EnemyDoubles.cs, and Combat.cs and CombatKills.cs against CombatDoubles.cs (CombatShot.cs needs Unity physics and is not compiled here). -->
+    <Compile Include="../../Core/*.cs" Link="Core/%(Filename)%(Extension)" />
+    <Compile Include="../../Native/Colliders.cs;../../Native/Enemies.cs;../../Native/Level.cs;../../Native/LevelNavigation.cs;../../Native/Il2CppArrays.cs;../../Native/Combat.cs;../../Native/GunPose.cs;../../Native/CombatDamage.cs;../../Native/EnemySpawn.cs;../../Native/CombatKills.cs;../../Native/Bracket.cs;../../Native/GameAssets.cs;../../../Testing/SourceDoubles/Game/AssetApiDouble.cs" Link="Native/%(Filename)%(Extension)" />
+    <Compile Include="*.cs" />
+    <ProjectReference Include="../../../ForgeCore/Once/ForgeCore.Once.csproj" />
+  </ItemGroup>
+</Project>

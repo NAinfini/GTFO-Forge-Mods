@@ -1,0 +1,10 @@
+{
+  "forge.energylab.beam.Name": "Forge Beam",
+  "forge.energylab.arc.Name": "Forge Chain Arc",
+  "forge.energylab.flame.Name": "Forge Flamethrower",
+  "forge.energylab.plasma-blast.Name": "Forge Charge Orb",
+  "forge.energylab.plasma-arc.Name": "Forge Shock Orb",
+  "forge.energylab.blast.Name": "Forge Blast Gun",
+  "forge.energylab.disc.Name": "Forge Ricochet Disc",
+  "forge.energylab.hole.Name": "Forge Gravity Core"
+}

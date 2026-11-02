@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>ForgeOrdnance</AssemblyName>
+    <Version>1.0.0</Version>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- Line numbers in error logs without the builder's local paths. -->
+    <DebugType>embedded</DebugType>
+    <PathMap>$(MSBuildProjectDirectory)=/ForgeOrdnance</PathMap>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <Target Name="RequireGameReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(GTFOBepInExPath)/core/BepInEx.Unity.IL2CPP.dll') or !Exists('$(GTFOBepInExPath)/interop/Modules-ASM.dll') or !Exists('$(GTFOApiPath)')"
+           Text="Set GTFOBepInExPath to a GTFO BepInEx IL2CPP profile with generated interop assemblies and GTFO-API." />
+  </Target>
+  <ItemGroup>
+    <ProjectReference Include="../ForgeCore/ForgeCore.csproj" Private="false" />
+    <ProjectReference Include="../ForgeUI/ForgeUI.csproj" Private="false" />
+    <ProjectReference Include="../ForgeAudio/ForgeAudio.csproj" Private="false" />
+    <ProjectReference Include="../ForgeVisual/ForgeVisual.csproj" Private="false" />
+    <Compile Include="Core/*.cs;Native/**/*.cs" />
+    <Reference Include="BepInEx.Core" HintPath="$(GTFOBepInExPath)/core/BepInEx.Core.dll" Private="false" />
+    <Reference Include="GTFO-API" HintPath="$(GTFOApiPath)" Private="false" />
+    <Reference Include="MTFO" HintPath="$(GTFOBepInExPath)/plugins/dakkhuza-MTFO/MTFO.dll" Private="false" />
+    <Reference Include="BepInEx.Unity.IL2CPP" HintPath="$(GTFOBepInExPath)/core/BepInEx.Unity.IL2CPP.dll" Private="false" />
+    <Reference Include="BepInEx.Unity.Common" HintPath="$(GTFOBepInExPath)/core/BepInEx.Unity.Common.dll" Private="false" />
+    <Reference Include="0Harmony" HintPath="$(GTFOBepInExPath)/core/0Harmony.dll" Private="false" />
+    <Reference Include="Il2CppInterop.Runtime" HintPath="$(GTFOBepInExPath)/core/Il2CppInterop.Runtime.dll" Private="false" />
+    <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" Private="false" />
+    <Reference Include="Modules-ASM" HintPath="$(GTFOBepInExPath)/interop/Modules-ASM.dll" Private="false" />
+    <Reference Include="Plugins-ASM" HintPath="$(GTFOBepInExPath)/interop/Plugins-ASM.dll" Private="false" />
+    <Reference Include="GameData-ASM" HintPath="$(GTFOBepInExPath)/interop/GameData-ASM.dll" Private="false" />
+    <Reference Include="SNet_ASM" HintPath="$(GTFOBepInExPath)/interop/SNet_ASM.dll" Private="false" />
+    <Reference Include="Shards-ASM" HintPath="$(GTFOBepInExPath)/interop/Shards-ASM.dll" Private="false" />
+    <Reference Include="Utils-ASM" HintPath="$(GTFOBepInExPath)/interop/Utils-ASM.dll" Private="false" />
+    <Reference Include="GlobalFramework-ASM" HintPath="$(GTFOBepInExPath)/interop/GlobalFramework-ASM.dll" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="UnityEngine.PhysicsModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.PhysicsModule.dll" Private="false" />
+    <Reference Include="UnityEngine.ParticleSystemModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.ParticleSystemModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AnimationModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.AnimationModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AIModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.AIModule.dll" Private="false" />
+    <Reference Include="UnityEngine.InputLegacyModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.InputLegacyModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AssetBundleModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.AssetBundleModule.dll" Private="false" />
+  </ItemGroup>
+</Project>

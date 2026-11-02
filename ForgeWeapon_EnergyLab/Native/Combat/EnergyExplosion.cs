@@ -1,12 +1,11 @@
 using System;
 using Enemies;
-using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using LevelGeneration;
 using Player;
 using SNetwork;
 using UnityEngine;
 
-namespace ForgeWeaponEnergyLabExperimental.Native;
+namespace ForgeWeaponEnergyLab.Native;
 
 // Enemy explosions use real limb hits; the native helper retains every other receiver and rigidbody.
 internal sealed class EnergyExplosion
@@ -27,18 +26,23 @@ internal sealed class EnergyExplosion
         internal bool HasNativeForce;
     }
 
-    private readonly Il2CppReferenceArray<Collider> _overlap = new(Capacity);
+    private readonly ForgeCore.ColliderQuery _overlap = new(Capacity);
     private readonly Target[] _targets = new Target[Capacity];
     private readonly NativeShot _shot = new();
 
-    internal void Apply(PlayerAgent owner, EnergyGear gear, Vector3 position, float radius, float damage, uint sequence = 0,
-        ShotTuning? nativeTuning = null)
+    internal void Apply(PlayerAgent owner, EnergyGear gear, Vector3 position, float radius, float damage)
+    {
+        try { ApplyChecked(owner, gear, position, radius, damage); }
+        catch (BudgetExhausted error) { Plugin.Error("An energy explosion was dropped: " + error); }
+    }
+
+    private void ApplyChecked(PlayerAgent owner, EnergyGear gear, Vector3 position, float radius, float damage)
     {
         var enemyMask = LayerManager.MASK_EXPLOSION_TARGETS & LayerManager.MASK_ENEMY_DAMAGABLE;
         var nativeMask = LayerManager.MASK_EXPLOSION_TARGETS & ~LayerManager.MASK_ENEMY_DAMAGABLE;
-        var count = Physics.OverlapSphereNonAlloc(position, radius, _overlap, enemyMask, QueryTriggerInteraction.UseGlobal);
-        if (count == _overlap.Length)
-            throw new InvalidOperationException("Energy explosion enemy budget exhausted; truncated damage refused.");
+        var count = _overlap.Sphere(position, radius, enemyMask, QueryTriggerInteraction.UseGlobal);
+        if (_overlap.Truncated)
+            throw new BudgetExhausted("Energy explosion enemy budget exhausted; truncated damage refused.");
         var targets = 0;
         try
         {
@@ -52,7 +56,7 @@ internal sealed class EnergyExplosion
                 var point = collider.ClosestPoint(position);
                 var distance = (point - position).magnitude;
                 if (distance > radius) continue;
-                var identity = VanillaDamage.Identity(receiver);
+                var identity = ForgeCore.Combat.ReceiverIdentity(receiver);
                 var slot = 0;
                 while (slot < targets && _targets[slot].Identity != identity) slot++;
                 var first = slot == targets;
@@ -87,23 +91,18 @@ internal sealed class EnergyExplosion
             for (var index = 0; index < targets; index++)
             {
                 ref var target = ref _targets[index];
-                if (!_shot.RayTarget(position, target.Point, target.Collider, out target.Hit))
-                {
-                    Plugin.Error("Energy explosion could not resolve an enemy's radial limb ray; that enemy took no blast damage: " +
-                        new InvalidOperationException("The enemy had no visible native damage limb."));
-                    continue;
-                }
+                // An enemy with no visible damage limb takes no blast damage.
+                if (!_shot.RayTarget(position, target.Point, target.Collider, out target.Hit)) continue;
                 var offset = target.Hit.point - position;
                 if (!Visible(target.Hit.collider, position, target.Hit.point, offset.normalized, offset.magnitude)) continue;
                 target.Visible = true;
             }
-            var nativeCount = Physics.OverlapSphereNonAlloc(position, radius, _overlap, nativeMask, QueryTriggerInteraction.UseGlobal);
-            if (nativeCount == _overlap.Length || nativeCount >= DamageUtil.s_tempColliders.Length)
-                throw new InvalidOperationException("Native explosion target budget exhausted; truncated damage refused.");
+            var nativeCount = _overlap.Sphere(position, radius, nativeMask, QueryTriggerInteraction.UseGlobal);
+            if (_overlap.Truncated || nativeCount >= DamageUtil.s_tempColliders.Length)
+                throw new BudgetExhausted("Native explosion target budget exhausted; truncated damage refused.");
             // Run this query before enemy destruction can spawn new physics objects into its target volume.
-            DamageUtil.DoExplosionDamage_Capsule(position, Vector3.zero, radius, 0f, radius, 0f, damage,
-                nativeMask, LayerManager.MASK_EXPLOSION_BLOCKERS, SNet.IsMaster, gear.Numbers.ExplosionForce,
-                null, DamageUtil.ExplosionDamageType.Damage, gear.CategoryId);
+            ForgeCore.Combat.Explode(position, radius, damage, gear.Numbers.ExplosionForce, nativeMask, SNet.IsMaster,
+                DamageUtil.ExplosionDamageType.Damage, gear.CategoryId);
             for (var index = 0; index < targets; index++)
             {
                 var target = _targets[index];
@@ -111,40 +110,16 @@ internal sealed class EnergyExplosion
                 var falloff = 1f - Mathf.Clamp01(target.Distance / radius);
                 var direction = (target.Hit.point - position).normalized;
                 // Explosion falloff is already applied, even when an authored blast exceeds the gun's ray range.
-                var tuning = (nativeTuning ?? gear.Numbers.Shot) with { Damage = damage * falloff, Range = MathF.Max(radius, gear.Numbers.Shot.Range) };
+                var tuning = gear.Numbers.Shot with { Damage = damage * falloff, Range = MathF.Max(radius, gear.Numbers.Shot.Range) };
                 _shot.ResolveHit(owner, tuning, position, direction, target.Hit);
                 _shot.Apply();
                 if (!target.Enemy.Alive && target.HasNativeForce)
                 {
-                    if (SNet.IsMaster) target.Enemy.Damage.SendExplosionForce(target.ForceOrigin, target.NativeForce);
-                    else EnergyBlastForces.Request(sequence, target.Enemy, target.NativeForce);
+                    ForgeCore.Combat.Force(target.Enemy.Damage, target.ForceOrigin, target.NativeForce);
                 }
             }
         }
         finally { Array.Clear(_targets, 0, targets); }
-    }
-
-    // Clients submit damage once. The host copies only the helper's non-damageable rigidbody branch.
-    internal void ApplyRigidbodyForce(EnergyGear gear, Vector3 position)
-    {
-        if (!SNet.IsMaster) throw new InvalidOperationException("Explosion rigidbody force requires the host.");
-        var radius = gear.Numbers.BlastRadius;
-        var mask = LayerManager.MASK_EXPLOSION_TARGETS & ~LayerManager.MASK_ENEMY_DAMAGABLE;
-        var count = Physics.OverlapSphereNonAlloc(position, radius, _overlap, mask, QueryTriggerInteraction.UseGlobal);
-        if (count == _overlap.Length) throw new InvalidOperationException("Explosion rigidbody budget exhausted; truncated force refused.");
-        for (var index = 0; index < count; index++)
-        {
-            var collider = _overlap[index];
-            if (collider == null) continue;
-            if (collider.GetComponent<IDamageable>() == null && collider.GetComponent<PlayerPingTarget>() is { } ping &&
-                ping.m_pingTargetStyle == eNavMarkerStyle.PlayerPingDoor && collider.GetComponentInParent<iLG_WeakDoor_Destruction>() is { } door)
-                collider = door.FindCollider(position);
-            if (collider == null || collider.GetComponent<IDamageable>() != null || collider.attachedRigidbody == null) continue;
-            var body = collider.attachedRigidbody;
-            var offset = collider.transform.position - position;
-            var falloff = 1f - Mathf.Clamp01(offset.magnitude / radius);
-            body.AddForce(offset.normalized * MathF.Min(gear.Numbers.ExplosionForce * falloff, body.mass * 20f), ForceMode.Impulse);
-        }
     }
 
     private static bool Visible(Collider collider, Vector3 origin, Vector3 point, Vector3 direction, float distance)

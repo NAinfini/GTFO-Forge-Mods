@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using System.Linq;
-using ForgeWeaponEnergyLabExperimental;
+using ForgeWeaponEnergyLab;
 
-namespace ForgeEnergyLab.Api;
+namespace ForgeWeaponEnergyLab.Api;
 
 /// <summary>Reusable firing behaviours; Off represents an unequipped weapon.</summary>
 public enum EnergyMode
@@ -40,19 +42,17 @@ public enum WeaponSlot
 /// <summary>An immutable model reference. Bundles contain presentation-format (4), presentation-profile,
 /// the named prefab, Receiver/Rail/Front/Stock/Magazine/Sight parts and RightHand/LeftHand/Muzzle/SightLook sockets.
 /// A bundle loads when the first gun using it is assembled and unloads once no gun object uses it.</summary>
-/// <param name="Key">Prefab key in the bundle; built-in keys are beam, arc, flame, plasma-blast, plasma-arc, blast, disc and hole.</param>
-/// <param name="BundlePath">Absolute path to the provider's bundle, or null for the built-in model with this key.</param>
-/// <param name="IconPath">Absolute path to a PNG inventory icon (at most 1 MiB). Required with BundlePath;
-/// null with a built-in model uses that model's icon.</param>
-public sealed record WeaponModel(string Key, string? BundlePath = null, string? IconPath = null);
+/// <param name="Key">Prefab key in the bundle.</param>
+/// <param name="BundlePath">Absolute path to the bundle file. A data file's <c>Model.Bundle</c> is relative to its folder and is made absolute when read.</param>
+public sealed record WeaponModel(string Key, string BundlePath);
 
-/// <summary>An immutable registration shared by built-in content and dependent plugins.</summary>
+/// <summary>An immutable registration. The eight shipped guns, data files in <c>ForgeEnergyLab</c> folders and dependent plugins all register through <see cref="EnergyLab.Register"/>.</summary>
 /// <param name="Id">Stable lowercase namespaced identity, for example author.mod.weapon; never change it for saved loadouts.</param>
 /// <param name="Name">Player-visible weapon name.</param>
 /// <param name="Slot">Native inventory slot.</param>
 /// <param name="Mode">Reusable firing behaviour, matched by the tuning record type.</param>
 /// <param name="Tuning">Complete gameplay values for this weapon.</param>
-/// <param name="Model">A built-in or provider-owned model reference.</param>
+/// <param name="Model">The model bundle and prefab key.</param>
 /// <param name="Description">Player-visible loadout description, or null for the default text.</param>
 public sealed record WeaponDefinition(string Id, string Name, WeaponSlot Slot, EnergyMode Mode,
     EnergyTuning Tuning, WeaponModel Model, string? Description = null);
@@ -169,17 +169,17 @@ public sealed record PlasmaArcTuning : PlasmaTuning
     public float FadeLifetime { get; init; } = 0.18f;
 }
 
-/// <summary>Instant explosion gameplay values. The shot has no range limit.</summary>
+/// <summary>Explosive shell gameplay values. The shell flies along the aim at <see cref="Speed"/> and explodes at the first thing it touches; it has no range limit.</summary>
 public sealed record BlastTuning : EnergyTuning
 {
-    /// <summary>Creates the built-in instant explosion defaults.</summary>
+    /// <summary>Creates the built-in explosive shell defaults.</summary>
     public BlastTuning() { Magazine = 6; AmmoPerRound = 6.93f; Interval = 0.45; Damage = 30.13f; Stagger = 1; ReloadTime = 3.3f; AimTime = 0.35f; }
+    /// <summary>Shell speed in metres per second; the shell explodes where it first touches terrain, an enemy or a player.</summary>
+    public float Speed { get; init; } = 40f;
     /// <summary>Explosion radius with native linear falloff.</summary>
     public float BlastRadius { get; init; } = 2.2f;
     /// <summary>Time an explosion occupies its projectile slot.</summary>
     public float ExplosionLifetime { get; init; } = 0.4f;
-    /// <summary>Simultaneous explosions from this definition, within four shared projectile slots.</summary>
-    public int ActiveProjectiles { get; init; } = 4;
     /// <summary>Maximum native explosion noise radius.</summary>
     public float NoiseRadius { get; init; } = 20f;
     /// <summary>Native explosion receiver force.</summary>
@@ -253,31 +253,46 @@ public sealed record BlackHoleTuning : EnergyTuning
 public static class EnergyLab
 {
     /// <summary>BepInEx dependency GUID.</summary>
-    public const string PluginId = "NAinfini.ForgeWeaponEnergyLabExperimental";
-    /// <summary>Plugin and protocol version.</summary>
-    public const string Version = "0.0.4";
+    public const string PluginId = "NAinfini.ForgeWeaponEnergyLab";
+    /// <summary>Plugin package version.</summary>
+    public const string Version = "1.0.0";
     private static readonly object Gate = new();
     private static readonly Dictionary<string, WeaponDefinition> Definitions = new(StringComparer.Ordinal);
+    private static readonly List<string> Order = new();
     private static bool _initialized, _closed;
+    private static string _configDirectory = "";
 
-    /// <summary>Registers one definition. Invalid values and duplicate identities or native IDs are rejected.
-    /// Throws InvalidOperationException once gear installation has started or if Energy Lab is disabled.</summary>
+    /// <summary>Registers one definition. Never throws: an invalid value, a duplicate identity, a native-ID collision (the message
+    /// names both IDs) or a call after gear installation started is refused with one line saying which field and why.</summary>
     /// <param name="definition">Complete immutable weapon definition.</param>
-    public static void Register(WeaponDefinition definition)
+    /// <param name="error">Why it was refused; null when registered.</param>
+    /// <returns>True when the weapon is registered.</returns>
+    public static bool Register(WeaponDefinition definition, [NotNullWhen(false)] out string? error)
     {
         lock (Gate)
         {
-            RequireOpen();
-            EnergyConfiguration.ValidateDefinition(definition);
-            if (Definitions.ContainsKey(definition.Id)) throw new ArgumentException("Duplicate weapon id: " + definition.Id, nameof(definition));
-            var ids = EnergyGears.Ids(definition.Id);
-            foreach (var other in Definitions.Values)
+            try
             {
-                var previous = EnergyGears.Ids(other.Id);
-                if (ids.Gear == previous.Gear || ids.Category == previous.Category || ids.Archetype == previous.Archetype)
-                    throw new ArgumentException($"Native ID collision between {definition.Id} and {other.Id}.", nameof(definition));
+                RequireOpen();
+                EnergyConfiguration.ValidateDefinition(definition);
+                if (Definitions.ContainsKey(definition.Id)) throw new ArgumentException("Duplicate weapon id: " + definition.Id);
+                var ids = EnergyGears.Ids(definition.Id);
+                foreach (var other in Definitions.Values)
+                {
+                    var previous = EnergyGears.Ids(other.Id);
+                    if (ids.Gear == previous.Gear || ids.Category == previous.Category || ids.Archetype == previous.Archetype)
+                        throw new ArgumentException($"Native ID collision between {definition.Id} and {other.Id}.");
+                }
+                Definitions.Add(definition.Id, definition);
+                Order.Add(definition.Id);
+                error = null;
+                return true;
             }
-            Definitions.Add(definition.Id, definition);
+            catch (Exception problem) when (problem is InvalidDataException or InvalidOperationException or ArgumentException)
+            {
+                error = problem.Message;
+                return false;
+            }
         }
     }
 
@@ -309,30 +324,26 @@ public static class EnergyLab
         }
     }
 
-    /// <summary>Returns a reusable built-in model reference by key; this does not load or instantiate Unity assets.</summary>
-    /// <param name="key">beam, arc, flame, plasma-blast, plasma-arc, blast, disc or hole.</param>
-    /// <returns>An immutable reference that can be assigned to any behaviour.</returns>
-    public static WeaponModel GetModel(string key) => EnergyGears.BuiltInModel(key);
-
     internal static void Initialize(string configDirectory)
     {
         lock (Gate)
         {
             if (_initialized) return;
-            var definitions = EnergyConfiguration.Load(configDirectory, EnergyGears.Defaults());
+            _configDirectory = configDirectory;
             _initialized = true;
-            try { foreach (var definition in definitions) Register(definition); }
-            catch { Definitions.Clear(); _initialized = false; throw; }
         }
     }
 
-    internal static EnergyGear[] Freeze()
+    /// <summary>Closes registration and applies the tuning files to every registered weapon, whoever registered it. The result is in registration order, which is the order the guns are listed in. Problems are added to <paramref name="errors"/>.</summary>
+    internal static EnergyGear[] Freeze(List<string> errors)
     {
         lock (Gate)
         {
             RequireInitialized();
             _closed = true;
-            return Definitions.Values.OrderBy(d => d.Id, StringComparer.Ordinal).Select(d => new EnergyGear(d)).ToArray();
+            var tuned = EnergyConfiguration.Load(_configDirectory, Order.Select(id => Definitions[id]).ToArray(), errors);
+            foreach (var definition in tuned) Definitions[definition.Id] = definition;
+            return tuned.Select(d => new EnergyGear(d)).ToArray();
         }
     }
 

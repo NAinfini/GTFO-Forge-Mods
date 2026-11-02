@@ -1,0 +1,104 @@
+Forge Ordnance Frames audio source record
+
+The converted Ogg files are distributable game assets. Original recordings are not included.
+
+Sonniss GameAudioGDC bundles (the owner's licensed royalty-free bundles; the original bundle licence remains authoritative):
+
+- exo.shield_down - BluezoneCorp 外星三足战争机器 - Bluezone_BC0292_alien_tripod_debris_glass_falling_003.wav - Sonniss royalty-free (2026 bundle)
+- exo.reload_done - BluezoneCorp 蒸汽朋克武器音效 - Bluezone_BC0296_steampunk_weapon_mechanism_texture_007.wav - Sonniss royalty-free (2026 bundle)
+- exo.dry_fire - BluezoneCorp 微型齿轮机构音 - Bluezone_BC0301_tiny_gears_small_mechanism_click_complex_011.wav - Sonniss royalty-free (2026 bundle)
+- exo.voice_ready - CB Sounddesign - Sci-Fi Voices Volume 03 Advanced Android - Maintenance complete.wav - Sonniss GDC 2024 royalty-free
+- exo.land - DavidDumais 机械生物音效 - CREAMisc_Heavy Mechanical Footsteps 03_DDUMAIS_MCSFX.wav - Sonniss royalty-free (2026 bundle)
+- exo.damage_alarm - BluezoneCorp 复古未来电脑音 - Bluezone_BC0304_retrofuturistic_computer_alarm_005.wav - Sonniss royalty-free (2026 bundle)
+- exo.shove_hit - BluezoneCorp 蒸汽朋克机械音 - Bluezone_BC0305_steampunk_machine_mechanical_texture_heavy_impact_011.wav - Sonniss royalty-free (2026 bundle)
+- exo.hud_section - 奇幻游戏第二套音效 - UIAlert_Collect Scifi Futuristic Electronic Bass Burst Sweep Heavy 04_ESM_FG2.wav - Sonniss royalty-free (2026 bundle)
+- exo.visor_boot - Rescopic Sound 用户界面交互 - UIMvmt_Window Open Thin 05_RSCPC_USIN.wav - Sonniss royalty-free (2026 bundle)
+- exo.siege_bolt - BluezoneCorp 微型齿轮机构音 - Bluezone_BC0301_tiny_gears_small_mechanism_click_complex_011.wav - Sonniss royalty-free (2026 bundle)
+- exo.plate_slide - BluezoneCorp 工业拉杆开关音 - Bluezone_BC0302_industrial_lever_switch_039.wav - Sonniss royalty-free (2026 bundle)
+
+Boom Library:
+
+- exo.rocket_blast - Boom Library - 035 爆炸冲击破坏电影游戏音效 - DTCK EXPLOSION Gas.wav
+- exo.rocket_blast - Boom Library - 035 爆炸冲击破坏电影游戏音效 - DTCK SWEETENER IMPACT Explosion Tight.wav
+- exo.servo_loop - Boom Library - 129 机械与机器人变形机甲 - ROBTMisc_GUNBUSTER-Large Idle Loop_B00M_MRDS.wav
+- exo.boost - Boom Library - 108 飞船宇宙空间站史诗震撼科幻场景音效 - DSGNSrce_ENGINE RAW-Flappy Exhaust Constant High_B00M_SFMCK.wav
+- exo.boost - Boom Library - 108 飞船宇宙空间站史诗震撼科幻场景音效 - DSGNSrce_ENGINE PROCESSED MID-Hover Tone_B00M_SFMCK.wav
+- exo.boost - Boom Library - 108 飞船宇宙空间站史诗震撼科幻场景音效 - DSGNSrce_ENGINE PROCESSED LOW-Hover Fluid Modulated Tonal_B00M_SFMCK.wav
+- exo.shield_up - Boom Library - 108 飞船宇宙空间站史诗震撼科幻场景音效 - DSGNSrce_ENGINE PROCESSED LOW-Choppy Motor Pops_B00M_SFMCK.wav
+- exo.shield_up - Boom Library - 108 飞船宇宙空间站史诗震撼科幻场景音效 - DSGNDist_AIR DISTORTION-Pops Mid Range Thrusty Burn_B00M_SFMCK.wav
+- exo.shield_up - Boom Library - 108 飞船宇宙空间站史诗震撼科幻场景音效 - DSGNSrce_SERVO-Close Double Release Medium_B00M_SFMCK.wav
+- exo.shield_hit - Boom Library - 108 飞船宇宙空间站史诗震撼科幻场景音效 - METLImpt_IMPACT PROCESSED-Granular Gear Attach Double Hit_B00M_SFMCK.wav
+- exo.shield_hit - Boom Library - 013 巫术魔法法师游戏技能音效 - MADS Electric Arrow 02 Hit.wav
+- exo.shield_down - Boom Library - 033 狙击枪机枪开枪突击武器音效 - AWDS AR AK 47 Krinkov Modern Auto.wav
+- exo.shield_down - Boom Library - 037 机器零件机械齿轮音效 - MEDS Medium Crankminer Short.wav
+- exo.shield_down - Boom Library - 037 机器零件机械齿轮音效 - MEDS Medium Chunky Metal Mayhem Short.wav
+- exo.boost_end - Boom Library - 056 未来科幻UI动态界面音效 - FX_Hologram_Call_End_02.wav
+- exo.boost_end - Boom Library - 056 未来科幻UI动态界面音效 - FX_Hologram_Call_End_01.wav
+- exo.breach_hit - Boom Library - 011 中世纪刀斧棍棒矛冷兵器音效 - Siege Wood Drop Medium 05.wav
+- exo.breach_hit - Boom Library - 027 紧张怪异邪恶恐怖惊悚电影音效 - HRCK Impact - Huge Cardboard Ensemble.wav
+- exo.breach_hit - Boom Library - 028 大气震撼低音冲击电影史诗预告片音效 - CH-DS HIT Massive 02.wav
+- exo.breach_hit - Boom Library - 028 大气震撼低音冲击电影史诗预告片音效 - CH-DS HIT Massive 07.wav
+- exo.reload_done - Boom Library - 018 步枪手枪短枪开枪射击音效 - Beretta M9 Handling 2x 01.wav
+- exo.reload_done - Boom Library - 018 步枪手枪短枪开枪射击音效 - Beretta M9 Handling 2x 07.wav
+- exo.dry_fire - Boom Library - 056 未来科幻UI动态界面音效 - HIT_GUI_Single_Beep_High_02.wav
+- ui.hold_complete - Boom Library - 056 未来科幻UI动态界面音效 - HIT_Signal_Triad_Short.wav
+- exo.hatch_close - Boom Library - 037 机器零件机械齿轮音效 - MEDS Large The Vault Door Long.wav
+- exo.hatch_close - Boom Library - 028 大气震撼低音冲击电影史诗预告片音效 - CH-CK Metal Crash Large Door 04.wav
+- exo.unseal - Boom Library - 056 未来科幻UI动态界面音效 - FX_Door_Open_02.wav
+- exo.footstep - Boom Library - 129 机械与机器人变形机甲 - ROBTMvmt_ANDROID-Medium Movement_B00M_MRDS.wav
+- exo.destroyed - Boom Library - 129 机械与机器人变形机甲 - ROBTMisc_TITAN-Large Dismantle_B00M_MRDS.wav
+- exo.destroyed - Boom Library - 110 冲击粒子能量爆炸科幻元素音效 - EXPLDsgn_EXPLOSION LARGE-Deep Punch_B00M_MATTER.wav
+- exo.siege_on - Boom Library - 037 机器零件机械齿轮音效 - MEDS Large Crossover Short.wav
+- exo.siege_on - Boom Library - 052 大气危险紧张金属撞击泰坦黑暗风格电影预告片音效 - CTCK CLUNK Gear Shift Interior Fat Rattle Snap.wav
+- exo.siege_off - Boom Library - 037 机器零件机械齿轮音效 - MEDS Medium Crankminer Short.wav
+- exo.armor_hit - Boom Library - 129 机械与机器人变形机甲 - ROBTMisc_MICROBOT-Small Damage_B00M_MRDS.wav
+- exo.jump - Boom Library - 129 机械与机器人变形机甲 - ROBTMvmt_AUTOMATON-Medium Footstep_B00M_MRDS.wav
+- exo.jump - Boom Library - 129 机械与机器人变形机甲 - ROBTMvmt_SUMMONER-Medium Footstep_B00M_MRDS.wav
+- exo.plate_slide - Boom Library - 037 机器零件机械齿轮音效 - MEDS Small Little Gizmo Short.wav
+- exo.plate_slide - Boom Library - 037 机器零件机械齿轮音效 - MEDS Medium Crankminer Short.wav
+- exo.landing - Boom Library - 110 冲击粒子能量爆炸科幻元素音效 - EXPLDsgn_EXPLOSION LARGE-Deep Punch_B00M_MATTER.wav
+- exo.landing - Boom Library - 035 爆炸冲击破坏电影游戏音效 - DTCK WOOD IMPACT Large Mutliple.wav
+- exo.landing - Boom Library - 129 机械与机器人变形机甲 - ROBTMvmt_TITAN-Large Bodyfall_B00M_MRDS.wav
+
+Attribution (Creative Commons Attribution; converted and trimmed for game use):
+
+- "Sci Fi Shield Hit (OGG)" by steaq (https://freesound.org/people/steaq/sounds/465541/), licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), used for exo.shield_hit.
+
+Public domain (CC0 1.0, no attribution required), recorded for provenance:
+
+- exo.shield_down - "131931_1542102-hq.mp3" by mcpable (https://freesound.org/people/mcpable/sounds/131931/)
+- exo.shield_down - "395378_4373137-hq.mp3" by Skylar1146 (https://freesound.org/people/Skylar1146/sounds/395378/)
+- exo.shield_down - "443465_1079491-hq.mp3" by squidge316 (https://freesound.org/people/squidge316/sounds/443465/)
+- exo.boost_end - "131931_1542102-hq.mp3" by mcpable (https://freesound.org/people/mcpable/sounds/131931/)
+- exo.reload_start - "719243_7157894-hq.mp3" by serøutōnin--deprivəd (https://freesound.org/people/serøutōnin--deprivəd/sounds/719243/)
+- exo.reload_start - "561471_12429869-hq.mp3" by GameWithBepis (https://freesound.org/people/GameWithBepis/sounds/561471/)
+- exo.dry_fire - "674568_7157894-hq.mp3" by serøutōnin--deprivəd (https://freesound.org/people/serøutōnin--deprivəd/sounds/674568/)
+- exo.unseal - "264061_2971294-hq.mp3" by Paul368 (https://freesound.org/people/Paul368/sounds/264061/)
+- exo.damage_alarm - "404150_6142149-hq.mp3" by LilMati (https://freesound.org/people/LilMati/sounds/404150/)
+- exo.jump - "521377_10847299-hq.mp3" by Jarusca (https://freesound.org/people/Jarusca/sounds/521377/)
+- exo.siege_bolt - "674568_7157894-hq.mp3" by serøutōnin--deprivəd (https://freesound.org/people/serøutōnin--deprivəd/sounds/674568/)
+
+Owner-confirmed open source (8600 high-quality sound collection):
+
+- exo.shield_up - GL_RangeCalibration_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- exo.shield_up - GL_SmallServoCalibration_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- exo.shield_down - GL_MediumServoError_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- exo.rocket - GL_PhaseCannon_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- exo.rocket - GL_MeteorGatlingRifle2_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- exo.rocket - GL_MeteorGatlingRifle5_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- exo.hatch_close - GL_Servo26_medium_veryshort_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- exo.hatch_close - GL_Servo31_large_short_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- exo.unseal - GL_FuturisticHydraulicHatch_Opening_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- exo.power_down - GL_MediumServoShutdown_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- exo.power_down - GL_SmallServoShutdown_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- exo.power_down - GL_NeutronsShutdown_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- ui.hold_cancel - GL_Bleep_negative_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- exo.visor_boot - GL_TelemetryCalibration_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- exo.plate_slide - GL_SmallServoCalibration_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+
+Origin not recorded in the sound library index (selected by the owner; confirm the licence before a public release):
+
+- exo.breach_hit - 电影重击与打击冲击音效 - SL 10 Massive Strike.wav
+- exo.plate_slide - 设计师机械伺服与金属拟音工具包 - GL_Servo_small9_CT.wav
+
+Pack, source file, source SHA-256 and processing section of every clip are recorded in sources.json.

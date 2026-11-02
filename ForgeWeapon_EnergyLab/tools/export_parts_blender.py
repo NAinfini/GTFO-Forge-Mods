@@ -149,9 +149,40 @@ def stage_texture_set(root, name, tex):
             stale.unlink()
     for target, source in wanted.items():
         dst = folder / target
-        if not dst.is_file() or sha256(dst) != sha256(source):
+        if target == "metallic.png":
+            write_gear_metallic(source, dst)
+        elif not dst.is_file() or sha256(dst) != sha256(source):
             shutil.copyfile(source, dst)
     return {"emission": emission, "normal": normal}
+
+
+def write_gear_metallic(source, dst):
+    # The vanilla gear shader reads metalness from R and smoothness from G; the source keeps smoothness in A.
+    img = bpy.data.images.load(str(source))
+    try:
+        img.colorspace_settings.name = "Non-Color"
+        w, h = img.size
+        px = np.empty(w * h * 4, np.float32)
+        img.pixels.foreach_get(px)
+        px = px.reshape(-1, 4)
+        px[:, 1] = px[:, 3]
+        px[:, 2] = px[:, 0]
+        out = bpy.data.images.new("gear_metallic", w, h, alpha=True, float_buffer=False)
+        try:
+            out.colorspace_settings.name = "Non-Color"
+            out.pixels.foreach_set(px.ravel())
+            tmp = dst.with_name(dst.name + ".tmp.png")
+            out.filepath_raw = str(tmp)
+            out.file_format = "PNG"
+            out.save()
+        finally:
+            bpy.data.images.remove(out)
+    finally:
+        bpy.data.images.remove(img)
+    if dst.is_file() and sha256(dst) == sha256(tmp):
+        tmp.unlink()
+    else:
+        tmp.replace(dst)
 
 
 def stage_project(root):

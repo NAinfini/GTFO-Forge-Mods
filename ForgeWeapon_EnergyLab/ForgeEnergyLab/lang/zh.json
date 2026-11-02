@@ -1,0 +1,10 @@
+{
+  "forge.energylab.beam.Name": "Forge 光束枪",
+  "forge.energylab.arc.Name": "Forge 连锁电弧",
+  "forge.energylab.flame.Name": "Forge 火焰喷射器",
+  "forge.energylab.plasma-blast.Name": "Forge 蓄能球",
+  "forge.energylab.plasma-arc.Name": "Forge 电击球",
+  "forge.energylab.blast.Name": "Forge 爆破枪",
+  "forge.energylab.disc.Name": "Forge 弹射飞盘",
+  "forge.energylab.hole.Name": "Forge 重力核心"
+}

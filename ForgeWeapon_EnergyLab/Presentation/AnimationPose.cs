@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace ForgeWeaponEnergyLabExperimental.Presentation;
+namespace ForgeWeaponEnergyLab.Presentation;
 
 internal readonly record struct AnimationFrame(Vector3 Position, Quaternion Rotation);
 

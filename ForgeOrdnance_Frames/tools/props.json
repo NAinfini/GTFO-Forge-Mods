@@ -1,0 +1,27 @@
+{
+  "Props": [
+    {
+      "Prefab": "frame-rocket-pod",
+      "File": "rocket_pod/rocket_pod.glb",
+      "Texture": 1024,
+      "Turn": [0, 0, -90],
+      "Length": 0.18,
+      "Origin": "bottom",
+      "Sockets": {
+        "muzzle_1": [0.027, 0.096, 0.088],
+        "muzzle_2": [-0.027, 0.096, 0.088],
+        "muzzle_3": [0.024, 0.039, 0.088],
+        "muzzle_4": [-0.024, 0.039, 0.088]
+      }
+    },
+    {
+      "Prefab": "frame-rocket",
+      "File": "rocket_missile_v2/rocket_missile.glb",
+      "Texture": 512,
+      "Turn": [0, 0, 90],
+      "Length": 0.123,
+      "Origin": "centre",
+      "Sockets": {}
+    }
+  ]
+}

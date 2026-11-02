@@ -1,0 +1,62 @@
+MIT License
+
+Copyright (c) 2026 NAinfini
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+======================================================================
+
+Third-party assets
+
+Models, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), re-oriented, scaled and re-exported for the game:
+- "M249 Machine Gun [Game-ready Download]" by Oskar "K1TT3N" Adamczyk
+  (https://sketchfab.com/3d-models/m249-machine-gun-game-ready-download-631d0a61696a4703914d6b598b47505a), modified:
+  scope replaced with the reflex sight below, carry handle folded, mesh reduced
+- "Barrett M82 Baked/Textured" by Shariff Butler Jr.
+  (https://sketchfab.com/3d-models/barrett-m82-bakedtextured-416849efe5cb454a8e538188d5a300d1), modified:
+  scope replaced with the reflex sight below
+- "RG-6 Grenade Launcher" by Sassiska
+  (https://sketchfab.com/3d-models/rg-6-grenade-launcher-d911c28d568c4dec838d67760f323d98), modified:
+  leaf and front sights removed, the reflex sight below added
+- "Artillery Shell" by SomeGuyUsingBlender
+- "Low-Poly VOG-25 and VOG-25P" by notcplkerry
+- "SciFi Cylinder Canisters" by Billy Jackman
+- "Combat Turret" by Danila
+- "Sci-fi Turret 3" by everlasting17th
+- "Sci-Fi Turret" by JonasDelnaye
+
+Reflex sight on the three heavy weapons, CC0 (https://creativecommons.org/publicdomain/zero/1.0/):
+- "Red Dot Sight" by Jean PFP (https://opengameart.org/content/red-dot-sight), recoloured, red dot added
+
+The stasis emitter is this mod's own model.
+
+Effect textures:
+- Kenney Particle Pack (CC0)
+- Kenney Smoke Particles (CC0)
+- "Smoke Aura" by Beast (CC0)
+- Unity Labs free VFX image sequences (CC0)
+
+Sounds, converted for the game:
+- Sonniss GameAudioGDC bundles
+- Boom Library
+- freesound.org
+- "Sci-fi Grenade Launcher" by ValhallaProject, CC BY 4.0 (https://freesound.org/people/ValhallaProject/sounds/771167/)
+- "2 High Quality Explosions" by Michel Baradari, apollo-music.de, CC BY 3.0 (https://opengameart.org/content/2-high-quality-explosions)
+
+Every clip and its source is listed in `Audio/License.txt`; every model and texture in `Models/License.txt`.

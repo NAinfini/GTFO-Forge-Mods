@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
+using ForgeCore;
 using GameData;
 using Gear;
 using UnityEngine;
 
-namespace ForgeWeaponEnergyLabExperimental.Native;
+namespace ForgeWeaponEnergyLab.Native;
 
 /// <summary>
 /// The game gives an assembled gun its base item's ItemFPSSettings block. That block is shared with vanilla guns,
@@ -54,8 +55,7 @@ internal static class EnergyItemFps
 
     internal static ItemMovementAnimationDataBlock CloneRecoilAnimation(ItemMovementAnimationDataBlock source, EnergyGear gear)
     {
-        var recoil = source.MemberwiseClone().Cast<ItemMovementAnimationDataBlock>();
-        recoil.name = gear.NativeName; recoil.persistentID = gear.CategoryId; recoil.internalEnabled = true;
+        var recoil = DataBlocks.Clone(source, gear.NativeName, gear.CategoryId);
         var scale = gear.Mode is EnergyMode.Beam or EnergyMode.Flame ? 0f : 1f / 3f;
         recoil.ItemPosition = CloneCurves(source.ItemPosition, scale);
         recoil.ItemRotation = CloneCurves(source.ItemRotation, scale);

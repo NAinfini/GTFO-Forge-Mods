@@ -15,7 +15,7 @@ namespace ForgeVfx.EditorTools
     ///     Unity.exe -batchmode -quit -projectPath Tools/Vfx/ForgeVfx -executeMethod ForgeVfx.EditorTools.ForgeVfxBuild.Build
     ///         [-forgeVfxOut &lt;folder&gt;] -logFile &lt;log&gt;
     ///
-    /// The default output is the repository's `Mods/ForgeMap/Assets/Vfx/`. Before anything is built every effect prefab
+    /// The default output is the repository's `Mods/ForgeVisual/Assets/Vfx/`. Before anything is built every effect prefab
     /// is checked: every member of <see cref="ForgeVfxProject.Members"/> has one, it is a particle effect with a
     /// ParticleSystem at the root that loops there if and only if the member is sustained, it carries no script,
     /// every renderer draws with a shader that ships in this project, and every file it depends on is covered by a
@@ -28,7 +28,7 @@ namespace ForgeVfx.EditorTools
         private static void BuildBundle()
         {
             var output = ForgeVfxProject.Argument("-forgeVfxOut")
-                ?? Path.Combine(ForgeVfxProject.RepositoryRoot, "Mods", "ForgeMap", "Assets", "Vfx");
+                ?? Path.Combine(ForgeVfxProject.RepositoryRoot, "Mods", "ForgeVisual", "Assets", "Vfx");
             var sources = Sources();
             var prefabs = ForgeVfxProject.EffectPrefabs();
             var missing = ForgeVfxProject.Members.Select(member => member.Name)
@@ -87,7 +87,7 @@ namespace ForgeVfx.EditorTools
                 effects = effects
             };
             var json = JsonUtility.ToJson(manifest, true).Replace("\r\n", "\n") + "\n";
-            File.WriteAllText(Path.Combine(output, "manifest.json"), json, new UTF8Encoding(false));
+            File.WriteAllText(Path.Combine(output, "forge-vfx.manifest.json"), json, new UTF8Encoding(false));
             Debug.Log("Forge VFX bundle: " + target + " (" + bytes.LongLength + " bytes, " + effects.Length + " effects)");
         }
 

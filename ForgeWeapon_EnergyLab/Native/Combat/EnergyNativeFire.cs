@@ -8,7 +8,7 @@ using Player;
 using SNetwork;
 using UnityEngine;
 
-namespace ForgeWeaponEnergyLabExperimental.Native;
+namespace ForgeWeaponEnergyLab.Native;
 
 // Fire remains native, including replacement prefixes. Only its shared ray/hit path changes.
 internal static class EnergyNativeFire
@@ -29,7 +29,7 @@ internal static class EnergyNativeFire
     internal static bool InFireEntry => Current != null;
     internal static bool InFireCall => _current != null;
     internal static bool Delayed(EnergyMode mode)
-        => mode is EnergyMode.PlasmaBlast or EnergyMode.PlasmaArc or EnergyMode.Disc or EnergyMode.BlackHole;
+        => mode is EnergyMode.PlasmaBlast or EnergyMode.PlasmaArc or EnergyMode.Disc or EnergyMode.BlackHole or EnergyMode.Blast;
 
     internal static Frame Begin(BulletWeapon weapon, bool synced = false)
     {
@@ -38,7 +38,7 @@ internal static class EnergyNativeFire
         frame.Weapon = weapon; frame.Gear = gear; frame.Previous = _current;
         frame.Hit = null; frame.CastSeen = frame.Resolved = frame.ApplyingHit = false; frame.Synced = synced;
         frame.Power = gear != null && weapon.Owner?.Owner?.IsBot == true
-            ? gear.Numbers.BotChargePower : PrototypeController.ReleasedPower(weapon);
+            ? gear.Numbers.BotChargePower : EnergyController.ReleasedPower(weapon);
         _current = frame;
         return frame;
     }
@@ -49,9 +49,6 @@ internal static class EnergyNativeFire
         try
         {
             if (frame.Gear != null && error != null) Plugin.Error("Native energy fire failed; committed hits will not be retried: " + error);
-            else if (frame.Gear != null && !frame.CastSeen)
-                Plugin.Error("Native energy fire did not call CastWeaponRay: " +
-                    new InvalidOperationException("The fire implementation did not provide a shared weapon ray."));
         }
         finally
         {
@@ -92,103 +89,95 @@ internal static class EnergyNativeFire
         var owner = frame.Weapon.Owner?.Owner;
         // Synced human fire is presentation only. Bots deal their native hits on the host.
         if (owner == null || frame.Synced && !owner.IsBot || (owner.IsBot ? !SNet.IsMaster : !owner.IsLocal)) return;
-        try { PrototypeController.NativeDischarge(frame.Weapon, frame.Gear!, origin, hit.fireDir); }
+        try { EnergyController.NativeDischarge(frame.Weapon, frame.Gear!, origin, hit.fireDir); }
+        catch (BudgetExhausted error)
+        {
+            // This shot found no room (a busy projectile slot); the gun is fine and only this shot is dropped.
+            Plugin.Error("An energy shot was dropped: " + error);
+        }
         catch (Exception error)
         {
             Plugin.Error("Energy discharge stopped; committed hits will not be retried: " + error);
-            PrototypeController.StopNativeDischarge(frame.Weapon);
+            EnergyController.StopNativeDischarge(frame.Weapon);
         }
     }
 }
 
 // Gate a bot's native shot request before it sets Shoot or spends its native burst count.
 // Its synced Fire and PlayerSync still own the actual round, shot count, recoil and animation.
-[HarmonyPatch]
+// Installed by EnergyLazyHooks the first time an energy gun is wielded.
 internal static class NativeEnergyBotShotReady
 {
-    private static IEnumerable<MethodBase> TargetMethods()
+    internal static void Install(Harmony harmony)
     {
-        yield return AccessTools.DeclaredMethod(typeof(PlayerBotActionUseFirearm), "StartShooting");
-        yield return AccessTools.DeclaredMethod(typeof(PlayerBotActionUseFirearm), "UpdateAutoFire");
+        var prefix = new HarmonyMethod(AccessTools.Method(typeof(NativeEnergyBotShotReady), nameof(Prefix))) { priority = Priority.First };
+        harmony.Patch(AccessTools.DeclaredMethod(typeof(PlayerBotActionUseFirearm), "StartShooting"), prefix);
+        harmony.Patch(AccessTools.DeclaredMethod(typeof(PlayerBotActionUseFirearm), "UpdateAutoFire"), prefix);
     }
 
-    [HarmonyPrefix, HarmonyPriority(Priority.First)]
     private static bool Prefix(PlayerBotActionUseFirearm __instance)
     {
         var weapon = __instance.m_bulletWeapon;
         if (!SNet.IsMaster || weapon?.Owner?.Owner?.IsBot != true ||
             EnergyGearRegistry.DefinitionOf(weapon) is not { } gear || !EnergyNativeFire.Delayed(gear.Mode)) return true;
-        return PrototypeController.CanLaunch(weapon, gear);
+        return EnergyController.CanLaunch(weapon, gear);
     }
 }
 
-[HarmonyPatch]
+// The four firing bodies run inside one frame each (ForgeCore's brackets open at the call and close once the game's body and every other
+// patch of it are done, or the body threw).
 internal static class NativeEnergyFireEntry
 {
-    private static IEnumerable<MethodBase> TargetMethods()
+    internal static void Subscribe()
     {
-        foreach (var type in new[] { typeof(BulletWeapon), typeof(Shotgun), typeof(BulletWeaponSynced), typeof(ShotgunSynced) })
-            yield return AccessTools.DeclaredMethod(type, nameof(BulletWeapon.Fire));
+        Watch(ForgeCore.GameHooks.Fire.BulletWeapon, synced: false);
+        Watch(ForgeCore.GameHooks.Fire.Shotgun, synced: false);
+        Watch(ForgeCore.GameHooks.Fire.BulletWeaponSynced, synced: true);
+        Watch(ForgeCore.GameHooks.Fire.ShotgunSynced, synced: true);
     }
 
-    [HarmonyPrefix, HarmonyPriority(int.MaxValue)]
-    private static void Prefix(BulletWeapon __instance, MethodBase __originalMethod, out EnergyNativeFire.Frame? __state)
-        => __state = EnergyNativeFire.Begin(__instance, __originalMethod.DeclaringType == typeof(BulletWeaponSynced) ||
-            __originalMethod.DeclaringType == typeof(ShotgunSynced));
-
-    [HarmonyFinalizer, HarmonyPriority(int.MinValue)]
-    private static Exception? Finalizer(EnergyNativeFire.Frame? __state, Exception? __exception)
-    {
-        EnergyNativeFire.End(__state, __exception);
-        return __exception;
-    }
+    private static void Watch<TWeapon>(ForgeCore.Bracket<TWeapon> bracket, bool synced) where TWeapon : BulletWeapon
+        => bracket.Around(weapon => EnergyNativeFire.Begin(weapon, synced),
+            (_, frame, _) => EnergyNativeFire.End(frame, null),
+            (_, frame, error) => EnergyNativeFire.End(frame, error));
 }
 
-// Synced Fire casts before preparing its owner/damage; this runs before any shared-ray modifiers.
-[HarmonyPatch]
-internal static class NativeEnergySyncedRayPreparation
-{
-    private static MethodBase TargetMethod() => NativeEnergyRay.TargetMethod();
-
-    [HarmonyPrefix, HarmonyPriority(int.MaxValue)]
-    private static void Prefix(ref Weapon.WeaponHitData __1) => EnergyNativeFire.PrepareSyncedRay(__1);
-}
-
-// The three-argument overload delegates to this overload in GameAssembly, so one resolution hook covers both.
-[HarmonyPatch]
+// The ray of the energy shot. The three-argument overload delegates to this overload in GameAssembly, so one hook covers both.
 internal static class NativeEnergyRay
 {
-    internal static MethodBase TargetMethod() => AccessTools.Method(typeof(Weapon), nameof(Weapon.CastWeaponRay),
-        new[] { typeof(Transform), typeof(Weapon.WeaponHitData).MakeByRefType(), typeof(Vector3), typeof(int) });
+    internal static void Subscribe() => ForgeCore.GameHooks.AlignedRay.Around<bool>(Enter, Exit);
 
-    [HarmonyPrefix, HarmonyPriority(int.MinValue)]
-    private static void Prefix(ref Weapon.WeaponHitData __1, out bool __state)
+    private static bool Enter(Transform transform, ref Weapon.WeaponHitData data, Vector3 origin)
     {
-        __state = false;
-        if (!EnergyNativeFire.Matches(__1)) return;
+        // Synced Fire casts before preparing its owner and damage; fill them before anything reads the ray.
+        EnergyNativeFire.PrepareSyncedRay(data);
+        if (!EnergyNativeFire.Matches(data)) return false;
         var frame = EnergyNativeFire.Current!;
-        __state = !frame.CastSeen;
+        var primary = !frame.CastSeen;
         frame.CastSeen = true;
         // The native primary ray is counted once. Recasts cannot add another counted shot or energy effect.
-        __1.maxRayDist = __state ? MathF.Max(100f, __1.maxRayDist) : 0f;
+        data.maxRayDist = primary ? MathF.Max(100f, data.maxRayDist) : 0f;
+        return primary;
     }
 
     // Shot counters observe the primary cast before its real limb hits are submitted.
-    [HarmonyPostfix, HarmonyPriority(int.MinValue)]
-    private static void Postfix(ref Weapon.WeaponHitData __1, Vector3 __2, bool __state, ref bool __result)
+    private static void Exit(bool primary, Transform transform, ref Weapon.WeaponHitData data, Vector3 origin, ref bool result, bool ran)
     {
-        if (!EnergyNativeFire.Matches(__1)) return;
-        __result = false;
-        if (__state) EnergyNativeFire.Resolve(__2, __1);
+        if (!EnergyNativeFire.Matches(data)) return;
+        result = false;
+        if (primary) EnergyNativeFire.Resolve(origin, data);
     }
 }
-
-[HarmonyPatch(typeof(BulletWeapon), nameof(BulletWeapon.BulletHit))]
+// The energy shot's own primary ray is not a bullet: the hit entry answers a miss for it (ForgeCore's one patch of
+// `BulletWeapon.BulletHit`, skipped from its before), unless the shot is applying its real hits.
 internal static class NativeEnergyHit
 {
-    [HarmonyPrefix, HarmonyPriority(int.MinValue)]
-    private static bool Prefix(Weapon.WeaponHitData __0)
-        => !EnergyNativeFire.Matches(__0) || EnergyNativeFire.Current!.ApplyingHit;
+    internal static void Subscribe() => ForgeCore.GameHooks.BulletHit.Before(Entered);
+
+    private static void Entered(ForgeCore.BulletHitCall call)
+    {
+        if (EnergyNativeFire.Matches(call.Data) && !EnergyNativeFire.Current!.ApplyingHit) call.Skip(false);
+    }
 }
 
 [HarmonyPatch]
@@ -214,13 +203,6 @@ internal static class NativeEnergyTracer
 
 [HarmonyPatch(typeof(BulletWeaponSynced), "WhizByTest")]
 internal static class NativeEnergyBulletWhiz
-{
-    [HarmonyPrefix]
-    private static bool Prefix() => !EnergyNativeFire.InFireEntry;
-}
-
-[HarmonyPatch(typeof(EX_SpriteMuzzleFlash), nameof(EX_SpriteMuzzleFlash.Play))]
-internal static class NativeEnergyMuzzleFlash
 {
     [HarmonyPrefix]
     private static bool Prefix() => !EnergyNativeFire.InFireEntry;

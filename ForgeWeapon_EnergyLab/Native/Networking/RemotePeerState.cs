@@ -1,4 +1,4 @@
-namespace ForgeWeaponEnergyLabExperimental.Native;
+namespace ForgeWeaponEnergyLab.Native;
 
 // Sequence watermarks outlive the renderer, so re-arming cannot replay a launch or its presentation.
 internal sealed class RemotePeerState

@@ -1,0 +1,18 @@
+[
+  { "Id": "forge.energylab.beam", "Name": "Forge Beam", "Slot": "Main", "Mode": "Beam",
+    "Model": { "Key": "beam", "Bundle": "forge-energy-model-beam.bundle" } },
+  { "Id": "forge.energylab.arc", "Name": "Forge Chain Arc", "Slot": "Main", "Mode": "ArcChain",
+    "Model": { "Key": "arc", "Bundle": "forge-energy-model-arc.bundle" } },
+  { "Id": "forge.energylab.flame", "Name": "Forge Flamethrower", "Slot": "Main", "Mode": "Flame",
+    "Model": { "Key": "flame", "Bundle": "forge-energy-model-flame.bundle" } },
+  { "Id": "forge.energylab.plasma-blast", "Name": "Forge Charge Orb", "Slot": "Special", "Mode": "PlasmaBlast",
+    "Model": { "Key": "plasma-blast", "Bundle": "forge-energy-model-plasma-blast.bundle" } },
+  { "Id": "forge.energylab.plasma-arc", "Name": "Forge Shock Orb", "Slot": "Special", "Mode": "PlasmaArc",
+    "Model": { "Key": "plasma-arc", "Bundle": "forge-energy-model-plasma-arc.bundle" } },
+  { "Id": "forge.energylab.blast", "Name": "Forge Blast Gun", "Slot": "Special", "Mode": "Blast",
+    "Model": { "Key": "blast", "Bundle": "forge-energy-model-blast.bundle" } },
+  { "Id": "forge.energylab.disc", "Name": "Forge Ricochet Disc", "Slot": "Special", "Mode": "Disc",
+    "Model": { "Key": "disc", "Bundle": "forge-energy-model-disc.bundle" } },
+  { "Id": "forge.energylab.hole", "Name": "Forge Gravity Core", "Slot": "Special", "Mode": "BlackHole",
+    "Model": { "Key": "hole", "Bundle": "forge-energy-model-hole.bundle" } }
+]

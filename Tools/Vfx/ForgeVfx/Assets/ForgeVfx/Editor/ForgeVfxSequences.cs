@@ -205,8 +205,6 @@ namespace ForgeVfx.EditorTools
                 _object.SetActive(false);
             }
 
-            internal Transform Transform => _object.transform;
-
             internal Fx Place(Vector3 position, Quaternion rotation, float scale = 1f)
             {
                 _object.transform.SetPositionAndRotation(position, rotation);

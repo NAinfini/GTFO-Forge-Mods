@@ -1,0 +1,773 @@
+{
+  "buses": {
+    "ui": {
+      "category": "ui",
+      "seats": 1
+    },
+    "drop-flight": {
+      "category": "vehicle"
+    },
+    "boom": {
+      "category": "explosion",
+      "seats": 2,
+      "duck": {
+        "categories": [
+          "debris",
+          "ambience"
+        ],
+        "db": 6
+      }
+    },
+    "drop-mech": {
+      "category": "vehicle",
+      "seats": 2
+    },
+    "debris": {
+      "category": "debris",
+      "seats": 3
+    },
+    "ambience": {
+      "category": "ambience"
+    },
+    "beacon": {
+      "category": "device",
+      "seats": 1
+    },
+    "beacon-tick": {
+      "category": "device",
+      "seats": 1
+    },
+    "supply": {
+      "category": "device",
+      "seats": 1
+    }
+  },
+  "cues": {
+    "drop.incoming": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 190,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 3,
+      "bus": "drop-flight",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 6,
+        "far": 70
+      },
+      "layers": [
+        {
+          "clips": [
+            "drop.incoming.ogg"
+          ],
+          "gainDb": 10
+        }
+      ]
+    },
+    "drop.impact": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 220,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 5,
+      "bus": "boom",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 6,
+        "far": 60
+      },
+      "layers": [
+        {
+          "clips": [
+            "drop.impact-l1-01.ogg"
+          ],
+          "fadeOutMs": 338
+        },
+        {
+          "clips": [
+            "drop.impact-l2-01.ogg"
+          ]
+        }
+      ]
+    },
+    "drop.open": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 160,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 3.2,
+      "bus": "drop-mech",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 3,
+        "far": 30
+      },
+      "layers": [
+        {
+          "clips": [
+            "drop.open-l1-01.ogg",
+            "drop.open-l1-02.ogg",
+            "drop.open-l1-03.ogg"
+          ],
+          "fadeInMs": 4,
+          "fadeOutMs": 80
+        },
+        {
+          "clips": [
+            "drop.open-l2-01.ogg",
+            "drop.open-l2-02.ogg"
+          ],
+          "offsetMs": 550,
+          "fadeInMs": 4,
+          "fadeOutMs": 644
+        }
+      ]
+    },
+    "beacon.activate": {
+      "gain": 0.94,
+      "loop": false,
+      "priority": 190,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 3,
+      "bus": "beacon",
+      "pitch": [
+        0.99,
+        1.01
+      ],
+      "space": {
+        "near": 3,
+        "far": 35
+      },
+      "layers": [
+        {
+          "clips": [
+            "beacon.activate-l1-01.ogg"
+          ],
+          "fadeOutMs": 450
+        },
+        {
+          "clips": [
+            "beacon.activate-l2-01.ogg"
+          ]
+        }
+      ]
+    },
+    "beacon.loop": {
+      "gain": 0.62,
+      "loop": true,
+      "priority": 120,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "bus": "ambience",
+      "pitch": 1.0,
+      "space": {
+        "near": 2,
+        "far": 25
+      },
+      "layers": [
+        {
+          "clips": [
+            "beacon.loop.ogg"
+          ]
+        }
+      ]
+    },
+    "supply.pickup": {
+      "gain": 0.88,
+      "loop": false,
+      "priority": 150,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 0.9,
+      "bus": "supply",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 2,
+        "far": 18
+      },
+      "layers": [
+        {
+          "clips": [
+            "supply.pickup-l1-01.ogg",
+            "supply.pickup-l1-02.ogg",
+            "supply.pickup-l1-03.ogg"
+          ],
+          "gainDb": -1.7,
+          "fadeInMs": 4,
+          "fadeOutMs": 80
+        },
+        {
+          "clips": [
+            "supply.pickup-l2-01.ogg"
+          ],
+          "offsetMs": 55
+        }
+      ]
+    },
+    "ui.key_up": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 200,
+      "maxVoices": 8,
+      "maxPerEmitter": 4,
+      "minInterval": 0.04,
+      "environment": false,
+      "maxSeconds": 0.5,
+      "bus": "ui",
+      "pitch": 1.0,
+      "space": {
+        "near": 1,
+        "far": 10
+      },
+      "layers": [
+        {
+          "clips": [
+            "ui.key_up.ogg"
+          ],
+          "fadeOutMs": 63
+        }
+      ]
+    },
+    "ui.key_right": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 200,
+      "maxVoices": 8,
+      "maxPerEmitter": 4,
+      "minInterval": 0.04,
+      "environment": false,
+      "maxSeconds": 0.5,
+      "bus": "ui",
+      "pitch": 1.0,
+      "space": {
+        "near": 1,
+        "far": 10
+      },
+      "layers": [
+        {
+          "clips": [
+            "ui.key_right.ogg"
+          ],
+          "fadeOutMs": 63
+        }
+      ]
+    },
+    "ui.key_left": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 200,
+      "maxVoices": 8,
+      "maxPerEmitter": 4,
+      "minInterval": 0.04,
+      "environment": false,
+      "maxSeconds": 0.5,
+      "bus": "ui",
+      "pitch": 1.0,
+      "space": {
+        "near": 1,
+        "far": 10
+      },
+      "layers": [
+        {
+          "clips": [
+            "ui.key_left.ogg"
+          ],
+          "fadeOutMs": 63
+        }
+      ]
+    },
+    "ui.key_down": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 200,
+      "maxVoices": 8,
+      "maxPerEmitter": 4,
+      "minInterval": 0.04,
+      "environment": false,
+      "maxSeconds": 0.5,
+      "bus": "ui",
+      "pitch": 1.0,
+      "space": {
+        "near": 1,
+        "far": 10
+      },
+      "layers": [
+        {
+          "clips": [
+            "ui.key_down.ogg"
+          ],
+          "fadeOutMs": 63
+        }
+      ]
+    },
+    "ui.key_wrong": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 210,
+      "maxVoices": 8,
+      "maxPerEmitter": 2,
+      "minInterval": 0.15,
+      "environment": false,
+      "maxSeconds": 0.6,
+      "bus": "ui",
+      "pitch": 1.0,
+      "space": {
+        "near": 1,
+        "far": 10
+      },
+      "layers": [
+        {
+          "clips": [
+            "ui.key_wrong-01.ogg",
+            "ui.key_wrong-02.ogg",
+            "ui.key_wrong-03.ogg"
+          ],
+          "gainDb": -4.8,
+          "fadeOutMs": 50
+        }
+      ]
+    },
+    "ui.code_complete": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 215,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "minInterval": 0.2,
+      "environment": false,
+      "maxSeconds": 0.6,
+      "bus": "ui",
+      "pitch": 1.0,
+      "space": {
+        "near": 1,
+        "far": 10
+      },
+      "layers": [
+        {
+          "clips": [
+            "ui.code_complete-01.ogg",
+            "ui.code_complete-02.ogg",
+            "ui.code_complete-03.ogg"
+          ],
+          "gainDb": -9.7,
+          "fadeOutMs": 14
+        }
+      ]
+    },
+    "ui.call_open": {
+      "gain": 0.88,
+      "loop": false,
+      "priority": 205,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "minInterval": 0.2,
+      "environment": false,
+      "maxSeconds": 0.6,
+      "bus": "ui",
+      "pitch": 1.0,
+      "space": {
+        "near": 1,
+        "far": 10
+      },
+      "layers": [
+        {
+          "clips": [
+            "ui.call_open-01.ogg"
+          ],
+          "gainDb": 2.8,
+          "fadeOutMs": 32
+        }
+      ]
+    },
+    "ui.call_cancel": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 205,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "minInterval": 0.2,
+      "environment": false,
+      "maxSeconds": 0.6,
+      "bus": "ui",
+      "pitch": 1.0,
+      "space": {
+        "near": 1,
+        "far": 10
+      },
+      "layers": [
+        {
+          "clips": [
+            "ui.call_cancel-01.ogg",
+            "ui.call_cancel-02.ogg"
+          ],
+          "gainDb": 0.6,
+          "fadeOutMs": 29
+        }
+      ]
+    },
+    "beacon.throw": {
+      "gain": 0.88,
+      "loop": false,
+      "priority": 185,
+      "maxVoices": 4,
+      "maxPerEmitter": 1,
+      "minInterval": 0.3,
+      "environment": false,
+      "maxSeconds": 1,
+      "bus": "beacon",
+      "pitch": [
+        0.99,
+        1.01
+      ],
+      "space": {
+        "near": 2,
+        "far": 20
+      },
+      "layers": [
+        {
+          "clips": [
+            "beacon.throw.ogg"
+          ]
+        }
+      ]
+    },
+    "beacon.land": {
+      "gain": 0.94,
+      "loop": false,
+      "priority": 190,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "minInterval": 0.1,
+      "environment": true,
+      "maxSeconds": 2,
+      "bus": "beacon",
+      "pitch": [
+        0.99,
+        1.01
+      ],
+      "space": {
+        "near": 3,
+        "far": 40
+      },
+      "layers": [
+        {
+          "clips": [
+            "beacon.land-l1-01.ogg"
+          ]
+        },
+        {
+          "clips": [
+            "beacon.land-l2-01.ogg"
+          ],
+          "offsetMs": 142
+        }
+      ]
+    },
+    "beacon.tick": {
+      "gain": 0.75,
+      "loop": false,
+      "priority": 170,
+      "maxVoices": 8,
+      "maxPerEmitter": 2,
+      "minInterval": 0.2,
+      "environment": true,
+      "maxSeconds": 0.5,
+      "bus": "beacon-tick",
+      "pitch": [
+        0.99,
+        1.01
+      ],
+      "space": {
+        "near": 2,
+        "far": 30
+      },
+      "layers": [
+        {
+          "clips": [
+            "beacon.tick-l1-01.ogg"
+          ]
+        },
+        {
+          "clips": [
+            "beacon.tick-l2-01.ogg"
+          ]
+        }
+      ]
+    },
+    "ui.denied": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 210,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "minInterval": 0.25,
+      "environment": false,
+      "maxSeconds": 0.6,
+      "bus": "ui",
+      "pitch": 1.0,
+      "space": {
+        "near": 1,
+        "far": 10
+      },
+      "layers": [
+        {
+          "clips": [
+            "ui.denied-01.ogg",
+            "ui.denied-02.ogg",
+            "ui.denied-03.ogg"
+          ],
+          "gainDb": -4.8,
+          "fadeOutMs": 50
+        }
+      ]
+    },
+    "ui.click": {
+      "gain": 0.88,
+      "loop": false,
+      "priority": 195,
+      "maxVoices": 8,
+      "maxPerEmitter": 2,
+      "minInterval": 0.06,
+      "environment": false,
+      "maxSeconds": 0.4,
+      "bus": "ui",
+      "pitch": 1.0,
+      "space": {
+        "near": 1,
+        "far": 10
+      },
+      "layers": [
+        {
+          "clips": [
+            "ui.click.ogg"
+          ]
+        }
+      ]
+    },
+    "ui.slot_select": {
+      "gain": 0.88,
+      "loop": false,
+      "priority": 195,
+      "maxVoices": 8,
+      "maxPerEmitter": 2,
+      "minInterval": 0.06,
+      "environment": false,
+      "maxSeconds": 0.5,
+      "bus": "ui",
+      "pitch": 1.0,
+      "space": {
+        "near": 1,
+        "far": 10
+      },
+      "layers": [
+        {
+          "clips": [
+            "ui.slot_select.ogg"
+          ],
+          "fadeOutMs": 63
+        }
+      ]
+    },
+    "ui.pick_confirm": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 205,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "minInterval": 0.1,
+      "environment": false,
+      "maxSeconds": 0.6,
+      "bus": "ui",
+      "pitch": 1.0,
+      "space": {
+        "near": 1,
+        "far": 10
+      },
+      "layers": [
+        {
+          "clips": [
+            "ui.pick_confirm-01.ogg",
+            "ui.pick_confirm-02.ogg",
+            "ui.pick_confirm-03.ogg"
+          ],
+          "gainDb": 9.3,
+          "fadeOutMs": 37
+        }
+      ]
+    },
+    "ui.pick_clear": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 205,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "minInterval": 0.1,
+      "environment": false,
+      "maxSeconds": 0.6,
+      "bus": "ui",
+      "pitch": 1.0,
+      "space": {
+        "near": 1,
+        "far": 10
+      },
+      "layers": [
+        {
+          "clips": [
+            "ui.pick_clear-01.ogg",
+            "ui.pick_clear-02.ogg",
+            "ui.pick_clear-03.ogg"
+          ],
+          "gainDb": 0.6,
+          "fadeOutMs": 29
+        }
+      ]
+    },
+    "drop.unlatch": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 165,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "minInterval": 0.1,
+      "environment": true,
+      "maxSeconds": 2.8,
+      "bus": "drop-mech",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 3,
+        "far": 35
+      },
+      "layers": [
+        {
+          "clips": [
+            "drop.unlatch-l1-01.ogg",
+            "drop.unlatch-l1-02.ogg"
+          ],
+          "fadeInMs": 4
+        },
+        {
+          "clips": [
+            "drop.unlatch-l2-01.ogg",
+            "drop.unlatch-l2-02.ogg"
+          ],
+          "fadeInMs": 4,
+          "fadeOutMs": 80
+        },
+        {
+          "clips": [
+            "drop.unlatch-l3-01.ogg",
+            "drop.unlatch-l3-02.ogg"
+          ],
+          "offsetMs": 450,
+          "fadeInMs": 4,
+          "fadeOutMs": 80
+        }
+      ]
+    },
+    "drop.leave": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 165,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "minInterval": 0.1,
+      "environment": true,
+      "maxSeconds": 5.5,
+      "bus": "drop-mech",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 5,
+        "far": 50
+      },
+      "layers": [
+        {
+          "clips": [
+            "drop.leave-l1-01.ogg",
+            "drop.leave-l1-02.ogg"
+          ],
+          "gainDb": -7.9,
+          "fadeInMs": 4,
+          "fadeOutMs": 80
+        },
+        {
+          "clips": [
+            "drop.leave-l2-01.ogg"
+          ],
+          "gainDb": -9,
+          "fadeOutMs": 800
+        }
+      ]
+    },
+    "drop.debris": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 175,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "minInterval": 0.1,
+      "environment": true,
+      "maxSeconds": 3.5,
+      "bus": "debris",
+      "pitch": [
+        0.97,
+        1.03
+      ],
+      "space": {
+        "near": 5,
+        "far": 60
+      },
+      "layers": [
+        {
+          "clips": [
+            "drop.debris-l1-01.ogg"
+          ],
+          "fadeOutMs": 20
+        },
+        {
+          "clips": [
+            "drop.debris-l2-01.ogg"
+          ],
+          "fadeOutMs": 270
+        },
+        {
+          "clips": [
+            "drop.debris-l3-01.ogg",
+            "drop.debris-l3-02.ogg"
+          ],
+          "offsetMs": 600,
+          "gainDb": 1.4,
+          "fadeInMs": 4,
+          "fadeOutMs": 725
+        }
+      ]
+    }
+  }
+}

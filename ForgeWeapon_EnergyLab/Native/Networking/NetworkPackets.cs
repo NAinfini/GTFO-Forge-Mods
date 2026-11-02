@@ -6,9 +6,10 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using Agents;
+using ForgeCore;
 using UnityEngine;
 
-namespace ForgeWeaponEnergyLabExperimental.Native;
+namespace ForgeWeaponEnergyLab.Native;
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
 internal struct BuildFingerprint : IEquatable<BuildFingerprint>
@@ -21,9 +22,9 @@ internal struct BuildFingerprint : IEquatable<BuildFingerprint>
 
     internal static BuildFingerprint Compute()
     {
-        var text = new StringBuilder(EnergyProtocol.Version);
-        foreach (var type in new[] { typeof(HelloPacket), typeof(FireCommand), typeof(FireVisual),
-                     typeof(ChargePacket), typeof(ModePacket), typeof(BlastForcePacket), typeof(BuildFingerprint) })
+        var text = new StringBuilder();
+        foreach (var type in new[] { typeof(FireCommand), typeof(FireVisual),
+                     typeof(ChargePacket), typeof(ModePacket), typeof(BuildFingerprint) })
         {
             text.Append('|').Append(type.Name).Append(':').Append(Marshal.SizeOf(type));
             foreach (var field in type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
@@ -50,7 +51,7 @@ internal struct BuildFingerprint : IEquatable<BuildFingerprint>
                 if (il != null) text.Append('|').Append(method).Append(':').Append(Convert.ToHexString(il));
             }
         }
-        foreach (var gear in EnergyGears.All)
+        foreach (var gear in EnergyGears.All.OrderBy(g => g.Definition.Id, StringComparer.Ordinal))
         {
             var definition = gear.Definition;
             var node = new System.Text.Json.Nodes.JsonObject
@@ -59,7 +60,7 @@ internal struct BuildFingerprint : IEquatable<BuildFingerprint>
                 ["mode"] = (int)definition.Mode, ["gearId"] = gear.GearId, ["categoryId"] = gear.CategoryId,
                 ["archetypeId"] = gear.ArchetypeId, ["tuningType"] = definition.Tuning.GetType().FullName,
                 ["tuning"] = EnergyConfiguration.TuningJson(definition.Tuning), ["modelKey"] = definition.Model.Key,
-                ["modelSha256"] = EnergyGears.ModelHashes[gear.ModelPath]
+                ["modelSha256"] = gear.ModelDigest
             };
             text.Append('|').Append(node.ToJsonString());
         }
@@ -75,41 +76,38 @@ internal struct BuildFingerprint : IEquatable<BuildFingerprint>
     }
 }
 
-[StructLayout(LayoutKind.Sequential, Pack = 1)]
-internal struct HelloPacket
-{
-    internal ushort Major, Minor, Patch;
-    internal ulong Epoch;
-    internal BuildFingerprint Fingerprint;
-    internal int Ready, Rejected;
-}
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
-internal struct FireCommand
+internal struct FireCommand : INetEpoch
 {
+    ulong INetEpoch.Epoch { readonly get => Epoch; set => Epoch = value; }
     internal ulong Epoch;
     internal uint Sequence;
     internal uint CategoryId;
     internal int Mode, Dimension;
     internal float X, Y, Z, Dx, Dy, Dz, Power;
+    /// <summary>The shooter's damage for this shot with its boosters (the Blast Gun's explosion); other modes ignore it.</summary>
+    internal float Damage;
     internal Vector3 Start => new(X, Y, Z);
     internal Vector3 Direction => new(Dx, Dy, Dz);
     internal static FireCommand Create(uint sequence, EnergyGear gear, Vector3 start,
-        Vector3 direction, int dimension, float power = 0f) => new()
+        Vector3 direction, int dimension, float power = 0f, float damage = 0f) => new()
     {
         Epoch = EnergyNetwork.Epoch, Sequence = sequence, Mode = (int)gear.Mode, CategoryId = gear.CategoryId, Dimension = dimension,
-        X = start.x, Y = start.y, Z = start.z, Dx = direction.x, Dy = direction.y, Dz = direction.z, Power = power
+        X = start.x, Y = start.y, Z = start.z, Dx = direction.x, Dy = direction.y, Dz = direction.z, Power = power, Damage = damage
     };
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
-internal struct FireVisual
+internal struct FireVisual : INetEpoch
 {
+    ulong INetEpoch.Epoch { readonly get => Epoch; set => Epoch = value; }
     internal ulong Epoch, Shooter;
     internal uint Sequence;
     internal uint CategoryId;
     internal int Mode, Segments, HitMask;
     internal float X, Y, Z, Dx, Dy, Dz, Power;
+    internal float Damage;
     internal float E0x, E0y, E0z, E1x, E1y, E1z, E2x, E2y, E2z, E3x, E3y, E3z;
     internal Vector3 Start => new(X, Y, Z);
     internal Vector3 Direction => new(Dx, Dy, Dz);
@@ -135,22 +133,14 @@ internal struct FireVisual
     {
         Epoch = command.Epoch, Shooter = shooter, Sequence = command.Sequence, Mode = command.Mode, CategoryId = command.CategoryId,
         X = command.X, Y = command.Y, Z = command.Z,
-        Dx = command.Dx, Dy = command.Dy, Dz = command.Dz, Power = command.Power
+        Dx = command.Dx, Dy = command.Dy, Dz = command.Dz, Power = command.Power, Damage = command.Damage
     };
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
-internal struct BlastForcePacket
+internal struct ChargePacket : INetEpoch
 {
-    internal ulong Epoch;
-    internal uint Sequence;
-    internal pEnemyAgent Target;
-    internal float Magnitude;
-}
-
-[StructLayout(LayoutKind.Sequential, Pack = 1)]
-internal struct ChargePacket
-{
+    ulong INetEpoch.Epoch { readonly get => Epoch; set => Epoch = value; }
     internal ulong Epoch, Shooter;
     internal uint CategoryId;
     internal int Mode, Phase;
@@ -164,8 +154,9 @@ internal struct ChargePacket
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
-internal struct ModePacket
+internal struct ModePacket : INetEpoch
 {
+    ulong INetEpoch.Epoch { readonly get => Epoch; set => Epoch = value; }
     internal ulong Epoch, Shooter;
     internal uint Arm, CategoryId;
     internal int Mode;

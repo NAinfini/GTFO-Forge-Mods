@@ -1,0 +1,7 @@
+{
+  "rack.pickUp": "拿起{0}",
+  "rack.inHand": "已经拿着重武器",
+  "rack.slotTaken": "{0}，不能领取",
+  "keys.group": "Forge Arsenal 重武器",
+  "keys.drop": "交还重武器"
+}

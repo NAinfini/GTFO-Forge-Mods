@@ -1,8 +1,9 @@
 using System;
+using ForgeAudio;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace ForgeWeaponEnergyLabExperimental.Presentation;
+namespace ForgeWeaponEnergyLab.Presentation;
 
 /// <summary>Audio for resolved weapon effects; native animations own handling sounds.</summary>
 internal sealed class EnergyEffects : IDisposable
@@ -13,27 +14,17 @@ internal sealed class EnergyEffects : IDisposable
     private const float ChargeHoldGain = 0.6f;
     // The beam's start, hold and stop overlap: the hold fades in under the start's tail and fades out under the stop.
     private const float BeamLoopEntry = 0.23f, BeamLoopFadeIn = 0.2f, BeamLoopFadeOut = 0.18f;
-    private const int BeamLoop = 0, BeamStart = 1, BeamStop = 2, BeamHit = 3, Arc = 4, ArcLoop = 5, ArcHit = 6,
-        ChargeRise = 7, ChargeHold = 8, ChargeFull = 9, PlasmaLaunch = 10, ParcLaunch = 11,
-        ChargeCancel = 12;
-    private static readonly string[] ClipNames = { "beam-loop", "beam-start", "beam-stop", "beam-hit",
-        "arc-fire", "arc-loop", "arc-hit", "plasma-charge-rise", "plasma-charge-loop", "plasma-charge-full", "orb-fire", "shock-fire",
-        "plasma-charge-cancel" };
+    private const string BeamLoop = "beam-loop", BeamStart = "beam-start", BeamStop = "beam-stop", BeamHit = "beam-hit",
+        Arc = "arc-fire", ArcLoop = "arc-loop", ArcHit = "arc-hit", ChargeRise = "plasma-charge-rise",
+        ChargeHold = "plasma-charge-loop", ChargeFull = "plasma-charge-full", PlasmaLaunch = "orb-fire", ParcLaunch = "shock-fire",
+        ChargeCancel = "plasma-charge-cancel";
     private readonly GameObject _root;
     private readonly Vector3[] _ends = new Vector3[Capacity];
     private readonly bool[] _hits = new bool[Capacity];
-    private AudioSource _loop = null!;
-    private AudioSource _beamEvent = null!;
-    private AudioSource _beamStop = null!;
-    private AudioSource _beamHit = null!;
-    private AudioSource _arcEvent = null!;
-    private AudioSource _arcLoop = null!;
-    private readonly AudioSource[] _arcHits = new AudioSource[Capacity];
-    private readonly AudioSource[] _launchVoices = new AudioSource[4];
+    private readonly AudioVoice _loop, _beamEvent, _beamStop, _beamHit, _arcEvent, _arcLoop, _chargeRise, _chargeHold, _chargeFull;
+    private readonly AudioVoice[] _arcHits = new AudioVoice[Capacity];
+    private readonly AudioVoice[] _launchVoices = new AudioVoice[4];
     private int _launchCursor;
-    private AudioSource _chargeRise = null!;
-    private AudioSource _chargeHold = null!;
-    private AudioSource _chargeFull = null!;
     private float _arcStarted, _arcLifetime, _arcHopDelay;
     private float _beamStarted;
     private float _beamLoopGain, _beamReleaseGain;
@@ -53,21 +44,25 @@ internal sealed class EnergyEffects : IDisposable
     {
         _root = new GameObject("Energy weapon effects");
         Object.DontDestroyOnLoad(_root);
-        try
-        {
-            _loop = EnergySound.Voice(_root.transform);
-            _beamEvent = EnergySound.Voice(_root.transform);
-            _beamStop = EnergySound.Voice(_root.transform);
-            _beamHit = EnergySound.Voice(_root.transform, "beam-hit-voice");
-            _arcEvent = EnergySound.Voice(_root.transform);
-            _arcLoop = EnergySound.Voice(_root.transform);
-            for (var index = 0; index < _launchVoices.Length; index++) _launchVoices[index] = EnergySound.Voice(_root.transform);
-            _chargeRise = EnergySound.Voice(_root.transform);
-            _chargeHold = EnergySound.Voice(_root.transform);
-            _chargeFull = EnergySound.Voice(_root.transform);
-            for (var index = 0; index < Capacity; index++) _arcHits[index] = EnergySound.Voice(_root.transform, "arc-hit-voice-" + index);
-        }
-        catch { Dispose(); throw; }
+        var anchor = _root.transform;
+        _loop = EnergyAudio.Library.Voice(anchor);
+        _beamEvent = EnergyAudio.Library.Voice(anchor);
+        _beamStop = EnergyAudio.Library.Voice(anchor);
+        _beamHit = EnergyAudio.Library.Voice(Child("beam-hit-voice"));
+        _arcEvent = EnergyAudio.Library.Voice(anchor);
+        _arcLoop = EnergyAudio.Library.Voice(anchor);
+        for (var index = 0; index < _launchVoices.Length; index++) _launchVoices[index] = EnergyAudio.Library.Voice(anchor);
+        _chargeRise = EnergyAudio.Library.Voice(anchor);
+        _chargeHold = EnergyAudio.Library.Voice(anchor);
+        _chargeFull = EnergyAudio.Library.Voice(anchor);
+        for (var index = 0; index < Capacity; index++) _arcHits[index] = EnergyAudio.Library.Voice(Child("arc-hit-voice-" + index));
+    }
+
+    private Transform Child(string name)
+    {
+        var child = new GameObject(name).transform;
+        child.SetParent(_root.transform, false);
+        return child;
     }
 
     public void Beam(Vector3 start, Vector3 end, bool hit, float now)
@@ -76,24 +71,24 @@ internal sealed class EnergyEffects : IDisposable
         _root.transform.position = start;
         if (!_beaming)
         {
-            Play(_beamEvent, BeamStart, 0.7f);
+            _beamEvent.Play(BeamStart, 0.7f);
             _beamStarted = now;
             _beaming = true;
             _beamReleased = -1f;
-            if (_loop.isPlaying) EnergySound.Stop(_loop);
+            if (_loop.Playing) _loop.Stop();
         }
         var introDone = now - _beamStarted >= BeamLoopEntry;
-        if (introDone && hit && (!_beamWasHit || now >= _nextBeamHit) && !_beamHit.isPlaying)
+        if (introDone && hit && (!_beamWasHit || now >= _nextBeamHit) && !_beamHit.Playing)
         {
-            _beamHit.transform.position = end;
-            Play(_beamHit, BeamHit, 0.33f);
+            _beamHit.Anchor.position = end;
+            _beamHit.Play(BeamHit, 0.33f);
             _nextBeamHit = now + 0.16f;
         }
         _beamWasHit = hit;
         if (introDone)
         {
             _beamLoopGain = (hit ? 0.63f : 0.55f) * Mathf.Clamp01((now - _beamStarted - BeamLoopEntry) / BeamLoopFadeIn);
-            Hold(_loop, BeamLoop, _beamLoopGain);
+            _loop.Hold(BeamLoop, _beamLoopGain);
         }
     }
 
@@ -106,15 +101,15 @@ internal sealed class EnergyEffects : IDisposable
         {
             _charging = true;
             _chargedFull = false;
-            EnergySound.Stop(_chargeFull);
-            Play(_chargeRise, ChargeRise, 0.95f);
+            _chargeFull.Stop();
+            _chargeRise.Play(ChargeRise, 0.95f);
         }
         if (power >= 1f && !_chargedFull)
         {
             _chargedFull = true;
-            EnergySound.Stop(_chargeRise);
-            Play(_chargeFull, ChargeFull, 0.9f);
-            Hold(_chargeHold, ChargeHold, ChargeHoldGain);
+            _chargeRise.Stop();
+            _chargeFull.Play(ChargeFull, 0.9f);
+            _chargeHold.Hold(ChargeHold, ChargeHoldGain);
         }
     }
 
@@ -124,26 +119,11 @@ internal sealed class EnergyEffects : IDisposable
         Charge(power);
     }
 
-    private void Hold(AudioSource voice, int clip, float volume)
-    {
-        if (!EnergySound.PlayingCue(voice, ClipNames[clip])) EnergySound.Stop(voice);
-        voice.pitch = 1f;
-        if (EnergySound.PlayingCue(voice, ClipNames[clip])) EnergySound.Gain(voice, volume);
-        else EnergySound.PlayCue(voice, ClipNames[clip], volume);
-    }
-
-    private void Play(AudioSource source, int index, float volume)
-    {
-        EnergySound.Stop(source);
-        source.pitch = 1f;
-        EnergySound.PlayCue(source, ClipNames[index], volume);
-    }
-
     public void Discharge(bool arcOrb, Vector3 position)
     {
         StopCharge();
         _root.transform.position = position;
-        Play(_launchVoices[_launchCursor], arcOrb ? ParcLaunch : PlasmaLaunch, 0.8f);
+        _launchVoices[_launchCursor].Play(arcOrb ? ParcLaunch : PlasmaLaunch, 0.8f);
         _launchCursor = (_launchCursor + 1) % _launchVoices.Length;
     }
 
@@ -151,16 +131,16 @@ internal sealed class EnergyEffects : IDisposable
     {
         if (!_charging) return;
         _charging = _chargedFull = false;
-        EnergySound.Stop(_chargeRise);
-        EnergySound.Stop(_chargeHold);
-        EnergySound.Stop(_chargeFull);
+        _chargeRise.Stop();
+        _chargeHold.Stop();
+        _chargeFull.Stop();
     }
 
     public void CancelCharge()
     {
         if (!_charging) return;
         StopCharge();
-        Play(_chargeFull, ChargeCancel, 0.45f);
+        _chargeFull.Play(ChargeCancel, 0.45f);
     }
 
     public void Chain(ReadOnlySpan<Vector3> starts, ReadOnlySpan<Vector3> ends, ReadOnlySpan<bool> hits, float now, float lifetime, float hopDelay)
@@ -173,7 +153,7 @@ internal sealed class EnergyEffects : IDisposable
         _arcStarted = now; _arcLifetime = lifetime; _arcHopDelay = hopDelay;
         _arcHitMask = 0;
         _root.transform.position = starts[0];
-        Play(_arcEvent, Arc, 0.82f);
+        _arcEvent.Play(Arc, 0.82f);
         Tick(now);
     }
 
@@ -181,8 +161,8 @@ internal sealed class EnergyEffects : IDisposable
     {
         if (held == _arcHeld) return;
         _arcHeld = held;
-        if (held) Hold(_arcLoop, ArcLoop, 0.5f);
-        else if (_arcLoop.isPlaying) EnergySound.Stop(_arcLoop);
+        if (held) _arcLoop.Hold(ArcLoop, 0.5f);
+        else _arcLoop.Stop();
     }
 
     /// <summary>Plays each chain hop's hit cue when its arc reaches the target, one hop delay after the last.</summary>
@@ -192,8 +172,8 @@ internal sealed class EnergyEffects : IDisposable
         {
             if (float.IsPositiveInfinity(_beamReleased)) _beamReleased = now;
             var fade = (now - _beamReleased) / BeamLoopFadeOut;
-            if (fade >= 1f || !_loop.isPlaying) { EnergySound.Stop(_loop); _beamReleased = -1f; }
-            else EnergySound.Gain(_loop, _beamReleaseGain * (1f - fade));
+            if (fade >= 1f || !_loop.Playing) { _loop.Stop(); _beamReleased = -1f; }
+            else _loop.SetGain(_beamReleaseGain * (1f - fade));
         }
         if (_segments == 0) return;
         var age = now - _arcStarted;
@@ -202,8 +182,8 @@ internal sealed class EnergyEffects : IDisposable
         {
             if (age < index * _arcHopDelay || !_hits[index] || (_arcHitMask & (1 << index)) != 0) continue;
             _arcHitMask |= 1 << index;
-            _arcHits[index].transform.position = _ends[index];
-            Play(_arcHits[index], ArcHit, index == 0 ? 0.34f : 0.22f);
+            _arcHits[index].Anchor.position = _ends[index];
+            _arcHits[index].Play(ArcHit, index == 0 ? 0.34f : 0.22f);
         }
     }
 
@@ -211,14 +191,14 @@ internal sealed class EnergyEffects : IDisposable
     {
         if (_segments == 0 && !_arcHeld && !_charging && !_beaming) return;
         _segments = 0;
-        if (_arcHeld && _arcLoop != null) EnergySound.Stop(_arcLoop);
+        if (_arcHeld) _arcLoop.Stop();
         _arcHeld = false;
         if (_charging) StopCharge();
         if (_beaming && !_disposed)
         {
             // The start keeps its tail; the hold fades out in Tick while the stop plays over it.
-            Play(_beamStop, BeamStop, 0.55f);
-            if (_loop.isPlaying) { _beamReleased = float.PositiveInfinity; _beamReleaseGain = _beamLoopGain; }
+            _beamStop.Play(BeamStop, 0.55f);
+            if (_loop.Playing) { _beamReleased = float.PositiveInfinity; _beamReleaseGain = _beamLoopGain; }
         }
         _beaming = false;
         _beamWasHit = false;
@@ -228,8 +208,11 @@ internal sealed class EnergyEffects : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        // Destroying the root owns every audio voice. Avoid touching child native components during scene
-        // teardown, when Unity may have invalidated them.
+        // The voices ride on the root's children; end their sounds before the root goes.
+        _loop.Stop(); _beamEvent.Stop(); _beamStop.Stop(); _beamHit.Stop(); _arcEvent.Stop(); _arcLoop.Stop();
+        _chargeRise.Stop(); _chargeHold.Stop(); _chargeFull.Stop();
+        foreach (var voice in _launchVoices) voice.Stop();
+        foreach (var voice in _arcHits) voice.Stop();
         if (_root != null) Object.Destroy(_root);
     }
 }

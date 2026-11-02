@@ -1,0 +1,18 @@
+<Project>
+  <Import Project="Build/GtfoApi.props" />
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Build-time media (sounds, effect bundles, icons) is local-only and never in Git. The root is FORGE_MODS_ROOT
+         and falls back to this checkout's own Mods folder. -->
+    <ForgeModsRoot Condition="'$(ForgeModsRoot)' == ''">$(FORGE_MODS_ROOT)</ForgeModsRoot>
+    <ForgeModsRoot Condition="'$(ForgeModsRoot)' == ''">$(MSBuildThisFileDirectory)</ForgeModsRoot>
+    <ForgeModsRoot>$([MSBuild]::EnsureTrailingSlash('$(ForgeModsRoot)'))</ForgeModsRoot>
+  </PropertyGroup>
+  <!-- Dead-code rescan (Mods/Build/dead-code.globalconfig); off in normal builds. -->
+  <PropertyGroup Condition="'$(ForgeDeadCodeScan)' == 'true'">
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(ForgeDeadCodeScan)' == 'true'">
+    <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)Build/dead-code.globalconfig" />
+  </ItemGroup>
+</Project>

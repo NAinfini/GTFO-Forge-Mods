@@ -61,20 +61,15 @@ try {
         if ($entry[0].sha256 -cne $hash -or $entry[0].bytes -ne $length -or !(Select-String -LiteralPath $log -Pattern $receipt -SimpleMatch -Quiet)) { throw "Unity's current run did not verify $name; see $log" }
     }
 
-    & $Blender --background --factory-startup --python-exit-code 1 --python (Join-Path $PSScriptRoot 'render_icons_blender.py') -- --source $Source --out (Join-Path $candidate 'Icons')
-    if ($LASTEXITCODE -ne 0) { throw 'Icon rendering failed.' }
-    foreach ($mode in $modes) {
-        if (!(Test-Path -LiteralPath (Join-Path $candidate "Icons/$mode.png"))) { throw "Missing icon: $mode" }
-    }
 
     New-Item -ItemType Directory -Force (Join-Path $module 'Assets/Models') | Out-Null
     foreach ($mode in $modes) {
         Copy-Asset (Join-Path $candidate "forge-energy-model-$mode.bundle") (Join-Path $module "Assets/Models/forge-energy-model-$mode.bundle")
-        Copy-Asset (Join-Path $candidate "Icons/$mode.png") (Join-Path $module "Assets/Icons/$mode.png")
+
     }
     Copy-Asset (Join-Path $candidate 'forge-energy-disc.bundle') (Join-Path $module 'Assets/Vfx/forge-energy-disc.bundle')
     Copy-Asset $manifestPath (Join-Path $module 'Assets/Models/weapon-models-manifest.json')
-    Write-Host "Verified and copied $($modes.Count) model bundles, the manifest and $($modes.Count) icons into $module/Assets. Evidence: $Evidence."
+    Write-Host "Verified and copied $($modes.Count) model bundles, and the manifest into $module/Assets. Evidence: $Evidence."
 } finally {
     $env:FORGE_ENERGY_PRESENTATION_OUTPUT = $oldOutput
 }

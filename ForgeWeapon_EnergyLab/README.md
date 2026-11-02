@@ -1,8 +1,8 @@
-# Forge Weapon Energy Lab Experimental
+# Forge Weapon Energy Lab
 
 Eight energy guns for GTFO.
 
-**Beta.** Tested solo and with bots; multiplayer has not been tested yet. Please report bugs on [GitHub](https://github.com/NAinfini/GTFO-Forge-Mods/issues).
+Report bugs on [GitHub](https://github.com/NAinfini/GTFO-Forge-Mods/issues), or find me on the GTFO Modding Discord as **nainfini**.
 
 ![The eight Energy Lab weapons](https://raw.githubusercontent.com/NAinfini/GTFO-Forge-Mods/main/ForgeWeapon_EnergyLab/docs/images/lineup.png)
 
@@ -40,7 +40,7 @@ Hold to charge, release to fire an orb that flies through enemies and shocks the
 
 ### Forge Blast Gun
 
-An instant explosion where you aim.
+A visible shell that flies along your aim and explodes at the first thing it touches.
 
 ![Forge Blast Gun](https://raw.githubusercontent.com/NAinfini/GTFO-Forge-Mods/main/ForgeWeapon_EnergyLab/docs/images/blast.png)
 
@@ -71,11 +71,11 @@ Fires a core that opens a gravity field, pulling enemies in and damaging them.
 
 ## Installation
 
-Install with r2modman; it also installs BepInExPack_GTFO. Everyone in the lobby needs the same version and the same tuning changes.
+Install with r2modman; it also installs BepInExPack_GTFO, MTFO, ForgeCore, ForgeUI, ForgeAudio and ForgeVisual. Names and descriptions are in English and Chinese and follow the `Language` setting in `NAinfini.ForgeUI.cfg` (by default the game's language). MTFO marks the game as modded, which turns off achievements and public matchmaking, so these guns stay out of official play. Everyone in the lobby needs the same version and the same tuning changes.
 
 ## Tuning
 
-Every number is listed in `BepInEx/config/ForgeEnergyLab/tuning-defaults.json`. To change one, copy only that value into `tuning-overrides.json` in the same folder, for example:
+Every number is listed in `BepInEx/config/ForgeWeapon_EnergyLab/tuning-defaults.json`. To change one, copy only that value into `tuning-overrides.json` in the same folder, for example:
 
 ```json
 {
@@ -85,13 +85,14 @@ Every number is listed in `BepInEx/config/ForgeEnergyLab/tuning-defaults.json`. 
 }
 ```
 
-Restart the game after editing. Values you did not copy follow each update's defaults. If the file has a mistake, the mod stays off and the log names the field.
+Restart the game after editing. Values you did not copy follow each update's defaults. If an entry has a mistake, only that gun keeps its normal values and the log names the field. An entry for a gun that is not installed (for example a removed extension) is ignored with one log line.
 
-## Known issues
+## Extra guns
 
-- Multiplayer has not been tested.
-- In stats mods, hit rate that counts every hit can go over 100% with Chain Arc, Flamethrower and Blast Gun.
+Other packages can add more energy guns as data files; their guns appear in the same loadout list and can be tuned in the same files. Everyone in the lobby must install the same extensions, otherwise energy weapons stay off between the players who differ.
 
 ## License
 
-[MIT](https://github.com/NAinfini/GTFO-Forge-Mods/blob/main/ForgeWeapon_EnergyLab/LICENSE). The effect bundle is [CC0](https://github.com/NAinfini/GTFO-Forge-Mods/blob/main/ForgeWeapon_EnergyLab/Assets/Vfx/LICENSE.txt).
+[MIT](https://github.com/NAinfini/GTFO-Forge-Mods/blob/main/ForgeWeapon_EnergyLab/LICENSE). The effect bundle ships in ForgeVisual (CC0). The sounds were made with Adobe Firefly (commercial use permitted); the Blast Gun's shot and explosion are the Ordnance grenade launcher's sounds, with their credits in `Assets/Audio/License.txt`.
+
+Modding the guns: see the [developer guide](https://github.com/NAinfini/GTFO-Forge-Mods/blob/main/ForgeWeapon_EnergyLab/DEVELOPERS.md).

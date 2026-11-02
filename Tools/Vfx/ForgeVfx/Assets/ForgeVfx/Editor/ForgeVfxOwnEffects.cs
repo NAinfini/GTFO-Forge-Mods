@@ -26,7 +26,7 @@ namespace ForgeVfx.EditorTools
     /// on the beam and the flame; `open` and `collapse` on the black hole). Playing the member never shows them; the
     /// energy weapons activate one for a phase of a shot. Particle lights are authored here at the brightness the
     /// effect's light should have; the energy weapons switch them off and light the scene with the game's own effect
-    /// lights at the same colour, range and timing (`Mods/ForgeWeapon_EnergyLab/Presentation/EnergyLights.cs`).
+    /// lights at the same colour, range and timing (`Mods/ForgeVisual/Native/PointLights.cs`).
     ///
     /// Budgets (particle caps per instance, every state included; what is live at once is lower): sparks 63, flame
     /// impact 20, explosion 131, plasma explosion 101, flame 153, beam 132, lightning arc 74 per hop, plasma discharge

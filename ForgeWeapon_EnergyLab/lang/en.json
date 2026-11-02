@@ -1,0 +1,4 @@
+{
+  "weapon.description": "Forge energy weapon",
+  "chat.mismatch": "[Energy Lab] {0} has a different Energy Lab build or tuning. Energy weapons stay off between you until every player uses the same mod files and tuning."
+}

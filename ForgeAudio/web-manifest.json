@@ -1,0 +1,448 @@
+{
+  "kind": "forge-library-manifest",
+  "schemaVersion": 1,
+  "library": "ForgeAudio",
+  "packageName": "NAinfini-ForgeAudio",
+  "version": "0.1.0",
+  "groups": [
+    {
+      "id": "categories",
+      "title": "Categories",
+      "entries": [
+        {
+          "id": "ui",
+          "summary": "menus, prompts, confirmations and warnings",
+          "details": {
+            "limit": 8
+          }
+        },
+        {
+          "id": "weapon",
+          "summary": "gunfire, reloads and weapon handling",
+          "details": {
+            "limit": 16
+          }
+        },
+        {
+          "id": "explosion",
+          "summary": "blasts and impacts",
+          "details": {
+            "limit": 10
+          }
+        },
+        {
+          "id": "debris",
+          "summary": "falling debris, shrapnel and settling rubble",
+          "details": {
+            "limit": 12
+          }
+        },
+        {
+          "id": "ambience",
+          "summary": "beds, hums and room tones",
+          "details": {
+            "limit": 8
+          }
+        },
+        {
+          "id": "voice",
+          "summary": "speech and radio voices",
+          "details": {
+            "limit": 4
+          }
+        },
+        {
+          "id": "vehicle",
+          "summary": "suits, drop pods and other vehicles: steps, servos, engines",
+          "details": {
+            "limit": 48
+          }
+        },
+        {
+          "id": "device",
+          "summary": "machines in the world: beacons, turrets, supply pods, terminals",
+          "details": {
+            "limit": 10
+          }
+        },
+        {
+          "id": "music",
+          "summary": "music",
+          "details": {
+            "limit": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "settings",
+      "title": "cues.json",
+      "entries": [
+        {
+          "id": "buses",
+          "summary": "A bus groups cues and names their global category; defined under \"buses\" and referenced by each cue.",
+          "parameters": [
+            {
+              "name": "category",
+              "type": "choice",
+              "summary": "The global category the bus belongs to; all mods share each category's voice limit.",
+              "required": true,
+              "values": [
+                "ui",
+                "weapon",
+                "explosion",
+                "debris",
+                "ambience",
+                "voice",
+                "vehicle",
+                "device",
+                "music"
+              ]
+            },
+            {
+              "name": "gain",
+              "type": "number",
+              "summary": "Volume of every cue on the bus, linear. Use either gain or gainDb.",
+              "min": 0,
+              "max": 4,
+              "default": 1
+            },
+            {
+              "name": "gainDb",
+              "type": "number",
+              "summary": "Volume of every cue on the bus, in decibels. Use either gain or gainDb.",
+              "min": -60,
+              "max": 12,
+              "unit": "dB"
+            },
+            {
+              "name": "seats",
+              "type": "integer",
+              "summary": "How many sounds of the bus may play at once from one emitter; the weakest are faded out for a stronger newcomer.",
+              "min": 1,
+              "max": 64,
+              "default": 0,
+              "unit": "sounds"
+            },
+            {
+              "name": "duck",
+              "type": "object",
+              "summary": "Lowers other categories while a sound of this bus plays."
+            },
+            {
+              "name": "duck.categories",
+              "type": "list",
+              "summary": "The categories to lower.",
+              "required": true,
+              "min": 1,
+              "max": 9,
+              "values": [
+                "ui",
+                "weapon",
+                "explosion",
+                "debris",
+                "ambience",
+                "voice",
+                "vehicle",
+                "device",
+                "music"
+              ]
+            },
+            {
+              "name": "duck.db",
+              "type": "number",
+              "summary": "How far to lower them.",
+              "min": 0.5,
+              "max": 48,
+              "default": 6,
+              "unit": "dB"
+            }
+          ]
+        },
+        {
+          "id": "cues",
+          "summary": "One playable sound; defined under \"cues\".",
+          "parameters": [
+            {
+              "name": "bus",
+              "type": "name",
+              "summary": "The bus the cue plays on; it must be defined in \"buses\". The bus decides the category.",
+              "required": true
+            },
+            {
+              "name": "layers",
+              "type": "list",
+              "summary": "The layers mixed into the cue. Without it the cue plays the .ogg file of the same name.",
+              "min": 1,
+              "max": 8
+            },
+            {
+              "name": "gain",
+              "type": "number-or-range",
+              "summary": "Volume, linear; a [min, max] pair lets each play pick between them. Use either gain or gainDb.",
+              "min": 0,
+              "max": 4,
+              "default": 1
+            },
+            {
+              "name": "gainDb",
+              "type": "number-or-range",
+              "summary": "Volume in decibels; a [min, max] pair lets each play pick between them.",
+              "min": -60,
+              "max": 12,
+              "unit": "dB"
+            },
+            {
+              "name": "pitch",
+              "type": "number-or-range",
+              "summary": "Playback speed as a factor; a [min, max] pair lets each play pick between them.",
+              "min": 0.1,
+              "max": 3,
+              "default": 1
+            },
+            {
+              "name": "loop",
+              "type": "boolean",
+              "summary": "Repeats seamlessly. A loop has exactly one layer with only clips and gain.",
+              "default": false
+            },
+            {
+              "name": "priority",
+              "type": "integer",
+              "summary": "Higher priority wins when voices run out; 200 and up counts as a warning.",
+              "min": 0,
+              "max": 255,
+              "default": 100
+            },
+            {
+              "name": "maxVoices",
+              "type": "integer",
+              "summary": "How many plays of the cue may sound at once.",
+              "min": 1,
+              "max": 256,
+              "default": 8
+            },
+            {
+              "name": "maxPerEmitter",
+              "type": "integer",
+              "summary": "How many plays of the cue may sound at once from one emitter; at most maxVoices.",
+              "min": 1,
+              "max": 256,
+              "default": 8
+            },
+            {
+              "name": "minInterval",
+              "type": "number",
+              "summary": "The shortest gap between two plays of the cue.",
+              "min": 0,
+              "max": 60,
+              "default": 0,
+              "unit": "s"
+            },
+            {
+              "name": "environment",
+              "type": "boolean",
+              "summary": "Whether room acoustics (occlusion, room tone) apply.",
+              "default": true
+            },
+            {
+              "name": "maxSeconds",
+              "type": "number",
+              "summary": "The longest the cue may last; the mix is cut there and fades out. 0 means no cap.",
+              "min": 0.05,
+              "max": 60,
+              "default": 0,
+              "unit": "s"
+            },
+            {
+              "name": "place",
+              "type": "choice",
+              "summary": "Where the sound sits: in the listener's head (2d), at a world point (world) or following an object (follow); auto keeps what the caller supplied. A { \"self\", \"other\" } pair sets the local player's own sounds and everyone else's separately.",
+              "default": "auto",
+              "values": [
+                "auto",
+                "2d",
+                "world",
+                "follow"
+              ]
+            },
+            {
+              "name": "space",
+              "type": "object",
+              "summary": "How the cue is heard in space; see the space settings."
+            }
+          ]
+        },
+        {
+          "id": "layers",
+          "summary": "One layer of a cue, listed in the cue's \"layers\".",
+          "parameters": [
+            {
+              "name": "clips",
+              "type": "list",
+              "summary": "The .ogg files of the layer; each play picks one.",
+              "required": true,
+              "min": 1,
+              "max": 32
+            },
+            {
+              "name": "offsetMs",
+              "type": "number",
+              "summary": "Delay before the layer starts.",
+              "min": 0,
+              "max": 60000,
+              "default": 0,
+              "unit": "ms"
+            },
+            {
+              "name": "gain",
+              "type": "number",
+              "summary": "Layer volume, linear. Use either gain or gainDb.",
+              "min": 0,
+              "max": 4,
+              "default": 1
+            },
+            {
+              "name": "gainDb",
+              "type": "number",
+              "summary": "Layer volume in decibels. Use either gain or gainDb.",
+              "min": -60,
+              "max": 12,
+              "unit": "dB"
+            },
+            {
+              "name": "range",
+              "type": "list",
+              "summary": "[start, end] seconds of the clip to use.",
+              "min": 0,
+              "max": 600,
+              "unit": "s"
+            },
+            {
+              "name": "fadeInMs",
+              "type": "number",
+              "summary": "Fade-in length.",
+              "min": 0,
+              "max": 10000,
+              "default": 0,
+              "unit": "ms"
+            },
+            {
+              "name": "fadeOutMs",
+              "type": "number",
+              "summary": "Fade-out length.",
+              "min": 0,
+              "max": 10000,
+              "default": 0,
+              "unit": "ms"
+            },
+            {
+              "name": "pitch",
+              "type": "number-or-range",
+              "summary": "Layer playback speed as a factor.",
+              "min": 0.1,
+              "max": 3,
+              "default": 1
+            },
+            {
+              "name": "distance",
+              "type": "object",
+              "summary": "The listener distances inside which the layer plays, so a far layer can replace the near one."
+            },
+            {
+              "name": "distance.min",
+              "type": "number",
+              "summary": "Nearest distance.",
+              "min": 0,
+              "max": 100000,
+              "default": 0,
+              "unit": "m"
+            },
+            {
+              "name": "distance.max",
+              "type": "number",
+              "summary": "Farthest distance; unbounded when omitted.",
+              "min": 0,
+              "max": 100000,
+              "unit": "m"
+            },
+            {
+              "name": "lowpassHz",
+              "type": "number",
+              "summary": "Low-pass cutoff; 0 leaves the layer unfiltered.",
+              "min": 50,
+              "max": 20000,
+              "default": 0,
+              "unit": "Hz"
+            }
+          ]
+        },
+        {
+          "id": "space",
+          "summary": "How a cue is heard in space; the cue's \"space\".",
+          "parameters": [
+            {
+              "name": "near",
+              "type": "number",
+              "summary": "Distance up to which the sound is at full volume.",
+              "min": 0.01,
+              "max": 10000,
+              "default": 2,
+              "unit": "m"
+            },
+            {
+              "name": "far",
+              "type": "number",
+              "summary": "Distance beyond which the sound is silent (when cull is on); greater than near.",
+              "min": 0.01,
+              "max": 10000,
+              "default": 30,
+              "unit": "m"
+            },
+            {
+              "name": "curve",
+              "type": "choice",
+              "summary": "Loudness by distance: \"linear\", \"log\", or 2 to 32 [metres, gain] points with increasing metres.",
+              "default": "linear",
+              "values": [
+                "linear",
+                "log"
+              ]
+            },
+            {
+              "name": "blend",
+              "type": "number",
+              "summary": "0 hears the sound flat (no distance loss, no panning), 1 fully positioned.",
+              "min": 0,
+              "max": 1,
+              "default": 1
+            },
+            {
+              "name": "spread",
+              "type": "number",
+              "summary": "How much the sound widens, which reduces panning.",
+              "min": 0,
+              "max": 180,
+              "default": 0,
+              "unit": "degrees"
+            },
+            {
+              "name": "doppler",
+              "type": "number",
+              "summary": "How strongly relative motion shifts the pitch.",
+              "min": 0,
+              "max": 5,
+              "default": 0
+            },
+            {
+              "name": "cull",
+              "type": "boolean",
+              "summary": "Beyond far the sound is silent and takes no voice.",
+              "default": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

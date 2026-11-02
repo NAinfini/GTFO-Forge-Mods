@@ -1,29 +1,20 @@
 # Changelog
 
-## 0.0.4 (beta)
+## 1.0.0
 
-- The full source code is now on [GitHub](https://github.com/NAinfini/GTFO-Forge-Mods/tree/main/ForgeWeapon_EnergyLab), including the Unity project that builds the effects.
-- The weapon pictures on the mod page load again.
-- No gameplay changes.
-
-## 0.0.3 (beta)
-
-- The Blast Gun and Beam have no range limit: a shot past 40 m (Blast Gun) or 45 m (Beam) now hits and explodes instead of doing nothing. The Chain Arc (16 m) and Flamethrower (8 m) keep their range.
-- The Blast Gun no longer draws a beam-like line; the explosion appears where you aim.
-- Switching weapons while holding aim no longer sends the sight's red dot flying across the screen; the dot shows only through the sight glass.
-- Bots given an energy gun by an older version no longer spam icon errors in the log or show a squashed weapon icon after a restart, and their gun is rebuilt with the current sounds and settings.
-- Tuning moved to `tuning-overrides.json`, which holds only the values you change; `tuning-defaults.json` lists every value. The old `tuning.json` is no longer read, so copy any values you changed.
-
-## 0.0.2 (beta)
-
-- The beam, flame and charging orb now stay on the muzzle while you strafe.
-- Firing sounds play right away instead of slightly late, most noticeably on the Charge Orb.
-- The Gravity Core's field stays visible as it collapses, and its collapse sound plays with it.
-
-## 0.0.1 (beta)
-
-- First release with eight energy guns: Beam, Chain Arc, Flamethrower, Charge Orb, Shock Orb, Blast Gun, Ricochet Disc and Gravity Core.
+- Weapons are defined in `ForgeEnergyLab/*.json` data files (any mod folder named `ForgeEnergyLab`); the eight guns above are the first file, and others add guns the same way without code. A loadout that used an earlier build's guns must be chosen again.
+- Eight energy guns: Beam, Chain Arc, Flamethrower, Charge Orb, Shock Orb, Blast Gun, Ricochet Disc and Gravity Core.
 - Beam and Flamethrower have no recoil; the other six have light recoil.
 - Back hits, weakspots and armor work the same as with normal guns.
 - Bots can use all eight guns, with their effects and sounds.
-- All numbers can be changed in `tuning.json`.
+- The Blast Gun fires a visible shell that flies at 40 m/s and explodes at the first terrain, enemy or player it touches, so a target that steps into its path is hit and one that moves away is missed.
+- The Blast Gun and Beam have no range limit; the Chain Arc (16 m) and Flamethrower (8 m) keep theirs.
+- The Blast Gun's shot and explosion use the Ordnance grenade launcher's sounds.
+- Gun icons are drawn by the game's own icon renderer from each gun's model, with the same shading and size as vanilla gun icons.
+- Sounds play through ForgeAudio and effects through ForgeVisual, mixed with the other Forge mods and following the game's sound-effects volume.
+- Gun names and descriptions are in English and Chinese and switch with the language without restarting. Players using different languages still match each other's gear, and the chat notice about a different Energy Lab build or tuning is translated too.
+- The Charge Orb and Shock Orb leave your sight clear while charging; other players see the full charge effect on you.
+- The beam, flame and charging orb stay on the muzzle while you strafe.
+- `BepInEx/config/ForgeWeapon_EnergyLab/tuning-overrides.json` holds only the values you change; `tuning-defaults.json` lists every value.
+- Requires ForgeCore, ForgeUI, ForgeAudio, ForgeVisual and MTFO. MTFO marks the game as modded and turns off achievements and public matchmaking, so these guns stay out of official play; without MTFO, Energy Lab does not load.
+- The source code and Unity effect project are on [GitHub](https://github.com/NAinfini/GTFO-Forge-Mods/tree/main/ForgeWeapon_EnergyLab). Media are local-only and are not included in Git.

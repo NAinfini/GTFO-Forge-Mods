@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace ForgeWeaponEnergyLabExperimental;
+namespace ForgeWeaponEnergyLab;
 
 internal static class SpecialWeaponMath
 {
@@ -32,14 +32,18 @@ internal static class SpecialWeaponMath
         return (offset - direction * along).LengthSquared() <= width * width;
     }
 
+    /// <summary>The longest time one pull step may cover.</summary>
+    public const float MaxPullDelta = 0.1f;
+
     public static Vector3 PullStep(Vector3 position, Vector3 center, float delta, in WeaponNumbers tuning)
     {
         var offset = center - position;
         var distance = offset.Length();
         if (!float.IsFinite(distance) || !float.IsFinite(delta) || delta <= 0f || distance <= tuning.CoreRadius || distance > tuning.Radius)
             return Vector3.Zero;
-        // Frame stalls must not teleport a victim across a wall or through the core.
-        return offset / distance * MathF.Min(distance - tuning.CoreRadius, tuning.PullSpeed * MathF.Min(delta, 0.05f));
+        // The pull is applied about twenty times a second with the time gathered since the last step (under 0.1 s); a stall must not
+        // teleport a victim across a wall or through the core.
+        return offset / distance * MathF.Min(distance - tuning.CoreRadius, tuning.PullSpeed * MathF.Min(delta, MaxPullDelta));
     }
 }
 
@@ -69,7 +73,7 @@ internal sealed class PlasmaContacts
     {
         if (identity == 0) throw new ArgumentOutOfRangeException(nameof(identity));
         if (_identities.AsSpan(0, _count).Contains(identity)) return false;
-        if (_count == Capacity) throw new InvalidOperationException("Plasma contact identity budget exhausted; no truncated result used.");
+        if (_count == Capacity) throw new BudgetExhausted("Plasma contact identity budget exhausted; no truncated result used.");
         _identities[_count++] = identity;
         return true;
     }

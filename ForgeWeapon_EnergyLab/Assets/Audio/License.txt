@@ -1,9 +1,31 @@
-Forge Weapon Energy Lab experimental audio
+Forge Weapon Energy Lab audio
 Copyright (c) 2026 NAinfini
 
-The audio in this directory is original to this mod and licensed under the
-MIT License in ../../LICENSE. manifest.json preserves source filenames and
-SHA-256 hashes; variants.tsv maps each runtime cue to its PCM recording.
+The sound effects in this directory were made with Adobe Firefly, whose output may be used commercially, and are licensed under the
+MIT License in ../../LICENSE. manifest.json preserves source filenames and SHA-256 hashes and lists each runtime cue's Ogg Vorbis file;
+the audio folder's cues.json describes how ForgeAudio plays them.
+
+The blast-fire and blast-explode cues are not Firefly sounds. They are the grenade launcher's fire and burst sounds of
+ForgeOrdnance_Arsenal, copied unchanged (provenance of every clip in ForgeOrdnance_Arsenal/Assets/Audio/sources.json). Their sources:
+
+Attribution (Creative Commons Attribution; converted and trimmed for game use):
+
+- "Sci-fi Grenade Launcher" by ValhallaProject (https://freesound.org/people/ValhallaProject/sounds/771167/), licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), used for blast-fire.
+- "2 High Quality Explosions (explode.wav)" by Michel Baradari (apollo-music.de) (https://opengameart.org/content/2-high-quality-explosions), licensed under CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/), used for blast-explode.
+
+Public domain (CC0 1.0, no attribution required), recorded for provenance:
+
+- blast-fire - "163458_2263027-hq.mp3" by LeMudCrab (https://freesound.org/people/LeMudCrab/sounds/163458/)
+
+Sonniss GameAudioGDC 2026 (royalty-free; the bundle licence remains authoritative):
+
+- blast-explode - BluezoneCorp stone and metal impacts - Bluezone_BC0297_stone_impact_041.wav
+
+Boom Library:
+
+- blast-explode - Boom Library - 053 FX_Fire_Explosion_Low_06.wav, FX_Fire_Explosion_Low_03.wav, FX_Fire_Explosion_Low_04.wav
+- blast-explode - Boom Library - 035 DTCK EXPLOSION Stone Pit Distant.wav
+- blast-explode - Boom Library - 045 UEDS EXPLOSION INDOOR FAST Large 2.0.wav
 
 Draw, holster, reload and disc hits on flesh use GTFO's installed sounds.
 Those game sounds are not included in this directory.

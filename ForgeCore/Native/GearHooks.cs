@@ -1,0 +1,200 @@
+using System;
+using System.Collections.Generic;
+using Gear;
+using HarmonyLib;
+using Player;
+
+namespace ForgeCore;
+
+/// <summary>One call of the static <c>BulletWeapon.BulletHit</c>, the hit entry every weapon family and the sentry's firing reach. In
+/// <c>Before</c> a subscriber may rewrite the hit data's fields (the data is the caller's: restore what you change in <c>After</c>) or
+/// <see cref="Skip"/> the body with the answer it should return (a miss: the game's own miss branch runs). The instance is pooled and
+/// valid only for the call: a subscriber must not keep it.</summary>
+public sealed class BulletHitCall
+{
+    public Weapon.WeaponHitData Data { get; internal set; } = null!;
+    public bool DoDamage { get; internal set; }
+    public float AdditionalDistance { get; internal set; }
+    public uint DamageSearchId { get; internal set; }
+    public bool AllowDirectionalBonus { get; internal set; }
+
+    /// <summary>True once a subscriber skipped the body.</summary>
+    public bool Skipped { get; private set; }
+
+    /// <summary>The answer when skipped; after the body ran, what it returned.</summary>
+    public bool Result { get; internal set; }
+
+    /// <summary>The body does not run and the call answers <paramref name="result"/>.</summary>
+    public void Skip(bool result = false) { Skipped = true; Result = result; }
+
+    internal void Reset() { Skipped = false; Result = false; Data = null!; }
+}
+
+/// <summary>One call of <c>PlayerBackpack.SetDeployed</c> (the slot's deployed marker). A subscriber of <c>Before</c> may <see cref="Skip"/>
+/// the write.</summary>
+public sealed class BackpackDeploy
+{
+    public BackpackDeploy(PlayerBackpack backpack, InventorySlot slot, bool mode) { Backpack = backpack; Slot = slot; Mode = mode; }
+    public PlayerBackpack Backpack { get; }
+    public InventorySlot Slot { get; }
+    public bool Mode { get; }
+    public bool Skipped { get; private set; }
+    public void Skip() => Skipped = true;
+}
+
+public static partial class GameHooks
+{
+    // ---- Weapons and gear: the hit entry, wield and unwield, the empty-clip paths, gear assembly, the reload start, the deployed marker and the sentry spawn.
+    public static readonly Bracket<BulletHitCall> BulletHit = new("GameHooks.BulletHit", typeof(BulletHitHook));
+    public static readonly Bracket<BulletWeapon> BulletWeaponWielded = new("GameHooks.BulletWeaponWielded", typeof(BulletWeaponWieldedHook));
+    public static readonly Bracket<BulletWeapon> BulletWeaponUnwielded = new("GameHooks.BulletWeaponUnwielded", typeof(BulletWeaponUnwieldedHook));
+    public static readonly Bracket<BWA_Auto> AutoDryFired = new("GameHooks.AutoDryFired", typeof(AutoDryFiredHook));
+    public static readonly Bracket<BWA_Semi> SemiDryFired = new("GameHooks.SemiDryFired", typeof(SemiDryFiredHook));
+    public static readonly Bracket<GearPartHolder> GearPartsSpawned = new("GameHooks.GearPartsSpawned", typeof(GearPartsSpawnedHook));
+    public static readonly Bracket<ItemEquippable> GearSpawnCompleted = new("GameHooks.GearSpawnCompleted", typeof(GearSpawnCompletedHook));
+    public static readonly Bracket<ItemEquippable> ReloadTriggered = new("GameHooks.ReloadTriggered", typeof(ReloadTriggeredHook));
+    public static readonly Bracket<BackpackDeploy> BackpackDeployed = new("GameHooks.BackpackDeployed", typeof(BackpackDeployedHook));
+    public static readonly Bracket<(SentryGunInstance Sentry, pGearSpawnData Data)> SentrySpawned = new("GameHooks.SentrySpawned", typeof(SentrySpawnedHook));
+}
+
+[HarmonyPatch(typeof(BulletWeapon), nameof(BulletWeapon.BulletHit))]
+internal static class BulletHitHook
+{
+    private static readonly Stack<BulletHitCall> Pool = new();
+
+    private static void Release(BulletHitCall call) { call.Reset(); Pool.Push(call); }
+
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static bool Before(Weapon.WeaponHitData weaponRayData, bool doDamage, float additionalDis, uint damageSearchID, bool allowDirectionalBonus,
+        ref bool __result, out BulletHitCall __state)
+    {
+        var call = __state = Pool.Count > 0 ? Pool.Pop() : new BulletHitCall();
+        call.Data = weaponRayData;
+        call.DoDamage = doDamage;
+        call.AdditionalDistance = additionalDis;
+        call.DamageSearchId = damageSearchID;
+        call.AllowDirectionalBonus = allowDirectionalBonus;
+        GameHooks.BulletHit.RunBefore(call);
+        if (!call.Skipped) return true;
+        __result = call.Result;
+        return false;
+    }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(BulletHitCall __state, bool __result, bool __runOriginal)
+    {
+        __state.Result = __result;
+        GameHooks.BulletHit.RunAfter(__state, __runOriginal);
+        Release(__state);
+    }
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, BulletHitCall __state)
+    {
+        if (__exception != null) { GameHooks.BulletHit.RunFaulted(__state, __exception); Release(__state); }
+        return __exception;
+    }
+}
+
+[HarmonyPatch(typeof(BulletWeapon), nameof(BulletWeapon.OnWield))]
+internal static class BulletWeaponWieldedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(BulletWeapon __instance) => GameHooks.BulletWeaponWielded.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(BulletWeapon __instance, bool __runOriginal) => GameHooks.BulletWeaponWielded.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, BulletWeapon __instance) { if (__exception != null) GameHooks.BulletWeaponWielded.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(BulletWeapon), nameof(BulletWeapon.OnUnWield))]
+internal static class BulletWeaponUnwieldedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(BulletWeapon __instance) => GameHooks.BulletWeaponUnwielded.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(BulletWeapon __instance, bool __runOriginal) => GameHooks.BulletWeaponUnwielded.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, BulletWeapon __instance) { if (__exception != null) GameHooks.BulletWeaponUnwielded.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(BWA_Auto), nameof(BWA_Auto.OnFireShotEmptyClip))]
+internal static class AutoDryFiredHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(BWA_Auto __instance) => GameHooks.AutoDryFired.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(BWA_Auto __instance, bool __runOriginal) => GameHooks.AutoDryFired.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, BWA_Auto __instance) { if (__exception != null) GameHooks.AutoDryFired.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(BWA_Semi), nameof(BWA_Semi.OnFireShotEmptyClip))]
+internal static class SemiDryFiredHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(BWA_Semi __instance) => GameHooks.SemiDryFired.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(BWA_Semi __instance, bool __runOriginal) => GameHooks.SemiDryFired.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, BWA_Semi __instance) { if (__exception != null) GameHooks.SemiDryFired.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(GearPartHolder), nameof(GearPartHolder.OnAllPartsSpawned))]
+internal static class GearPartsSpawnedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(GearPartHolder __instance) => GameHooks.GearPartsSpawned.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(GearPartHolder __instance, bool __runOriginal) => GameHooks.GearPartsSpawned.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, GearPartHolder __instance) { if (__exception != null) GameHooks.GearPartsSpawned.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(ItemEquippable), nameof(ItemEquippable.OnGearSpawnComplete))]
+internal static class GearSpawnCompletedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(ItemEquippable __instance) => GameHooks.GearSpawnCompleted.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(ItemEquippable __instance, bool __runOriginal) => GameHooks.GearSpawnCompleted.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, ItemEquippable __instance) { if (__exception != null) GameHooks.GearSpawnCompleted.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(ItemEquippable), nameof(ItemEquippable.TryTriggerReloadAnimationSequence))]
+internal static class ReloadTriggeredHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(ItemEquippable __instance) => GameHooks.ReloadTriggered.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(ItemEquippable __instance, bool __runOriginal) => GameHooks.ReloadTriggered.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, ItemEquippable __instance) { if (__exception != null) GameHooks.ReloadTriggered.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(PlayerBackpack), nameof(PlayerBackpack.SetDeployed))]
+internal static class BackpackDeployedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static bool Before(PlayerBackpack __instance, InventorySlot slot, bool mode, out BackpackDeploy __state)
+    {
+        __state = new BackpackDeploy(__instance, slot, mode);
+        GameHooks.BackpackDeployed.RunBefore(__state);
+        return !__state.Skipped;
+    }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(BackpackDeploy __state, bool __runOriginal) => GameHooks.BackpackDeployed.RunAfter(__state, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, BackpackDeploy __state) { if (__exception != null) GameHooks.BackpackDeployed.RunFaulted(__state, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(SentryGunInstance), nameof(SentryGunInstance.OnSpawn))]
+internal static class SentrySpawnedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(SentryGunInstance __instance, pGearSpawnData spawnData, out (SentryGunInstance, pGearSpawnData) __state)
+    { __state = (__instance, spawnData); GameHooks.SentrySpawned.RunBefore(__state); }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After((SentryGunInstance Sentry, pGearSpawnData Data) __state, bool __runOriginal) => GameHooks.SentrySpawned.RunAfter(__state, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, (SentryGunInstance Sentry, pGearSpawnData Data) __state) { if (__exception != null) GameHooks.SentrySpawned.RunFaulted(__state, __exception); return __exception; }
+}

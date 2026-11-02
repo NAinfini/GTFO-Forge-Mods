@@ -1,0 +1,1141 @@
+{
+  "kind": "forge-library-manifest",
+  "schemaVersion": 1,
+  "library": "ForgeUI",
+  "packageName": "NAinfini-ForgeUI",
+  "version": "0.1.0",
+  "groups": [
+    {
+      "id": "regions",
+      "title": "HUD regions",
+      "entries": [
+        {
+          "id": "WeaponList",
+          "summary": "Under the game's weapon list, right-aligned, stacking downwards.",
+          "details": {
+            "flowX": -1,
+            "flowY": -1
+          }
+        },
+        {
+          "id": "Vitals",
+          "summary": "Above the game's health bar and vitals, centred on the bar, stacking upwards.",
+          "details": {
+            "flowX": 0,
+            "flowY": 1
+          }
+        },
+        {
+          "id": "CenterBanner",
+          "summary": "A little above the middle of the screen: one element at a time (the highest priority one that is shown).",
+          "details": {
+            "flowX": 0,
+            "flowY": 0
+          }
+        },
+        {
+          "id": "TopCenter",
+          "summary": "The top edge of the screen, centred, stacking downwards.",
+          "details": {
+            "flowX": 0,
+            "flowY": -1
+          }
+        },
+        {
+          "id": "Notices",
+          "summary": "The top left corner under the game's own objective text, stacking downwards.",
+          "details": {
+            "flowX": 1,
+            "flowY": -1
+          }
+        },
+        {
+          "id": "RightColumn",
+          "summary": "The right edge in the middle of the screen, right-aligned, stacking downwards.",
+          "details": {
+            "flowX": -1,
+            "flowY": -1
+          }
+        },
+        {
+          "id": "BottomLeft",
+          "summary": "The bottom left corner, stacking upwards.",
+          "details": {
+            "flowX": 1,
+            "flowY": 1
+          }
+        },
+        {
+          "id": "BottomRight",
+          "summary": "The bottom right corner, right-aligned, stacking upwards.",
+          "details": {
+            "flowX": -1,
+            "flowY": 1
+          }
+        },
+        {
+          "id": "World",
+          "summary": "Free: the element's root is the middle of the screen and it follows places in the world (markers, hit ticks, damage numbers). It takes no room and is not laid out.",
+          "details": {
+            "flowX": 0,
+            "flowY": 0
+          }
+        },
+        {
+          "id": "TopRight",
+          "summary": "The top right corner, right-aligned, stacking downwards.",
+          "details": {
+            "flowX": -1,
+            "flowY": -1
+          }
+        },
+        {
+          "id": "TopLeft",
+          "summary": "The top left corner, stacking downwards (above Notices, which leaves room for the game's own objective text).",
+          "details": {
+            "flowX": 1,
+            "flowY": -1
+          }
+        }
+      ]
+    },
+    {
+      "id": "registrations",
+      "title": "Registrations",
+      "entries": [
+        {
+          "id": "AddCrosshairAttachment(string)",
+          "summary": "Marks drawn on the game's crosshair layer: a thin ring, ticks, an optional dot and a landing circle (see CrosshairAttachment). Null (logged) when the name cannot be used or is taken.",
+          "name": "AddCrosshairAttachment",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "CrosshairAttachment"
+          }
+        },
+        {
+          "id": "AddEnemyHealthBars(string, EnemyHealthBarStyle?)",
+          "summary": "Adds a switch for enemy health bars: while it is Active, an enemy the local player hits gets a thin bar over its head showing the health the game holds for it (on every machine the game applies every player's hits, so a teammate's damage shows too). The piece each hit takes flashes and then shrinks away. Bars show only for enemies in sight (a wall between hides the bar), fade a few seconds after the last hit and go at once when the enemy dies. Damage numbers and kill marks are the hit feedback's (AddHitFeedback). The player can turn every bar off in ForgeUI's config (EnemyHealthBars / Enabled).",
+          "name": "AddEnemyHealthBars",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "style",
+              "type": "EnemyHealthBarStyle?",
+              "summary": "",
+              "default": "null"
+            }
+          ],
+          "details": {
+            "returns": "EnemyHealthBar"
+          }
+        },
+        {
+          "id": "AddInteractPrompt(string)",
+          "summary": "A claim on the game's interaction prompt (the line near the middle of the screen with a key in brackets). Call Show every frame the prompt should be up (the game's own prompts replace it between frames) and Hide when it should go. Null (logged) when the name cannot be used or is taken.",
+          "name": "AddInteractPrompt",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "InteractPrompt"
+          }
+        },
+        {
+          "id": "AddCountdownMarker(Vector3, UIText, float, Color)",
+          "summary": "One of the game's world markers that counts down to arriveAt (Time.time) at position: name small and pale, then the seconds left in large digits (one decimal) in accent and, over the last three seconds, red and larger. Call Update every frame: it keeps the marker beside the position and changes the text only when a tenth of a second passes. Null (logged) when the game's marker layer refuses the marker.",
+          "name": "AddCountdownMarker",
+          "parameters": [
+            {
+              "name": "position",
+              "type": "Vector3",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "name",
+              "type": "UIText",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "arriveAt",
+              "type": "float",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "accent",
+              "type": "Color",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "NavMarkerHandle"
+          }
+        },
+        {
+          "id": "AddHitFeedback(string, HitFeedbackStyle?)",
+          "summary": "Adds a switch for hit feedback: while it is Active, damage numbers float up from where hits land (hits on one target close together add up into one number), a marker flashes round the crosshair on a hit (stronger for a weak spot, larger and red for a kill), a kill leaves a short mark where the target was and a small confirmation beside the crosshair. With LocalHits the local player's hits on enemies drive it on their own; Pulse, Show and ShowAt drive it from your own code. The player can turn all hit feedback off in ForgeUI's config (HitFeedback / Enabled).",
+          "name": "AddHitFeedback",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "style",
+              "type": "HitFeedbackStyle?",
+              "summary": "",
+              "default": "null"
+            }
+          ],
+          "details": {
+            "returns": "HitFeedback"
+          }
+        },
+        {
+          "id": "AddKeyAction(string, string, string, string, KeyMode, string)",
+          "summary": "Registers a key action the player can rebind in the game's settings (Controls, under your group's heading). Read it every frame through the handle. Keys the player never changed follow defaultKey, also when you change the default in a later version. Two actions on one key in overlapping contexts, or on a key the game itself uses, are shown in the settings and logged; ForgeUI never moves anyone's key. Use the game's own bindings (InputAction) for what the game already has a key for, rather than a second action.",
+          "name": "AddKeyAction",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "nameKey",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "groupKey",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "defaultKey",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "mode",
+              "type": "KeyMode",
+              "summary": "",
+              "default": "KeyMode.Press"
+            },
+            {
+              "name": "context",
+              "type": "string",
+              "summary": "",
+              "default": "\"\""
+            }
+          ],
+          "details": {
+            "returns": "KeyAction"
+          }
+        },
+        {
+          "id": "AddLobbyStrip(string, Func<SNet_Player, IReadOnlyList<LobbyStripItem>?>, int)",
+          "summary": "A row of slot cells on every lobby bar with a player (the local one and everyone else's), one button step under the APPAREL button and the lobby buttons and exactly as wide as they are: each cell a chamfered tile in one muted dark tone with a light outline and a light band along its cut corner, the picture in its own colours. items gives each player's cells in slot order (null or empty shows no row); pass Empty for a free slot. Called once per bar per frame; it may return the same list it keeps, and the row is redrawn only when that content changes. Null (logged) when the name cannot be used or is taken.",
+          "name": "AddLobbyStrip",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "items",
+              "type": "Func<SNet_Player, IReadOnlyList<LobbyStripItem>?>",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "maxItems",
+              "type": "int",
+              "summary": "",
+              "default": 6
+            }
+          ],
+          "details": {
+            "returns": "LobbyStrip"
+          }
+        },
+        {
+          "id": "AddPowerOn(string, PowerOnSpec)",
+          "summary": "A screen power-on and power-down played over the whole picture (see ScreenPowerOn): your panels and seams cut the screen, each panel comes on in its block's turn of Timeline with ForgeUI's glitch (the picture in your tint, banding, scanlines, split into your three channel colours with torn bands and noise bars in them) settling to the plain picture, and the seams fade once every block has settled; powering down runs the blocks in reverse to black and clears. An exclusive layer at Priority. Built and compiled by WarmNextLayer (or Warm). Null (logged) when the name is taken or the panels do not match the timeline.",
+          "name": "AddPowerOn",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "spec",
+              "type": "PowerOnSpec",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "ScreenPowerOn"
+          }
+        },
+        {
+          "id": "AddHitEdge(string)",
+          "summary": "Hit-direction flashes on the screen edge (an overlay layer, see HitEdge). Null (logged) when the name is taken.",
+          "name": "AddHitEdge",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "HitEdge"
+          }
+        },
+        {
+          "id": "AddVisor(string)",
+          "summary": "A helmet visor over the screen (an overlay layer, see Visor). Null (logged) when the name is taken.",
+          "name": "AddVisor",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "Visor"
+          }
+        },
+        {
+          "id": "AddTeammateTag(string, Func<SNet_Player, TeammateTag>)",
+          "summary": "Adds a tag to every teammate row of every teammates panel (HudTeammates, whichever mod made it): per player, a status picture and a short value at the row's right before the health, and a hairline share under the health. read runs once per row per frame while a panel is drawn; return None for a player the tag does not apply to, and the same string while the value is the same. A callback that throws is turned off (logged once).",
+          "name": "AddTeammateTag",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "read",
+              "type": "Func<SNet_Player, TeammateTag>",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "TeammateTagSource"
+          }
+        },
+        {
+          "id": "AddLoadout(string, HudSlot?)",
+          "summary": "The game's whole inventory in the cockpit style (see HudLoadout). Default slot: bottom right, above a moved chat. It stands in for the game's weapon list: while a mod hides that list, every mod's WeaponList elements stack on past the loadout.",
+          "name": "AddLoadout",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "slot",
+              "type": "HudSlot?",
+              "summary": "",
+              "default": "null"
+            }
+          ],
+          "details": {
+            "returns": "HudLoadout"
+          }
+        },
+        {
+          "id": "AddSegmentBar(string, Func<float>, int, HudSlot?)",
+          "summary": "A compact segmented bar for the top of the screen (see HudSegmentBar). Default slot: top centre.",
+          "name": "AddSegmentBar",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "value",
+              "type": "Func<float>",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "segments",
+              "type": "int",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "slot",
+              "type": "HudSlot?",
+              "summary": "",
+              "default": "null"
+            }
+          ],
+          "details": {
+            "returns": "HudSegmentBar"
+          }
+        },
+        {
+          "id": "AddArcGauge(string, Func<float>, ArcSide)",
+          "summary": "A half arc beside the crosshair (see HudArcGauge; region World).",
+          "name": "AddArcGauge",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "value",
+              "type": "Func<float>",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "side",
+              "type": "ArcSide",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "HudArcGauge"
+          }
+        },
+        {
+          "id": "AddBearingArc(string, int, HudSlot?)",
+          "summary": "Contacts round the crosshair (see HudBearingArc; region World).",
+          "name": "AddBearingArc",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "capacity",
+              "type": "int",
+              "summary": "",
+              "default": 24
+            },
+            {
+              "name": "slot",
+              "type": "HudSlot?",
+              "summary": "",
+              "default": "null"
+            }
+          ],
+          "details": {
+            "returns": "HudBearingArc"
+          }
+        },
+        {
+          "id": "AddSilhouette(string, IReadOnlyList<Sprite?>, HudSlot?)",
+          "summary": "A hull status disc of same-size layers (see HudSilhouette). Default slot: bottom left. A missing picture (null, for example an art file that was not found) is logged as an error and its layer is not drawn; the other layers keep their index.",
+          "name": "AddSilhouette",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "layers",
+              "type": "IReadOnlyList<Sprite?>",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "slot",
+              "type": "HudSlot?",
+              "summary": "",
+              "default": "null"
+            }
+          ],
+          "details": {
+            "returns": "HudSilhouette"
+          }
+        },
+        {
+          "id": "AddObjectives(string, HudSlot?)",
+          "summary": "The game's objectives in the kit's style (see HudObjectives). Default slot: the notices corner.",
+          "name": "AddObjectives",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "slot",
+              "type": "HudSlot?",
+              "summary": "",
+              "default": "null"
+            }
+          ],
+          "details": {
+            "returns": "HudObjectives"
+          }
+        },
+        {
+          "id": "AddInteraction(string)",
+          "summary": "The game's interaction prompt under the crosshair (see HudInteraction; region World).",
+          "name": "AddInteraction",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "HudInteraction"
+          }
+        },
+        {
+          "id": "AddSubtitles(string)",
+          "summary": "The game's subtitles low in the middle (see HudSubtitles; region World).",
+          "name": "AddSubtitles",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "HudSubtitles"
+          }
+        },
+        {
+          "id": "AddTeammates(string, HudSlot?)",
+          "summary": "The other players (see HudTeammates). Default slot: bottom left.",
+          "name": "AddTeammates",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "slot",
+              "type": "HudSlot?",
+              "summary": "",
+              "default": "null"
+            }
+          ],
+          "details": {
+            "returns": "HudTeammates"
+          }
+        },
+        {
+          "id": "AddLabel(string, Func<string>[])",
+          "summary": "A few short lines of small text (see HudLabel). Default slot: top left.",
+          "name": "AddLabel",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "lines",
+              "type": "Func<string>[]",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "HudLabel"
+          }
+        },
+        {
+          "id": "AddLabel(string, HudSlot?, Func<string>[])",
+          "summary": "A few short lines of small text in slot (null: the top left corner; see HudLabel).",
+          "name": "AddLabel",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "slot",
+              "type": "HudSlot?",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "lines",
+              "type": "Func<string>[]",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "HudLabel"
+          }
+        },
+        {
+          "id": "AddTimeline(string)",
+          "summary": "A time bar across the bottom of the screen (HudTimeline), hidden until you set Visible. Null (logged) when the name cannot be used or is taken.",
+          "name": "AddTimeline",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "HudTimeline"
+          }
+        },
+        {
+          "id": "AddBootMessage(string, BootMessageBeats, BootMessageLook, HudSlot?)",
+          "summary": "A power-on message with your beats, colours and words (see HudBootMessage). Default slot: the centre banner, priority 100, sized by look.",
+          "name": "AddBootMessage",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "beats",
+              "type": "BootMessageBeats",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "look",
+              "type": "BootMessageLook",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "slot",
+              "type": "HudSlot?",
+              "summary": "",
+              "default": "null"
+            }
+          ],
+          "details": {
+            "returns": "HudBootMessage"
+          }
+        },
+        {
+          "id": "AddSkillSlot(string, Func<float>, float, UIText?, HudSlot?)",
+          "summary": "An ability slot (see HudSkillSlot). remaining is read every frame and returns the seconds left (0 when ready); cooldown is the full length. Default slot: bottom left.",
+          "name": "AddSkillSlot",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "remaining",
+              "type": "Func<float>",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "cooldown",
+              "type": "float",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "key",
+              "type": "UIText?",
+              "summary": "",
+              "default": "null"
+            },
+            {
+              "name": "slot",
+              "type": "HudSlot?",
+              "summary": "",
+              "default": "null"
+            }
+          ],
+          "details": {
+            "returns": "HudSkillSlot"
+          }
+        },
+        {
+          "id": "AddKeyHint(string, KeyCode, UIText, HudSlot?)",
+          "summary": "A key prompt for a keyboard or mouse key (named the way the game names it). Default slot: under the weapon list.",
+          "name": "AddKeyHint",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "key",
+              "type": "KeyCode",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "label",
+              "type": "UIText",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "slot",
+              "type": "HudSlot?",
+              "summary": "",
+              "default": "null"
+            }
+          ],
+          "details": {
+            "returns": "HudKeyHint"
+          }
+        },
+        {
+          "id": "AddKeyHint(string, InputAction, UIText, HudSlot?)",
+          "summary": "A key prompt for a game action, showing whatever the player has bound to it. Default slot: under the weapon list.",
+          "name": "AddKeyHint",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "action",
+              "type": "InputAction",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "label",
+              "type": "UIText",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "slot",
+              "type": "HudSlot?",
+              "summary": "",
+              "default": "null"
+            }
+          ],
+          "details": {
+            "returns": "HudKeyHint"
+          }
+        },
+        {
+          "id": "AddKeyHint(string, KeyAction, UIText, HudSlot?)",
+          "summary": "A key prompt for one of your key actions (AddKeyAction), showing the key the player gave it. Default slot: under the weapon list.",
+          "name": "AddKeyHint",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "action",
+              "type": "KeyAction",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "label",
+              "type": "UIText",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "slot",
+              "type": "HudSlot?",
+              "summary": "",
+              "default": "null"
+            }
+          ],
+          "details": {
+            "returns": "HudKeyHint"
+          }
+        },
+        {
+          "id": "AddHintLine(string, HudSlot?)",
+          "summary": "A line of mixed words and key boxes (\"Release [F] to cancel\"); give the parts with Set. Default slot: under the weapon list. To put the same line inside an element of your own, use HintRow.",
+          "name": "AddHintLine",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "slot",
+              "type": "HudSlot?",
+              "summary": "",
+              "default": "null"
+            }
+          ],
+          "details": {
+            "returns": "HudHintLine"
+          }
+        },
+        {
+          "id": "AddCommandList(string, UIText, UIText, UIText, int, int)",
+          "summary": "The list of commands called by typing an arrow code (see HudCommandList). Hidden until you call Show. It stands at the right edge of the screen, its middle on the middle of the screen, clear of the rest of the HUD (CommandDock); while it shows, the game's glass reflection is held off (a hide claim named name + Glass).",
+          "name": "AddCommandList",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "title",
+              "type": "UIText",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "heldTitle",
+              "type": "UIText",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "heldLabel",
+              "type": "UIText",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "maxItems",
+              "type": "int",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "maxSteps",
+              "type": "int",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "HudCommandList"
+          }
+        },
+        {
+          "id": "AddBanner(string, int)",
+          "summary": "A claim on the shared banner (big text a little above the middle of the screen). Banners of every mod share one slot: priority decides against other mods' banners (higher takes the slot, equal or lower waits).",
+          "name": "AddBanner",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "priority",
+              "type": "int",
+              "summary": "",
+              "default": 0
+            }
+          ],
+          "details": {
+            "returns": "HudBanner"
+          }
+        },
+        {
+          "id": "AddNotices(string)",
+          "summary": "A claim on the shared notice list in the top left corner (under where the game draws its objective).",
+          "name": "AddNotices",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "HudNotices"
+          }
+        },
+        {
+          "id": "AddWaypoints(string, int)",
+          "summary": "World points this mod places (see HudWaypoints): up to capacity (1..64) marks with a label, distance and an arrow on the screen's edge while off screen, and, for points that ask, a mark on every bearing ring that shows the compass. Region World.",
+          "name": "AddWaypoints",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "capacity",
+              "type": "int",
+              "summary": "",
+              "default": 16
+            }
+          ],
+          "details": {
+            "returns": "HudWaypoints"
+          }
+        },
+        {
+          "id": "AddLobbyButton(string, UIText, Action<CM_PlayerLobbyBar>, Func<string>?, Func<CM_PlayerLobbyBar, bool>?)",
+          "summary": "Adds a button to the lobby player bar, under the game's APPAREL button. Buttons from all mods stack downwards in the order of their full IDs.",
+          "name": "AddLobbyButton",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "title",
+              "type": "UIText",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "onClick",
+              "type": "Action<CM_PlayerLobbyBar>",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "note",
+              "type": "Func<string>?",
+              "summary": "",
+              "default": "null"
+            },
+            {
+              "name": "visible",
+              "type": "Func<CM_PlayerLobbyBar, bool>?",
+              "summary": "",
+              "default": "null"
+            }
+          ],
+          "details": {
+            "returns": "LobbyButton"
+          }
+        },
+        {
+          "id": "AddMenuBarButton(string, UIText, Action)",
+          "summary": "Adds a button to the top menu bar of every page, after the game's left-hand buttons (SETTINGS, RUNDOWN, LOADOUT). Buttons from all mods follow in the order of their full IDs.",
+          "name": "AddMenuBarButton",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "title",
+              "type": "UIText",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "onClick",
+              "type": "Action",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "MenuBarButton"
+          }
+        },
+        {
+          "id": "AddMenuBarPage(string, UIText, Action<MenuBarPage>, Action?)",
+          "summary": "Adds a menu bar button (as AddMenuBarButton) that opens and closes a page: a window under the menu bar with title as its heading, closed by its close box, a click outside it or the button again. Its content is yours: build is called the first time the page is opened from a page's menu bar (so once per game page it is opened on) and fills Root, for example with AddText. When the language changes the page is built again, so text keys given to the page show in the new language.",
+          "name": "AddMenuBarPage",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "title",
+              "type": "UIText",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "build",
+              "type": "Action<MenuBarPage>",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "clicked",
+              "type": "Action?",
+              "summary": "",
+              "default": "null"
+            }
+          ],
+          "details": {
+            "returns": "MenuBarButton"
+          }
+        },
+        {
+          "id": "AddMenuBarScreen(string, UIText, Action<MenuScreen>, Action?)",
+          "summary": "Adds a menu bar button that opens a full screen on the game's settings page, built from that page's own pieces (see MenuScreen): build adds sections, windows, rows and buttons every time it opens, so what it shows is current. Call Rebuild to build it again while it is open; any page change closes it.",
+          "name": "AddMenuBarScreen",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "title",
+              "type": "UIText",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "build",
+              "type": "Action<MenuScreen>",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "clicked",
+              "type": "Action?",
+              "summary": "",
+              "default": "null"
+            }
+          ],
+          "details": {
+            "returns": "MenuBarButton"
+          }
+        },
+        {
+          "id": "AddHud(string, HudSlot, Action<HudElement>)",
+          "summary": "Adds an element to the in-level HUD in slot's region. ForgeUI places the elements of every mod: a region stacks its elements by priority with a gap, keeps them clear of each other and of the game's weapon list and vitals, and collapses (and logs) the lowest priority ones when it is full. build runs each time the game creates its HUD (every level) and puts your pieces under Root with AddText and AddSprite, which copy the game's own HUD text and sprites, so they are drawn by the game's HUD camera, sway with the HUD and hide with it. Draw from the root in the region's direction (FlowX, FlowY).",
+          "name": "AddHud",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "slot",
+              "type": "HudSlot",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "build",
+              "type": "Action<HudElement>",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "HudElement"
+          }
+        }
+      ]
+    },
+    {
+      "id": "icons",
+      "title": "Game icons",
+      "entries": [
+        {
+          "id": "Game:symbol_hostile",
+          "summary": "The hollow triangle on an enemy's tag marker."
+        },
+        {
+          "id": "Game:cellUI_SmallTriangleFill",
+          "summary": "A small filled triangle."
+        },
+        {
+          "id": "Game:CircleBigMiddleSize_Fill",
+          "summary": "A filled circle."
+        },
+        {
+          "id": "Game:GUIX_Detail_BoxFilled_AA_Centered",
+          "summary": "A filled square."
+        }
+      ]
+    }
+  ]
+}

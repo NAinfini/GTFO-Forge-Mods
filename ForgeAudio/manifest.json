@@ -1,0 +1,7 @@
+{
+  "name": "ForgeAudio",
+  "version_number": "0.1.0",
+  "website_url": "https://github.com/NAinfini/GTFO-Forge-Mods",
+  "description": "Public GTFO audio library: Ogg Vorbis cues, positioned and attached playback, voice budgets, occlusion and sounds every player hears.",
+  "dependencies": ["BepInEx-BepInExPack_GTFO-3.2.4", "NAinfini-ForgeCore-0.1.0"]
+}

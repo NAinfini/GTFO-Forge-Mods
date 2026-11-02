@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Text.Json;
 
-namespace ForgeWeaponEnergyLabExperimental.Presentation;
+namespace ForgeWeaponEnergyLab.Presentation;
 
 // The bundle's presentation-profile, written by tools/BuildWeaponBundle.cs from the parts library.
 // Unity coordinates in metres: +Z muzzle, +Y up, root origin at the right-hand grip.

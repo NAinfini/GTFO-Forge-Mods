@@ -1,0 +1,165 @@
+{
+  "buses": {
+    "energy": { "category": "weapon", "gain": 2 },
+    "boom": { "category": "explosion", "gain": 2 },
+    "grenade-shot": {
+      "category": "weapon",
+      "seats": 1
+    },
+    "grenade-boom": {
+      "category": "explosion",
+      "seats": 4,
+      "duck": {
+        "categories": [
+          "debris",
+          "ambience"
+        ],
+        "db": 6
+      }
+    }
+  },
+  "cues": {
+    "beam-start": { "bus": "energy", "environment": false, "space": { "near": 2, "far": 30 } },
+    "beam-loop": { "bus": "energy", "loop": true, "environment": false, "space": { "near": 2, "far": 30 } },
+    "beam-stop": { "bus": "energy", "environment": false, "space": { "near": 2, "far": 30 } },
+    "beam-hit": { "bus": "energy", "environment": false, "space": { "near": 1.5, "far": 25 } },
+    "arc-fire": { "bus": "energy", "environment": false, "space": { "near": 1, "far": 24 } },
+    "arc-loop": { "bus": "energy", "loop": true, "environment": false, "space": { "near": 2, "far": 24 } },
+    "arc-hit": { "bus": "energy", "environment": false, "space": { "near": 1, "far": 24 } },
+    "plasma-charge-rise": { "bus": "energy", "environment": false, "space": { "near": 2, "far": 24 } },
+    "plasma-charge-loop": { "bus": "energy", "loop": true, "environment": false, "space": { "near": 2, "far": 24 } },
+    "plasma-charge-full": { "bus": "energy", "environment": false, "space": { "near": 2, "far": 24 } },
+    "plasma-charge-cancel": { "bus": "energy", "environment": false, "space": { "near": 2, "far": 24 } },
+    "orb-fire": { "bus": "energy", "environment": false, "space": { "near": 2, "far": 30 } },
+    "orb-fly-loop": { "bus": "energy", "loop": true, "environment": false, "space": { "near": 2, "far": 30 } },
+    "shock-fly-loop": { "bus": "energy", "loop": true, "environment": false, "space": { "near": 2, "far": 30 } },
+    "orb-explode": { "bus": "boom", "priority": 150, "environment": false, "space": { "near": 1.5, "far": 36 } },
+    "shock-fire": { "bus": "energy", "environment": false, "space": { "near": 2, "far": 30 } },
+    "shock-fade": { "bus": "energy", "environment": false, "space": { "near": 1.5, "far": 30 } },
+    "shock-hit": { "bus": "energy", "environment": false, "space": { "near": 1, "far": 22 } },
+    "shock-pulse": { "bus": "energy", "environment": false, "space": { "near": 1, "far": 24 } },
+    "blast-fire": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 200,
+      "maxVoices": 12,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 1,
+      "bus": "grenade-shot",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 4,
+        "far": 50
+      },
+      "place": {
+        "self": "2d",
+        "other": "auto"
+      },
+      "layers": [
+        {
+          "clips": [
+            "weapon.grenade_fire-01.ogg",
+            "weapon.grenade_fire-02.ogg"
+          ],
+          "gainDb": -0.5,
+          "fadeInMs": 4,
+          "fadeOutMs": 43
+        }
+      ]
+    },
+    "blast-cycle": { "bus": "energy", "environment": false, "space": { "near": 2, "far": 30 } },
+    "blast-explode": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 210,
+      "maxVoices": 16,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 4,
+      "bus": "grenade-boom",
+      "pitch": [
+        0.97,
+        1.03
+      ],
+      "space": {
+        "near": 8,
+        "far": 180,
+        "curve": [
+          [
+            0,
+            1
+          ],
+          [
+            8,
+            1
+          ],
+          [
+            40,
+            0.61
+          ],
+          [
+            90,
+            0.3
+          ],
+          [
+            180,
+            0
+          ]
+        ]
+      },
+      "layers": [
+        {
+          "clips": [
+            "weapon.grenade_burst-l1-01.ogg"
+          ]
+        },
+        {
+          "clips": [
+            "weapon.grenade_burst-l2-01.ogg",
+            "weapon.grenade_burst-l2-02.ogg",
+            "weapon.grenade_burst-l2-03.ogg"
+          ],
+          "gainDb": -0.8,
+          "fadeInMs": 4,
+          "fadeOutMs": 80
+        },
+        {
+          "clips": [
+            "weapon.grenade_burst-l3-01.ogg"
+          ],
+          "offsetMs": 275
+        },
+        {
+          "clips": [
+            "weapon.grenade_burst-l4-01.ogg",
+            "weapon.grenade_burst-l4-02.ogg"
+          ],
+          "gainDb": -10.8,
+          "fadeInMs": 4,
+          "fadeOutMs": 80,
+          "distance": {
+            "min": 40
+          }
+        }
+      ]
+    },
+    "disc-fire": { "bus": "energy", "environment": false, "space": { "near": 2, "far": 30 } },
+    "disc-fly-loop": { "bus": "energy", "loop": true, "environment": false, "space": { "near": 4, "far": 36 } },
+    "disc-bounce": { "bus": "energy", "environment": false, "space": { "near": 4, "far": 36 } },
+    "disc-drop": { "bus": "energy", "environment": false, "space": { "near": 3, "far": 30 } },
+    "flame-start": { "bus": "energy", "environment": false, "space": { "near": 2, "far": 24 } },
+    "flame-loop": { "bus": "energy", "loop": true, "environment": false, "space": { "near": 2, "far": 24 } },
+    "flame-stop": { "bus": "energy", "environment": false, "space": { "near": 2, "far": 24 } },
+    "flame-hit": { "bus": "energy", "environment": false, "space": { "near": 3, "far": 18 } },
+    "flame-crackle": { "bus": "energy", "environment": false, "space": { "near": 3, "far": 18 } },
+    "gravity-fire": { "bus": "energy", "environment": false, "space": { "near": 2, "far": 30 } },
+    "gravity-fly-loop": { "bus": "energy", "loop": true, "environment": false, "space": { "near": 3, "far": 30 } },
+    "gravity-open": { "bus": "energy", "environment": false, "space": { "near": 5, "far": 40 } },
+    "gravity-close": { "bus": "energy", "environment": false, "space": { "near": 5, "far": 40 } },
+    "gravity-field-loop": { "bus": "energy", "loop": true, "environment": false, "space": { "near": 5, "far": 40 } }
+  }
+}

@@ -1,0 +1,1452 @@
+{
+  "schemaVersion": "1.0.0",
+  "cues": {
+    "exo.visor_boot": {
+      "maxSeconds": 2.5,
+      "layers": [
+        {
+          "offsetMs": 467
+        },
+        {
+          "fadeOutMs": 375
+        }
+      ]
+    },
+    "exo.footstep": {
+      "maxSeconds": 1,
+      "layers": [
+        {
+          "fadeOutMs": 150
+        },
+        {
+          "fadeOutMs": 150
+        },
+        {
+          "fadeOutMs": 150
+        },
+        {
+          "fadeOutMs": 60
+        }
+      ]
+    },
+    "exo.servo_loop": {
+      "layers": [
+        {}
+      ]
+    },
+    "exo.damage_alarm": {
+      "maxSeconds": 1.5,
+      "layers": [
+        {},
+        {}
+      ]
+    },
+    "exo.destroyed": {
+      "maxSeconds": 5,
+      "layers": [
+        {},
+        {}
+      ]
+    },
+    "exo.voice_ready": {
+      "maxSeconds": 2.5,
+      "layers": [
+        {}
+      ]
+    },
+    "exo.boost": {
+      "layers": [
+        {
+          "gainDb": -3.6
+        }
+      ]
+    },
+    "exo.rocket": {
+      "maxSeconds": 2.5,
+      "layers": [
+        {
+          "gainDb": -2.8,
+          "fadeOutMs": 80
+        }
+      ]
+    },
+    "exo.shield_up": {
+      "maxSeconds": 2.5,
+      "layers": [
+        {
+          "gainDb": -2,
+          "fadeInMs": 4,
+          "fadeOutMs": 75
+        },
+        {
+          "gainDb": -4.6,
+          "fadeOutMs": 80
+        }
+      ]
+    },
+    "exo.shield_hit": {
+      "maxSeconds": 1,
+      "layers": [
+        {
+          "offsetMs": 190
+        },
+        {
+          "offsetMs": 145,
+          "fadeOutMs": 57
+        },
+        {
+          "fadeOutMs": 158
+        }
+      ]
+    },
+    "exo.shield_down": {
+      "maxSeconds": 3,
+      "layers": [
+        {
+          "fadeOutMs": 20
+        },
+        {
+          "gainDb": -7.5,
+          "fadeInMs": 4,
+          "fadeOutMs": 80
+        },
+        {
+          "offsetMs": 380,
+          "gainDb": -6.4,
+          "fadeInMs": 4,
+          "fadeOutMs": 80
+        },
+        {
+          "fadeOutMs": 170
+        },
+        {}
+      ]
+    },
+    "ui.hold_complete": {
+      "maxSeconds": 0.6,
+      "layers": [
+        {}
+      ]
+    },
+    "ui.hold_cancel": {
+      "maxSeconds": 0.6,
+      "layers": [
+        {
+          "fadeOutMs": 75
+        }
+      ]
+    },
+    "exo.hatch_close": {
+      "maxSeconds": 2.5,
+      "layers": [
+        {},
+        {
+          "fadeOutMs": 350
+        },
+        {},
+        {
+          "offsetMs": 510
+        }
+      ]
+    },
+    "exo.hud_section": {
+      "maxSeconds": 0.5,
+      "layers": [
+        {}
+      ]
+    },
+    "exo.unseal": {
+      "maxSeconds": 3.2,
+      "layers": [
+        {},
+        {
+          "fadeOutMs": 220
+        },
+        {
+          "offsetMs": 569
+        }
+      ]
+    },
+    "exo.power_down": {
+      "maxSeconds": 3.5,
+      "layers": [
+        {},
+        {},
+        {
+          "offsetMs": 674,
+          "fadeOutMs": 550
+        }
+      ]
+    },
+    "exo.jump": {
+      "maxSeconds": 1.2,
+      "layers": [
+        {
+          "fadeOutMs": 144
+        },
+        {},
+        {}
+      ]
+    },
+    "exo.reload_start": {
+      "maxSeconds": 1,
+      "layers": [
+        {
+          "gainDb": -0.7,
+          "fadeOutMs": 47
+        }
+      ]
+    },
+    "exo.reload_done": {
+      "maxSeconds": 0.8,
+      "layers": [
+        {
+          "gainDb": -2,
+          "fadeOutMs": 29
+        }
+      ]
+    },
+    "exo.dry_fire": {
+      "maxSeconds": 0.5,
+      "layers": [
+        {
+          "gainDb": -0.1,
+          "fadeInMs": 4,
+          "fadeOutMs": 15
+        }
+      ]
+    },
+    "exo.boost_end": {
+      "maxSeconds": 2,
+      "layers": [
+        {
+          "gainDb": -4.5,
+          "fadeInMs": 4,
+          "fadeOutMs": 80
+        }
+      ]
+    },
+    "exo.siege_on": {
+      "maxSeconds": 3,
+      "layers": [
+        {},
+        {}
+      ]
+    },
+    "exo.siege_off": {
+      "maxSeconds": 3,
+      "layers": [
+        {}
+      ]
+    },
+    "exo.siege_deploy": {
+      "maxSeconds": 1.5,
+      "layers": [
+        {
+          "fadeInMs": 4,
+          "fadeOutMs": 120
+        }
+      ]
+    },
+    "exo.breach_hit": {
+      "maxSeconds": 2.5,
+      "layers": [
+        {},
+        {
+          "gainDb": -1.5,
+          "fadeInMs": 4,
+          "fadeOutMs": 80
+        },
+        {
+          "fadeOutMs": 388
+        }
+      ]
+    },
+    "exo.shove_hit": {
+      "maxSeconds": 1,
+      "layers": [
+        {}
+      ]
+    },
+    "exo.armor_hit": {
+      "maxSeconds": 1,
+      "layers": [
+        {},
+        {}
+      ]
+    },
+    "exo.land": {
+      "maxSeconds": 1.6,
+      "layers": [
+        {}
+      ]
+    },
+    "exo.rocket_blast": {
+      "maxSeconds": 2.5,
+      "layers": [
+        {
+          "fadeOutMs": 400
+        },
+        {
+          "gainDb": -3.0,
+          "fadeOutMs": 300
+        }
+      ]
+    },
+    "exo.siege_bolt": {
+      "maxSeconds": 0.5,
+      "layers": [
+        {
+          "gainDb": -0.1,
+          "fadeInMs": 4,
+          "fadeOutMs": 15
+        }
+      ]
+    },
+    "exo.plate_slide": {
+      "maxSeconds": 2.2,
+      "layers": [
+        {},
+        {},
+        {},
+        {
+          "offsetMs": 160
+        },
+        {
+          "offsetMs": 298
+        }
+      ]
+    },
+    "exo.landing": {
+      "maxSeconds": 5,
+      "layers": [
+        {
+          "gainDb": -5.5
+        },
+        {},
+        {
+          "gainDb": -0.5
+        }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "forgeordnance.frames:exo.rocket_blast-l1-01",
+      "cue": "exo.rocket_blast",
+      "layer": 1,
+      "path": "<sound library>/音效/爆炸破坏/035 爆炸冲击破坏电影游戏音效/Destruction CK/DTCK EXPLOSION Gas.wav",
+      "pack": "Boom Library - 035 爆炸冲击破坏电影游戏音效",
+      "license": "Boom Library",
+      "sha256": "f5ef033fd9b49170f46f8f4f0cfff8a3b5f5b3bd344757cf6800f70e8a8124c4",
+      "title": "DTCK EXPLOSION Gas",
+      "start": 0.15,
+      "duration": 2.4
+    },
+    {
+      "id": "forgeordnance.frames:exo.rocket_blast-l1-02",
+      "cue": "exo.rocket_blast",
+      "layer": 1,
+      "path": "<sound library>/音效/爆炸破坏/035 爆炸冲击破坏电影游戏音效/Destruction CK/DTCK EXPLOSION Gas.wav",
+      "pack": "Boom Library - 035 爆炸冲击破坏电影游戏音效",
+      "license": "Boom Library",
+      "sha256": "f5ef033fd9b49170f46f8f4f0cfff8a3b5f5b3bd344757cf6800f70e8a8124c4",
+      "title": "DTCK EXPLOSION Gas",
+      "start": 4.61,
+      "duration": 2.4
+    },
+    {
+      "id": "forgeordnance.frames:exo.rocket_blast-l1-03",
+      "cue": "exo.rocket_blast",
+      "layer": 1,
+      "path": "<sound library>/音效/爆炸破坏/035 爆炸冲击破坏电影游戏音效/Destruction CK/DTCK EXPLOSION Gas.wav",
+      "pack": "Boom Library - 035 爆炸冲击破坏电影游戏音效",
+      "license": "Boom Library",
+      "sha256": "f5ef033fd9b49170f46f8f4f0cfff8a3b5f5b3bd344757cf6800f70e8a8124c4",
+      "title": "DTCK EXPLOSION Gas",
+      "start": 9.19,
+      "duration": 2.4
+    },
+    {
+      "id": "forgeordnance.frames:exo.rocket_blast-l1-04",
+      "cue": "exo.rocket_blast",
+      "layer": 1,
+      "path": "<sound library>/音效/爆炸破坏/035 爆炸冲击破坏电影游戏音效/Destruction CK/DTCK EXPLOSION Gas.wav",
+      "pack": "Boom Library - 035 爆炸冲击破坏电影游戏音效",
+      "license": "Boom Library",
+      "sha256": "f5ef033fd9b49170f46f8f4f0cfff8a3b5f5b3bd344757cf6800f70e8a8124c4",
+      "title": "DTCK EXPLOSION Gas",
+      "start": 14.01,
+      "duration": 2.4
+    },
+    {
+      "id": "forgeordnance.frames:exo.rocket_blast-l2-01",
+      "cue": "exo.rocket_blast",
+      "layer": 2,
+      "path": "<sound library>/音效/爆炸破坏/035 爆炸冲击破坏电影游戏音效/Destruction CK/DTCK SWEETENER IMPACT Explosion Tight.wav",
+      "pack": "Boom Library - 035 爆炸冲击破坏电影游戏音效",
+      "license": "Boom Library",
+      "sha256": "3effaf7e2448f13d72806faf32ddf848d7c2a3f3e0e6d919e51d67d9f1b5e251",
+      "title": "DTCK SWEETENER IMPACT Explosion Tight",
+      "start": 0.24,
+      "duration": 1.5
+    },
+    {
+      "id": "forgeordnance.frames:exo.rocket_blast-l2-02",
+      "cue": "exo.rocket_blast",
+      "layer": 2,
+      "path": "<sound library>/音效/爆炸破坏/035 爆炸冲击破坏电影游戏音效/Destruction CK/DTCK SWEETENER IMPACT Explosion Tight.wav",
+      "pack": "Boom Library - 035 爆炸冲击破坏电影游戏音效",
+      "license": "Boom Library",
+      "sha256": "3effaf7e2448f13d72806faf32ddf848d7c2a3f3e0e6d919e51d67d9f1b5e251",
+      "title": "DTCK SWEETENER IMPACT Explosion Tight",
+      "start": 2.29,
+      "duration": 1.5
+    },
+    {
+      "id": "forgeordnance.frames:exo.rocket_blast-l2-03",
+      "cue": "exo.rocket_blast",
+      "layer": 2,
+      "path": "<sound library>/音效/爆炸破坏/035 爆炸冲击破坏电影游戏音效/Destruction CK/DTCK SWEETENER IMPACT Explosion Tight.wav",
+      "pack": "Boom Library - 035 爆炸冲击破坏电影游戏音效",
+      "license": "Boom Library",
+      "sha256": "3effaf7e2448f13d72806faf32ddf848d7c2a3f3e0e6d919e51d67d9f1b5e251",
+      "title": "DTCK SWEETENER IMPACT Explosion Tight",
+      "start": 4.34,
+      "duration": 1.5
+    },
+    {
+      "id": "forgeordnance.frames:exo.servo_loop-l1-01",
+      "cue": "exo.servo_loop",
+      "layer": 1,
+      "path": "<sound library>/音效/机械机器人/129 机械与机器人变形机甲/Mechs & Robots Designed/ROBTMisc_GUNBUSTER-Large Idle Loop_B00M_MRDS.wav",
+      "pack": "Boom Library - 129 机械与机器人变形机甲",
+      "license": "Boom Library",
+      "sha256": "943e3e5f94d91002961db817bc81598bf9201aa5f24c51c2c36c6af83a3176d6",
+      "title": "ROBTMisc_GUNBUSTER-Large Idle Loop_B00M_MRDS",
+      "start": 0.0,
+      "duration": 31.473
+    },
+    {
+      "id": "forgeordnance.frames:exo.boost-l1-01",
+      "cue": "exo.boost",
+      "layer": 1,
+      "path": "<sound library>/音效/科幻能量/108 飞船宇宙空间站史诗震撼科幻场景音效/Sci-Fi Momentum CK/DSGNSrce_ENGINE RAW-Flappy Exhaust Constant High_B00M_SFMCK.wav",
+      "pack": "Boom Library - 108 飞船宇宙空间站史诗震撼科幻场景音效",
+      "license": "Boom Library",
+      "sha256": "1a84fbb799cbae102799f8387ee2fad998bd5df84dd8960f082c8f23242a6939",
+      "title": "DSGNSrce_ENGINE RAW-Flappy Exhaust Constant High_B00M_SFMCK",
+      "start": 0.06,
+      "duration": 29.9
+    },
+    {
+      "id": "forgeordnance.frames:exo.boost-l1-02",
+      "cue": "exo.boost",
+      "layer": 1,
+      "path": "<sound library>/音效/科幻能量/108 飞船宇宙空间站史诗震撼科幻场景音效/Sci-Fi Momentum CK/DSGNSrce_ENGINE PROCESSED MID-Hover Tone_B00M_SFMCK.wav",
+      "pack": "Boom Library - 108 飞船宇宙空间站史诗震撼科幻场景音效",
+      "license": "Boom Library",
+      "sha256": "9f8a0a7a66446b32165ce5364ca0ca6d79b16aaa39777c34ba5aad898bcbe9d2",
+      "title": "DSGNSrce_ENGINE PROCESSED MID-Hover Tone_B00M_SFMCK",
+      "start": 0.07,
+      "duration": 30.0
+    },
+    {
+      "id": "forgeordnance.frames:exo.boost-l1-03",
+      "cue": "exo.boost",
+      "layer": 1,
+      "path": "<sound library>/音效/科幻能量/108 飞船宇宙空间站史诗震撼科幻场景音效/Sci-Fi Momentum CK/DSGNSrce_ENGINE PROCESSED LOW-Hover Fluid Modulated Tonal_B00M_SFMCK.wav",
+      "pack": "Boom Library - 108 飞船宇宙空间站史诗震撼科幻场景音效",
+      "license": "Boom Library",
+      "sha256": "c2102471b938db633db5d681b3665050626043c806fb4e116cd8aac8c39fc3db",
+      "title": "DSGNSrce_ENGINE PROCESSED LOW-Hover Fluid Modulated Tonal_B00M_SFMCK",
+      "start": 0.2,
+      "duration": 30.0
+    },
+    {
+      "id": "forgeordnance.frames:exo.shield_up-l1-01",
+      "cue": "exo.shield_up",
+      "layer": 1,
+      "path": "<sound library>/音效/科幻能量/108 飞船宇宙空间站史诗震撼科幻场景音效/Sci-Fi Momentum CK/DSGNSrce_ENGINE PROCESSED LOW-Choppy Motor Pops_B00M_SFMCK.wav",
+      "pack": "Boom Library - 108 飞船宇宙空间站史诗震撼科幻场景音效",
+      "license": "Boom Library",
+      "sha256": "af0a4df7d6cd5329763ab681be33a4ffc8da0e068fefa43190dacd00334b8e12",
+      "title": "DSGNSrce_ENGINE PROCESSED LOW-Choppy Motor Pops_B00M_SFMCK",
+      "start": 0.195,
+      "duration": 0.3
+    },
+    {
+      "id": "forgeordnance.frames:exo.shield_up-l1-02",
+      "cue": "exo.shield_up",
+      "layer": 1,
+      "path": "<sound library>/音效/科幻能量/108 飞船宇宙空间站史诗震撼科幻场景音效/Sci-Fi Momentum CK/DSGNDist_AIR DISTORTION-Pops Mid Range Thrusty Burn_B00M_SFMCK.wav",
+      "pack": "Boom Library - 108 飞船宇宙空间站史诗震撼科幻场景音效",
+      "license": "Boom Library",
+      "sha256": "ae2fb278df0fa4b48818d4e5192feaa2b4211f13215610150b24d55fc8ed947b",
+      "title": "DSGNDist_AIR DISTORTION-Pops Mid Range Thrusty Burn_B00M_SFMCK",
+      "start": 0.262,
+      "duration": 0.3
+    },
+    {
+      "id": "forgeordnance.frames:exo.shield_up-l1-03",
+      "cue": "exo.shield_up",
+      "layer": 1,
+      "path": "<sound library>/音效/科幻能量/108 飞船宇宙空间站史诗震撼科幻场景音效/Sci-Fi Momentum CK/DSGNSrce_SERVO-Close Double Release Medium_B00M_SFMCK.wav",
+      "pack": "Boom Library - 108 飞船宇宙空间站史诗震撼科幻场景音效",
+      "license": "Boom Library",
+      "sha256": "5c46d57d882835a2fd0a0b0911e24cf9fe8d4ccefc56117af0defb1ffdae9eb8",
+      "title": "DSGNSrce_SERVO-Close Double Release Medium_B00M_SFMCK",
+      "start": 7.075,
+      "duration": 0.3
+    },
+    {
+      "id": "forgeordnance.frames:exo.shield_up-l2-01",
+      "cue": "exo.shield_up",
+      "layer": 2,
+      "path": "<sound library>/音效/科幻能量/科幻飞船武器与机械界面设计音效/Calibration & Maintenance/GL_RangeCalibration_CT.wav",
+      "pack": "8600 高质量音效合集（GL_*_CT）",
+      "license": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+      "sha256": "6d6119a1f4a1388c980c5ebb4ed251dea3fa0ba03ecfb78fa6880963459f5e6e",
+      "title": "GL_RangeCalibration_CT",
+      "start": 0.005,
+      "duration": 1.318
+    },
+    {
+      "id": "forgeordnance.frames:exo.shield_up-l2-02",
+      "cue": "exo.shield_up",
+      "layer": 2,
+      "path": "<sound library>/音效/科幻能量/科幻飞船武器与机械界面设计音效/Calibration & Maintenance/GL_SmallServoCalibration_CT.wav",
+      "pack": "8600 高质量音效合集（GL_*_CT）",
+      "license": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+      "sha256": "fd3b8e3f450dc30ce19b0a0a5389ff7937fb71a53f7257cec3d5380a1b202eaa",
+      "title": "GL_SmallServoCalibration_CT",
+      "start": 0.0,
+      "duration": 1.584
+    },
+    {
+      "id": "forgeordnance.frames:exo.shield_hit-l1-01",
+      "cue": "exo.shield_hit",
+      "layer": 1,
+      "path": "<sound library>/音效/科幻能量/108 飞船宇宙空间站史诗震撼科幻场景音效/Sci-Fi Momentum CK/METLImpt_IMPACT PROCESSED-Granular Gear Attach Double Hit_B00M_SFMCK.wav",
+      "pack": "Boom Library - 108 飞船宇宙空间站史诗震撼科幻场景音效",
+      "license": "Boom Library",
+      "sha256": "e0c98f9a15189eb90a54cecdc53a31fc0159a8d885dbf32d447f35642060d8b0",
+      "title": "METLImpt_IMPACT PROCESSED-Granular Gear Attach Double Hit_B00M_SFMCK",
+      "start": 0.23,
+      "duration": 0.66
+    },
+    {
+      "id": "forgeordnance.frames:exo.shield_hit-l2-01",
+      "cue": "exo.shield_hit",
+      "layer": 2,
+      "path": "<sound library>/音效/魔法/013 巫术魔法法师游戏技能音效/Magic DS/MADS Electric Arrow 02 Hit.wav",
+      "pack": "Boom Library - 013 巫术魔法法师游戏技能音效",
+      "license": "Boom Library",
+      "sha256": "5123b3d969536f7b4f4b529df25740483b522ef6307de885b1778cc923e262ef",
+      "title": "MADS Electric Arrow 02 Hit",
+      "start": 0.175,
+      "duration": 0.855
+    },
+    {
+      "id": "forgeordnance.frames:exo.shield_hit-l3-01",
+      "cue": "exo.shield_hit",
+      "layer": 3,
+      "path": "<sound library>/音效/爆炸破坏/爆炸打击与外骨骼护盾音效/exo.shield_hit/465541_1474204-hq.mp3",
+      "pack": "Freesound",
+      "license": "CC BY 4.0",
+      "sha256": "3ede47cde722b75d0ae06bd6ed166538ea0eb7741feabd168c229cf35d32b491",
+      "title": "465541_1474204-hq",
+      "start": 0.035,
+      "duration": 0.63,
+      "author": "steaq",
+      "url": "https://freesound.org/people/steaq/sounds/465541/",
+      "attribution": "\"Sci Fi Shield Hit (OGG)\" by steaq (https://freesound.org/people/steaq/sounds/465541/), licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)"
+    },
+    {
+      "id": "forgeordnance.frames:exo.shield_down-l1-01",
+      "cue": "exo.shield_down",
+      "layer": 1,
+      "path": "<sound library>/音效/武器枪械/033 狙击枪机枪开枪突击武器音效/Assault Weapons DS/AWDS AR AK 47 Krinkov Modern Auto.wav",
+      "pack": "Boom Library - 033 狙击枪机枪开枪突击武器音效",
+      "license": "Boom Library",
+      "sha256": "e4b20c1cc3779d4e8f59eaa30d0a8f8239f31ca523becc432eff6839544a2a9c",
+      "title": "AWDS AR AK 47 Krinkov Modern Auto",
+      "start": 0.085,
+      "duration": 0.08
+    },
+    {
+      "id": "forgeordnance.frames:exo.shield_down-l2-01",
+      "cue": "exo.shield_down",
+      "layer": 2,
+      "path": "<sound library>/音效/机械机器人/037 机器零件机械齿轮音效/Mechanicals DS/MEDS Medium Crankminer Short.wav",
+      "pack": "Boom Library - 037 机器零件机械齿轮音效",
+      "license": "Boom Library",
+      "sha256": "7cdda9c826d8eef772b3e26a101b9fbb379e6ad2b8b554a11a8cf1c3786c9808",
+      "title": "MEDS Medium Crankminer Short",
+      "start": 0.218,
+      "duration": 1.192
+    },
+    {
+      "id": "forgeordnance.frames:exo.shield_down-l2-02",
+      "cue": "exo.shield_down",
+      "layer": 2,
+      "path": "<sound library>/音效/机械机器人/037 机器零件机械齿轮音效/Mechanicals DS/MEDS Medium Chunky Metal Mayhem Short.wav",
+      "pack": "Boom Library - 037 机器零件机械齿轮音效",
+      "license": "Boom Library",
+      "sha256": "0cf72c5f11c8490728da78a0f3b64f1c261f91805e7abe0d8a0667b2e7c3e804",
+      "title": "MEDS Medium Chunky Metal Mayhem Short",
+      "start": 0.234,
+      "duration": 1.346
+    },
+    {
+      "id": "forgeordnance.frames:exo.shield_down-l3-01",
+      "cue": "exo.shield_down",
+      "layer": 3,
+      "path": "<sound library>/音效/界面UI/按键信标与空投科幻提示音/exo.boost_end/131931_1542102-hq.mp3",
+      "pack": "Freesound",
+      "license": "CC0 1.0",
+      "sha256": "8a72303aedd5882ed2cdce21f8c83285141179908de8259a9fc0f049d20254a6",
+      "title": "131931_1542102-hq",
+      "start": 0.169,
+      "duration": 1.541,
+      "author": "mcpable",
+      "url": "https://freesound.org/people/mcpable/sounds/131931/"
+    },
+    {
+      "id": "forgeordnance.frames:exo.shield_down-l3-02",
+      "cue": "exo.shield_down",
+      "layer": 3,
+      "path": "<sound library>/音效/界面UI/按键信标与空投科幻提示音/exo.power_down/395378_4373137-hq.mp3",
+      "pack": "Freesound",
+      "license": "CC0 1.0",
+      "sha256": "798b7522670141afea8e698ae8f8b4d4d0587676c0154a3d0fcd74ae07b4cd5d",
+      "title": "395378_4373137-hq",
+      "start": 0.065,
+      "duration": 2.142,
+      "author": "Skylar1146",
+      "url": "https://freesound.org/people/Skylar1146/sounds/395378/"
+    },
+    {
+      "id": "forgeordnance.frames:exo.shield_down-l3-03",
+      "cue": "exo.shield_down",
+      "layer": 3,
+      "path": "<sound library>/音效/界面UI/按键信标与空投科幻提示音/turret.expire/443465_1079491-hq.mp3",
+      "pack": "Freesound",
+      "license": "CC0 1.0",
+      "sha256": "40a88bc8770938186ba8ea1c305ab50eae5b73fea2ed75e60acd83f91b6f7bc3",
+      "title": "443465_1079491-hq",
+      "start": 0.0,
+      "duration": 1.515,
+      "author": "squidge316",
+      "url": "https://freesound.org/people/squidge316/sounds/443465/"
+    },
+    {
+      "id": "forgeordnance.frames:exo.shield_down-l4-01",
+      "cue": "exo.shield_down",
+      "layer": 4,
+      "path": "<sound library>/音效/科幻能量/科幻飞船武器与机械界面设计音效/警报和故障 Alerts & Malfunctions/GL_MediumServoError_CT.wav",
+      "pack": "8600 高质量音效合集（GL_*_CT）",
+      "license": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+      "sha256": "9223ef76d6e4969aeb92d4a916da6c8b775c12106dd92c5cfb17367eb690904b",
+      "title": "GL_MediumServoError_CT",
+      "start": 0.765,
+      "duration": 1.921
+    },
+    {
+      "id": "forgeordnance.frames:exo.shield_down-l5-01",
+      "cue": "exo.shield_down",
+      "layer": 5,
+      "path": "<sound library>/音效/科幻能量/BluezoneCorp 外星三足战争机器/Bluezone_BC0292_alien_tripod_debris_glass_falling_003.wav",
+      "pack": "BluezoneCorp 外星三足战争机器",
+      "license": "Sonniss royalty-free (bundle year not recorded in the library index)",
+      "sha256": "04b2cc42758cec33a91b28e059e7c408a9215311407ebac1e71b8e2060ce39a1",
+      "title": "Bluezone_BC0292_alien_tripod_debris_glass_falling_003",
+      "start": 0.0,
+      "duration": 1.5
+    },
+    {
+      "id": "forgeordnance.frames:exo.rocket-l1-01",
+      "cue": "exo.rocket",
+      "layer": 1,
+      "path": "<sound library>/音效/科幻能量/科幻飞船武器与机械界面设计音效/武器 Weapons/GL_PhaseCannon_CT.wav",
+      "pack": "8600 高质量音效合集（GL_*_CT）",
+      "license": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+      "sha256": "22967f0fc68d68ebdc48c87a39021757bc7ce711c74efafb7aa790a7ee56f148",
+      "title": "GL_PhaseCannon_CT",
+      "start": 0.0,
+      "duration": 0.98
+    },
+    {
+      "id": "forgeordnance.frames:exo.rocket-l1-02",
+      "cue": "exo.rocket",
+      "layer": 1,
+      "path": "<sound library>/音效/科幻能量/科幻飞船武器与机械界面设计音效/武器 Weapons/GL_MeteorGatlingRifle2_CT.wav",
+      "pack": "8600 高质量音效合集（GL_*_CT）",
+      "license": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+      "sha256": "aa622475db8d20f917379e4ea6a290bdb8df549c4f8bb755ad7ba09537af7013",
+      "title": "GL_MeteorGatlingRifle2_CT",
+      "start": 0.0,
+      "duration": 1.02
+    },
+    {
+      "id": "forgeordnance.frames:exo.rocket-l1-03",
+      "cue": "exo.rocket",
+      "layer": 1,
+      "path": "<sound library>/音效/科幻能量/科幻飞船武器与机械界面设计音效/武器 Weapons/GL_MeteorGatlingRifle5_CT.wav",
+      "pack": "8600 高质量音效合集（GL_*_CT）",
+      "license": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+      "sha256": "f07c73512581094e88158f36257f36f1f57b962999fe1b7ecadf1eb76b4010bc",
+      "title": "GL_MeteorGatlingRifle5_CT",
+      "start": 0.096,
+      "duration": 1.004
+    },
+    {
+      "id": "forgeordnance.frames:exo.boost_end-l1-01",
+      "cue": "exo.boost_end",
+      "layer": 1,
+      "path": "<sound library>/音效/界面UI/按键信标与空投科幻提示音/exo.boost_end/131931_1542102-hq.mp3",
+      "pack": "Freesound",
+      "license": "CC0 1.0",
+      "sha256": "8a72303aedd5882ed2cdce21f8c83285141179908de8259a9fc0f049d20254a6",
+      "title": "131931_1542102-hq",
+      "start": 0.169,
+      "duration": 1.541,
+      "author": "mcpable",
+      "url": "https://freesound.org/people/mcpable/sounds/131931/"
+    },
+    {
+      "id": "forgeordnance.frames:exo.boost_end-l1-02",
+      "cue": "exo.boost_end",
+      "layer": 1,
+      "path": "<sound library>/音效/界面UI/056 未来科幻UI动态界面音效/Future Technology/FX_Hologram_Call_End_02.wav",
+      "pack": "Boom Library - 056 未来科幻UI动态界面音效",
+      "license": "Boom Library",
+      "sha256": "a23d639b7a88931065000f9de0374d0b453206c75747aaecc2ede73a31306a89",
+      "title": "FX_Hologram_Call_End_02",
+      "start": 0.115,
+      "duration": 0.92
+    },
+    {
+      "id": "forgeordnance.frames:exo.boost_end-l1-03",
+      "cue": "exo.boost_end",
+      "layer": 1,
+      "path": "<sound library>/音效/界面UI/056 未来科幻UI动态界面音效/Future Technology/FX_Hologram_Call_End_01.wav",
+      "pack": "Boom Library - 056 未来科幻UI动态界面音效",
+      "license": "Boom Library",
+      "sha256": "8db7cef8629077129a30eece3fe607dce326a38910e428f3dd3c09f37c8fd7e1",
+      "title": "FX_Hologram_Call_End_01",
+      "start": 0.185,
+      "duration": 0.835
+    },
+    {
+      "id": "forgeordnance.frames:exo.breach_hit-l1-01",
+      "cue": "exo.breach_hit",
+      "layer": 1,
+      "path": "<sound library>/音效/武器枪械/011 中世纪刀斧棍棒矛冷兵器音效/Medieval Weapons CK/Siege Wood Drop Medium 05.wav",
+      "pack": "Boom Library - 011 中世纪刀斧棍棒矛冷兵器音效",
+      "license": "Boom Library",
+      "sha256": "60da8f2042296efa1fdeac1d366f9194c395e0df9184150d7e207002dd7ae5b1",
+      "title": "Siege Wood Drop Medium 05",
+      "start": 0.0,
+      "duration": 0.56
+    },
+    {
+      "id": "forgeordnance.frames:exo.breach_hit-l2-01",
+      "cue": "exo.breach_hit",
+      "layer": 2,
+      "path": "<sound library>/音效/预告片设计/027 紧张怪异邪恶恐怖惊悚电影音效/Cinematic Horror CK/HRCK Impact - Huge Cardboard Ensemble.wav",
+      "pack": "Boom Library - 027 紧张怪异邪恶恐怖惊悚电影音效",
+      "license": "Boom Library",
+      "sha256": "ad93eae65e64d39be28e3d3cffd67021b6836a408db5eecb3af911debbc92dd2",
+      "title": "HRCK Impact - Huge Cardboard Ensemble",
+      "start": 0.125,
+      "duration": 1.2
+    },
+    {
+      "id": "forgeordnance.frames:exo.breach_hit-l2-02",
+      "cue": "exo.breach_hit",
+      "layer": 2,
+      "path": "<sound library>/音效/预告片设计/028 大气震撼低音冲击电影史诗预告片音效/Cinematic Hits DS/CH-DS HIT Massive 02.wav",
+      "pack": "Boom Library - 028 大气震撼低音冲击电影史诗预告片音效",
+      "license": "Boom Library",
+      "sha256": "73b053a00d1bde5623e4fd27aaea6269dc1fc9d4c20c3a85d0588edd862dae26",
+      "title": "CH-DS HIT Massive 02",
+      "start": 0.152,
+      "duration": 2.5
+    },
+    {
+      "id": "forgeordnance.frames:exo.breach_hit-l2-03",
+      "cue": "exo.breach_hit",
+      "layer": 2,
+      "path": "<sound library>/音效/预告片设计/028 大气震撼低音冲击电影史诗预告片音效/Cinematic Hits DS/CH-DS HIT Massive 07.wav",
+      "pack": "Boom Library - 028 大气震撼低音冲击电影史诗预告片音效",
+      "license": "Boom Library",
+      "sha256": "9d97e4a8ebfe39822a35d2b941d56d04d1b6ca3cdbd5f6c2003992c0e1ff563c",
+      "title": "CH-DS HIT Massive 07",
+      "start": 0.015,
+      "duration": 2.5
+    },
+    {
+      "id": "forgeordnance.frames:exo.breach_hit-l3-01",
+      "cue": "exo.breach_hit",
+      "layer": 3,
+      "path": "<sound library>/音效/预告片设计/电影重击与打击冲击音效/SL 10 Massive Strike.wav",
+      "pack": "电影重击与打击冲击音效",
+      "license": "来源不明（音效库索引未标注授权；所有者在选音台中选定）",
+      "sha256": "0f03a106a8a5b5d986d317674d7c165c6594f11f6c97035fb0da22fbea908e15",
+      "title": "SL 10 Massive Strike",
+      "start": 0.035,
+      "duration": 1.2
+    },
+    {
+      "id": "forgeordnance.frames:exo.reload_start-l1-01",
+      "cue": "exo.reload_start",
+      "layer": 1,
+      "path": "<sound library>/音效/界面UI/按键信标与空投科幻提示音/exo.reload_start/719243_7157894-hq.mp3",
+      "pack": "Freesound",
+      "license": "CC0 1.0",
+      "sha256": "b3e7c94dcd8380dc0d04a710e2d8e68f90780d1cf0e1a71d1950c67af4a5d575",
+      "title": "719243_7157894-hq",
+      "start": 0.0,
+      "duration": 0.472,
+      "author": "serøutōnin--deprivəd",
+      "url": "https://freesound.org/people/serøutōnin--deprivəd/sounds/719243/"
+    },
+    {
+      "id": "forgeordnance.frames:exo.reload_start-l1-02",
+      "cue": "exo.reload_start",
+      "layer": 1,
+      "path": "<sound library>/音效/界面UI/按键信标与空投科幻提示音/exo.reload_done/561471_12429869-hq.mp3",
+      "pack": "Freesound",
+      "license": "CC0 1.0",
+      "sha256": "9c993fae2609d1f873a46a8f101a2e60d7b9e8a76ef4a23504b3d78486bc2d21",
+      "title": "561471_12429869-hq",
+      "start": 0.005,
+      "duration": 0.495,
+      "author": "GameWithBepis",
+      "url": "https://freesound.org/people/GameWithBepis/sounds/561471/"
+    },
+    {
+      "id": "forgeordnance.frames:exo.reload_done-l1-01",
+      "cue": "exo.reload_done",
+      "layer": 1,
+      "path": "<sound library>/音效/武器枪械/BluezoneCorp 蒸汽朋克武器音效/Bluezone_BC0296_steampunk_weapon_mechanism_texture_007.wav",
+      "pack": "BluezoneCorp 蒸汽朋克武器音效",
+      "license": "Sonniss royalty-free (bundle year not recorded in the library index)",
+      "sha256": "838a6c2c9a35bd8707c4ec83513cbf1ea29ea2d44c4049abd280bdc515d74096",
+      "title": "Bluezone_BC0296_steampunk_weapon_mechanism_texture_007",
+      "start": 0.0,
+      "duration": 0.29
+    },
+    {
+      "id": "forgeordnance.frames:exo.reload_done-l1-02",
+      "cue": "exo.reload_done",
+      "layer": 1,
+      "path": "<sound library>/音效/武器枪械/018 步枪手枪短枪开枪射击音效/Guns CK/Pistols/Beretta M9/Beretta M9 Handling 2x 01.wav",
+      "pack": "Boom Library - 018 步枪手枪短枪开枪射击音效",
+      "license": "Boom Library",
+      "sha256": "b5a975f9aaf06a07d6026b60174bbe036cc30de1a450c32ea55cbe4459ac0b5e",
+      "title": "Beretta M9 Handling 2x 01",
+      "start": 3.555,
+      "duration": 0.125
+    },
+    {
+      "id": "forgeordnance.frames:exo.reload_done-l1-03",
+      "cue": "exo.reload_done",
+      "layer": 1,
+      "path": "<sound library>/音效/武器枪械/018 步枪手枪短枪开枪射击音效/Guns CK/Pistols/Beretta M9/Beretta M9 Handling 2x 07.wav",
+      "pack": "Boom Library - 018 步枪手枪短枪开枪射击音效",
+      "license": "Boom Library",
+      "sha256": "cc2eebe0bc8d2e32ed456a39c42774f30c493d7c111448f2e9e19d7c75c8e18e",
+      "title": "Beretta M9 Handling 2x 07",
+      "start": 3.562,
+      "duration": 0.168
+    },
+    {
+      "id": "forgeordnance.frames:exo.dry_fire-l1-01",
+      "cue": "exo.dry_fire",
+      "layer": 1,
+      "path": "<sound library>/音效/界面UI/按键信标与空投科幻提示音/exo.dry_fire/674568_7157894-hq.mp3",
+      "pack": "Freesound",
+      "license": "CC0 1.0",
+      "sha256": "6700946539de625cafa82a8f8a9ba54f49abcb768430b482e85ed8e95ccdd549",
+      "title": "674568_7157894-hq",
+      "start": 0.021,
+      "duration": 0.149,
+      "author": "serøutōnin--deprivəd",
+      "url": "https://freesound.org/people/serøutōnin--deprivəd/sounds/674568/"
+    },
+    {
+      "id": "forgeordnance.frames:exo.dry_fire-l1-02",
+      "cue": "exo.dry_fire",
+      "layer": 1,
+      "path": "<sound library>/音效/界面UI/056 未来科幻UI动态界面音效/Future Technology/HIT_GUI_Single_Beep_High_02.wav",
+      "pack": "Boom Library - 056 未来科幻UI动态界面音效",
+      "license": "Boom Library",
+      "sha256": "ec6eb7f1f68f3d1d15a1b30e64a5b6c88a7878f3116fe01b025b272169acf9da",
+      "title": "HIT_GUI_Single_Beep_High_02",
+      "start": 0.0,
+      "duration": 0.237
+    },
+    {
+      "id": "forgeordnance.frames:exo.dry_fire-l1-03",
+      "cue": "exo.dry_fire",
+      "layer": 1,
+      "path": "<sound library>/音效/机械机器人/BluezoneCorp 微型齿轮机构音/Bluezone_BC0301_tiny_gears_small_mechanism_click_complex_011.wav",
+      "pack": "BluezoneCorp 微型齿轮机构音",
+      "license": "Sonniss royalty-free (bundle year not recorded in the library index)",
+      "sha256": "48e5e77e8d9258bd5d7c338ec4c7a39b9396ece77ae171f78210117b57b04f18",
+      "title": "Bluezone_BC0301_tiny_gears_small_mechanism_click_complex_011",
+      "start": 0.0,
+      "duration": 0.25
+    },
+    {
+      "id": "forgeordnance.frames:ui.hold_complete-l1-01",
+      "cue": "ui.hold_complete",
+      "layer": 1,
+      "path": "<sound library>/音效/界面UI/056 未来科幻UI动态界面音效/Future Technology/HIT_Signal_Triad_Short.wav",
+      "pack": "Boom Library - 056 未来科幻UI动态界面音效",
+      "license": "Boom Library",
+      "sha256": "732b9bc9ad99c26883910393716af31f14a126ce35359d82732711e89a3eff86",
+      "title": "HIT_Signal_Triad_Short",
+      "start": 0.0,
+      "duration": 0.278
+    },
+    {
+      "id": "forgeordnance.frames:exo.hatch_close-l1-01",
+      "cue": "exo.hatch_close",
+      "layer": 1,
+      "path": "<sound library>/音效/机械机器人/设计师机械伺服与金属拟音工具包/GL_Servo26_medium_veryshort_CT.wav",
+      "pack": "8600 高质量音效合集（GL_*_CT）",
+      "license": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+      "sha256": "71a29bf4f1f63b8a0c7e20d857d249098c0544b47d72839c845358346a3bd205",
+      "title": "GL_Servo26_medium_veryshort_CT",
+      "start": 0.0,
+      "duration": 0.313
+    },
+    {
+      "id": "forgeordnance.frames:exo.hatch_close-l2-01",
+      "cue": "exo.hatch_close",
+      "layer": 2,
+      "path": "<sound library>/音效/机械机器人/037 机器零件机械齿轮音效/Mechanicals DS/MEDS Large The Vault Door Long.wav",
+      "pack": "Boom Library - 037 机器零件机械齿轮音效",
+      "license": "Boom Library",
+      "sha256": "f5f55e41c8aef732c8cc071ae78e1f7c11a80cc9c0359b2ea00edf6fa8c8e755",
+      "title": "MEDS Large The Vault Door Long",
+      "start": 0.645,
+      "duration": 1.4
+    },
+    {
+      "id": "forgeordnance.frames:exo.hatch_close-l3-01",
+      "cue": "exo.hatch_close",
+      "layer": 3,
+      "path": "<sound library>/音效/机械机器人/设计师机械伺服与金属拟音工具包/GL_Servo31_large_short_CT.wav",
+      "pack": "8600 高质量音效合集（GL_*_CT）",
+      "license": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+      "sha256": "7bb5ce5a2e1c805f816b8c7f3211e283038eefa039d0f5828b64d0c9450092e2",
+      "title": "GL_Servo31_large_short_CT",
+      "start": 0.0,
+      "duration": 1.4
+    },
+    {
+      "id": "forgeordnance.frames:exo.hatch_close-l4-01",
+      "cue": "exo.hatch_close",
+      "layer": 4,
+      "path": "<sound library>/音效/预告片设计/028 大气震撼低音冲击电影史诗预告片音效/Cinematic Hits CK/CH-CK Metal Crash Large Door 04.wav",
+      "pack": "Boom Library - 028 大气震撼低音冲击电影史诗预告片音效",
+      "license": "Boom Library",
+      "sha256": "c365ca36a6ffcc56d1a4953dfe3cdc7cc2fa1545fb43b2725b7117d79ab2406b",
+      "title": "CH-CK Metal Crash Large Door 04",
+      "start": 11.18,
+      "duration": 0.89
+    },
+    {
+      "id": "forgeordnance.frames:exo.voice_ready-l1-01",
+      "cue": "exo.voice_ready",
+      "layer": 1,
+      "path": "<sound library>/音效/机械机器人/CB Sounddesign 高级安卓机器人语音/Maintenance complete.wav",
+      "pack": "CB Sounddesign - Sci-Fi Voices Volume 03 Advanced Android",
+      "license": "Sonniss GDC 2024 royalty-free",
+      "sha256": "449626ea296687ad9213ac23b70a0872ffafeb1f227bfe9e70e57246ae095a37",
+      "title": "Maintenance complete",
+      "start": 0.0,
+      "duration": 2.389
+    },
+    {
+      "id": "forgeordnance.frames:exo.unseal-l1-01",
+      "cue": "exo.unseal",
+      "layer": 1,
+      "path": "<sound library>/音效/科幻能量/科幻飞船武器与机械界面设计音效/Door & Hatch/GL_FuturisticHydraulicHatch_Opening_CT.wav",
+      "pack": "8600 高质量音效合集（GL_*_CT）",
+      "license": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+      "sha256": "2ec0957ab2ead11beb599acb9ac064c185519ec8731e194a3052bcc4adc1f768",
+      "title": "GL_FuturisticHydraulicHatch_Opening_CT",
+      "start": 0.0,
+      "duration": 2.0
+    },
+    {
+      "id": "forgeordnance.frames:exo.unseal-l2-01",
+      "cue": "exo.unseal",
+      "layer": 2,
+      "path": "<sound library>/音效/界面UI/按键信标与空投科幻提示音/exo.unseal/264061_2971294-hq.mp3",
+      "pack": "Freesound",
+      "license": "CC0 1.0",
+      "sha256": "4316ef248b3694d56f020907ba4d409eecd855033379f88e9f2fc341b3f04a14",
+      "title": "264061_2971294-hq",
+      "start": 0.0,
+      "duration": 1.121,
+      "author": "Paul368",
+      "url": "https://freesound.org/people/Paul368/sounds/264061/"
+    },
+    {
+      "id": "forgeordnance.frames:exo.unseal-l3-01",
+      "cue": "exo.unseal",
+      "layer": 3,
+      "path": "<sound library>/音效/界面UI/056 未来科幻UI动态界面音效/Future Technology/FX_Door_Open_02.wav",
+      "pack": "Boom Library - 056 未来科幻UI动态界面音效",
+      "license": "Boom Library",
+      "sha256": "5a853e85da56ad980bd026b186392501378b75c290dbb4c676f9628908348628",
+      "title": "FX_Door_Open_02",
+      "start": 0.0,
+      "duration": 1.285
+    },
+    {
+      "id": "forgeordnance.frames:exo.power_down-l1-01",
+      "cue": "exo.power_down",
+      "layer": 1,
+      "path": "<sound library>/音效/科幻能量/科幻飞船武器与机械界面设计音效/Servos & Machines/GL_MediumServoShutdown_CT.wav",
+      "pack": "8600 高质量音效合集（GL_*_CT）",
+      "license": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+      "sha256": "78dcee96b979949fde2180f9e321291467b7b4dc687f54eb1a695bea0fc1727f",
+      "title": "GL_MediumServoShutdown_CT",
+      "start": 0.0,
+      "duration": 2.65
+    },
+    {
+      "id": "forgeordnance.frames:exo.power_down-l2-01",
+      "cue": "exo.power_down",
+      "layer": 2,
+      "path": "<sound library>/音效/科幻能量/科幻飞船武器与机械界面设计音效/Servos & Machines/GL_SmallServoShutdown_CT.wav",
+      "pack": "8600 高质量音效合集（GL_*_CT）",
+      "license": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+      "sha256": "a13c8e8853aef16c8f62825b64a7c5685bf7d54e0dd0ba5384e180bf4a2b46e8",
+      "title": "GL_SmallServoShutdown_CT",
+      "start": 0.0,
+      "duration": 1.024
+    },
+    {
+      "id": "forgeordnance.frames:exo.power_down-l3-01",
+      "cue": "exo.power_down",
+      "layer": 3,
+      "path": "<sound library>/音效/科幻能量/科幻飞船武器与机械界面设计音效/Computer & Telemetry/GL_NeutronsShutdown_CT.wav",
+      "pack": "8600 高质量音效合集（GL_*_CT）",
+      "license": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+      "sha256": "a38b6481b82a0a44df75f6398d86ee40adf3b793c170089c87ea0df2f4cb2492",
+      "title": "GL_NeutronsShutdown_CT",
+      "start": 0.345,
+      "duration": 1.976
+    },
+    {
+      "id": "forgeordnance.frames:exo.footstep-l1-01",
+      "cue": "exo.footstep",
+      "layer": 1,
+      "path": "<sound library>/音效/机械机器人/129 机械与机器人变形机甲/Mechs & Robots Designed/ROBTMvmt_ANDROID-Medium Movement_B00M_MRDS.wav",
+      "pack": "Boom Library - 129 机械与机器人变形机甲",
+      "license": "Boom Library",
+      "sha256": "b7836c07f3e39ee6f1f32bd7ed6ab2bf1232f1e43babf903bab2b48947d3e566",
+      "title": "ROBTMvmt_ANDROID-Medium Movement_B00M_MRDS",
+      "start": 0.12,
+      "duration": 0.9
+    },
+    {
+      "id": "forgeordnance.frames:exo.footstep-l2-01",
+      "cue": "exo.footstep",
+      "layer": 2,
+      "path": "<sound library>/音效/机械机器人/129 机械与机器人变形机甲/Mechs & Robots Designed/ROBTMvmt_ANDROID-Medium Movement_B00M_MRDS.wav",
+      "pack": "Boom Library - 129 机械与机器人变形机甲",
+      "license": "Boom Library",
+      "sha256": "b7836c07f3e39ee6f1f32bd7ed6ab2bf1232f1e43babf903bab2b48947d3e566",
+      "title": "ROBTMvmt_ANDROID-Medium Movement_B00M_MRDS",
+      "start": 16.13,
+      "duration": 0.9
+    },
+    {
+      "id": "forgeordnance.frames:exo.footstep-l3-01",
+      "cue": "exo.footstep",
+      "layer": 3,
+      "path": "<sound library>/音效/机械机器人/129 机械与机器人变形机甲/Mechs & Robots Designed/ROBTMvmt_ANDROID-Medium Movement_B00M_MRDS.wav",
+      "pack": "Boom Library - 129 机械与机器人变形机甲",
+      "license": "Boom Library",
+      "sha256": "b7836c07f3e39ee6f1f32bd7ed6ab2bf1232f1e43babf903bab2b48947d3e566",
+      "title": "ROBTMvmt_ANDROID-Medium Movement_B00M_MRDS",
+      "start": 12.02,
+      "duration": 0.9
+    },
+    {
+      "id": "forgeordnance.frames:exo.footstep-l4-01",
+      "cue": "exo.footstep",
+      "layer": 4,
+      "path": "<sound library>/音效/机械机器人/129 机械与机器人变形机甲/Mechs & Robots Designed/ROBTMvmt_ANDROID-Medium Movement_B00M_MRDS.wav",
+      "pack": "Boom Library - 129 机械与机器人变形机甲",
+      "license": "Boom Library",
+      "sha256": "b7836c07f3e39ee6f1f32bd7ed6ab2bf1232f1e43babf903bab2b48947d3e566",
+      "title": "ROBTMvmt_ANDROID-Medium Movement_B00M_MRDS",
+      "start": 14.09,
+      "duration": 0.26
+    },
+    {
+      "id": "forgeordnance.frames:exo.land-l1-01",
+      "cue": "exo.land",
+      "layer": 1,
+      "path": "<sound library>/音效/机械机器人/DavidDumais 机械生物音效/CREAMisc_Heavy Mechanical Footsteps 03_DDUMAIS_MCSFX.wav",
+      "pack": "DavidDumais 机械生物音效",
+      "license": "Sonniss royalty-free (bundle year not recorded in the library index)",
+      "sha256": "ceed55ae03955880c86e33fdde67075ec6fc5de25acc22cab6a3018d4174f67d",
+      "title": "CREAMisc_Heavy Mechanical Footsteps 03_DDUMAIS_MCSFX",
+      "start": 0.03,
+      "duration": 1.07
+    },
+    {
+      "id": "forgeordnance.frames:exo.damage_alarm-l1-01",
+      "cue": "exo.damage_alarm",
+      "layer": 1,
+      "path": "<sound library>/音效/界面UI/按键信标与空投科幻提示音/ui.key_wrong/404150_6142149-hq.mp3",
+      "pack": "Freesound",
+      "license": "CC0 1.0",
+      "sha256": "6f87046a1872b99ea311a5bf351174ba763f5624739dc35dd77c1790b1a1e969",
+      "title": "404150_6142149-hq",
+      "start": 0.0,
+      "duration": 0.137,
+      "author": "LilMati",
+      "url": "https://freesound.org/people/LilMati/sounds/404150/"
+    },
+    {
+      "id": "forgeordnance.frames:exo.damage_alarm-l2-01",
+      "cue": "exo.damage_alarm",
+      "layer": 2,
+      "path": "<sound library>/音效/界面UI/BluezoneCorp 复古未来电脑音/Bluezone_BC0304_retrofuturistic_computer_alarm_005.wav",
+      "pack": "BluezoneCorp 复古未来电脑音",
+      "license": "Sonniss royalty-free (bundle year not recorded in the library index)",
+      "sha256": "898c110cf39ec79b30f48f5a965e394a0ff7ca4b3a4364188061729ac1a1e553",
+      "title": "Bluezone_BC0304_retrofuturistic_computer_alarm_005",
+      "start": 0.155,
+      "duration": 1.5
+    },
+    {
+      "id": "forgeordnance.frames:exo.destroyed-l1-01",
+      "cue": "exo.destroyed",
+      "layer": 1,
+      "path": "<sound library>/音效/机械机器人/129 机械与机器人变形机甲/Mechs & Robots Designed/ROBTMisc_TITAN-Large Dismantle_B00M_MRDS.wav",
+      "pack": "Boom Library - 129 机械与机器人变形机甲",
+      "license": "Boom Library",
+      "sha256": "c085ad7c0b8838e0b3ac7922a5c3388352ff73af40fd03311b9fc3f36c8681e2",
+      "title": "ROBTMisc_TITAN-Large Dismantle_B00M_MRDS",
+      "start": 7.25,
+      "duration": 1.7
+    },
+    {
+      "id": "forgeordnance.frames:exo.destroyed-l2-01",
+      "cue": "exo.destroyed",
+      "layer": 2,
+      "path": "<sound library>/音效/科幻能量/110 冲击粒子能量爆炸科幻元素音效/Matter - Sci-Fi Elements/EXPLDsgn_EXPLOSION LARGE-Deep Punch_B00M_MATTER.wav",
+      "pack": "Boom Library - 110 冲击粒子能量爆炸科幻元素音效",
+      "license": "Boom Library",
+      "sha256": "3142a2c612c305024f082eb388d44490a64036516ac34821a0d435122b0eabdf",
+      "title": "EXPLDsgn_EXPLOSION LARGE-Deep Punch_B00M_MATTER",
+      "start": 9.9,
+      "duration": 1.69
+    },
+    {
+      "id": "forgeordnance.frames:exo.siege_on-l1-01",
+      "cue": "exo.siege_on",
+      "layer": 1,
+      "path": "<sound library>/音效/机械机器人/037 机器零件机械齿轮音效/Mechanicals DS/MEDS Large Crossover Short.wav",
+      "pack": "Boom Library - 037 机器零件机械齿轮音效",
+      "license": "Boom Library",
+      "sha256": "aa453fcfc50ecde0174811aae3fa855f1612b0e06539b1d35c9bb5ce6eb0f566",
+      "title": "MEDS Large Crossover Short",
+      "start": 0.24,
+      "duration": 2.01
+    },
+    {
+      "id": "forgeordnance.frames:exo.siege_on-l2-01",
+      "cue": "exo.siege_on",
+      "layer": 2,
+      "path": "<sound library>/音效/冲击打击/052 大气危险紧张金属撞击泰坦黑暗风格电影预告片音效/Cinematic Metal - Titan CK/CTCK CLUNK Gear Shift Interior Fat Rattle Snap.wav",
+      "pack": "Boom Library - 052 大气危险紧张金属撞击泰坦黑暗风格电影预告片音效",
+      "license": "Boom Library",
+      "sha256": "86c2a65542d78d1636c6885630c012435a4b4d4ed85edc712ea7bac14bbe240f",
+      "title": "CTCK CLUNK Gear Shift Interior Fat Rattle Snap",
+      "start": 0.28,
+      "duration": 1.01
+    },
+    {
+      "id": "forgeordnance.frames:exo.siege_off-l1-01",
+      "cue": "exo.siege_off",
+      "layer": 1,
+      "path": "<sound library>/音效/机械机器人/037 机器零件机械齿轮音效/Mechanicals DS/MEDS Medium Crankminer Short.wav",
+      "pack": "Boom Library - 037 机器零件机械齿轮音效",
+      "license": "Boom Library",
+      "sha256": "7cdda9c826d8eef772b3e26a101b9fbb379e6ad2b8b554a11a8cf1c3786c9808",
+      "title": "MEDS Medium Crankminer Short",
+      "start": 5.2,
+      "duration": 1.69
+    },
+    {
+      "id": "forgeordnance.frames:exo.siege_deploy-l1-01",
+      "cue": "exo.siege_deploy",
+      "layer": 1,
+      "path": "<sound library>/音效/机械机器人/037 机器零件机械齿轮音效/Mechanicals DS/MEDS Tiny Pocket Watch Short.wav",
+      "pack": "Boom Library - 037 机器零件机械齿轮音效",
+      "license": "Boom Library",
+      "sha256": "cc32e4835f3c2fd0ad7195979373ed047cdec0e26b6fff72ccbb37b23cc9a225",
+      "title": "MEDS Tiny Pocket Watch Short",
+      "start": 0.15,
+      "duration": 1.2
+    },
+    {
+      "id": "forgeordnance.frames:exo.shove_hit-l1-01",
+      "cue": "exo.shove_hit",
+      "layer": 1,
+      "path": "<sound library>/音效/机械机器人/BluezoneCorp 蒸汽朋克机械音/Bluezone_BC0305_steampunk_machine_mechanical_texture_heavy_impact_011.wav",
+      "pack": "BluezoneCorp 蒸汽朋克机械音",
+      "license": "Sonniss royalty-free (bundle year not recorded in the library index)",
+      "sha256": "9596e5c7b8eb5ea393dd9c24083cd3e90359c1d7dbc0919381fdc1b5829e5f26",
+      "title": "Bluezone_BC0305_steampunk_machine_mechanical_texture_heavy_impact_011",
+      "start": 0.0,
+      "duration": 0.687
+    },
+    {
+      "id": "forgeordnance.frames:exo.armor_hit-l1-01",
+      "cue": "exo.armor_hit",
+      "layer": 1,
+      "path": "<sound library>/音效/机械机器人/129 机械与机器人变形机甲/Mechs & Robots Designed/ROBTMisc_MICROBOT-Small Damage_B00M_MRDS.wav",
+      "pack": "Boom Library - 129 机械与机器人变形机甲",
+      "license": "Boom Library",
+      "sha256": "94ca520f38ec5c947c4cc307801983ace638c5dd829773aa501fa822b3c58456",
+      "title": "ROBTMisc_MICROBOT-Small Damage_B00M_MRDS",
+      "start": 2.83,
+      "duration": 0.67
+    },
+    {
+      "id": "forgeordnance.frames:exo.armor_hit-l2-01",
+      "cue": "exo.armor_hit",
+      "layer": 2,
+      "path": "<sound library>/音效/机械机器人/129 机械与机器人变形机甲/Mechs & Robots Designed/ROBTMisc_MICROBOT-Small Damage_B00M_MRDS.wav",
+      "pack": "Boom Library - 129 机械与机器人变形机甲",
+      "license": "Boom Library",
+      "sha256": "94ca520f38ec5c947c4cc307801983ace638c5dd829773aa501fa822b3c58456",
+      "title": "ROBTMisc_MICROBOT-Small Damage_B00M_MRDS",
+      "start": 5.56,
+      "duration": 0.69
+    },
+    {
+      "id": "forgeordnance.frames:exo.jump-l1-01",
+      "cue": "exo.jump",
+      "layer": 1,
+      "path": "<sound library>/音效/爆炸破坏/爆炸打击与外骨骼护盾音效/exo.rocket/521377_10847299-hq.mp3",
+      "pack": "Freesound",
+      "license": "CC0 1.0",
+      "sha256": "056a9db66902e5f2d6ec7df188a80341bb3ba37b03e0ee8013cf170ae3773f4b",
+      "title": "521377_10847299-hq",
+      "start": 0.0,
+      "duration": 0.6,
+      "author": "Jarusca",
+      "url": "https://freesound.org/people/Jarusca/sounds/521377/"
+    },
+    {
+      "id": "forgeordnance.frames:exo.jump-l2-01",
+      "cue": "exo.jump",
+      "layer": 2,
+      "path": "<sound library>/音效/机械机器人/129 机械与机器人变形机甲/Mechs & Robots Designed/ROBTMvmt_AUTOMATON-Medium Footstep_B00M_MRDS.wav",
+      "pack": "Boom Library - 129 机械与机器人变形机甲",
+      "license": "Boom Library",
+      "sha256": "ee46ef3e7276cac96d894fa9b0081ac470b85b2053feddd7333ea83527d2df8a",
+      "title": "ROBTMvmt_AUTOMATON-Medium Footstep_B00M_MRDS",
+      "start": 12.3,
+      "duration": 0.6
+    },
+    {
+      "id": "forgeordnance.frames:exo.jump-l3-01",
+      "cue": "exo.jump",
+      "layer": 3,
+      "path": "<sound library>/音效/机械机器人/129 机械与机器人变形机甲/Mechs & Robots Designed/ROBTMvmt_SUMMONER-Medium Footstep_B00M_MRDS.wav",
+      "pack": "Boom Library - 129 机械与机器人变形机甲",
+      "license": "Boom Library",
+      "sha256": "3434009b13481d14f97d1ce009c1bab1220465e3ac0df261d3437e4f7713ce1d",
+      "title": "ROBTMvmt_SUMMONER-Medium Footstep_B00M_MRDS",
+      "start": 17.58,
+      "duration": 0.6
+    },
+    {
+      "id": "forgeordnance.frames:ui.hold_cancel-l1-01",
+      "cue": "ui.hold_cancel",
+      "layer": 1,
+      "path": "<sound library>/音效/科幻能量/科幻飞船武器与机械界面设计音效/UI/GL_Bleep_negative_CT.wav",
+      "pack": "8600 高质量音效合集（GL_*_CT）",
+      "license": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+      "sha256": "8442fe4114a017969e2e6b326aa6a6d9374015f883711b35bd0b2eb3ff3a0b07",
+      "title": "GL_Bleep_negative_CT",
+      "start": 0.095,
+      "duration": 0.3
+    },
+    {
+      "id": "forgeordnance.frames:exo.hud_section-l1-01",
+      "cue": "exo.hud_section",
+      "layer": 1,
+      "path": "<sound library>/音效/魔法/奇幻游戏第二套音效/UIAlert_Collect Scifi Futuristic Electronic Bass Burst Sweep Heavy 04_ESM_FG2.wav",
+      "pack": "奇幻游戏第二套音效",
+      "license": "Sonniss royalty-free (bundle year not recorded in the library index)",
+      "sha256": "98c50fe281d7709223a25ba4ad06bfa4de75426e0b69f831ba75b64d69f759ec",
+      "title": "UIAlert_Collect Scifi Futuristic Electronic Bass Burst Sweep Heavy 04_ESM_FG2",
+      "start": 0.0,
+      "duration": 0.31
+    },
+    {
+      "id": "forgeordnance.frames:exo.visor_boot-l1-01",
+      "cue": "exo.visor_boot",
+      "layer": 1,
+      "path": "<sound library>/音效/界面UI/Rescopic Sound 用户界面交互/UIMvmt_Window Open Thin 05_RSCPC_USIN.wav",
+      "pack": "Rescopic Sound 用户界面交互",
+      "license": "Sonniss royalty-free (bundle year not recorded in the library index)",
+      "sha256": "96656cc15943723d77daad1f1f586c3193754a7c225bc0f5fccde02699783033",
+      "title": "UIMvmt_Window Open Thin 05_RSCPC_USIN",
+      "start": 0.0,
+      "duration": 1.033
+    },
+    {
+      "id": "forgeordnance.frames:exo.visor_boot-l2-01",
+      "cue": "exo.visor_boot",
+      "layer": 2,
+      "path": "<sound library>/音效/科幻能量/科幻飞船武器与机械界面设计音效/Computer & Telemetry/GL_TelemetryCalibration_CT.wav",
+      "pack": "8600 高质量音效合集（GL_*_CT）",
+      "license": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+      "sha256": "c66df36209a472e83bd27cafd8e7973588eaebb3129794d5b578b8470e37b620",
+      "title": "GL_TelemetryCalibration_CT",
+      "start": 0.0,
+      "duration": 1.5
+    },
+    {
+      "id": "forgeordnance.frames:exo.siege_bolt-l1-01",
+      "cue": "exo.siege_bolt",
+      "layer": 1,
+      "path": "<sound library>/音效/界面UI/按键信标与空投科幻提示音/exo.dry_fire/674568_7157894-hq.mp3",
+      "pack": "Freesound",
+      "license": "CC0 1.0",
+      "sha256": "6700946539de625cafa82a8f8a9ba54f49abcb768430b482e85ed8e95ccdd549",
+      "title": "674568_7157894-hq",
+      "start": 0.021,
+      "duration": 0.149,
+      "author": "serøutōnin--deprivəd",
+      "url": "https://freesound.org/people/serøutōnin--deprivəd/sounds/674568/"
+    },
+    {
+      "id": "forgeordnance.frames:exo.siege_bolt-l1-02",
+      "cue": "exo.siege_bolt",
+      "layer": 1,
+      "path": "<sound library>/音效/机械机器人/BluezoneCorp 微型齿轮机构音/Bluezone_BC0301_tiny_gears_small_mechanism_click_complex_011.wav",
+      "pack": "BluezoneCorp 微型齿轮机构音",
+      "license": "Sonniss royalty-free (bundle year not recorded in the library index)",
+      "sha256": "48e5e77e8d9258bd5d7c338ec4c7a39b9396ece77ae171f78210117b57b04f18",
+      "title": "Bluezone_BC0301_tiny_gears_small_mechanism_click_complex_011",
+      "start": 0.0,
+      "duration": 0.25
+    },
+    {
+      "id": "forgeordnance.frames:exo.plate_slide-l1-01",
+      "cue": "exo.plate_slide",
+      "layer": 1,
+      "path": "<sound library>/音效/机械机器人/037 机器零件机械齿轮音效/Mechanicals DS/MEDS Small Little Gizmo Short.wav",
+      "pack": "Boom Library - 037 机器零件机械齿轮音效",
+      "license": "Boom Library",
+      "sha256": "5023b55ffe1fdee1b76058bd30d4456ea5bae3b29a1ee3697fafc41308af0a7d",
+      "title": "MEDS Small Little Gizmo Short",
+      "start": 0.19,
+      "duration": 1.51
+    },
+    {
+      "id": "forgeordnance.frames:exo.plate_slide-l2-01",
+      "cue": "exo.plate_slide",
+      "layer": 2,
+      "path": "<sound library>/音效/科幻能量/科幻飞船武器与机械界面设计音效/Calibration & Maintenance/GL_SmallServoCalibration_CT.wav",
+      "pack": "8600 高质量音效合集（GL_*_CT）",
+      "license": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+      "sha256": "fd3b8e3f450dc30ce19b0a0a5389ff7937fb71a53f7257cec3d5380a1b202eaa",
+      "title": "GL_SmallServoCalibration_CT",
+      "start": 0.0,
+      "duration": 1.51
+    },
+    {
+      "id": "forgeordnance.frames:exo.plate_slide-l3-01",
+      "cue": "exo.plate_slide",
+      "layer": 3,
+      "path": "<sound library>/音效/机械机器人/037 机器零件机械齿轮音效/Mechanicals DS/MEDS Medium Crankminer Short.wav",
+      "pack": "Boom Library - 037 机器零件机械齿轮音效",
+      "license": "Boom Library",
+      "sha256": "7cdda9c826d8eef772b3e26a101b9fbb379e6ad2b8b554a11a8cf1c3786c9808",
+      "title": "MEDS Medium Crankminer Short",
+      "start": 0.2,
+      "duration": 1.21
+    },
+    {
+      "id": "forgeordnance.frames:exo.plate_slide-l4-01",
+      "cue": "exo.plate_slide",
+      "layer": 4,
+      "path": "<sound library>/音效/机械机器人/BluezoneCorp 工业拉杆开关音/Bluezone_BC0302_industrial_lever_switch_039.wav",
+      "pack": "BluezoneCorp 工业拉杆开关音",
+      "license": "Sonniss royalty-free (bundle year not recorded in the library index)",
+      "sha256": "0dd324d9332369e6f6a1b743a394d119e5629a8677ffdd1c4db9a65fdfda4938",
+      "title": "Bluezone_BC0302_industrial_lever_switch_039",
+      "start": 0.0,
+      "duration": 1.25
+    },
+    {
+      "id": "forgeordnance.frames:exo.plate_slide-l5-01",
+      "cue": "exo.plate_slide",
+      "layer": 5,
+      "path": "<sound library>/音效/机械机器人/设计师机械伺服与金属拟音工具包/GL_Servo_small9_CT.wav",
+      "pack": "设计师机械伺服与金属拟音工具包",
+      "license": "来源不明（音效库索引未标注授权；所有者在选音台中选定）",
+      "sha256": "dbffba5a3a77d11c23aff3532ca42104eec71da719ddb8968a6c8cd0b991bdf2",
+      "title": "GL_Servo_small9_CT",
+      "start": 0.0,
+      "duration": 1.212
+    },
+    {
+      "id": "forgeordnance.frames:exo.landing-l1-01",
+      "cue": "exo.landing",
+      "layer": 1,
+      "path": "<sound library>/音效/科幻能量/110 冲击粒子能量爆炸科幻元素音效/Matter - Sci-Fi Elements/EXPLDsgn_EXPLOSION LARGE-Deep Punch_B00M_MATTER.wav",
+      "pack": "Boom Library - 110 冲击粒子能量爆炸科幻元素音效",
+      "license": "Boom Library",
+      "sha256": "3142a2c612c305024f082eb388d44490a64036516ac34821a0d435122b0eabdf",
+      "title": "EXPLDsgn_EXPLOSION LARGE-Deep Punch_B00M_MATTER",
+      "start": 16.24,
+      "duration": 1.32
+    },
+    {
+      "id": "forgeordnance.frames:exo.landing-l2-01",
+      "cue": "exo.landing",
+      "layer": 2,
+      "path": "<sound library>/音效/爆炸破坏/035 爆炸冲击破坏电影游戏音效/Destruction CK/DTCK WOOD IMPACT Large Mutliple.wav",
+      "pack": "Boom Library - 035 爆炸冲击破坏电影游戏音效",
+      "license": "Boom Library",
+      "sha256": "98f6cabd204c89133e30ea4876684930dc7b6ba08494b549572c26da3465c8fa",
+      "title": "DTCK WOOD IMPACT Large Mutliple",
+      "start": 0.18,
+      "duration": 1.45
+    },
+    {
+      "id": "forgeordnance.frames:exo.landing-l3-01",
+      "cue": "exo.landing",
+      "layer": 3,
+      "path": "<sound library>/音效/机械机器人/129 机械与机器人变形机甲/Mechs & Robots Designed/ROBTMvmt_TITAN-Large Bodyfall_B00M_MRDS.wav",
+      "pack": "Boom Library - 129 机械与机器人变形机甲",
+      "license": "Boom Library",
+      "sha256": "2a1737050e50ebf9c498da4b76b88e29f5f8082177160789a2b5b111806c4c5c",
+      "title": "ROBTMvmt_TITAN-Large Bodyfall_B00M_MRDS",
+      "start": 0.26,
+      "duration": 3.0
+    }
+  ]
+}

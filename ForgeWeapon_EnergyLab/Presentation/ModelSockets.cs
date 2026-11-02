@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using UnityEngine;
 
-namespace ForgeWeaponEnergyLabExperimental.Presentation;
+namespace ForgeWeaponEnergyLab.Presentation;
 
 // BuildWeaponBundle creates mesh parts and authored sockets as direct children. A part may
 // share a socket's name (notably Muzzle), so Transform.Find can bind the mesh pivot instead.

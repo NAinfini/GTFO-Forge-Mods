@@ -1,0 +1,94 @@
+The converted Ogg Vorbis files are derived from the exact owner-selected recordings in sources.json.
+The original recordings are not included in Git or the release package.
+
+Sonniss GameAudioGDC bundles (the owner's licensed royalty-free bundles; the original bundle licence remains authoritative):
+
+- strike.small_boom - 动漫游戏通用音效 - EXPLDsgn_Explosion Small Blast Enemy Death Crunchy Boom Cartoon Noisy Crash Impact Delay 03_ESM_AG.wav - Sonniss royalty-free (bundle year not recorded in the library index)
+- strike.small_boom - DavidDumais 爆炸与碎裂音效包 - EXPLReal_Medium Realistic Explosion 15_DDUMAIS_NONE.wav - Sonniss royalty-free (bundle year not recorded in the library index)
+- strike.big_boom - 烟花爆炸与升空哨声 - 13 Fireworks_powerful explosions_multiples in a row_near.wav - Sonniss royalty-free (bundle year not recorded in the library index)
+- strike.gas_release - BluezoneCorp 蒸汽朋克机械音 - Bluezone_BC0305_steampunk_machine_mechanical_texture_053.wav - Sonniss royalty-free (bundle year not recorded in the library index)
+- weapon.grenade_burst - BluezoneCorp 石头金属撞击音 - Bluezone_BC0297_stone_impact_041.wav - Sonniss royalty-free (bundle year not recorded in the library index)
+
+Boom Library:
+
+- strike.incoming_shell - Boom Library - 026 史诗震撼大气电影预告片设计音效 - WHOOSH_Meteorite.wav
+- strike.small_boom - Boom Library - 104 二战枪械射击枪声音效 - GUNAuto_LMG-Bren MG Modern Auto_B00M_WW2FD.wav
+- strike.small_boom - Boom Library - 045 城市建筑物爆炸音效 - UECK Urban Explosion ADD 02 e901.wav
+- strike.small_boom - Boom Library - 035 爆炸冲击破坏电影游戏音效 - DTCK EXPLOSION Stone Pit Distant.wav
+- strike.small_boom - Boom Library - 045 城市建筑物爆炸音效 - UEDS EXPLOSION INDOOR FAR DISTANCE Medium 2.0.wav
+- strike.big_boom - Boom Library - 035 爆炸冲击破坏电影游戏音效 - DTCK EXPLOSION Stone Pit.wav
+- strike.big_boom - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBDS Metal Large 01.wav
+- strike.big_boom - Boom Library - 093 破坏撞击转场爆炸能量电影音效 - EXPLDsgn_ORGANIC CRACK-Earth Shatter_B00M_BRUTE FORCE.wav
+- strike.big_boom - Boom Library - 093 破坏撞击转场爆炸能量电影音效 - EXPLDsgn_ORGANIC CRACK-Building Collapse_B00M_BRUTE FORCE.wav
+- strike.big_boom - Boom Library - 093 破坏撞击转场爆炸能量电影音效 - EXPLDsgn_ORGANIC CRACK-Atomic Explosion_B00M_BRUTE FORCE.wav
+- strike.big_boom - Boom Library - 045 城市建筑物爆炸音效 - UEDS EXPLOSION INDOOR FAR DISTANCE Medium 2.0.wav
+- strike.big_boom - Boom Library - 045 城市建筑物爆炸音效 - UEDS EXPLOSION INDOOR FAR DISTANCE Small 2.0.wav
+- strike.big_boom - Boom Library - 045 城市建筑物爆炸音效 - UEDS EXPLOSION INDOOR SLOW Large 2.0.wav
+- strike.cluster_split - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBDS Building Small 01.wav
+- strike.cluster_split - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBDS Rocks Small 02.wav
+- strike.cluster_split - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBDS Glass & Stone Small 01.wav
+- strike.cluster_split - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBDS Glass & Stone Small 02.wav
+- strike.cluster_split - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBDS Impact Glass Small 01.wav
+- strike.cluster_split - Boom Library - 035 爆炸冲击破坏电影游戏音效 - DTCK EXPLOSION Stone Pit Distant.wav
+- strike.cluster_split - Boom Library - 045 城市建筑物爆炸音效 - UEDS EXPLOSION INDOOR FAR DISTANCE Small 2.0.wav
+- strike.debris - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBCK Rock Bricks Roll Long.wav
+- strike.debris - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBDS Rocks Small 02.wav
+- strike.debris - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBDS Glass & Stone Small 01.wav
+- strike.debris - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBDS Glass & Stone Medium 01.wav
+- strike.debris - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBDS Rocks Small 01.wav
+- strike.debris - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBDS Glass & Stone Small 02.wav
+- strike.fire_ignite - Boom Library - 092 汽油火焰喷射器音效 - Flamethrower Single Thick Short Burst.wav
+- strike.fire_loop - Boom Library - 127 世界末日自然灾害音效 - FIREBurn_FLAMES CONTINUOUS MEDIUM-Molten Geyser_B00M_AGDS.wav
+- strike.stasis_loop - Boom Library - 034 未来科幻机器人音效 - SF-DS Ambience Machinehall Low 01.wav
+- strike.beam_start - Boom Library - 034 未来科幻机器人音效 - SF-DS Energy Laser Small 02.wav
+- strike.beam_loop - Boom Library - 034 未来科幻机器人音效 - SF-DS Energy Hum 01.wav
+- strike.beam_loop - Boom Library - 034 未来科幻机器人音效 - SF-DS Energy Hum 04.wav
+- strike.beam_cutting - Boom Library - 034 未来科幻机器人音效 - SF-CK Power Sparks Long 01.wav
+- strike.beam_cutting - Boom Library - 034 未来科幻机器人音效 - SF-CK Power Sparks Long 04.wav
+- strike.beam_cutting - Boom Library - 034 未来科幻机器人音效 - SF-CK Power Sparks Long 02.wav
+- strike.beam_end - Boom Library - 110 冲击粒子能量爆炸科幻元素音效 - DSGNTonl_ABILITY DEACTIVATE-Metallic Swirling Force_B00M_MATTER.wav
+- strike.beam_end - Boom Library - 071 未来科幻高科技能量武器开枪音效 - SCIMisc_TAIL OFF Energy Click Tail Low_B00M_CWCK.wav
+- strike.beam_end - Boom Library - 071 未来科幻高科技能量武器开枪音效 - SCIMisc_TAIL OFF Modulated Cool Down_B00M_CWCK.wav
+- weapon.handover - Boom Library - 018 步枪手枪短枪开枪射击音效 - Beretta M9 Handling 2x 02.wav
+- weapon.handover - Boom Library - 018 步枪手枪短枪开枪射击音效 - Beretta M9 Handling 2x 07.wav
+- weapon.grenade_reload - Boom Library - 018 步枪手枪短枪开枪射击音效 - Beretta M9 Handling 2x 02.wav
+- weapon.grenade_burst - Boom Library - 053 大气泰坦风格气氛渲染音效 - FX_Fire_Explosion_Low_06.wav
+- weapon.grenade_burst - Boom Library - 053 大气泰坦风格气氛渲染音效 - FX_Fire_Explosion_Low_03.wav
+- weapon.grenade_burst - Boom Library - 053 大气泰坦风格气氛渲染音效 - FX_Fire_Explosion_Low_04.wav
+- weapon.grenade_burst - Boom Library - 035 爆炸冲击破坏电影游戏音效 - DTCK EXPLOSION Stone Pit Distant.wav
+- weapon.grenade_burst - Boom Library - 045 城市建筑物爆炸音效 - UEDS EXPLOSION INDOOR FAST Large 2.0.wav
+- turret.idle - Boom Library - 034 未来科幻机器人音效 - SF-DS Ambience Computerroom Low 02.wav
+
+Attribution (Creative Commons Attribution; converted and trimmed for game use):
+
+- "Sci-fi Grenade Launcher" by ValhallaProject (https://freesound.org/people/ValhallaProject/sounds/771167/), licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), used for weapon.grenade_fire.
+- "2 High Quality Explosions (explode.wav)" by Michel Baradari (apollo-music.de) (https://opengameart.org/content/2-high-quality-explosions), licensed under CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/), used for weapon.grenade_burst.
+
+Public domain (CC0 1.0, no attribution required), recorded for provenance:
+
+- weapon.grenade_fire - "163458_2263027-hq.mp3" by LeMudCrab (https://freesound.org/people/LeMudCrab/sounds/163458/)
+- weapon.grenade_reload - "561471_12429869-hq.mp3" by GameWithBepis (https://freesound.org/people/GameWithBepis/sounds/561471/)
+
+Owner-confirmed open source (8600 high-quality sound collection):
+
+- strike.gas_loop - GL_Hydraulic_AirRelease12_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- strike.stasis_pulse - GL_FuturisticDoor_Opening_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- strike.stasis_pulse - GL_FuturisticHydraulicHatch_Opening_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- strike.stasis_loop - GL_MothershipControlRoom_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- weapon.return - GL_Hydraulic_AirRelease_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- weapon.return - GL_Servo12_small10_short_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- turret.deploy - GL_MalfunctioningSturtup_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- turret.deploy - GL_SmallServoCalibration_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- turret.expire - GL_MediumServoShutdown_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- turret.expire - GL_SmallServoShutdown_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- turret.expire - GL_MediumServoShutdown2_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+
+Origin not recorded in the sound library index (selected by the owner; confirm the licence before a public release):
+
+- strike.incoming_shell - 各式转场嗖声音效 - DS 15 Quick Pan.wav
+- strike.big_boom - 电影低频轰鸣重击音效 - INTRO-HD.NET--ESE - QUANTUM - BOOM - JC - Take Me To Church-INTRO-HD.NET-.wav
+- strike.big_boom - 电影低频轰鸣重击音效 - INTRO-HD.NET--ESE - QUANTUM - BOOM - KP - Thunderous-INTRO-HD.NET-.wav
+- strike.cluster_split - 玻璃碎裂坠落拟音 - Glass Crumble.wav
+- strike.cluster_split - 玻璃碎裂坠落拟音 - Glass Drop.wav
+
+Pack, source file, source SHA-256 and processing section of every clip are recorded in sources.json.

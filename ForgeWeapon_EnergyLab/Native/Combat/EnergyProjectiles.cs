@@ -1,11 +1,11 @@
 using System;
 using Enemies;
-using ForgeWeaponEnergyLabExperimental.Presentation;
+using ForgeWeaponEnergyLab.Presentation;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using Player;
 using UnityEngine;
 
-namespace ForgeWeaponEnergyLabExperimental.Native;
+namespace ForgeWeaponEnergyLab.Native;
 
 // Bounded projectile state and native damage. Presentation never queries or damages the world.
 // The host deals every flight's damage outside Fire; other peers simulate presentation only.
@@ -31,7 +31,7 @@ internal sealed class EnergyProjectiles : IDisposable
 
     private readonly Flight[] _flights = new Flight[Capacity];
     private readonly Il2CppStructArray<RaycastHit> _sweep = new(QueryCapacity);
-    private readonly Il2CppReferenceArray<Collider> _overlap = new(QueryCapacity);
+    private readonly ForgeCore.ColliderQuery _overlap = new(QueryCapacity);
     private readonly VisibleEnemies _enemies = new();
     private readonly EnergyExplosion _explosion = new();
     private readonly NativeShot _contact = new();
@@ -61,7 +61,7 @@ internal sealed class EnergyProjectiles : IDisposable
     internal void Launch(PlayerAgent owner, Vector3 position, Vector3 direction, float power, EnergyGear gear, float now)
     {
         var mode = gear.Mode;
-        if (!CanLaunch(gear)) throw new InvalidOperationException("Energy projectile limit reached for " + gear.Definition.Id);
+        if (!CanLaunch(gear)) throw new BudgetExhausted("Energy projectile limit reached for " + gear.Definition.Id);
         if (mode is not (EnergyMode.PlasmaBlast or EnergyMode.PlasmaArc)) throw new ArgumentOutOfRangeException(nameof(mode));
         if (direction.sqrMagnitude < 0.0001f) throw new ArgumentException("Plasma launch direction is empty.");
         for (var index = 0; index < Capacity; index++)
@@ -81,7 +81,7 @@ internal sealed class EnergyProjectiles : IDisposable
             Visuals.Orb(index, position, flight.Payload.BodyRadius, now, mode == EnergyMode.PlasmaArc, flying: true);
             return;
         }
-        throw new InvalidOperationException("All energy projectile slots are occupied.");
+        throw new BudgetExhausted("All energy projectile slots are occupied.");
     }
 
     internal void Tick(float delta, float now)
@@ -89,74 +89,83 @@ internal sealed class EnergyProjectiles : IDisposable
         if (EnergyNativeFire.InFireCall) return;
         for (var index = 0; index < Capacity; index++)
         {
-            var flight = _flights[index];
-            if (flight.Phase == Phase.Free) continue;
-            if (flight.Owner == null || !flight.Owner.Alive || (int)flight.Owner.DimensionIndex != flight.Dimension) { Clear(index); continue; }
-            if (flight.Phase == Phase.Launched)
+            if (_flights[index].Phase == Phase.Free) continue;
+            // A query that outgrew its budget drops this projectile only, never the gun.
+            try { Advance(index, delta, now); }
+            catch (BudgetExhausted error)
             {
-                SpawnContacts(index, now);
-                if (flight.Phase != Phase.Flying) continue;
+                Plugin.Error("A plasma projectile was dropped: " + error);
+                Clear(index);
             }
-            if (flight.Phase is Phase.Exploding or Phase.Fading)
-            {
-                var lifetime = flight.Phase == Phase.Exploding ? ExplosionLifetime(flight) : flight.Gear.Numbers.FadeLifetime;
-                var progress = 1f - (flight.Until - now) / lifetime;
-                if (progress >= 1f) { Clear(index); continue; }
-                if (flight.Phase == Phase.Fading)
-                    Visuals.Dissipate(index, flight.Position, flight.Payload.BodyRadius, progress, now);
-                continue;
-            }
-            var remainingTime = MathF.Max(0f, flight.Until - (now - delta));
-            var distance = flight.Payload.Speed * Math.Clamp(delta, 0f, remainingTime);
-            var count = Physics.SphereCastNonAlloc(flight.Position, flight.Payload.BodyRadius, flight.Direction,
-                _sweep, distance, LayerManager.MASK_BULLETWEAPON_RAY, QueryTriggerInteraction.UseGlobal);
-            if (count == _sweep.Length) throw new InvalidOperationException("Plasma sweep budget exhausted; no truncated collision result used.");
-            var stop = -1;
-            for (var hit = 0; hit < count; hit++)
-            {
-                var collider = _sweep[hit].collider;
-                if (collider == null || VanillaDamage.IsShooter(collider, flight.Owner)
-                    || (flight.Mode == EnergyMode.PlasmaArc && IsActor(collider))) continue;
-                if (stop < 0 || _sweep[hit].distance < _sweep[stop].distance) stop = hit;
-            }
-            if (flight.Mode == EnergyMode.PlasmaArc)
-            {
-                var stopDistance = stop < 0 ? float.PositiveInfinity : _sweep[stop].distance;
-                for (var hit = 0; hit < count; hit++)
-                {
-                    var collision = _sweep[hit];
-                    if (collision.collider == null || collision.distance > stopDistance) continue;
-                    // A sphere sweep that starts inside a receiver can report a zero-distance placeholder point.
-                    if (collision.distance <= 0f) collision.point = collision.collider.ClosestPoint(flight.Position);
-                    Contact(flight, collision);
-                }
-            }
-            if (stop >= 0)
-            {
-                flight.Position += flight.Direction * MathF.Max(0f, _sweep[stop].distance - 0.01f);
-                EndFlight(index, now);
-                continue;
-            }
-            flight.Position += flight.Direction * distance;
-            if (now >= flight.Until) { EndFlight(index, now); continue; }
-            Visuals.Orb(index, flight.Position, flight.Payload.BodyRadius, now, flight.Mode == EnergyMode.PlasmaArc, flying: true);
-            if (flight.Mode == EnergyMode.PlasmaArc) Pulse(index, now);
         }
     }
 
+    private void Advance(int index, float delta, float now)
+    {
+        var flight = _flights[index];
+        if (flight.Owner == null || !flight.Owner.Alive || (int)flight.Owner.DimensionIndex != flight.Dimension) { Clear(index); return; }
+        if (flight.Phase == Phase.Launched)
+        {
+            SpawnContacts(index, now);
+            if (flight.Phase != Phase.Flying) return;
+        }
+        if (flight.Phase is Phase.Exploding or Phase.Fading)
+        {
+            var lifetime = flight.Phase == Phase.Exploding ? ExplosionLifetime(flight) : flight.Gear.Numbers.FadeLifetime;
+            var progress = 1f - (flight.Until - now) / lifetime;
+            if (progress >= 1f) { Clear(index); return; }
+            if (flight.Phase == Phase.Fading)
+                Visuals.Dissipate(index, flight.Position, flight.Payload.BodyRadius, progress, now);
+            return;
+        }
+        var remainingTime = MathF.Max(0f, flight.Until - (now - delta));
+        var distance = flight.Payload.Speed * Math.Clamp(delta, 0f, remainingTime);
+        var count = Physics.SphereCastNonAlloc(flight.Position, flight.Payload.BodyRadius, flight.Direction,
+            _sweep, distance, LayerManager.MASK_BULLETWEAPON_RAY, QueryTriggerInteraction.UseGlobal);
+        if (count == _sweep.Length) throw new BudgetExhausted("Plasma sweep budget exhausted; no truncated collision result used.");
+        var stop = -1;
+        for (var hit = 0; hit < count; hit++)
+        {
+            var collider = _sweep[hit].collider;
+            if (collider == null || ForgeCore.Combat.IsPartOf(collider, flight.Owner)
+                || (flight.Mode == EnergyMode.PlasmaArc && ColliderKinds.IsActor(collider))) continue;
+            if (stop < 0 || _sweep[hit].distance < _sweep[stop].distance) stop = hit;
+        }
+        if (flight.Mode == EnergyMode.PlasmaArc)
+        {
+            var stopDistance = stop < 0 ? float.PositiveInfinity : _sweep[stop].distance;
+            for (var hit = 0; hit < count; hit++)
+            {
+                var collision = _sweep[hit];
+                if (collision.collider == null || collision.distance > stopDistance) continue;
+                // A sphere sweep that starts inside a receiver can report a zero-distance placeholder point.
+                if (collision.distance <= 0f) collision.point = collision.collider.ClosestPoint(flight.Position);
+                Contact(flight, collision);
+            }
+        }
+        if (stop >= 0)
+        {
+            flight.Position += flight.Direction * MathF.Max(0f, _sweep[stop].distance - 0.01f);
+            EndFlight(index, now);
+            return;
+        }
+        flight.Position += flight.Direction * distance;
+        if (now >= flight.Until) { EndFlight(index, now); return; }
+        Visuals.Orb(index, flight.Position, flight.Payload.BodyRadius, now, flight.Mode == EnergyMode.PlasmaArc, flying: true);
+        if (flight.Mode == EnergyMode.PlasmaArc) Pulse(index, now);
+    }
     // Even a projectile launched inside a receiver waits until Fire has returned before contact or explosion damage.
     private void SpawnContacts(int index, float now)
     {
         var flight = _flights[index];
         flight.Phase = Phase.Flying;
-        var count = Physics.OverlapSphereNonAlloc(flight.Position, flight.Payload.BodyRadius, _overlap,
-            LayerManager.MASK_BULLETWEAPON_RAY, QueryTriggerInteraction.UseGlobal);
-        if (count == QueryCapacity) throw new InvalidOperationException("Plasma spawn overlap budget exhausted.");
+        var count = _overlap.Sphere(flight.Position, flight.Payload.BodyRadius, LayerManager.MASK_BULLETWEAPON_RAY, QueryTriggerInteraction.UseGlobal);
+        if (_overlap.Truncated) throw new BudgetExhausted("Plasma spawn overlap budget exhausted.");
         for (var hit = 0; hit < count; hit++)
         {
             var collider = _overlap[hit];
-            if (collider == null || VanillaDamage.IsShooter(collider, flight.Owner!) ||
-                flight.Mode == EnergyMode.PlasmaArc && IsActor(collider)) continue;
+            if (collider == null || ForgeCore.Combat.IsPartOf(collider, flight.Owner!) ||
+                flight.Mode == EnergyMode.PlasmaArc && ColliderKinds.IsActor(collider)) continue;
             if (flight.Mode == EnergyMode.PlasmaArc)
                 Contact(flight, NativeShot.OverlapContact(collider, flight.Position, flight.Direction));
             EndFlight(index, now);
@@ -171,7 +180,7 @@ internal sealed class EnergyProjectiles : IDisposable
     private void Contact(Flight flight, RaycastHit hit)
     {
         if (!_contact.ContactTarget(flight.Position, flight.Direction, hit, out hit)
-            || !VanillaDamage.DirectReceiver(flight.Owner!, hit.collider, out var identity)
+            || !ForgeCore.Combat.DirectReceiver(flight.Owner!, hit.collider, out var identity)
             || !flight.Contacts.Remember(identity)) return;
         var tuning = flight.Gear.Numbers.Shot with { Damage = flight.Payload.Damage };
         _contact.ResolveHit(flight.Owner!, tuning, flight.Position, flight.Direction, hit);
@@ -231,12 +240,6 @@ internal sealed class EnergyProjectiles : IDisposable
         Visuals.Boom(flight.Position);
     }
 
-    private static bool IsActor(Collider collider)
-    {
-        var agent = collider.GetComponentInParent<IDamageable>()?.GetBaseAgent();
-        return agent?.TryCast<EnemyAgent>() != null || agent?.TryCast<PlayerAgent>() != null
-            || collider.GetComponentInParent<PlayerAgent>() != null;
-    }
 
     private void Clear(int index)
     {

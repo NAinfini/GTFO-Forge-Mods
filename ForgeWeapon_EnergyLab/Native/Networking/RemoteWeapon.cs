@@ -1,12 +1,12 @@
 using System;
 using System.Collections;
-using ForgeWeaponEnergyLabExperimental.Presentation;
+using ForgeWeaponEnergyLab.Presentation;
 using Gear;
 using Player;
-using SNetwork;
+using ForgeCore;
 using UnityEngine;
 
-namespace ForgeWeaponEnergyLabExperimental.Native;
+namespace ForgeWeaponEnergyLab.Native;
 
 // Delayed modes are host simulations. Instant modes only deal hits from a host bot's native Fire callback.
 internal sealed class RemoteWeapon : IDisposable
@@ -24,7 +24,8 @@ internal sealed class RemoteWeapon : IDisposable
     private int _preparedModes;
     private PlayerAgent? _chargeOwner;
     private EnergyGear? _chargeGear;
-    private Vector3 _chargeOffset;
+    /// <summary>The charge point as the shooter reported it, in the shooter's yaw frame, so it turns with the shooter.</summary>
+    private Vector3 _chargeLocal;
     private float _chargeStartedAt;
     private bool _charging;
     private bool _disposed;
@@ -56,6 +57,7 @@ internal sealed class RemoteWeapon : IDisposable
             EnergyMode.PlasmaBlast or EnergyMode.PlasmaArc => Plasma().CanLaunch(gear),
             EnergyMode.Disc => Special().CanLaunchDisc(gear),
             EnergyMode.BlackHole => Special().CanLaunchHole,
+            EnergyMode.Blast => Special().CanLaunchShell,
             _ => true
         };
     }
@@ -69,6 +71,7 @@ internal sealed class RemoteWeapon : IDisposable
             !Finite(owner.Position) ||
             !Finite(command.Start) || !Finite(command.Direction) || command.Direction.sqrMagnitude < 0.25f ||
             command.Direction.sqrMagnitude > 2.25f || !float.IsFinite(command.Power) || command.Power < 0f || command.Power > 1f ||
+            !float.IsFinite(command.Damage) || command.Damage < 0f ||
             (command.Start - owner.Position).sqrMagnitude > EnergyProtocol.MaximumMuzzleDistance * EnergyProtocol.MaximumMuzzleDistance ||
             !_state.BeginLaunch(command.Sequence)) return false;
         // Consume the watermark before any side effect. A fault cannot replay a partially launched projectile.
@@ -98,7 +101,6 @@ internal sealed class RemoteWeapon : IDisposable
         if (EnergyGears.Match(visual.CategoryId, visual.Mode) is not { } gear ||
             !ValidVisual(visual, gear)) return false;
         _state.LastVisualSequence = visual.Sequence;
-        if (_authoritative && gear.Mode == EnergyMode.Blast) EnergyBlastForces.AcceptVisual(visual);
         PreparePresentation(gear);
         Present(owner, null, visual, now);
         return true;
@@ -107,7 +109,7 @@ internal sealed class RemoteWeapon : IDisposable
     private static bool ValidVisual(FireVisual visual, EnergyGear gear)
     {
         if (!Finite(visual.Start) || !Finite(visual.Direction) || visual.Direction.sqrMagnitude < 0.25f ||
-            visual.Direction.sqrMagnitude > 2.25f || !float.IsFinite(visual.Power)) return false;
+            visual.Direction.sqrMagnitude > 2.25f || !float.IsFinite(visual.Power) || !float.IsFinite(visual.Damage) || visual.Damage < 0f) return false;
         if (EnergyNativeFire.Delayed(gear.Mode))
             return visual.Segments == 0 && visual.HitMask == 0 && visual.Power >= 0f && visual.Power <= 1f;
         var segments = gear.Mode == EnergyMode.ArcChain ? gear.Numbers.Targets : 1;
@@ -126,7 +128,7 @@ internal sealed class RemoteWeapon : IDisposable
         _chargeGear = gear;
         PreparePresentation(gear);
         SetModel(owner, owner.Inventory?.WieldedItem?.TryCast<BulletWeapon>(), gear);
-        _chargeOffset = packet.Position - owner.Position;
+        _chargeLocal = GunPose.ToYawFrame(packet.Position - owner.Position, owner.TargetLookDir);
         _chargeStartedAt = now;
         _charging = true;
         return true;
@@ -193,21 +195,11 @@ internal sealed class RemoteWeapon : IDisposable
                 Effects().Discharge(mode == EnergyMode.PlasmaArc, start);
                 break;
             case EnergyMode.Blast:
-                if (!Finite(visual.End(0))) return;
-                if (visual.Hit(0))
-                {
-                    var point = visual.End(0) - direction * 0.04f;
-                    Special().Visuals.GrenadeExplosion(point, gear.Numbers.BlastRadius, now);
-                    if (_authoritative && owner.Owner != null && !owner.Owner.IsBot)
-                    {
-                        _discharge.ApplyRemoteForce(gear, point);
-                        WeaponNoise.Explosion(owner, gear, point);
-                    }
-                }
                 Effects().Hide();
                 Visuals().Blast(start, now);
                 Special().Visuals.Origin(start);
                 Special().Visuals.BlastLaunch();
+                Special().LaunchShell(owner, gear, _authoritative ? reported : start, direction, visual.Damage, now);
                 break;
             case EnergyMode.Disc:
                 Special().LaunchDisc(owner, gear, _authoritative ? reported : start, direction, now);
@@ -222,6 +214,12 @@ internal sealed class RemoteWeapon : IDisposable
                 break;
         }
     }
+
+    // Where this machine shows the charging gun's muzzle: the shooter's third-person gun follows its aim, and the reported point (kept in the
+    // shooter's yaw frame) stands in only while that gun is not shown.
+    internal static Vector3 ChargePoint(PlayerAgent owner, EnergyGear gear, Vector3 local)
+        => ShownStart(owner, owner.Inventory?.WieldedItem?.TryCast<BulletWeapon>(), gear,
+            owner.Position + GunPose.FromYawFrame(local, owner.TargetLookDir));
 
     private static Vector3 ShownStart(PlayerAgent owner, BulletWeapon? weapon, EnergyGear gear, Vector3 reported)
     {
@@ -238,12 +236,12 @@ internal sealed class RemoteWeapon : IDisposable
         if (_charging && (_chargeOwner == null || !_chargeOwner.Alive)) StopCharge();
         if (_charging && _chargeOwner != null)
         {
-            var position = _chargeOwner.Position + _chargeOffset;
+            var position = ChargePoint(_chargeOwner, _chargeGear!, _chargeLocal);
             var power = (float)Math.Clamp((now - _chargeStartedAt - _chargeGear!.Numbers.MinimumCharge) /
                 (_chargeGear!.Numbers.FullCharge - _chargeGear!.Numbers.MinimumCharge), 0d, 1d);
             Effects().Charge(power, position);
             Plasma().Visuals.ChargingOrb(EnergyProjectiles.Capacity, position,
-                PlasmaPayload.FromCharge(power, _chargeGear!.Numbers).BodyRadius, now, _chargeGear!.Mode == EnergyMode.PlasmaArc);
+                PlasmaPayload.FromCharge(power, _chargeGear!.Numbers).BodyRadius, now, _chargeGear!.Mode == EnergyMode.PlasmaArc, sight: null);
         }
         _effects?.Tick(now);
         _visuals?.Tick(now);

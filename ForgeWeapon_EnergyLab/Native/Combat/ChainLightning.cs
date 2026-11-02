@@ -1,10 +1,8 @@
 using System;
 using Enemies;
-using Gear;
 using Player;
-using UnityEngine;
 
-namespace ForgeWeaponEnergyLabExperimental.Native;
+namespace ForgeWeaponEnergyLab.Native;
 
 // Resolve the whole chain before submitting damage.
 internal sealed class ChainLightning

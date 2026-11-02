@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
+using ForgeCore;
 using GameData;
 using Gear;
 using GTFO.API;
@@ -10,9 +10,9 @@ using Player;
 using UnityEngine;
 using Il2CppGearList = Il2CppSystem.Collections.Generic.List<Gear.GearIDRange>;
 
-namespace ForgeWeaponEnergyLabExperimental.Native;
+namespace ForgeWeaponEnergyLab.Native;
 
-// Add-only GTFO datablocks. No MTFO, ForgeRuntime or ForgeWeapon installation is needed.
+// Add-only GTFO datablocks, registered by this plugin itself; no MTFO rundown files and no Forge base package are used.
 internal static class EnergyGearRegistry
 {
     // Shipped R8 templates: a semi-auto main weapon and a semi-auto special weapon.
@@ -26,6 +26,24 @@ internal static class EnergyGearRegistry
     internal static void Register()
     {
         GameDataAPI.OnGameDataInitialized += Install;
+        ForgeUI.UIKit.LanguageChanged += Relabel;
+    }
+
+    /// <summary>Writes the names and descriptions the lobby and inventory show again in the new language (ForgeUI translates the screens
+    /// already drawn). The gear packet's own public name stays the stable name every peer agrees on, so the packet does not depend on
+    /// a player's language.</summary>
+    private static void Relabel()
+    {
+        if (!Ready) return;
+        foreach (var gear in EnergyGears.All)
+        {
+            var name = Label(EnergyText.Name(gear));
+            var description = Label(EnergyText.Description(gear));
+            var archetype = GameDataBlockBase<ArchetypeDataBlock>.GetBlock(gear.ArchetypeId);
+            var category = GameDataBlockBase<GearCategoryDataBlock>.GetBlock(gear.CategoryId);
+            if (archetype != null) { archetype.PublicName = name; archetype.Description = description; }
+            if (category != null) { category.PublicName = name; category.Description = description; }
+        }
     }
 
     internal static EnergyGear? DefinitionOf(BulletWeapon? weapon)
@@ -39,7 +57,10 @@ internal static class EnergyGearRegistry
         Ready = false;
         try
         {
-            EnergyGears.Freeze();
+            var problems = new List<string>();
+            EnergyGears.Freeze(problems);
+            foreach (var problem in problems) Plugin.Error(problem);
+            Presentation.EnergyIcons.Supply();
             var mainGear = Require<PlayerOfflineGearDataBlock>(MainTemplate);
             var specialGear = Require<PlayerOfflineGearDataBlock>(SpecialTemplate);
             var mainCategory = Require<GearCategoryDataBlock>(MainCategory);
@@ -59,8 +80,7 @@ internal static class EnergyGearRegistry
                 var sourceCategory = gear.Main ? mainCategory : specialCategory;
                 var sourceArchetype = gear.Main ? mainArchetype : specialArchetype;
                 var source = new GearIDRange(sourceGear.GearJSON);
-                var audio = Require<WeaponAudioDataBlock>(source.GetCompID(eGearComponent.AudioSetting)).MemberwiseClone().Cast<WeaponAudioDataBlock>();
-                audio.name = gear.NativeName; audio.persistentID = gear.CategoryId; audio.internalEnabled = true;
+                var audio = DataBlocks.Clone(Require<WeaponAudioDataBlock>(source.GetCompID(eGearComponent.AudioSetting)), gear.NativeName, gear.CategoryId);
                 audio.eventOnSemiFire2D = new(); audio.eventOnSemiFire3D = new();
                 audio.eventOnBurstFire2D = new(); audio.eventOnBurstFire3D = new();
                 audio.eventOnBurstFireOneShot2D = new();
@@ -71,19 +91,15 @@ internal static class EnergyGearRegistry
                 audio.eventOnCooldown2D = new(); audio.eventOnCooldown3D = new();
                 audio.eventOnCooldownEnd2D = string.Empty; audio.eventOnCooldownEnd3D = string.Empty;
                 audio.eventOnSyncedBurstFirePerShot3D = new(); audio.eventOnSyncedAutoFirePerShot3D = new();
-                var casing = Require<WeaponShellCasingDataBlock>(source.GetCompID(eGearComponent.ShellCasing)).MemberwiseClone().Cast<WeaponShellCasingDataBlock>();
-                casing.name = gear.NativeName; casing.persistentID = gear.CategoryId; casing.internalEnabled = true;
+                var casing = DataBlocks.Clone(Require<WeaponShellCasingDataBlock>(source.GetCompID(eGearComponent.ShellCasing)), gear.NativeName, gear.CategoryId);
                 casing.ShellCasingType = ShellTypes.Shell_None;
                 var recoil = CloneRecoil(Require<RecoilDataBlock>(sourceArchetype.RecoilDataID), gear);
                 ValidateOwned(audio); ValidateOwned(casing); ValidateOwned(recoil);
                 // Nested donor data is shared read-only; only the cloned blocks are changed.
-                var archetype = sourceArchetype.MemberwiseClone().Cast<ArchetypeDataBlock>();
-                archetype.name = gear.NativeName;
-                archetype.persistentID = gear.ArchetypeId;
-                archetype.internalEnabled = true;
+                var archetype = DataBlocks.Clone(sourceArchetype, gear.NativeName, gear.ArchetypeId);
                 archetype.RecoilDataID = recoil.persistentID;
-                archetype.PublicName = Label(gear.Name);
-                archetype.Description = Label(gear.Definition.Description ?? "Experimental Forge energy weapon");
+                archetype.PublicName = Label(EnergyText.Name(gear));
+                archetype.Description = Label(EnergyText.Description(gear));
                 archetype.Damage = gear.Numbers.Shot.Damage;
                 archetype.DamageFalloff = new Vector2(gear.Numbers.Shot.Range, gear.Numbers.Shot.Range);
                 archetype.StaggerDamageMulti = gear.Numbers.Shot.Stagger;
@@ -103,12 +119,9 @@ internal static class EnergyGearRegistry
                 archetype.HipFireSpread = archetype.AimSpread = 0f;
                 archetype.EquipTransitionTime = gear.Definition.Tuning.EquipTime;
                 archetype.AimTransitionTime = gear.Definition.Tuning.AimTime;
-                var category = sourceCategory.MemberwiseClone().Cast<GearCategoryDataBlock>();
-                category.name = gear.NativeName;
-                category.persistentID = gear.CategoryId;
-                category.internalEnabled = true;
-                category.PublicName = Label(gear.Name);
-                category.Description = Label(gear.Definition.Description ?? "Experimental Forge energy weapon");
+                var category = DataBlocks.Clone(sourceCategory, gear.NativeName, gear.CategoryId);
+                category.PublicName = Label(EnergyText.Name(gear));
+                category.Description = Label(EnergyText.Description(gear));
                 category.SemiArchetype = category.BurstArchetype = category.AutoArchetype = category.SemiBurstArchetype = gear.ArchetypeId;
                 var block = new PlayerOfflineGearDataBlock
                 {
@@ -149,6 +162,7 @@ internal static class EnergyGearRegistry
                     throw new InvalidOperationException("Energy gear did not register: " + gear.Name);
             foreach (var gear in EnergyGears.All)
                 CurrentPackets[gear.CategoryId] = (gear, new GearIDRange(Require<PlayerOfflineGearDataBlock>(gear.GearId).GearJSON).GetPacketStruct().Comps);
+            EnergyText.Register();
             Ready = true;
         }
         catch (Exception error)
@@ -189,26 +203,26 @@ internal static class EnergyGearRegistry
         }
         catch (Exception error)
         {
-            Plugin.Error("Forge Weapon Energy Lab experimental weapons are not confirmed in the loadout: " + error);
+            Plugin.Error("Forge Weapon Energy Lab weapons are not confirmed in the loadout: " + error);
         }
     }
 
     // Saved bot loadouts keep whole gear packets. A packet saved by an earlier build would assemble the gun with
     // outdated components (stock fire sound, shell casings) under an icon checksum this build never registered,
-    // so every energy gun packet takes this build's components and its checksum maps to the gun's icon.
+    // so every energy gun packet takes this build's components and its icon file is cleared once per run.
     internal static void UseCurrentPacket(GearIDRange? range)
     {
         if (!Ready || range == null || !CurrentPackets.TryGetValue(range.GetCompID(eGearComponent.Category), out var current)) return;
         range.ApplyCompIDs(current.Comps);
-        Presentation.EnergyIcons.Register(range, current.Gear);
+        ForgeUI.GearIcons.ClearCached(range);
     }
 
-    // Baked previews keep a separate in-memory cache; native PNGs remain untouched.
+    // The game draws each energy gun's icon from its own model; the file it keeps per checksum is cleared once per run.
     private static void RegisterPreviewChecksums()
     {
         if (_iconChecksumsRegistered) return;
         foreach (var gear in EnergyGears.All)
-            Presentation.EnergyIcons.Register(new GearIDRange(Require<PlayerOfflineGearDataBlock>(gear.GearId).GearJSON), gear);
+            ForgeUI.GearIcons.ClearCached(new GearIDRange(Require<PlayerOfflineGearDataBlock>(gear.GearId).GearJSON));
         _iconChecksumsRegistered = true;
     }
 
@@ -238,51 +252,30 @@ internal static class EnergyGearRegistry
 
     internal static RecoilDataBlock CloneRecoil(RecoilDataBlock source, EnergyGear gear)
     {
-        var recoil = source.MemberwiseClone().Cast<RecoilDataBlock>();
-        recoil.name = gear.NativeName; recoil.persistentID = gear.CategoryId; recoil.internalEnabled = true;
         var continuous = gear.Mode is EnergyMode.Beam or EnergyMode.Flame;
-        var scale = continuous ? 0f : 1f / 3f;
+        // Strength (view kick, crosshair pop, weapon kick, shake) is ForgeCore's one scaling; only the direction pattern and the
+        // shake timing are this mod's: a continuous gun keeps no direction or shake data.
+        var recoil = ForgeCore.Gear.ScaledRecoil(DataBlocks.Clone(source, gear.NativeName, gear.CategoryId), continuous ? 0f : 1f / 3f);
         var directionScale = continuous ? 0f : 1f;
-        // The two axis ranges define the normalized direction pattern, not its strength.
-        // All ranges are reference types and must remain independent of the donor.
-        recoil.power = new() { Min = source.power.Min * scale, Max = source.power.Max * scale };
         recoil.horizontalScale = new() { Min = source.horizontalScale.Min * directionScale, Max = source.horizontalScale.Max * directionScale };
         recoil.verticalScale = new() { Min = source.verticalScale.Min * directionScale, Max = source.verticalScale.Max * directionScale };
-        recoil.hipFireCrosshairRecoilPop = source.hipFireCrosshairRecoilPop * scale;
-        recoil.recoilPosImpulse = source.recoilPosImpulse * scale;
-        recoil.recoilPosShift = source.recoilPosShift * scale;
-        recoil.recoilRotImpulse = source.recoilRotImpulse * scale;
-        // Weights multiply the magnitudes above; they keep donor values so each kick is scaled once, not squared.
-        recoil.concussionIntensity = source.concussionIntensity * scale;
         recoil.concussionFrequency = continuous ? 0f : source.concussionFrequency;
         recoil.concussionDuration = continuous ? 0f : source.concussionDuration;
-        // Continuous guns retain zero direction/shake data. Other timing/blending and animations keep their donor values.
         return recoil;
     }
 
-    private static class Owned<T> { internal static readonly HashSet<uint> Ids = new(); }
-
+    // ForgeCore's DataBlocks adds only: an ID the game or another mod holds is refused, and a block this plugin added before is kept.
     private static void ValidateOwned<T>(T staged) where T : GameDataBlockBase<T>
     {
-        var existing = GameDataBlockBase<T>.GetBlock(staged.persistentID);
-        if (existing != null && (!Owned<T>.Ids.Contains(staged.persistentID) || existing.name != staged.name))
+        if (DataBlocks.Check(Plugin.Id, staged) == DataBlockResult.Conflict)
             throw new InvalidOperationException($"Energy gear ID collision: {typeof(T).Name}/{staged.persistentID}.");
     }
 
     private static void AddMissing<T>(T block) where T : GameDataBlockBase<T>
     {
-        ValidateOwned(block);
-        if (GameDataBlockBase<T>.GetBlock(block.persistentID) == null)
-        {
-            // A native call can throw after insertion. Retain ownership for a safe retry.
-            try { GameDataBlockBase<T>.AddBlock(block); }
-            finally
-            {
-                if (GameDataBlockBase<T>.GetBlock(block.persistentID)?.name == block.name) Owned<T>.Ids.Add(block.persistentID);
-            }
-        }
-        if (GameDataBlockBase<T>.GetBlock(block.persistentID)?.name != block.name)
-            throw new InvalidOperationException($"Energy block registration readback failed: {typeof(T).Name}/{block.persistentID}.");
+        var result = DataBlocks.Add(Plugin.Id, block);
+        if (result is not (DataBlockResult.Added or DataBlockResult.AlreadyAdded))
+            throw new InvalidOperationException($"Energy block registration failed ({result}): {typeof(T).Name}/{block.persistentID}.");
     }
 
     // LocalizedText is an IL2CPP value type. Its managed string constructor does not

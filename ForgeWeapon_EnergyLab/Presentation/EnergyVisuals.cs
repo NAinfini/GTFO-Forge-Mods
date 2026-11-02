@@ -1,40 +1,34 @@
 using System;
 using System.Collections;
+using ForgeVisual;
 using UnityEngine;
 
-namespace ForgeWeaponEnergyLabExperimental.Presentation;
+namespace ForgeWeaponEnergyLab.Presentation;
 
 /// <summary>Resolved segments only; chain hops retain their native timing. This renderer never applies damage.</summary>
 internal sealed class EnergyVisuals : IDisposable
 {
-    private const string BeamMember = "forge_energy_beam", ArcMember = "forge_lightning_arc";
     private const string IgniteState = "ignite";
-    private static readonly LightSpec BeamMuzzleLight = new(new Color(0.4f, 0.7f, 1f), 3f, 1.5f, flicker: 0.2f);
-    private static readonly LightSpec BeamImpactLight = new(new Color(0.45f, 0.75f, 1f), 4.5f, 2.5f, flicker: 0.3f);
-    private static readonly LightSpec ArcLight = new(new Color(0.5f, 0.75f, 1f), 5f, 3f, 0.2f, 0.4f);
-    private static readonly LightSpec BlastMuzzleLight =new(new Color(1f, 0.6f, 0.25f), 4f, 3f, 0.12f);
+    private static readonly PointLightSpec BeamMuzzleLight = new(new Color(0.4f, 0.7f, 1f), 3f, 1.5f, flicker: 0.2f);
+    private static readonly PointLightSpec BeamImpactLight = new(new Color(0.45f, 0.75f, 1f), 4.5f, 2.5f, flicker: 0.3f);
+    private static readonly PointLightSpec ArcLight = new(new Color(0.5f, 0.75f, 1f), 5f, 3f, 0.2f, 0.4f);
+    private static readonly PointLightSpec BlastMuzzleLight =new(new Color(1f, 0.6f, 0.25f), 4f, 3f, 0.12f);
     private const int Capacity = EnergyLimits.ArcTargets;
-    private readonly VfxPool _pool = new("Energy weapon visuals");
+    private readonly FxInstancePool _pool = new("Energy weapon visuals");
     private readonly Vector3[] _starts = new Vector3[Capacity];
     private readonly Vector3[] _ends = new Vector3[Capacity];
     private readonly bool[] _hits = new bool[Capacity];
-    private VfxInstance? _beam;
+    private FxInstance? _beam;
     private int _beamMuzzleLight, _beamImpactLight;
     private float _arcStarted, _arcHopDelay;
     private int _segments, _started;
     private bool _disposed, _prepared;
 
-    public EnergyVisuals()
-    {
-        VfxLibrary.Prefab(BeamMember);
-        VfxLibrary.Prefab(ArcMember);
-    }
-
     internal IEnumerator Prepare()
     {
         if (_prepared) yield break;
-        foreach (var step in _pool.Prepare(BeamMember, 2)) yield return step;
-        foreach (var step in _pool.Prepare(ArcMember, Capacity * 2)) yield return step;
+        foreach (var step in _pool.Prepare(EnergyVfx.Beam, 2)) yield return step;
+        foreach (var step in _pool.Prepare(EnergyVfx.Arc, Capacity * 2)) yield return step;
         _prepared = true;
     }
 
@@ -44,14 +38,14 @@ internal sealed class EnergyVisuals : IDisposable
         if (_disposed) return;
         _segments = 0;
         var ignite = _beam == null;
-        _beam ??= _pool.Take(BeamMember).Hold();
+        _beam ??= _pool.Take(EnergyVfx.Beam).Hold();
         _beam.Stretch(start, end);
         _beam.Emit("impact", hit);
         _beam.Keep();
         if (ignite) _beam.PlayState(IgniteState);
-        EnergyLights.Hold(ref _beamMuzzleLight, start, BeamMuzzleLight, now);
-        if (hit) EnergyLights.Hold(ref _beamImpactLight, end, BeamImpactLight, now);
-        else EnergyLights.Release(ref _beamImpactLight);
+        PointLights.Hold(ref _beamMuzzleLight, start, BeamMuzzleLight, now);
+        if (hit) PointLights.Hold(ref _beamImpactLight, end, BeamImpactLight, now);
+        else PointLights.Release(ref _beamImpactLight);
     }
 
     public void Chain(ReadOnlySpan<Vector3> starts, ReadOnlySpan<Vector3> ends, ReadOnlySpan<bool> hits, float now, float hopDelay)
@@ -74,7 +68,7 @@ internal sealed class EnergyVisuals : IDisposable
     {
         if (_disposed) return;
         Hide();
-        EnergyLights.Flash(start, BlastMuzzleLight, now);
+        PointLights.Flash(start, BlastMuzzleLight, now);
     }
 
     /// <summary>Starts each chain hop's arc when its delay is due; the arc then plays out on its own.</summary>
@@ -83,11 +77,11 @@ internal sealed class EnergyVisuals : IDisposable
         if (_disposed) return;
         while (_started < _segments && now - _arcStarted >= _started * _arcHopDelay)
         {
-            var arc = _pool.Take(ArcMember);
+            var arc = _pool.Take(EnergyVfx.Arc);
             arc.Stretch(_starts[_started], _ends[_started]);
             arc.Emit("end", _hits[_started]);
             arc.Start();
-            if (_hits[_started]) EnergyLights.Flash(_ends[_started], ArcLight, now);
+            if (_hits[_started]) PointLights.Flash(_ends[_started], ArcLight, now);
             _started++;
         }
     }
@@ -99,8 +93,8 @@ internal sealed class EnergyVisuals : IDisposable
         _segments = _started = 0;
         _beam?.Release();
         _beam = null;
-        EnergyLights.Release(ref _beamMuzzleLight);
-        EnergyLights.Release(ref _beamImpactLight);
+        PointLights.Release(ref _beamMuzzleLight);
+        PointLights.Release(ref _beamImpactLight);
     }
 
     public void Dispose()

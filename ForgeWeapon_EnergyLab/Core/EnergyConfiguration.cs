@@ -6,9 +6,8 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using ForgeEnergyLab.Api;
 
-namespace ForgeWeaponEnergyLabExperimental;
+namespace ForgeWeaponEnergyLab;
 
 internal static class EnergyConfiguration
 {
@@ -73,90 +72,108 @@ internal static class EnergyConfiguration
         => JsonSerializer.SerializeToNode(tuning, tuning.GetType(), JsonOptions)!;
 
     internal const string OverridesFile = "tuning-overrides.json", DefaultsFile = "tuning-defaults.json";
+    private static readonly string[] RootFields = { "weapons" };
+
+    internal static EnergyTuning DefaultTuning(EnergyMode mode) => mode switch
+    {
+        EnergyMode.Beam => new BeamTuning(), EnergyMode.ArcChain => new ArcChainTuning(),
+        EnergyMode.PlasmaBlast => new PlasmaBlastTuning(), EnergyMode.PlasmaArc => new PlasmaArcTuning(),
+        EnergyMode.Blast => new BlastTuning(), EnergyMode.Disc => new DiscTuning(),
+        EnergyMode.Flame => new FlameTuning(), EnergyMode.BlackHole => new BlackHoleTuning(),
+        _ => throw new ForgeCore.StrictJsonException("Mode", "must be a firing behaviour, not Off.")
+    };
+
+    /// <summary><paramref name="item"/> laid over <paramref name="current"/>: only the fields it names change, each checked for type and spelling.
+    /// Range and consistency are checked by <see cref="ValidateTuning"/>.</summary>
+    internal static EnergyTuning MergeTuning(EnergyTuning current, JsonElement item, string field)
+    {
+        var type = current.GetType();
+        var properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public);
+        ForgeCore.StrictJson.OnlyKnown(item, field + ".", properties.Select(p => JsonOptions.PropertyNamingPolicy!.ConvertName(p.Name)).ToArray());
+        var merged = TuningJson(current).AsObject();
+        foreach (var property in properties)
+        {
+            var key = JsonOptions.PropertyNamingPolicy!.ConvertName(property.Name);
+            if (!item.TryGetProperty(key, out var value)) continue;
+            var limit = property.PropertyType == typeof(float) ? float.MaxValue : double.MaxValue;
+            if (property.PropertyType == typeof(int)) ForgeCore.StrictJson.Integer(item, field + ".", key, null, int.MinValue, int.MaxValue);
+            else ForgeCore.StrictJson.Number(item, field + ".", key, null, -limit, limit);
+            merged[key] = JsonNode.Parse(value.GetRawText());
+        }
+        return (EnergyTuning)merged.Deserialize(type, JsonOptions)!;
+    }
 
     // The defaults file is a reference rewritten on every launch, so it always shows this build's values.
-    // The overrides file holds only the values a player changed; every other value follows the current defaults.
-    internal static WeaponDefinition[] Load(string directory, WeaponDefinition[] defaults)
+    // The overrides file holds only the values a player changed; every other value follows the current defaults. A problem is
+    // added to errors and costs only what it names: one weapon's overrides, or the whole file when it cannot be read at all.
+    internal static WeaponDefinition[] Load(string directory, WeaponDefinition[] defaults, List<string> errors)
     {
-        Directory.CreateDirectory(directory);
-        var reference = new JsonObject();
-        foreach (var definition in defaults) reference.Add(definition.Id, TuningJson(definition.Tuning));
-        File.WriteAllText(Path.Combine(directory, DefaultsFile), new JsonObject
-        {
-            ["_note"] = "Reference only, rewritten on every launch. Copy the values you want to change into " + OverridesFile + ".",
-            ["_descriptions"] = JsonSerializer.SerializeToNode(Descriptions, JsonOptions), ["weapons"] = reference
-        }.ToJsonString(JsonOptions), new System.Text.UTF8Encoding(false));
         var path = Path.Combine(directory, OverridesFile);
-        if (!File.Exists(path))
-        {
-            using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-            using var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false));
-            writer.Write(new JsonObject { ["weapons"] = new JsonObject() }.ToJsonString(JsonOptions));
-        }
         try
         {
-            using var doc = JsonDocument.Parse(File.ReadAllText(path));
-            var root = Object(doc.RootElement, "$", new[] { "weapons" }, required: new[] { "weapons" });
-            var weapons = Object(root.GetProperty("weapons"), "$.weapons", defaults.Select(d => d.Id).ToArray(), required: Array.Empty<string>());
+            Directory.CreateDirectory(directory);
+            var reference = new JsonObject();
+            foreach (var definition in defaults) reference.Add(definition.Id, TuningJson(definition.Tuning));
+            File.WriteAllText(Path.Combine(directory, DefaultsFile), new JsonObject
+            {
+                ["_note"] = "Reference only, rewritten on every launch. Copy the values you want to change into " + OverridesFile + ".",
+                ["_descriptions"] = JsonSerializer.SerializeToNode(Descriptions, JsonOptions), ["weapons"] = reference
+            }.ToJsonString(JsonOptions), new System.Text.UTF8Encoding(false));
+            if (!File.Exists(path))
+            {
+                using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                using var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false));
+                writer.Write(new JsonObject { ["weapons"] = new JsonObject() }.ToJsonString(JsonOptions));
+            }
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { errors.Add(directory + ": could not write the tuning files: " + error); }
+        JsonDocument doc;
+        try { doc = JsonDocument.Parse(File.ReadAllText(path)); }
+        catch (JsonException error) { errors.Add($"{OverridesFile}: invalid JSON at line {error.LineNumber + 1}, byte {error.BytePositionInLine + 1}; no override applied."); return defaults; }
+        catch (IOException error) { errors.Add($"{OverridesFile}: could not be read: {error}; no override applied."); return defaults; }
+        using (doc)
+        {
+            JsonElement weapons;
+            try
+            {
+                ForgeCore.StrictJson.UniqueMembers(doc.RootElement);
+                ForgeCore.StrictJson.OnlyKnown(doc.RootElement, "", RootFields);
+                weapons = ForgeCore.StrictJson.Object(doc.RootElement, "", "weapons");
+            }
+            catch (ForgeCore.StrictJsonException error) { errors.Add($"{OverridesFile}: {error.Field}: {error.Message} No override applied."); return defaults; }
+            var known = new HashSet<string>(defaults.Select(d => d.Id), StringComparer.Ordinal);
+            foreach (var entry in weapons.EnumerateObject())
+                if (!known.Contains(entry.Name)) errors.Add($"{OverridesFile}: weapons.{entry.Name}: no weapon with this id is loaded (is its package installed?); skipped.");
             var result = new WeaponDefinition[defaults.Length];
             for (var index = 0; index < defaults.Length; index++)
             {
                 var definition = defaults[index];
                 result[index] = definition;
                 if (!weapons.TryGetProperty(definition.Id, out var item)) continue;
-                var field = "$.weapons." + definition.Id;
-                var type = definition.Tuning.GetType();
-                var properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public);
-                Object(item, field, properties.Select(p => JsonOptions.PropertyNamingPolicy!.ConvertName(p.Name)).ToArray(), required: Array.Empty<string>());
-                var merged = TuningJson(definition.Tuning).AsObject();
-                foreach (var property in properties)
+                var field = "weapons." + definition.Id;
+                try
                 {
-                    var key = JsonOptions.PropertyNamingPolicy!.ConvertName(property.Name);
-                    if (!item.TryGetProperty(key, out var value)) continue;
-                    if (value.ValueKind != JsonValueKind.Number ||
-                        (property.PropertyType == typeof(int) ? !value.TryGetInt32(out _) :
-                         property.PropertyType == typeof(float) ? !value.TryGetSingle(out var f) || !float.IsFinite(f) :
-                         !value.TryGetDouble(out var d) || !double.IsFinite(d)))
-                        Fail(field + "." + key, property.PropertyType == typeof(int) ? "expected a 32-bit whole number" : "expected a finite number");
-                    merged[key] = JsonNode.Parse(value.GetRawText());
+                    var tuning = MergeTuning(definition.Tuning, item, field);
+                    ValidateTuning(definition.Mode, tuning, field);
+                    result[index] = definition with { Tuning = tuning };
                 }
-                var tuning = (EnergyTuning)merged.Deserialize(type, JsonOptions)!;
-                ValidateTuning(definition.Mode, tuning, field);
-                result[index] = definition with { Tuning = tuning };
+                catch (ForgeCore.StrictJsonException error) { errors.Add($"{OverridesFile}: {error.Field}: {error.Message} This weapon keeps its default tuning."); }
+                catch (InvalidDataException error) { errors.Add($"{OverridesFile}: {error.Message}. This weapon keeps its default tuning."); }
+                catch (JsonException error) { errors.Add($"{OverridesFile}: {field}: invalid number type at line {error.LineNumber + 1}. This weapon keeps its default tuning."); }
             }
             return result;
         }
-        catch (JsonException error) { throw new InvalidDataException($"{error.Path ?? "$"}: invalid JSON or numeric type at line {error.LineNumber + 1}, byte {error.BytePositionInLine + 1}", error); }
-    }
-
-    private static JsonElement Object(JsonElement value, string path, string[] allowed, string[]? required = null)
-    {
-        if (value.ValueKind != JsonValueKind.Object) Fail(path, "expected an object");
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var property in value.EnumerateObject())
-        {
-            if (!allowed.Contains(property.Name, StringComparer.Ordinal)) Fail(path + "." + property.Name, "unknown field");
-            if (!seen.Add(property.Name)) Fail(path + "." + property.Name, "duplicate field");
-        }
-        foreach (var field in required ?? allowed) if (!seen.Contains(field)) Fail(path + "." + field, "missing field");
-        return value;
     }
 
     internal static void ValidateDefinition(WeaponDefinition definition)
     {
         if (definition == null) throw new ArgumentNullException(nameof(definition));
-        if (definition.Id == null || definition.Id.Length > 128 || !Regex.IsMatch(definition.Id, "^[a-z0-9][a-z0-9_-]*(\\.[a-z0-9][a-z0-9_-]*){2,}$")) Fail("id", "expected a lowercase namespaced id such as author.mod.weapon (at most 128 characters)");
+        if (definition.Id == null || definition.Id.Length > 128 || !Regex.IsMatch(definition.Id, "^[a-z0-9][a-z0-9_-]*(\\.[a-z0-9][a-z0-9_-]*){2,}$")) Fail(definition.Id + ".id", "expected a lowercase namespaced id such as author.mod.weapon (at most 128 characters)");
         if (string.IsNullOrWhiteSpace(definition.Name) || definition.Name.Length > 128) Fail(definition.Id + ".name", "expected a nonempty name of at most 128 characters");
         if (definition.Description is { } text && (string.IsNullOrWhiteSpace(text) || text.Length > 512)) Fail(definition.Id + ".description", "expected null or a nonempty text of at most 512 characters");
         if (definition.Slot is not (WeaponSlot.Main or WeaponSlot.Special)) Fail(definition.Id + ".slot", "expected Main or Special");
         if (definition.Model == null || string.IsNullOrWhiteSpace(definition.Model.Key) || definition.Model.Key.Length > 128) Fail(definition.Id + ".model.key", "expected a prefab key");
-        if (definition.Model!.BundlePath is { } path)
-        {
-            if (!Path.IsPathFullyQualified(path)) Fail(definition.Id + ".model.bundlePath", "expected an absolute bundle path");
-            if (definition.Model.IconPath == null) Fail(definition.Id + ".model.iconPath", "a provider bundle needs its own PNG icon");
-        }
-        else EnergyGears.BuiltInModel(definition.Model.Key);
-        if (definition.Model.IconPath is { } icon && !Path.IsPathFullyQualified(icon)) Fail(definition.Id + ".model.iconPath", "expected an absolute PNG path");
+        if (string.IsNullOrWhiteSpace(definition.Model!.BundlePath) || !Path.IsPathFullyQualified(definition.Model.BundlePath)) Fail(definition.Id + ".model.bundlePath", "expected an absolute bundle path");
         ValidateTuning(definition.Mode, definition.Tuning, definition.Id + ".tuning");
     }
 
@@ -204,8 +221,8 @@ internal static class EnergyConfiguration
                 }
                 break;
             case BlastTuning blast:
-                Check(nameof(blast.BlastRadius), blast.BlastRadius, 0.01, 100); Check(nameof(blast.ExplosionLifetime), blast.ExplosionLifetime, 0.01, 120);
-                Check(nameof(blast.ActiveProjectiles), blast.ActiveProjectiles, 1, 4); Check(nameof(blast.NoiseRadius), blast.NoiseRadius, 0, 1000); Check(nameof(blast.ExplosionForce), blast.ExplosionForce, 0, 1000);
+                Check(nameof(blast.Speed), blast.Speed, 0.01, 1000); Check(nameof(blast.BlastRadius), blast.BlastRadius, 0.01, 100); Check(nameof(blast.ExplosionLifetime), blast.ExplosionLifetime, 0.01, 120);
+                Check(nameof(blast.NoiseRadius), blast.NoiseRadius, 0, 1000); Check(nameof(blast.ExplosionForce), blast.ExplosionForce, 0, 1000);
                 break;
             case DiscTuning disc:
                 Check(nameof(disc.Speed), disc.Speed, 0.01, 1000); Check(nameof(disc.BodyRadius), disc.BodyRadius, 0.01, 100); Check(nameof(disc.Bounces), disc.Bounces, 0, 128);

@@ -1,4 +1,4 @@
-"""Shared by export_parts_blender.py and render_icons_blender.py (runs inside Blender).
+"""Shared by export_parts_blender.py (runs inside Blender).
 
 assemble(src, mode) rebuilds one energy gun from the parts library in an empty scene: the receiver root at the origin,
 front / stock / mag roots at the receiver's align_Front / align_Stock / align_Magazine, the sight root at align_Sight,

@@ -1,0 +1,17 @@
+{
+  "picker.slots": "配装",
+  "picker.all": "全部",
+  "picker.clear": "空",
+  "teammates.downed": "倒地",
+  "teammates.grabbed": "被抓",
+  "loadout.carrying": "搬运中",
+  "countdown.seconds": "{0}秒",
+  "keys.none": "未绑定",
+  "keys.press": "请按键",
+  "keys.conflict": "冲突：{0}",
+  "keys.group": "界面",
+  "keys.confirm": "确认",
+  "keys.cancel": "取消",
+  "confirm.yes": "确认",
+  "confirm.no": "取消"
+}

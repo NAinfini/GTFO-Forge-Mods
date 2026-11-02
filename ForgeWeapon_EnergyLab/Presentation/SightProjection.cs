@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace ForgeWeaponEnergyLabExperimental.Presentation;
+namespace ForgeWeaponEnergyLab.Presentation;
 
 internal static class SightProjection
 {

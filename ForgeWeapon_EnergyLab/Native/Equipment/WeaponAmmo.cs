@@ -1,6 +1,6 @@
 using Gear;
 
-namespace ForgeWeaponEnergyLabExperimental.Native;
+namespace ForgeWeaponEnergyLab.Native;
 
 internal static class WeaponAmmo
 {

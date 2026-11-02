@@ -1,0 +1,740 @@
+using System;
+using Agents;
+using ChainedPuzzles;
+using Enemies;
+using Gear;
+using HarmonyLib;
+using LevelGeneration;
+using Player;
+using SNetwork;
+using UnityEngine;
+
+namespace ForgeCore;
+
+/// <summary>Which of a player's damage receive entries ran (<c>Dam_PlayerDamageBase.Receive*Damage</c>).</summary>
+public enum PlayerReceiveKind { Bullet, Melee, Explosion, TentacleAttack, ShooterProjectile, Fall }
+
+/// <summary>One receive on a player: the entry, the receiver, the damage the packet carries scaled to the receiver's maximum health
+/// (<c>data.damage.Get(HealthMax)</c>) and the packet's source (<c>default</c> for the entries whose packet names none).</summary>
+public readonly record struct PlayerReceive(PlayerReceiveKind Kind, Dam_PlayerDamageBase Receiver, float Amount, pAgent Source);
+
+/// <summary>Which <c>SentryGunInstance</c> method a <see cref="GameHooks.SentryLifecycle"/> call is.</summary>
+public enum SentryStep { GearSpawnComplete, PickUp, SyncedPickup, Despawn, Destroy, BackpackCleanup, CleanUp }
+
+/// <summary>One call of a sentry's lifecycle: the sentry, the method, and the player who picks it up (<c>PickUp</c> and
+/// <c>SyncedPickup</c>; null for the other steps).</summary>
+public readonly record struct SentryCall(SentryGunInstance Sentry, SentryStep Step, PlayerAgent? Actor);
+
+/// <summary>The game methods that more than one package reads, patched here once. Each member is a <see cref="Bracket{TCall}"/> over one
+/// game method (or the same method of the families named): subscribe with <c>Before</c>, <c>After</c> or <c>Around</c>. ForgeCore
+/// holds only how the game method is hung; what a subscriber does with the call is its own. Main thread only.</summary>
+public static partial class GameHooks
+{
+    // ---- Level objects: the state callbacks of doors, terminals, generators, reactor, scans, containers and pickups, and noise.
+    public static readonly Bracket<(LG_WeakDoor Door, pDoorState State)> WeakDoorState = new("GameHooks.WeakDoorState", typeof(WeakDoorStateHook));
+    public static readonly Bracket<(LG_WardenObjective_Reactor Reactor, pReactorState Old, pReactorState New, bool Dropin)> ReactorState = new("GameHooks.ReactorState", typeof(ReactorStateHook));
+    public static readonly Bracket<(ChainedPuzzleInstance Puzzle, pChainedPuzzleState Old, pChainedPuzzleState New)> PuzzleState = new("GameHooks.PuzzleState", typeof(PuzzleStateHook));
+    public static readonly Bracket<(LG_ResourceContainer_Sync Container, pResourceContainerItemState New)> ResourceContainerState = new("GameHooks.ResourceContainerState", typeof(ResourceContainerStateHook));
+    public static readonly Bracket<(LG_PowerGenerator_Core Generator, pPowerGeneratorState New)> GeneratorState = new("GameHooks.GeneratorState", typeof(GeneratorStateHook));
+    public static readonly Bracket<(LG_PickupItem_Sync Item, pPickupItemState Old, pPickupItemState New, bool Recall)> PickupItemState = new("GameHooks.PickupItemState", typeof(PickupItemStateHook));
+    public static readonly Bracket<(LG_ComputerTerminalCommandInterpreter Interpreter, TERM_Command Command, string Line)> TerminalCommand = new("GameHooks.TerminalCommand", typeof(TerminalCommandHook));
+    public static readonly Bracket<NM_NoiseData> NoiseMade = new("GameHooks.NoiseMade", typeof(NoiseMadeHook));
+
+    // ---- Enemies.
+    public static readonly Bracket<ES_ScoutScream> ScoutScreamActivated = new("GameHooks.ScoutScreamActivated", typeof(ScoutScreamActivatedHook));
+    public static readonly Bracket<ES_ScoutDetection> ScoutDetectionEntered = new("GameHooks.ScoutDetectionEntered", typeof(ScoutDetectionEnteredHook));
+    public static readonly Bracket<(Dam_EnemyDamageBase Receiver, pExplosionDamageData Data)> EnemyExplosionReceived = new("GameHooks.EnemyExplosionReceived", typeof(EnemyExplosionReceivedHook));
+    public static readonly Bracket<SurvivalWave> WaveStopped = new("GameHooks.WaveStopped", typeof(WaveStoppedHook));
+    /// <summary><c>ES_EnemyAttackBase.DoStartAttack</c> (strikers, tanks, shooters; the base body, no attack state overrides it): the attack state, where it
+    /// aims and the animation it plays. Run on the host and, from the network, on a client.</summary>
+    public static readonly Bracket<(ES_EnemyAttackBase State, Vector3 Target, int AnimIndex)> EnemyAttackStarted = new("GameHooks.EnemyAttackStarted", typeof(EnemyAttackStartedHook));
+    /// <summary><c>ES_Hitreact.DoHitReact</c>: an enemy plays a hit reaction; the state's <c>m_data</c> holds its type, the side it was hit from and the animation index.</summary>
+    public static readonly Bracket<ES_Hitreact> EnemyHitreacted = new("GameHooks.EnemyHitreacted", typeof(EnemyHitreactedHook));
+    /// <summary><c>ES_HibernateWakeUp.ActivateState</c>: a sleeping enemy getting up, with the distance and delay the game gave it and whether another enemy's wake-up passed it on (<c>Skip</c> keeps the enemy asleep).</summary>
+    public static readonly Bracket<(ES_HibernateWakeUp State, float Distance, float Delay, bool Propagated)> HibernateWakeActivated = new("GameHooks.HibernateWakeActivated", typeof(HibernateWakeActivatedHook));
+    /// <summary>An enemy's scream starting: <c>ES_Scream.ActivateState</c> (the host decides) and <c>ES_Scream.OnStateShouldBeActivated</c> (a client is told).</summary>
+    /// <summary><c>ES_Scream.ActivateState</c>: the host starts an enemy's scream.</summary>
+    public static readonly Bracket<ES_Scream> EnemyScreamStarted = new("GameHooks.EnemyScreamStarted", typeof(EnemyScreamStartedHook));
+    /// <summary><c>ES_Scream.OnStateShouldBeActivated</c>: an awake enemy's scream packet arrives (the entry other packages read).</summary>
+    public static readonly Bracket<ES_Scream> EnemyScreamed = new("GameHooks.EnemyScreamed", typeof(EnemyScreamedHook));
+
+    // ---- Players.
+    /// <summary>The six damage entries of <c>Dam_PlayerDamageBase</c> a hit can arrive through (bullet, melee, explosion, tentacle,
+    /// shooter projectile, fall); the local player's overriding bodies and the rarer entries are not part of it.</summary>
+    public static readonly Bracket<PlayerReceive> PlayerReceived = new("GameHooks.PlayerReceived", typeof(PlayerReceiveHooks));
+    public static readonly Bracket<PLOC_Downed> PlayerRevived = new("GameHooks.PlayerRevived", typeof(PlayerRevivedHook));
+
+    // ---- Weapons: the four firing bodies are four methods and four brackets; a family is the one the game runs.
+    public static class Fire
+    {
+        public static readonly Bracket<BulletWeapon> BulletWeapon = new("GameHooks.Fire.BulletWeapon", typeof(BulletWeaponFireHook));
+        public static readonly Bracket<Shotgun> Shotgun = new("GameHooks.Fire.Shotgun", typeof(ShotgunFireHook));
+        public static readonly Bracket<BulletWeaponSynced> BulletWeaponSynced = new("GameHooks.Fire.BulletWeaponSynced", typeof(BulletWeaponSyncedFireHook));
+        public static readonly Bracket<ShotgunSynced> ShotgunSynced = new("GameHooks.Fire.ShotgunSynced", typeof(ShotgunSyncedFireHook));
+    }
+
+    /// <summary><c>Weapon.CastWeaponRay(Transform muzzle, ref WeaponHitData, int mask)</c>: the origin is the muzzle's own position, which
+    /// is not read here (a native read); the subscriber reads it when it needs it.</summary>
+    public static readonly RayBracket MuzzleRay = new("GameHooks.MuzzleRay", typeof(MuzzleRayHook));
+    /// <summary><c>Weapon.CastWeaponRay(Transform alignTransform, ref WeaponHitData, Vector3 originPos, int mask)</c>: the origin is the caller's own.</summary>
+    public static readonly RayBracket AlignedRay = new("GameHooks.AlignedRay", typeof(AlignedRayHook));
+
+    // ---- Equipment in the world.
+    /// <summary><c>MeleeWeaponFirstPerson.DoAttackDamage</c>: a swing's hit on one target (<c>Skip</c> keeps the hit from being dealt).</summary>
+    public static readonly Bracket<(MeleeWeaponFirstPerson Weapon, MeleeWeaponDamageData Data, bool IsPush)> MeleeAttackDamage = new("GameHooks.MeleeAttackDamage", typeof(MeleeAttackDamageHook));
+    public static readonly Bracket<MWS_Push> PushEntered = new("GameHooks.PushEntered", typeof(PushEnteredHook));
+    public static readonly Bracket<SentryGunInstance> SentryGearSpawned = new("GameHooks.SentryGearSpawned", typeof(SentryGearSpawnedHook));
+    public static readonly Bracket<SentryGunInstance> SentryDespawned = new("GameHooks.SentryDespawned", typeof(SentryDespawnedHook));
+    /// <summary>Every method that moves a sentry in or out of its owner's backpack and the world, in one bracket: <c>OnGearSpawnComplete</c>,
+    /// <c>PickUp</c>, <c>SyncedPickup</c>, <c>OnDespawn</c>, <c>OnDestroy</c>, <c>OnBackpackCleanupCallback</c> and <c>CleanUp</c> (see
+    /// <see cref="SentryStep"/>). A subscriber filters on the step it wants; <see cref="SentryGearSpawned"/> and <see cref="SentryDespawned"/> are
+    /// the same two methods for a subscriber that wants only those.</summary>
+    public static readonly Bracket<SentryCall> SentryLifecycle = new("GameHooks.SentryLifecycle", typeof(SentryLifecycleHook));
+    public static readonly Bracket<MineDeployerInstance> MineSpawned = new("GameHooks.MineSpawned", typeof(MineSpawnedHook));
+    public static readonly Bracket<(MineDeployerInstance Mine, PlayerAgent Actor)> MinePickedUp = new("GameHooks.MinePickedUp", typeof(MinePickedUpHook));
+
+    // ---- Items: the one entry every client builds an Item through (first person, third person, pickup, instance).
+    public static readonly Bracket<ItemSpawn> ItemSpawned = new("GameHooks.ItemSpawned", typeof(ItemSpawnedHook));
+
+    // ---- The local player's first-person view.
+    /// <summary><c>FirstPersonItemHolder.LateUpdate</c>: the holder of the local player's first-person arms and gun has placed itself for this frame; a
+    /// subscriber that moves it moves the arms and the gun with it (the body of the player stays where it is).</summary>
+    public static readonly Bracket<FirstPersonItemHolder> FirstPersonHolderLateUpdate = new("GameHooks.FirstPersonHolderLateUpdate", typeof(FirstPersonHolderLateUpdateHook));
+    /// <summary><c>ItemEquippable.TryTriggerReloadAnimationSequence</c>: an item starts its reload animation (the local player's reload).</summary>
+    public static readonly Bracket<ItemEquippable> ReloadAnimationStarted = new("GameHooks.ReloadAnimationStarted", typeof(ReloadAnimationStartedHook));
+
+    // ---- The game's event log.
+    public static readonly Bracket<(string Log, eGameEventChatLogType Type)> GameLogAdded = new("GameHooks.GameLogAdded", typeof(GameLogAddedHook));
+}
+
+/// <summary>The ray cast of a weapon (<see cref="GameHooks.MuzzleRay"/>, <see cref="GameHooks.AlignedRay"/>): like <see cref="Bracket{TCall}"/>
+/// but the hit data and the result are handed by reference, so a subscriber can change what the game reads back.</summary>
+public sealed class RayBracket
+{
+    /// <summary>Before the cast; the state comes back to <see cref="RayExit{TState}"/> and <see cref="RayFaulted{TState}"/>.</summary>
+    public delegate TState RayEnter<TState>(Transform transform, ref Weapon.WeaponHitData data, Vector3 origin);
+    /// <summary>After the cast returned (<c>ran</c> false when a prefix skipped it); <c>result</c> is what the game returns.</summary>
+    public delegate void RayExit<TState>(TState state, Transform transform, ref Weapon.WeaponHitData data, Vector3 origin, ref bool result, bool ran);
+    /// <summary>The cast threw; the exception is still the game's to throw.</summary>
+    public delegate void RayFaulted<TState>(TState state);
+
+    private interface ITap
+    {
+        void Enter(Transform transform, ref Weapon.WeaponHitData data, Vector3 origin);
+        void Exit(Transform transform, ref Weapon.WeaponHitData data, Vector3 origin, ref bool result, bool ran);
+        void Faulted();
+    }
+
+    private sealed class Tap<TState> : ITap
+    {
+        private readonly RayBracket _owner;
+        private readonly RayEnter<TState> _enter;
+        private readonly RayExit<TState>? _exit;
+        private readonly RayFaulted<TState>? _faulted;
+        private readonly System.Collections.Generic.Stack<TState> _states = new();
+
+        internal Tap(RayBracket owner, RayEnter<TState> enter, RayExit<TState>? exit, RayFaulted<TState>? faulted)
+        {
+            _owner = owner;
+            _enter = enter;
+            _exit = exit;
+            _faulted = faulted;
+        }
+
+        public void Enter(Transform transform, ref Weapon.WeaponHitData data, Vector3 origin)
+        {
+            var state = default(TState)!;
+            try { state = _enter(transform, ref data, origin); }
+            catch (Exception error) { _owner.Failed("enter", error); }
+            _states.Push(state);
+        }
+
+        public void Exit(Transform transform, ref Weapon.WeaponHitData data, Vector3 origin, ref bool result, bool ran)
+        {
+            if (!_states.TryPop(out var state)) return;
+            try { _exit?.Invoke(state, transform, ref data, origin, ref result, ran); }
+            catch (Exception error) { _owner.Failed("exit", error); }
+        }
+
+        public void Faulted()
+        {
+            if (!_states.TryPop(out var state)) return;
+            try { _faulted?.Invoke(state); }
+            catch (Exception error) { _owner.Failed("faulted", error); }
+        }
+    }
+
+    private readonly string _module;
+    private readonly Type _patches;
+    private ITap[] _taps = [];
+
+    internal RayBracket(string module, Type patches)
+    {
+        _module = module;
+        _patches = patches;
+    }
+
+    internal bool Active => _taps.Length != 0;
+
+    /// <summary>Subscribes around the cast; the first subscription puts the module's patches on. A prefix that runs first and a
+    /// postfix and finalizer that run last, so the subscriber reads the cast around every other patch of it.</summary>
+    public void Around<TState>(RayEnter<TState> enter, RayExit<TState>? exit, RayFaulted<TState>? faulted = null)
+    {
+        Patches.Ensure(_module, _patches);
+        _taps = [.. _taps, new Tap<TState>(this, enter ?? throw new ArgumentNullException(nameof(enter)), exit, faulted)];
+    }
+
+    internal void RunEnter(Transform transform, ref Weapon.WeaponHitData data, Vector3 origin)
+    {
+        foreach (var tap in _taps) tap.Enter(transform, ref data, origin);
+    }
+
+    internal void RunExit(Transform transform, ref Weapon.WeaponHitData data, Vector3 origin, ref bool result, bool ran)
+    {
+        var taps = _taps;
+        for (var i = taps.Length - 1; i >= 0; i--) taps[i].Exit(transform, ref data, origin, ref result, ran);
+    }
+
+    internal void RunFaulted()
+    {
+        var taps = _taps;
+        for (var i = taps.Length - 1; i >= 0; i--) taps[i].Faulted();
+    }
+
+    private void Failed(string end, Exception error)
+        => Plugin.Logger.ErrorOnce("A " + _module + " handler failed (" + end + "): " + error);
+}
+
+// The patch classes. Each target is one class: a prefix at Priority.First opens the call and keeps it in __state, a postfix at
+// Priority.Last closes it, a finalizer at Priority.Last closes a call whose body threw. The prefix always exists, which is also what
+// makes Harmony hand the postfix its __runOriginal.
+
+[HarmonyPatch(typeof(LG_WeakDoor), nameof(LG_WeakDoor.OnSyncDoorStateChange))]
+internal static class WeakDoorStateHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(LG_WeakDoor __instance, pDoorState state, out (LG_WeakDoor, pDoorState) __state) { __state = (__instance, state); GameHooks.WeakDoorState.RunBefore(__state); }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After((LG_WeakDoor Door, pDoorState State) __state, bool __runOriginal) => GameHooks.WeakDoorState.RunAfter(__state, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, (LG_WeakDoor Door, pDoorState State) __state) { if (__exception != null) GameHooks.WeakDoorState.RunFaulted(__state, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(LG_WardenObjective_Reactor), nameof(LG_WardenObjective_Reactor.OnStateChange))]
+internal static class ReactorStateHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(LG_WardenObjective_Reactor __instance, pReactorState oldState, pReactorState newState, bool isDropinState, out (LG_WardenObjective_Reactor, pReactorState, pReactorState, bool) __state)
+    { __state = (__instance, oldState, newState, isDropinState); GameHooks.ReactorState.RunBefore(__state); }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After((LG_WardenObjective_Reactor Reactor, pReactorState Old, pReactorState New, bool Dropin) __state, bool __runOriginal) => GameHooks.ReactorState.RunAfter(__state, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, (LG_WardenObjective_Reactor Reactor, pReactorState Old, pReactorState New, bool Dropin) __state) { if (__exception != null) GameHooks.ReactorState.RunFaulted(__state, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(ChainedPuzzleInstance), nameof(ChainedPuzzleInstance.OnStateChange))]
+internal static class PuzzleStateHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(ChainedPuzzleInstance __instance, pChainedPuzzleState oldState, pChainedPuzzleState newState, out (ChainedPuzzleInstance, pChainedPuzzleState, pChainedPuzzleState) __state)
+    { __state = (__instance, oldState, newState); GameHooks.PuzzleState.RunBefore(__state); }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After((ChainedPuzzleInstance Puzzle, pChainedPuzzleState Old, pChainedPuzzleState New) __state, bool __runOriginal) => GameHooks.PuzzleState.RunAfter(__state, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, (ChainedPuzzleInstance Puzzle, pChainedPuzzleState Old, pChainedPuzzleState New) __state) { if (__exception != null) GameHooks.PuzzleState.RunFaulted(__state, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(LG_ResourceContainer_Sync), nameof(LG_ResourceContainer_Sync.OnStateChange))]
+internal static class ResourceContainerStateHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(LG_ResourceContainer_Sync __instance, pResourceContainerItemState newState, out (LG_ResourceContainer_Sync, pResourceContainerItemState) __state)
+    { __state = (__instance, newState); GameHooks.ResourceContainerState.RunBefore(__state); }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After((LG_ResourceContainer_Sync Container, pResourceContainerItemState New) __state, bool __runOriginal) => GameHooks.ResourceContainerState.RunAfter(__state, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, (LG_ResourceContainer_Sync Container, pResourceContainerItemState New) __state) { if (__exception != null) GameHooks.ResourceContainerState.RunFaulted(__state, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(LG_PowerGenerator_Core), nameof(LG_PowerGenerator_Core.OnStateChange))]
+internal static class GeneratorStateHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(LG_PowerGenerator_Core __instance, pPowerGeneratorState newState, out (LG_PowerGenerator_Core, pPowerGeneratorState) __state)
+    { __state = (__instance, newState); GameHooks.GeneratorState.RunBefore(__state); }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After((LG_PowerGenerator_Core Generator, pPowerGeneratorState New) __state, bool __runOriginal) => GameHooks.GeneratorState.RunAfter(__state, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, (LG_PowerGenerator_Core Generator, pPowerGeneratorState New) __state) { if (__exception != null) GameHooks.GeneratorState.RunFaulted(__state, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(LG_PickupItem_Sync), nameof(LG_PickupItem_Sync.OnStateChange))]
+internal static class PickupItemStateHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(LG_PickupItem_Sync __instance, pPickupItemState oldState, pPickupItemState newState, bool isRecall, out (LG_PickupItem_Sync, pPickupItemState, pPickupItemState, bool) __state)
+    { __state = (__instance, oldState, newState, isRecall); GameHooks.PickupItemState.RunBefore(__state); }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After((LG_PickupItem_Sync Item, pPickupItemState Old, pPickupItemState New, bool Recall) __state, bool __runOriginal) => GameHooks.PickupItemState.RunAfter(__state, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, (LG_PickupItem_Sync Item, pPickupItemState Old, pPickupItemState New, bool Recall) __state) { if (__exception != null) GameHooks.PickupItemState.RunFaulted(__state, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(LG_ComputerTerminalCommandInterpreter), "ReceiveCommand")]
+internal static class TerminalCommandHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(LG_ComputerTerminalCommandInterpreter __instance, TERM_Command cmd, string inputLine, out (LG_ComputerTerminalCommandInterpreter, TERM_Command, string) __state)
+    { __state = (__instance, cmd, inputLine); GameHooks.TerminalCommand.RunBefore(__state); }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After((LG_ComputerTerminalCommandInterpreter Interpreter, TERM_Command Command, string Line) __state, bool __runOriginal) => GameHooks.TerminalCommand.RunAfter(__state, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, (LG_ComputerTerminalCommandInterpreter Interpreter, TERM_Command Command, string Line) __state) { if (__exception != null) GameHooks.TerminalCommand.RunFaulted(__state, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(NoiseManager), nameof(NoiseManager.MakeNoise))]
+internal static class NoiseMadeHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(NM_NoiseData noiseData, out NM_NoiseData __state) { __state = noiseData; GameHooks.NoiseMade.RunBefore(noiseData); }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(NM_NoiseData __state, bool __runOriginal) => GameHooks.NoiseMade.RunAfter(__state, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, NM_NoiseData __state) { if (__exception != null) GameHooks.NoiseMade.RunFaulted(__state, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(ES_ScoutScream), nameof(ES_ScoutScream.ActivateState))]
+internal static class ScoutScreamActivatedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(ES_ScoutScream __instance) => GameHooks.ScoutScreamActivated.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(ES_ScoutScream __instance, bool __runOriginal) => GameHooks.ScoutScreamActivated.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, ES_ScoutScream __instance) { if (__exception != null) GameHooks.ScoutScreamActivated.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(ES_ScoutDetection), nameof(ES_ScoutDetection.CommonEnter))]
+internal static class ScoutDetectionEnteredHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(ES_ScoutDetection __instance) => GameHooks.ScoutDetectionEntered.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(ES_ScoutDetection __instance, bool __runOriginal) => GameHooks.ScoutDetectionEntered.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, ES_ScoutDetection __instance) { if (__exception != null) GameHooks.ScoutDetectionEntered.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(Dam_EnemyDamageBase), nameof(Dam_EnemyDamageBase.ReceiveExplosionDamage))]
+internal static class EnemyExplosionReceivedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(Dam_EnemyDamageBase __instance, pExplosionDamageData data, out (Dam_EnemyDamageBase, pExplosionDamageData) __state)
+    { __state = (__instance, data); GameHooks.EnemyExplosionReceived.RunBefore(__state); }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After((Dam_EnemyDamageBase Receiver, pExplosionDamageData Data) __state, bool __runOriginal) => GameHooks.EnemyExplosionReceived.RunAfter(__state, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, (Dam_EnemyDamageBase Receiver, pExplosionDamageData Data) __state) { if (__exception != null) GameHooks.EnemyExplosionReceived.RunFaulted(__state, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(ES_EnemyAttackBase), nameof(ES_EnemyAttackBase.DoStartAttack))]
+internal static class EnemyAttackStartedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(ES_EnemyAttackBase __instance, Vector3 attackTargetPosition, int animIndex, out (ES_EnemyAttackBase, Vector3, int) __state)
+    { __state = (__instance, attackTargetPosition, animIndex); GameHooks.EnemyAttackStarted.RunBefore(__state); }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After((ES_EnemyAttackBase State, Vector3 Target, int AnimIndex) __state, bool __runOriginal) => GameHooks.EnemyAttackStarted.RunAfter(__state, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, (ES_EnemyAttackBase State, Vector3 Target, int AnimIndex) __state) { if (__exception != null) GameHooks.EnemyAttackStarted.RunFaulted(__state, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(ES_Hitreact), nameof(ES_Hitreact.DoHitReact))]
+internal static class EnemyHitreactedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(ES_Hitreact __instance) => GameHooks.EnemyHitreacted.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(ES_Hitreact __instance, bool __runOriginal) => GameHooks.EnemyHitreacted.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, ES_Hitreact __instance) { if (__exception != null) GameHooks.EnemyHitreacted.RunFaulted(__instance, __exception); return __exception; }
+}
+
+internal static class EnemyScreamStartedHook
+{
+    [HarmonyPatch(typeof(ES_Scream), nameof(ES_Scream.ActivateState), new Type[0])]
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void HostBefore(ES_Scream __instance) => GameHooks.EnemyScreamStarted.RunBefore(__instance);
+    [HarmonyPatch(typeof(ES_Scream), nameof(ES_Scream.ActivateState), new Type[0])]
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void HostAfter(ES_Scream __instance, bool __runOriginal) => GameHooks.EnemyScreamStarted.RunAfter(__instance, __runOriginal);
+    [HarmonyPatch(typeof(ES_Scream), nameof(ES_Scream.ActivateState), new Type[0])]
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? HostFaulted(Exception? __exception, ES_Scream __instance) { if (__exception != null) GameHooks.EnemyScreamStarted.RunFaulted(__instance, __exception); return __exception; }
+}
+
+internal static class EnemyScreamedHook
+{
+    [HarmonyPatch(typeof(ES_Scream), nameof(ES_Scream.OnStateShouldBeActivated))]
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void ClientBefore(ES_Scream __instance) => GameHooks.EnemyScreamed.RunBefore(__instance);
+    [HarmonyPatch(typeof(ES_Scream), nameof(ES_Scream.OnStateShouldBeActivated))]
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void ClientAfter(ES_Scream __instance, bool __runOriginal) => GameHooks.EnemyScreamed.RunAfter(__instance, __runOriginal);
+    [HarmonyPatch(typeof(ES_Scream), nameof(ES_Scream.OnStateShouldBeActivated))]
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? ClientFaulted(Exception? __exception, ES_Scream __instance) { if (__exception != null) GameHooks.EnemyScreamed.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(FirstPersonItemHolder), "LateUpdate")]
+internal static class FirstPersonHolderLateUpdateHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(FirstPersonItemHolder __instance) => GameHooks.FirstPersonHolderLateUpdate.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(FirstPersonItemHolder __instance, bool __runOriginal) => GameHooks.FirstPersonHolderLateUpdate.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, FirstPersonItemHolder __instance) { if (__exception != null) GameHooks.FirstPersonHolderLateUpdate.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(ItemEquippable), nameof(ItemEquippable.TryTriggerReloadAnimationSequence))]
+internal static class ReloadAnimationStartedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(ItemEquippable __instance) => GameHooks.ReloadAnimationStarted.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(ItemEquippable __instance, bool __runOriginal) => GameHooks.ReloadAnimationStarted.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, ItemEquippable __instance) { if (__exception != null) GameHooks.ReloadAnimationStarted.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(SurvivalWave), nameof(SurvivalWave.StopEvent))]
+internal static class WaveStoppedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(SurvivalWave __instance) => GameHooks.WaveStopped.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(SurvivalWave __instance, bool __runOriginal) => GameHooks.WaveStopped.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, SurvivalWave __instance) { if (__exception != null) GameHooks.WaveStopped.RunFaulted(__instance, __exception); return __exception; }
+}
+
+/// <summary>The six receive entries share one class: one bracket, six targets.</summary>
+internal static class PlayerReceiveHooks
+{
+    private static PlayerReceive Open(PlayerReceiveKind kind, Dam_PlayerDamageBase receiver, UFloat16 damage, pAgent source)
+    {
+        var amount = 0f;
+        try { amount = damage.Get(receiver.HealthMax); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Reading the damage of a player hit failed: " + error); }
+        var call = new PlayerReceive(kind, receiver, amount, source);
+        GameHooks.PlayerReceived.RunBefore(call);
+        return call;
+    }
+
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveBulletDamage))]
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void BulletBefore(Dam_PlayerDamageBase __instance, pBulletDamageData data, out PlayerReceive __state) => __state = Open(PlayerReceiveKind.Bullet, __instance, data.damage, data.source);
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveBulletDamage))]
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void BulletAfter(PlayerReceive __state, bool __runOriginal) => GameHooks.PlayerReceived.RunAfter(__state, __runOriginal);
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveBulletDamage))]
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? BulletFaulted(Exception? __exception, PlayerReceive __state) => Faulted(__exception, __state);
+
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveMeleeDamage))]
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void MeleeBefore(Dam_PlayerDamageBase __instance, pFullDamageData data, out PlayerReceive __state) => __state = Open(PlayerReceiveKind.Melee, __instance, data.damage, data.source);
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveMeleeDamage))]
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void MeleeAfter(PlayerReceive __state, bool __runOriginal) => GameHooks.PlayerReceived.RunAfter(__state, __runOriginal);
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveMeleeDamage))]
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? MeleeFaulted(Exception? __exception, PlayerReceive __state) => Faulted(__exception, __state);
+
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveExplosionDamage))]
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void ExplosionBefore(Dam_PlayerDamageBase __instance, pExplosionDamageData data, out PlayerReceive __state) => __state = Open(PlayerReceiveKind.Explosion, __instance, data.damage, default);
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveExplosionDamage))]
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void ExplosionAfter(PlayerReceive __state, bool __runOriginal) => GameHooks.PlayerReceived.RunAfter(__state, __runOriginal);
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveExplosionDamage))]
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? ExplosionFaulted(Exception? __exception, PlayerReceive __state) => Faulted(__exception, __state);
+
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveTentacleAttackDamage))]
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void TentacleBefore(Dam_PlayerDamageBase __instance, pMediumDamageData data, out PlayerReceive __state) => __state = Open(PlayerReceiveKind.TentacleAttack, __instance, data.damage, data.source);
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveTentacleAttackDamage))]
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void TentacleAfter(PlayerReceive __state, bool __runOriginal) => GameHooks.PlayerReceived.RunAfter(__state, __runOriginal);
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveTentacleAttackDamage))]
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? TentacleFaulted(Exception? __exception, PlayerReceive __state) => Faulted(__exception, __state);
+
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveShooterProjectileDamage))]
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void ProjectileBefore(Dam_PlayerDamageBase __instance, pMediumDamageData data, out PlayerReceive __state) => __state = Open(PlayerReceiveKind.ShooterProjectile, __instance, data.damage, data.source);
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveShooterProjectileDamage))]
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void ProjectileAfter(PlayerReceive __state, bool __runOriginal) => GameHooks.PlayerReceived.RunAfter(__state, __runOriginal);
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveShooterProjectileDamage))]
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? ProjectileFaulted(Exception? __exception, PlayerReceive __state) => Faulted(__exception, __state);
+
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveFallDamage))]
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void FallBefore(Dam_PlayerDamageBase __instance, pMiniDamageData data, out PlayerReceive __state) => __state = Open(PlayerReceiveKind.Fall, __instance, data.damage, default);
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveFallDamage))]
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void FallAfter(PlayerReceive __state, bool __runOriginal) => GameHooks.PlayerReceived.RunAfter(__state, __runOriginal);
+    [HarmonyPatch(typeof(Dam_PlayerDamageBase), nameof(Dam_PlayerDamageBase.ReceiveFallDamage))]
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? FallFaulted(Exception? __exception, PlayerReceive __state) => Faulted(__exception, __state);
+
+    private static Exception? Faulted(Exception? error, PlayerReceive call)
+    {
+        if (error != null) GameHooks.PlayerReceived.RunFaulted(call, error);
+        return error;
+    }
+}
+
+[HarmonyPatch(typeof(PLOC_Downed), nameof(PLOC_Downed.OnPlayerRevived))]
+internal static class PlayerRevivedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(PLOC_Downed __instance) => GameHooks.PlayerRevived.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(PLOC_Downed __instance, bool __runOriginal) => GameHooks.PlayerRevived.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, PLOC_Downed __instance) { if (__exception != null) GameHooks.PlayerRevived.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(BulletWeapon), nameof(BulletWeapon.Fire))]
+internal static class BulletWeaponFireHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(BulletWeapon __instance) => GameHooks.Fire.BulletWeapon.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(BulletWeapon __instance, bool __runOriginal) => GameHooks.Fire.BulletWeapon.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, BulletWeapon __instance) { if (__exception != null) GameHooks.Fire.BulletWeapon.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(Shotgun), nameof(Shotgun.Fire))]
+internal static class ShotgunFireHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(Shotgun __instance) => GameHooks.Fire.Shotgun.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(Shotgun __instance, bool __runOriginal) => GameHooks.Fire.Shotgun.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, Shotgun __instance) { if (__exception != null) GameHooks.Fire.Shotgun.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(BulletWeaponSynced), nameof(BulletWeaponSynced.Fire))]
+internal static class BulletWeaponSyncedFireHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(BulletWeaponSynced __instance) => GameHooks.Fire.BulletWeaponSynced.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(BulletWeaponSynced __instance, bool __runOriginal) => GameHooks.Fire.BulletWeaponSynced.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, BulletWeaponSynced __instance) { if (__exception != null) GameHooks.Fire.BulletWeaponSynced.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(ShotgunSynced), nameof(ShotgunSynced.Fire))]
+internal static class ShotgunSyncedFireHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(ShotgunSynced __instance) => GameHooks.Fire.ShotgunSynced.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(ShotgunSynced __instance, bool __runOriginal) => GameHooks.Fire.ShotgunSynced.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, ShotgunSynced __instance) { if (__exception != null) GameHooks.Fire.ShotgunSynced.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(Weapon), nameof(Weapon.CastWeaponRay), new[] { typeof(Transform), typeof(Weapon.WeaponHitData), typeof(int) },
+    new[] { ArgumentType.Normal, ArgumentType.Ref, ArgumentType.Normal })]
+internal static class MuzzleRayHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(Transform __0, ref Weapon.WeaponHitData __1) { if (GameHooks.MuzzleRay.Active) GameHooks.MuzzleRay.RunEnter(__0, ref __1, default); }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(Transform __0, ref Weapon.WeaponHitData __1, ref bool __result, bool __runOriginal) { if (GameHooks.MuzzleRay.Active) GameHooks.MuzzleRay.RunExit(__0, ref __1, default, ref __result, __runOriginal); }
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception) { if (__exception != null && GameHooks.MuzzleRay.Active) GameHooks.MuzzleRay.RunFaulted(); return __exception; }
+}
+
+[HarmonyPatch(typeof(Weapon), nameof(Weapon.CastWeaponRay), new[] { typeof(Transform), typeof(Weapon.WeaponHitData), typeof(Vector3), typeof(int) },
+    new[] { ArgumentType.Normal, ArgumentType.Ref, ArgumentType.Normal, ArgumentType.Normal })]
+internal static class AlignedRayHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(Transform __0, ref Weapon.WeaponHitData __1, Vector3 __2) { if (GameHooks.AlignedRay.Active) GameHooks.AlignedRay.RunEnter(__0, ref __1, __2); }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(Transform __0, ref Weapon.WeaponHitData __1, Vector3 __2, ref bool __result, bool __runOriginal) { if (GameHooks.AlignedRay.Active) GameHooks.AlignedRay.RunExit(__0, ref __1, __2, ref __result, __runOriginal); }
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception) { if (__exception != null && GameHooks.AlignedRay.Active) GameHooks.AlignedRay.RunFaulted(); return __exception; }
+}
+
+[HarmonyPatch(typeof(MWS_Push), nameof(MWS_Push.Enter))]
+internal static class PushEnteredHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(MWS_Push __instance) => GameHooks.PushEntered.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(MWS_Push __instance, bool __runOriginal) => GameHooks.PushEntered.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, MWS_Push __instance) { if (__exception != null) GameHooks.PushEntered.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(SentryGunInstance), nameof(SentryGunInstance.OnGearSpawnComplete))]
+internal static class SentryGearSpawnedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(SentryGunInstance __instance) => GameHooks.SentryGearSpawned.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(SentryGunInstance __instance, bool __runOriginal) => GameHooks.SentryGearSpawned.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, SentryGunInstance __instance) { if (__exception != null) GameHooks.SentryGearSpawned.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(SentryGunInstance), nameof(SentryGunInstance.OnDespawn))]
+internal static class SentryDespawnedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(SentryGunInstance __instance) => GameHooks.SentryDespawned.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(SentryGunInstance __instance, bool __runOriginal) => GameHooks.SentryDespawned.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, SentryGunInstance __instance) { if (__exception != null) GameHooks.SentryDespawned.RunFaulted(__instance, __exception); return __exception; }
+}
+
+/// <summary>The seven sentry lifecycle methods behind <see cref="GameHooks.SentryLifecycle"/>: one patch class over all of them, the step read
+/// from the patched method and the acting player from the first argument of the two pick-up methods (the other five take none the bracket
+/// reports).</summary>
+[HarmonyPatch]
+internal static class SentryLifecycleHook
+{
+    private static readonly string[] Methods =
+    {
+        nameof(SentryGunInstance.OnGearSpawnComplete), nameof(SentryGunInstance.PickUp), nameof(SentryGunInstance.SyncedPickup),
+        nameof(SentryGunInstance.OnDespawn), nameof(SentryGunInstance.OnDestroy), nameof(SentryGunInstance.OnBackpackCleanupCallback),
+        nameof(SentryGunInstance.CleanUp),
+    };
+
+    private static System.Collections.Generic.IEnumerable<System.Reflection.MethodBase> TargetMethods()
+    {
+        foreach (var name in Methods)
+            yield return AccessTools.DeclaredMethod(typeof(SentryGunInstance), name) ?? throw new MissingMethodException(nameof(SentryGunInstance), name);
+    }
+
+    internal static SentryStep StepOf(string method) => method switch
+    {
+        nameof(SentryGunInstance.OnGearSpawnComplete) => SentryStep.GearSpawnComplete,
+        nameof(SentryGunInstance.PickUp) => SentryStep.PickUp,
+        nameof(SentryGunInstance.SyncedPickup) => SentryStep.SyncedPickup,
+        nameof(SentryGunInstance.OnDespawn) => SentryStep.Despawn,
+        nameof(SentryGunInstance.OnDestroy) => SentryStep.Destroy,
+        nameof(SentryGunInstance.OnBackpackCleanupCallback) => SentryStep.BackpackCleanup,
+        nameof(SentryGunInstance.CleanUp) => SentryStep.CleanUp,
+        _ => throw new ArgumentOutOfRangeException(nameof(method), method, "Not a sentry lifecycle method."),
+    };
+
+    internal static SentryCall Call(SentryGunInstance sentry, System.Reflection.MethodBase method, object[] args)
+    {
+        var step = StepOf(method.Name);
+        return new(sentry, step, step is SentryStep.PickUp or SentryStep.SyncedPickup && args.Length > 0 ? args[0] as PlayerAgent : null);
+    }
+
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(SentryGunInstance __instance, System.Reflection.MethodBase __originalMethod, object[] __args)
+        => GameHooks.SentryLifecycle.RunBefore(Call(__instance, __originalMethod, __args));
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(SentryGunInstance __instance, System.Reflection.MethodBase __originalMethod, object[] __args, bool __runOriginal)
+        => GameHooks.SentryLifecycle.RunAfter(Call(__instance, __originalMethod, __args), __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, SentryGunInstance __instance, System.Reflection.MethodBase __originalMethod, object[] __args)
+    { if (__exception != null) GameHooks.SentryLifecycle.RunFaulted(Call(__instance, __originalMethod, __args), __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(MineDeployerInstance), nameof(MineDeployerInstance.OnSpawn))]
+internal static class MineSpawnedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(MineDeployerInstance __instance) => GameHooks.MineSpawned.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(MineDeployerInstance __instance, bool __runOriginal) => GameHooks.MineSpawned.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, MineDeployerInstance __instance) { if (__exception != null) GameHooks.MineSpawned.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(MineDeployerInstance), nameof(MineDeployerInstance.SyncedPickup))]
+internal static class MinePickedUpHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(MineDeployerInstance __instance, PlayerAgent __0, out (MineDeployerInstance, PlayerAgent) __state) { __state = (__instance, __0); GameHooks.MinePickedUp.RunBefore(__state); }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After((MineDeployerInstance Mine, PlayerAgent Actor) __state, bool __runOriginal) => GameHooks.MinePickedUp.RunAfter(__state, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, (MineDeployerInstance Mine, PlayerAgent Actor) __state) { if (__exception != null) GameHooks.MinePickedUp.RunFaulted(__state, __exception); return __exception; }
+}
+
+// dump.cs:565768, RVA 0x12A2000. SpawnItem assembles the mode's prefabs and runs setup before returning; the After handlers read the
+// returned Item (ItemSpawn.Item), which the postfix stores before they run.
+[HarmonyPatch(typeof(ItemSpawnManager), nameof(ItemSpawnManager.SpawnItem))]
+internal static class ItemSpawnedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(uint persistentID, ItemMode mode, out ItemSpawn __state) { __state = new ItemSpawn(persistentID, mode); GameHooks.ItemSpawned.RunBefore(__state); }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(ItemSpawn __state, Item __result, bool __runOriginal) { __state.Item = __result; GameHooks.ItemSpawned.RunAfter(__state, __runOriginal); }
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, ItemSpawn __state) { if (__exception != null) GameHooks.ItemSpawned.RunFaulted(__state, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(PUI_GameEventLog), nameof(PUI_GameEventLog.AddLogItem))]
+internal static class GameLogAddedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(string log, eGameEventChatLogType type, out (string, eGameEventChatLogType) __state) { __state = (log, type); GameHooks.GameLogAdded.RunBefore(__state); }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After((string Log, eGameEventChatLogType Type) __state, bool __runOriginal) => GameHooks.GameLogAdded.RunAfter(__state, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, (string Log, eGameEventChatLogType Type) __state) { if (__exception != null) GameHooks.GameLogAdded.RunFaulted(__state, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(MeleeWeaponFirstPerson), nameof(MeleeWeaponFirstPerson.DoAttackDamage))]
+internal static class MeleeAttackDamageHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static bool Before(MeleeWeaponFirstPerson __instance, MeleeWeaponDamageData data, bool isPush)
+    {
+        var call = (__instance, data, isPush);
+        var skip = GameHooks.MeleeAttackDamage.Skipped(call);
+        GameHooks.MeleeAttackDamage.RunBefore(call);
+        return !skip;
+    }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(MeleeWeaponFirstPerson __instance, MeleeWeaponDamageData data, bool isPush, bool __runOriginal) => GameHooks.MeleeAttackDamage.RunAfter((__instance, data, isPush), __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, MeleeWeaponFirstPerson __instance, MeleeWeaponDamageData data, bool isPush) { if (__exception != null) GameHooks.MeleeAttackDamage.RunFaulted((__instance, data, isPush), __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(ES_HibernateWakeUp), nameof(ES_HibernateWakeUp.ActivateState))]
+internal static class HibernateWakeActivatedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static bool Before(ES_HibernateWakeUp __instance, float distance, float delay, bool isPropagatedWakeup)
+    {
+        var call = (__instance, distance, delay, isPropagatedWakeup);
+        var skip = GameHooks.HibernateWakeActivated.Skipped(call);
+        GameHooks.HibernateWakeActivated.RunBefore(call);
+        return !skip;
+    }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(ES_HibernateWakeUp __instance, float distance, float delay, bool isPropagatedWakeup, bool __runOriginal) => GameHooks.HibernateWakeActivated.RunAfter((__instance, distance, delay, isPropagatedWakeup), __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, ES_HibernateWakeUp __instance, float distance, float delay, bool isPropagatedWakeup) { if (__exception != null) GameHooks.HibernateWakeActivated.RunFaulted((__instance, distance, delay, isPropagatedWakeup), __exception); return __exception; }
+}

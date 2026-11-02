@@ -1,8 +1,9 @@
 using System;
 using System.Collections;
-using ForgeWeaponEnergyLabExperimental.Native;
+using ForgeWeaponEnergyLab.Native;
+using UnityEngine;
 
-namespace ForgeWeaponEnergyLabExperimental.Presentation;
+namespace ForgeWeaponEnergyLab.Presentation;
 
 /// <summary>One bounded main-thread step per frame, started at plugin startup rather than first draw.
 /// Unity async requests are polled; no Unity objects are created on a worker thread.</summary>
@@ -11,6 +12,7 @@ internal static class PresentationPreload
     private static IEnumerator? _work;
     internal static bool Ready { get; private set; }
     internal static bool Failed { get; private set; }
+    private const float AudioLoadSeconds = 120f;
     private static string _phase = "icons";
 
     internal static void Tick()
@@ -33,8 +35,8 @@ internal static class PresentationPreload
 
     private static IEnumerator Prepare()
     {
-        var phases = new[] { EnergyIcons.Preload(), WeaponModels.Preload(), VfxLibrary.Preload(), PrepareAudio() };
-        var names = new[] { "icons", "models", "vfx", "audio" };
+        var phases = new[] { WeaponModels.Preload(), EnergyVfx.Preload(), PrepareAudio() };
+        var names = new[] { "models", "vfx", "audio" };
         for (var i = 0; i < phases.Length; i++)
         {
             _phase = names[i];
@@ -44,8 +46,15 @@ internal static class PresentationPreload
         }
     }
 
+    /// <summary>ForgeAudio decodes the sounds in the background; the weapons wait until every cue they play is ready.</summary>
     private static IEnumerator PrepareAudio()
     {
-        foreach (var cue in EnergySound.Cues) { EnergySound.Load(cue.Name); yield return null; }
+        var give = Time.realtimeSinceStartup + AudioLoadSeconds;
+        while (!EnergyAudio.Loaded)
+        {
+            if (Time.realtimeSinceStartup > give) throw new System.TimeoutException("ForgeAudio did not finish decoding the energy sounds in " + AudioLoadSeconds + " s.");
+            yield return null;
+        }
+        EnergyAudio.Library.Require(EnergyAudio.Cues);
     }
 }

@@ -2,7 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using ForgeWeaponEnergyLabExperimental.Native;
+using ForgeVisual;
+using ForgeWeaponEnergyLab.Native;
 using Gear;
 using Il2CppInterop.Runtime;
 using Player;
@@ -10,18 +11,20 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
-namespace ForgeWeaponEnergyLabExperimental.Presentation;
+namespace ForgeWeaponEnergyLab.Presentation;
 
 /// <summary>Metre-scale models attached by the grip, with native hand and sight bindings.</summary>
 internal static class WeaponModels
 {
-    internal const string ModelName = "ForgeWeaponEnergyLabExperimental.Model";
+    internal const string ModelName = "ForgeWeaponEnergyLab.Model";
     private const int FirstPersonLayer = 12;
     private const float ModelScale = 0.85f;
     private const string GearShader = "Cell/Player/CustomGearShader";
     // A bundle loads when the first gun using it is assembled. It unloads only after every gun object using it
     // was destroyed (loadout change, level exit, a departed peer) and stayed gone this long; holstered guns keep it.
     private const float IdleUnloadSeconds = 10f;
+    // How often the loaded bundles are looked at for an idle one; an unload is never urgent.
+    private const float IdleCheckSeconds = 5f;
     private sealed class PreparedModel
     {
         internal string Digest = "";
@@ -72,7 +75,7 @@ internal static class WeaponModels
         internal bool RegisteredFirstPerson;
         internal Transform? DonorMagazine, Magazine;
         internal AnimationFrame GripRest, LeftRest, RightAuthoredRest, LeftAuthoredRest, LeftTargetRest;
-        internal AnimationFrame ModelRest, MagazineRest, DonorMagazineRest;
+        internal AnimationFrame ModelRest;
         internal bool MagazineVisible = true;
     }
     private static readonly List<AnimationMount> Animations = new();
@@ -91,6 +94,8 @@ internal static class WeaponModels
     private readonly record struct AnimatorSnapshot(Animator Animator, AnimatorCullingMode CullingMode);
 
     private static bool IsProxy(Transform? node, Transform proxy) => node is not null && node.Pointer == proxy.Pointer;
+
+    private static bool IsUnder(Transform node, Transform? root) => root != null && node.IsChildOf(root);
 
     private static PlayerSyncIK? WieldedSyncIK(ItemEquippable? weapon)
     {
@@ -220,7 +225,7 @@ internal static class WeaponModels
     // Returns false when the model already failed to load; guns using it then stay unarmed.
     private static bool Request(EnergyGear gear)
     {
-        var model = (EnergyGears.ModelHashes[gear.ModelPath], gear.Definition.Model.Key);
+        var model = (gear.ModelDigest, gear.Definition.Model.Key);
         if (Failed.Contains(model)) return false;
         if (Models.TryGetValue(model, out var prepared)) { Prepared[gear.CategoryId] = prepared; return true; }
         foreach (var load in Loading) if (load.Model == model) return true;
@@ -269,7 +274,7 @@ internal static class WeaponModels
         while (!prefabRequest.isDone) yield return null;
         var prefab = prefabRequest.asset?.TryCast<GameObject>();
         if (prefab == null) throw new InvalidDataException("Model missing: " + key);
-        AssetRetention.Keep(prefab);
+        ForgeCore.Assets.Keep(prefab);
         foreach (var socket in new[] { "RightHand", "LeftHand", "Muzzle", "SightLook" })
             ModelSockets.Require(prefab.transform, socket);
         var materials = new Dictionary<string, SurfaceMaterials>();
@@ -289,18 +294,18 @@ internal static class WeaponModels
                         if (i == 2 && !set.Emission || i == 3 && !set.Normal) continue;
                         var request = loaded.Bundle.LoadAssetAsync(set.Name + suffixes[i], Il2CppType.Of<Texture2D>());
                         while (!request.isDone) yield return null;
-                        textures[i] = AssetRetention.Keep(request.asset?.TryCast<Texture2D>() ?? throw new InvalidDataException("Texture missing: " + set.Name + suffixes[i]));
+                        textures[i] = ForgeCore.Assets.Keep(request.asset?.TryCast<Texture2D>() ?? throw new InvalidDataException("Texture missing: " + set.Name + suffixes[i]));
                     }
                     // Vanilla gear materials carry these properties.
                     var world = new Material(_gearShader) { name = "Energy " + set.Name };
-                    loaded.Created.Add(AssetRetention.Keep(world));
+                    loaded.Created.Add(ForgeCore.Assets.Keep(world));
                     world.SetTexture("_MainTex", textures[0]); world.SetTexture("_MetallicGlossMap", textures[1]);
                     if (textures[3] != null) world.SetTexture("_BumpMap", textures[3]);
                     world.SetFloat("_ShadingType", 4f); world.SetFloat("_IsCustomGearMaterial", 1f); world.SetFloat("_SupportsFPSRendering", 1f);
                     world.SetFloat("_EnableEmissive", textures[2] != null ? 1f : 0f);
                     if (textures[2] != null) { world.SetTexture("_EmissiveMap", textures[2]); world.SetColor("_EmissiveColor", Color.white); world.EnableKeyword("ENABLE_EMISSIVE"); }
                     var firstPerson = new Material(world) { name = "Energy " + set.Name + " (first person)" };
-                    loaded.Created.Add(AssetRetention.Keep(firstPerson));
+                    loaded.Created.Add(ForgeCore.Assets.Keep(firstPerson));
                     firstPerson.EnableKeyword(Player.PlayerBackpackManager.ENABLE_FPS_RENDERING);
                     world.SetPass(0); firstPerson.SetPass(0);
                     body = new SurfaceMaterials(world, firstPerson);
@@ -311,7 +316,7 @@ internal static class WeaponModels
             else
             {
                 var tinted = part.Surface == "glass" ? Glass(_glassShader, key, part) : Reticle(_reticleShader, key, part);
-                loaded.Created.Add(AssetRetention.Keep(tinted));
+                loaded.Created.Add(ForgeCore.Assets.Keep(tinted));
                 if (part.Surface == "reticle")
                 {
                     // The native FPS shader takes its tint from vertex colors, not a _Color property.
@@ -322,7 +327,7 @@ internal static class WeaponModels
                     mesh.colors = colors;
                 }
                 var firstPerson = new Material(tinted) { name = tinted.name + " (first person)" };
-                loaded.Created.Add(AssetRetention.Keep(firstPerson));
+                loaded.Created.Add(ForgeCore.Assets.Keep(firstPerson));
                 firstPerson.EnableKeyword(Player.PlayerBackpackManager.ENABLE_FPS_RENDERING);
                 tinted.SetPass(0); firstPerson.SetPass(0);
                 materials.Add(part.Name, new SurfaceMaterials(tinted, firstPerson));
@@ -337,7 +342,7 @@ internal static class WeaponModels
     private static void UnloadIdle(float now)
     {
         if (now < _nextIdleCheck || Bundles.Count == 0) return;
-        _nextIdleCheck = now + 1f;
+        _nextIdleCheck = now + IdleCheckSeconds;
         List<string>? idle = null;
         foreach (var (digest, loaded) in Bundles)
         {
@@ -355,7 +360,7 @@ internal static class WeaponModels
         foreach (var pending in Pending)
             if (pending.Holder != null && pending.Holder.CategoryData != null &&
                 EnergyGears.ForCategory(pending.Holder.CategoryData.persistentID) is { } gear &&
-                EnergyGears.ModelHashes[gear.ModelPath] == digest) return true;
+                gear.ModelDigest == digest) return true;
         return false;
     }
 
@@ -377,7 +382,9 @@ internal static class WeaponModels
         var c = part.Color;
         var glass = new Material(shader) { name = "Energy glass " + key + " " + part.Name, color = new Color(c.R, c.G, c.B, c.A), renderQueue = 3000 };
         glass.SetFloat("_SupportsFPSRendering", 1f);
-        glass.SetFloat("_Smoothness", .85f); glass.SetFloat("_Metallic", 0f);
+        // GTFO/Glass adds its specular/IBL reflection on top of the tint, so a mirror finish (smoothness .85) turned a
+        // 5% tint into an opaque white lens. A low smoothness keeps only a faint sheen; no fresnel opacity at grazing angles.
+        glass.SetFloat("_Smoothness", .1f); glass.SetFloat("_Metallic", 0f); glass.SetFloat("_FresnelAlpha", 0f);
         return glass;
     }
 
@@ -436,22 +443,32 @@ internal static class WeaponModels
         var donorRenderers = new List<RendererSnapshot>();
         var donorAnimators = new List<AnimatorSnapshot>();
         AnimationMount? mount = null;
+        GunSockets sockets = null!; GunNodes gunNodes = null!;
         Transform? rightProxy = null, leftProxy = null;
         var donorVisibilityChanged = false;
         var instance = Object.Instantiate(prefab, holder.transform);
         try
         {
             instance.name = ModelName; var root = instance.transform;
-            // Scale the model and all sockets in both views before native grip, bore and sight alignment.
-            root.localScale = Vector3.one * ModelScale;
+            // ForgeVisual seats the model at ModelScale: the grip on the native right hand along the barrel, the authored
+            // bore on the native bore across, the authored sight at the native sight height (native aim only corrects height).
             root.rotation = Quaternion.LookRotation(muzzle.forward, holder.transform.up);
-            var grip = ModelSockets.Require(root, "RightHand"); root.position += rightPosition - grip.position;
-            // Native hands sit beside the bore, and native aim only corrects height. Align the authored bore
-            // laterally and the sight vertically to the donor; move the hand down with the model.
-            var side = root.right; var up = root.up;
-            var lateral = side * Vector3.Dot(muzzle.position - ModelSockets.Require(root, "Muzzle").position, side);
-            var drop = up * Vector3.Dot(sightLook.position - ModelSockets.Require(root, "SightLook").position, up);
-            root.position += lateral + drop;
+            var grip = ModelSockets.Require(root, "RightHand");
+            sockets = new GunSockets
+            {
+                RightHand = grip, LeftHand = ModelSockets.Require(root, "LeftHand"), Muzzle = ModelSockets.Require(root, "Muzzle"),
+                Sight = ModelSockets.Require(root, "SightLook"), Magazine = root.Find("Magazine")
+            };
+            gunNodes = new GunNodes
+            {
+                RightHand = right, LeftHand = left, Muzzle = muzzle, Sight = sightLook, Magazine = nativeMagazine,
+                MinScale = ModelScale, MaxScale = ModelScale
+            };
+            if (!ForgeVisual.Models.SeatGun(root, holder.transform, gunNodes, sockets, mode.ToString(), out _))
+                throw new InvalidDataException("Native hand/muzzle/sight positions are not numbers: " + mode);
+            // The hand moves down with the model but not across with the bore: the native hands sit beside it.
+            var up = root.up;
+            var drop = up * Vector3.Dot(grip.position - rightPosition, up);
             grip.position = rightPosition + drop; grip.rotation = rightRotation;
             foreach (var renderer in instance.GetComponentsInChildren<MeshRenderer>(true))
                 if (!materials.ContainsKey(renderer.name)) throw new InvalidDataException($"Unknown model surface: {mode}/{renderer.name}");
@@ -466,21 +483,21 @@ internal static class WeaponModels
                 GripRest = Frame(holder.transform, right), ModelRest = Frame(holder.transform, root),
                 LeftRest = Frame(holder.transform, left), RightAuthoredRest = Frame(holder.transform, grip),
                 LeftAuthoredRest = Frame(holder.transform, ModelSockets.Require(root, "LeftHand")),
-                DonorMagazine = nativeMagazine, Magazine = root.Find("Magazine"), MagazineVisible = magazineVisible
+                DonorMagazine = nativeMagazine, Magazine = sockets.Magazine, MagazineVisible = magazineVisible
             };
             mount.LeftTargetRest = AnimationPose.LimitHandReach(mount.ModelRest, mount.LeftRest, mount.LeftAuthoredRest, EnergyItemFps.HoldOffset.z);
             if (mount.Magazine != null)
             {
                 if (nativeMagazine == null) throw new InvalidDataException("Native magazine animation alignment missing: " + mode);
-                mount.DonorMagazineRest = Frame(holder.transform, nativeMagazine);
-                mount.MagazineRest = Frame(holder.transform, mount.Magazine);
-                mount.MagazineObject = mount.Magazine.gameObject;
+                // The game's reload animation moves the native magazine node; the authored magazine hangs on it.
+                mount.Magazine = ForgeVisual.Models.HangMagazine(mount.Magazine, gunNodes, mode.ToString());
+                mount.MagazineObject = mount.Magazine!.gameObject;
                 mount.MagazineObject.SetActive(magazineVisible);
             }
             if (Animations.Count >= 128) throw new InvalidOperationException("Energy animation instance budget exhausted.");
             // Snapshot every original flag before writes. Preflight failures leave donor renderers untouched.
             foreach (var renderer in holder.GetComponentsInChildren<Renderer>(true))
-                if (!renderer.transform.IsChildOf(root))
+                if (!renderer.transform.IsChildOf(root) && !IsUnder(renderer.transform, mount.Magazine))
                     donorRenderers.Add(new RendererSnapshot(renderer, renderer.enabled, renderer.forceRenderingOff));
             foreach (var animator in holder.GetComponentsInChildren<Animator>(true))
                 if (!animator.transform.IsChildOf(root))
@@ -520,6 +537,8 @@ internal static class WeaponModels
             }
             DestroyHandProxy(rightProxy, failures);
             DestroyHandProxy(leftProxy, failures);
+            // The hung magazine is no longer under the instance.
+            if (mount?.MagazineObject != null) AttemptRollback(() => Object.Destroy(mount.MagazineObject!), failures);
             // Destroy is deferred in Unity: remove the failed instance from lookup immediately.
             if (instance != null)
             {
@@ -540,8 +559,9 @@ internal static class WeaponModels
     {
         var layer = mount.Owner != null && mount.Owner.IsFirstPerson ? FirstPersonLayer : mount.WorldLayer;
         if (mount.ViewLayer == layer) return;
-        SetLayer(mount.Model, layer);
-        ApplySurfaces(mount.Assets.Description, mount.Assets.Materials, mount.Model, layer);
+        ForgeVisual.Models.SetLayer(mount.Model, layer);
+        if (mount.Magazine != null) ForgeVisual.Models.SetLayer(mount.Magazine, layer);
+        ApplySurfaces(mount.Assets.Description, mount.Assets.Materials, mount.Model, mount.Magazine, layer);
         mount.ViewLayer = layer;
     }
 
@@ -576,11 +596,11 @@ internal static class WeaponModels
             mount.GripRest = rest;
         }
         if (left != mount.DonorLeft) mount.LeftRest = Frame(mount.HolderTransform, left);
-        if (magazine != mount.DonorMagazine && mount.Magazine != null && magazine != null)
+        if (magazine != mount.DonorMagazine && mount.MagazineObject is not null && magazine != null)
         {
-            var rest = Frame(mount.HolderTransform, magazine);
-            mount.MagazineRest = AnimationPose.Follow(mount.DonorMagazineRest, rest, mount.MagazineRest);
-            mount.DonorMagazineRest = rest;
+            // The authored magazine dies with the native node it hangs on; a replaced node is taken over before the old one goes.
+            if (mount.Magazine == null) throw new InvalidDataException("Energy magazine was destroyed with the native magazine node: " + mount.Mode);
+            mount.Magazine = ForgeVisual.Models.HangMagazine(mount.Magazine, new GunNodes { Magazine = magazine }, mount.Mode.ToString());
         }
         mount.DonorGrip = right; mount.DonorLeft = left; mount.DonorMagazine = magazine;
         if (donorChanged)
@@ -590,7 +610,7 @@ internal static class WeaponModels
             foreach (var animator in holder.GetComponentsInChildren<Animator>(true))
                 if (!animator.transform.IsChildOf(mount.Model)) animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             foreach (var renderer in holder.GetComponentsInChildren<Renderer>(true))
-                if (!renderer.transform.IsChildOf(mount.Model))
+                if (!renderer.transform.IsChildOf(mount.Model) && !IsUnder(renderer.transform, mount.Magazine))
                 { renderer.enabled = false; renderer.forceRenderingOff = true; }
             FollowNativePose(mount);
         }
@@ -609,12 +629,12 @@ internal static class WeaponModels
 
     // First person uses the FPS gear materials and casts no shadows; glass and reticles never do. Reticles are marks
     // projected along the moving optic's axis; they start hidden and TickSight shows them only while aiming through the glass.
-    private static void ApplySurfaces(WeaponPresentation description, Dictionary<string, SurfaceMaterials> materials, Transform model, int layer)
+    private static void ApplySurfaces(WeaponPresentation description, Dictionary<string, SurfaceMaterials> materials, Transform model, Transform? magazine, int layer)
     {
         var firstPerson = layer == FirstPersonLayer;
         foreach (var part in description.Parts)
         {
-            var surface = model.Find(part.Name);
+            var surface = part.Name == "Magazine" && magazine != null ? magazine : model.Find(part.Name);
             if (surface == null) continue;
             var renderer = surface.GetComponent<MeshRenderer>();
             var pair = materials[part.Name];
@@ -630,7 +650,7 @@ internal static class WeaponModels
     // The virtual point belongs to SightLook, never to the camera's look/raycast target.
     internal static void TickSight(FirstPersonItemHolder? fp)
     {
-        if (fp == null || !WeaponBindings.TryGet(fp.WieldedItem, out var binding) || binding.Reticles.Length == 0) return;
+        if (_heldWeapon == null || fp == null || !WeaponBindings.TryGet(_heldWeapon, out var binding) || binding.Reticles.Length == 0) return;
         var camera = fp.m_LookCamera;
         // Leaving aim hides the mark at once; it would otherwise hang at the screen centre while the gun lowers.
         var weight = fp.m_aimWeight;
@@ -696,16 +716,46 @@ internal static class WeaponModels
         mount.RegisteredFirstPerson = weapon.IsFirstPerson;
     }
 
+    /// <summary>A free-standing copy of the gun's model with its world materials, for the game's icon renderer (EnergyIcons); the renderer
+    /// destroys it when the picture is taken. Null while the model is still loading (the load is started); <paramref name="failed"/> is set
+    /// when it can never load.</summary>
+    internal static GameObject? IconModel(EnergyGear gear, out bool failed)
+    {
+        failed = false;
+        if (!_ready) return null;
+        if (Prepared[gear.CategoryId] is not { } assets)
+        {
+            failed = !Request(gear);
+            return null;
+        }
+        var instance = Object.Instantiate(assets.Prefab);
+        try
+        {
+            instance.name = "Energy icon model " + gear.Definition.Id;
+            ApplySurfaces(assets.Description, assets.Materials, instance.transform, null, instance.layer);
+            instance.SetActive(true);
+            return instance;
+        }
+        catch
+        {
+            Object.Destroy(instance);
+            throw;
+        }
+    }
+
     internal static void BindWeapon(ItemEquippable weapon)
     {
         if (weapon?.GearPartHolder == null) return;
         Ensure(weapon.GearPartHolder);
     }
 
+    /// <summary>Whether a mount, a queued mount, a model load or a loaded bundle exists: the only times the per-frame ticks have work.</summary>
+    internal static bool HasWork => Animations.Count != 0 || Pending.Count != 0 || Loading.Count != 0 || Bundles.Count != 0;
+
     internal static void TickPending()
     {
         // Restore dead mounts' native targets before a replacement mount samples its donor rest poses.
-        PruneAnimations();
+        if (Animations.Count != 0) PruneAnimations();
         if (!_ready) return;
         AdvanceLoad();
         UnloadIdle(Time.time);
@@ -746,6 +796,7 @@ internal static class WeaponModels
                 else RestoreSyncTarget(mount.NativeBindings, failures);
                 DestroyHandProxy(mount.RightProxy, failures);
                 DestroyHandProxy(mount.LeftProxy, failures);
+                if (mount.MagazineObject != null) AttemptRollback(() => Object.Destroy(mount.MagazineObject!), failures);
                 if (mount.ModelObject != null)
                 {
                     AttemptRollback(() => mount.ModelObject.SetActive(false), failures);
@@ -772,13 +823,33 @@ internal static class WeaponModels
 
     // The native LateUpdate inlines UpdateIKGrips. A prefix on UpdateIKGrips alone never runs in this build.
     // Called from FirstPersonItemHolder.LateUpdate's prefix, before either hand getter and IK target write.
-    internal static void UpdateFirstPersonPose(FirstPersonItemHolder fp)
+    internal static void UpdateFirstPersonPose()
     {
-        var weapon = fp.WieldedItem;
-        var holder = weapon != null ? weapon.GearPartHolder : null;
-        if (holder == null || !Mounts.TryGetValue(holder.Pointer, out var mount) ||
-            mount.Model == null || !mount.ModelObject.activeInHierarchy) return;
-        FollowNativePose(mount);
+        // A stock gun in the hand has no cached energy gun and costs nothing here.
+        if (_heldWeapon == null) return;
+        if (_heldMount == null || _heldMount.Model == null)
+        {
+            var holder = _heldWeapon.GearPartHolder;
+            _heldMount = holder != null && Mounts.TryGetValue(holder.Pointer, out var found) ? found : null;
+            if (_heldMount == null) return;
+        }
+        if (_heldMount.Model == null || !_heldMount.ModelObject.activeInHierarchy) return;
+        FollowNativePose(_heldMount);
+    }
+
+    // The local player's energy gun in the hand, kept by the wield events (the holder's per-frame callbacks act only for it).
+    private static ItemEquippable? _heldWeapon;
+    private static AnimationMount? _heldMount;
+
+    /// <summary>A bullet weapon went into or out of a hand: only the local player's energy gun is kept as the held one.</summary>
+    internal static void NoteHeld(BulletWeapon weapon, bool held)
+    {
+        if (held)
+        {
+            if (weapon.Owner?.Owner is not { IsLocal: true, IsBot: false }) return;
+            _heldWeapon = weapon; _heldMount = null;
+        }
+        else if (_heldWeapon != null && _heldWeapon.Pointer == weapon.Pointer) { _heldWeapon = null; _heldMount = null; }
     }
 
     private static void FollowNativePose(AnimationMount mount)
@@ -787,10 +858,7 @@ internal static class WeaponModels
         var grip = Frame(holder, mount.DonorGrip);
         var left = Frame(holder, mount.DonorLeft);
         // Read every animation input before moving any output; proxies never feed back into the donor poses.
-        var magazine = mount.DonorMagazine != null ? Frame(holder, mount.DonorMagazine) : default;
         ApplyFrame(holder, mount.Model, AnimationPose.Follow(mount.GripRest, grip, mount.ModelRest));
-        if (mount.Magazine != null && mount.DonorMagazine != null)
-            ApplyFrame(holder, mount.Magazine, AnimationPose.Follow(mount.DonorMagazineRest, magazine, mount.MagazineRest));
         // The reach-limited wrist target stays attached to the gun; native wrist rotation must not orbit its offset.
         // Keep the left hand's independent movement and rotation for the donor's reload and grip animations.
         ApplyFrame(holder, mount.RightProxy, AnimationPose.Follow(mount.GripRest, grip, mount.RightAuthoredRest));
@@ -814,9 +882,4 @@ internal static class WeaponModels
         mount.MagazineObject.SetActive(visible);
     }
 
-    private static void SetLayer(Transform root, int layer)
-    {
-        root.gameObject.layer = layer;
-        for (var i = 0; i < root.childCount; i++) SetLayer(root.GetChild(i), layer);
-    }
 }

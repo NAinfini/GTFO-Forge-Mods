@@ -1,0 +1,4 @@
+{
+  "weapon.description": "Forge 能量武器",
+  "chat.mismatch": "[Energy Lab] {0} 的 Energy Lab 版本或调校与你不同。在所有玩家使用相同的模组文件和调校之前，你们之间的能量武器保持关闭。"
+}

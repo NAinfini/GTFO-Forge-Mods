@@ -1,8 +1,9 @@
-"""Import the energy weapon recordings as embedded PCM variants.
+"""Import the energy weapon recordings as the Ogg Vorbis files ForgeAudio plays.
 
 python import_audio.py --source <recordings folder> --qa <report.json>
 Files are named `<weapon>-<event>-<version>.wav` and the cue is `<weapon>-<event>`; loops end in `-loop`.
-Its cues.md lists every cue with its length; that table is the only length source.
+Its cues.md lists every cue with its length; that table is the only length source. The runtime cues are the keys of audio/cues.json;
+each is written to Assets/Audio/ogg/<cue>.ogg (FFmpeg with libvorbis on PATH), which the build copies into the audio folder beside the DLL.
 One-shots keep full level for the table length, then up to TAIL more of their natural decay, faded out:
 that tail is what overlaps the next sound (a beam's start under its loop, its stop over the loop's fade).
 Cues listed under 1 s start just before their main attack (a quiet swell or a lone click would
@@ -18,6 +19,7 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
 import wave
 from pathlib import Path
 
@@ -26,10 +28,9 @@ import numpy as np
 
 MOD = Path(__file__).resolve().parents[1]
 OUT = MOD / "Assets/Audio"
-VARIANTS = OUT / "Variants"
+VARIANTS = OUT / "ogg"
 RATE = 48000
 TAIL = 0.3
-CUES = re.compile(r'(?:Clip|Loop)\("([a-z][a-z0-9-]*)"')
 # Listed recordings that are a layer of another cue's loop rather than a cue of their own: they play mixed together.
 LAYERS = {"disc-rotor-loop": "disc-fly-loop"}
 
@@ -117,6 +118,12 @@ def loop(layers: list[np.ndarray]) -> tuple[np.ndarray, dict]:
     return data, {"trimStartSeconds": round(start / RATE, 4), "crossfadeSeconds": round(fade / RATE, 4)}
 
 
+def encode(pcm: bytes) -> bytes:
+    done = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "s16le", "-ar", str(RATE), "-ac", "1", "-i", "-",
+                           "-c:a", "libvorbis", "-q:a", "7", "-f", "ogg", "-"], input=pcm, capture_output=True, check=True)
+    return done.stdout
+
+
 def process(layers: list[np.ndarray], seconds: float, looping: bool) -> tuple[bytes, dict]:
     if not looping and len(layers) != 1: raise ValueError("Only loops take layers")
     data, shape = loop(layers) if looping else one_shot(layers[0], seconds)
@@ -144,11 +151,15 @@ def main() -> None:
         match = FILE.match(path.name)
         if not match or match[1] not in table: raise ValueError(f"Not a listed cue recording: {path.name}")
         recordings.setdefault(match[1], {})[int(match[2])] = path
-    sound = (MOD / "Presentation/EnergySound.cs").read_text(encoding="utf-8")
-    runtime = CUES.findall(sound[sound.index("internal static readonly Cue[] Cues"):])
+    runtime = list(json.loads((MOD / "audio/cues.json").read_text(encoding="utf-8"))["cues"])
     known = set(runtime)
     manifest_path = OUT / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    # Cues copied unchanged from ForgeOrdnance_Arsenal (manifest entries carry "external"): never regenerated or deleted here.
+    external = {entry["cue"]: entry for entry in manifest["outputs"] if "external" in entry}
+    kept_files = {file.split("/")[-1] for entry in external.values() for file in entry["files"]}
+    for cue in recordings:
+        if cue in external: raise ValueError(f"{cue} comes from ForgeOrdnance_Arsenal; remove its recording")
     outputs = {entry["cue"]: entry for entry in manifest["outputs"] if entry["cue"] in known}
     for entry in outputs.values(): entry.pop("source", None)
     qa = json.loads(qa_path.read_text(encoding="utf-8")) if qa_path.is_file() else {}
@@ -164,9 +175,11 @@ def main() -> None:
             sources.append(next(iter(versions.values())))
         seconds, looping = table[cue]
         data, metrics = process([read_wave(source) for source in sources], seconds, looping)
-        output = f"{cue}.bin"
+        data = encode(data)
+        VARIANTS.mkdir(parents=True, exist_ok=True)
+        output = f"{cue}.ogg"
         (VARIANTS / output).write_bytes(data)
-        outputs[cue] = {"cue": cue, "file": f"Variants/{output}", "sources": [f"energy-weapons/{source.name}" for source in sources],
+        outputs[cue] = {"cue": cue, "file": f"ogg/{output}", "sources": [f"energy-weapons/{source.name}" for source in sources],
                         "tableSeconds": seconds, "loop": looping,
                         "sourceSha256": [hashlib.sha256(source.read_bytes()).hexdigest() for source in sources],
                         "sha256": hashlib.sha256(data).hexdigest(), "seconds": metrics["seconds"]}
@@ -177,16 +190,15 @@ def main() -> None:
     missing = [cue for cue in runtime if cue not in outputs]
     if missing: raise ValueError(f"Runtime cues without a recording: {missing}")
     ordered = [outputs[cue] for cue in runtime]
-    names = {entry["file"].split("/")[-1] for entry in ordered}
-    for old in VARIANTS.glob("*.bin"):
+    names = {entry["file"].split("/")[-1] for entry in ordered if "file" in entry} | kept_files
+    for old in VARIANTS.glob("*.ogg"):
         if old.name not in names: old.unlink()
-    (OUT / "variants.tsv").write_text("".join(f"{e['cue']}\t{e['file'].split('/')[-1]}\n" for e in ordered), encoding="utf-8")
-    old = [e["cue"] for e in ordered if "sources" not in e]
+    old = [e["cue"] for e in ordered if "sources" not in e and "external" not in e]
     manifest = {
-        "format": "signed little-endian PCM16 mono 48000 Hz, one recording per runtime cue",
+        "format": "Ogg Vorbis (libvorbis quality 7) mono 48000 Hz, one recording per runtime cue; played through ForgeAudio with audio/cues.json",
         "generator": "tools/import_audio.py",
-        "source": "original recordings (not published); cues listed in cues.md",
-        "rights": "Original audio for Forge Weapon Energy Lab experimental; MIT, copyright 2026 NAinfini",
+        "source": "Adobe Firefly sound effects (commercial use permitted), not published; cues listed in cues.md. The blast-fire and blast-explode cues are copied from ForgeOrdnance_Arsenal",
+        "rights": "Adobe Firefly output, commercial use permitted; MIT, copyright 2026 NAinfini. blast-fire and blast-explode: see License.txt",
         "pendingFromOldLibrary": old,
         "outputs": ordered,
     }

@@ -1,0 +1,17 @@
+{
+  "picker.slots": "LOADOUT",
+  "picker.all": "ALL",
+  "picker.clear": "EMPTY",
+  "teammates.downed": "DOWN",
+  "teammates.grabbed": "GRABBED",
+  "loadout.carrying": "CARRYING",
+  "countdown.seconds": "{0}s",
+  "keys.none": "Unbound",
+  "keys.press": "Press a key",
+  "keys.conflict": "Also: {0}",
+  "keys.group": "Interface",
+  "keys.confirm": "Confirm",
+  "keys.cancel": "Cancel",
+  "confirm.yes": "CONFIRM",
+  "confirm.no": "CANCEL"
+}

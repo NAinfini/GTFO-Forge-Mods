@@ -1,4 +1,4 @@
-namespace ForgeWeaponEnergyLabExperimental;
+namespace ForgeWeaponEnergyLab;
 
 internal static class EnergyLimits
 {
@@ -70,7 +70,7 @@ internal readonly record struct WeaponNumbers
             PlasmaBlastTuning blastOrb => values with { BlastRadius = blastOrb.BlastRadius, FullBlastRadius = blastOrb.FullBlastRadius, ExplosionLifetime = blastOrb.ExplosionLifetime, NoiseRadius = blastOrb.NoiseRadius, ExplosionForce = blastOrb.ExplosionForce },
             PlasmaArcTuning arcOrb => values with { ArcRadius = arcOrb.ArcRadius, FullArcRadius = arcOrb.FullArcRadius,
                 Pulse = new(0, arcOrb.PulseInterval, 0, arcOrb.PulseStagger, arcOrb.Precision), PulseDamageFraction = arcOrb.PulseDamageFraction, PulseTargets = arcOrb.PulseTargets, FadeLifetime = arcOrb.FadeLifetime },
-            BlastTuning blast => values with { BlastRadius = blast.BlastRadius, FullBlastRadius = blast.BlastRadius, ExplosionLifetime = blast.ExplosionLifetime, ActiveProjectiles = blast.ActiveProjectiles, NoiseRadius = blast.NoiseRadius, ExplosionForce = blast.ExplosionForce },
+            BlastTuning blast => values with { Speed = blast.Speed, BlastRadius = blast.BlastRadius, FullBlastRadius = blast.BlastRadius, ExplosionLifetime = blast.ExplosionLifetime, NoiseRadius = blast.NoiseRadius, ExplosionForce = blast.ExplosionForce },
             DiscTuning disc => values with { Speed = disc.Speed, BodyRadius = disc.BodyRadius, Bounces = disc.Bounces, Lifetime = disc.Lifetime, ActiveProjectiles = disc.ActiveProjectiles },
             FlameTuning flame => values with { StartRadius = flame.StartRadius, RadiusPerMetre = flame.RadiusPerMetre },
             BlackHoleTuning hole => values with { Speed = hole.Speed, BodyRadius = hole.BodyRadius, FlightLifetime = hole.FlightLifetime, Gravity = hole.Gravity,

@@ -1,0 +1,573 @@
+{
+  "kind": "forge-library-manifest",
+  "schemaVersion": 1,
+  "library": "ForgeVisual",
+  "packageName": "NAinfini-ForgeVisual",
+  "version": "0.1.0",
+  "groups": [
+    {
+      "id": "gameEffects",
+      "title": "Game effects",
+      "entries": [
+        {
+          "id": "Game:FX_Tripmine",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "FX_Tripmine",
+            "source": "PreloadedPool"
+          }
+        },
+        {
+          "id": "Game:FX_TripmineGlue",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "FX_TripmineGlue",
+            "source": "PreloadedPool"
+          }
+        },
+        {
+          "id": "Game:FX_Tracer",
+          "summary": "A game effect drawn along a line from a start to an end.",
+          "details": {
+            "line": true,
+            "native": "FX_Tracer",
+            "source": "PreloadedPool"
+          }
+        },
+        {
+          "id": "Game:FX_BulletImpact_Concrete",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "FX_BulletImpact_Concrete",
+            "source": "PreloadedPool"
+          }
+        },
+        {
+          "id": "Game:FX_BulletImpact_Metal",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "FX_BulletImpact_Metal",
+            "source": "PreloadedPool"
+          }
+        },
+        {
+          "id": "Game:FX_BulletImpact_SheetMetal",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "FX_BulletImpact_SheetMetal",
+            "source": "PreloadedPool"
+          }
+        },
+        {
+          "id": "Game:FX_BulletImpact_Glass",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "FX_BulletImpact_Glass",
+            "source": "PreloadedPool"
+          }
+        },
+        {
+          "id": "Game:FX_BulletImpact_Wood",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "FX_BulletImpact_Wood",
+            "source": "PreloadedPool"
+          }
+        },
+        {
+          "id": "Game:FX_BulletImpact_Plastic",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "FX_BulletImpact_Plastic",
+            "source": "PreloadedPool"
+          }
+        },
+        {
+          "id": "Game:FX_BulletImpact_Mud",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "FX_BulletImpact_Mud",
+            "source": "PreloadedPool"
+          }
+        },
+        {
+          "id": "Game:FX_BulletImpact_Gravel",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "FX_BulletImpact_Gravel",
+            "source": "PreloadedPool"
+          }
+        },
+        {
+          "id": "Game:FX_3D_Blood_Impact",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "FX_3D Blood Impact",
+            "source": "PreloadedPool"
+          }
+        },
+        {
+          "id": "Game:FXC_MeshBloodBomb",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "FXC_MeshBloodBomb",
+            "source": "PreloadedPool"
+          }
+        },
+        {
+          "id": "Game:FX_TorchCutting",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "FX_TorchCutting",
+            "source": "PreloadedPool"
+          }
+        },
+        {
+          "id": "Game:FX_ElevatorSparks",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "FX_ElevatorSparks",
+            "source": "PreloadedPool"
+          }
+        },
+        {
+          "id": "Game:FX_LockMelter",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "FX_LockMelter",
+            "source": "PreloadedPool"
+          }
+        },
+        {
+          "id": "Game:FX_InfectionSpit",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "FX_InfectionSpit",
+            "source": "PreloadedPool"
+          }
+        },
+        {
+          "id": "Game:fxc_flyerdeath",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "fxc_flyerdeath",
+            "source": "ResourcePrefab"
+          }
+        },
+        {
+          "id": "Game:fxc_flyerbigdeath",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "fxc_flyerbigdeath",
+            "source": "ResourcePrefab"
+          }
+        },
+        {
+          "id": "Game:fx_flyer_teleport",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "fx_flyer_teleport",
+            "source": "ResourcePrefab"
+          }
+        },
+        {
+          "id": "Game:fx_flyer_big_teleport",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "fx_flyer_big_teleport",
+            "source": "ResourcePrefab"
+          }
+        },
+        {
+          "id": "Game:fxc_fleshbulb_pop",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "fxc_fleshbulb_pop",
+            "source": "ResourcePrefab"
+          }
+        },
+        {
+          "id": "Game:fxc_fleshbulb_pop_boss",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "fxc_fleshbulb_pop_boss",
+            "source": "ResourcePrefab"
+          }
+        },
+        {
+          "id": "Game:AssaultRifle_MuzzleFlash_3RD",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "Assets/AssetPrefabs/Effects/Weapon/MuzzleFlash/AssaultRifle_MuzzleFlash_3RD.prefab",
+            "source": "MuzzleFlash"
+          }
+        },
+        {
+          "id": "Game:Pistol_MuzzleFlash_3RD",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "Assets/AssetPrefabs/Effects/Weapon/MuzzleFlash/Pistol_MuzzleFlash_3RD.prefab",
+            "source": "MuzzleFlash"
+          }
+        },
+        {
+          "id": "Game:Shotgun_MuzzleFlash_3RD",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "Assets/AssetPrefabs/Effects/Weapon/MuzzleFlash/Shotgun_MuzzleFlash_3RD.prefab",
+            "source": "MuzzleFlash"
+          }
+        },
+        {
+          "id": "Game:SubMachine_MuzzleFlash_3RD",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "Assets/AssetPrefabs/Effects/Weapon/MuzzleFlash/SubMachine_MuzzleFlash_3RD.prefab",
+            "source": "MuzzleFlash"
+          }
+        },
+        {
+          "id": "Game:Sentrygun_MuzzleFlash_3RD",
+          "summary": "A game effect played at a point.",
+          "details": {
+            "line": false,
+            "native": "Assets/AssetPrefabs/Effects/Weapon/MuzzleFlash/Sentrygun_MuzzleFlash_3RD.prefab",
+            "source": "MuzzleFlash"
+          }
+        }
+      ]
+    },
+    {
+      "id": "forgeSprites",
+      "title": "Built-in sprites",
+      "entries": [
+        {
+          "id": "Forge:soft-dot",
+          "summary": "A round soft-edged dot: glows, sparks, smoke puffs and light spots; tinted and sized per use."
+        },
+        {
+          "id": "Forge:soft-line",
+          "summary": "A soft-edged streak across its length: tracers, beams and trails; tinted and sized per use."
+        }
+      ]
+    },
+    {
+      "id": "fx",
+      "title": "Fx calls",
+      "entries": [
+        {
+          "id": "Play(FxHandle, Vector3, Vector3)",
+          "summary": "Plays fx once at position, facing direction (zero: unrotated).",
+          "name": "Fx.Play",
+          "parameters": [
+            {
+              "name": "fx",
+              "type": "FxHandle",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "position",
+              "type": "Vector3",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "direction",
+              "type": "Vector3",
+              "summary": "",
+              "required": true
+            }
+          ]
+        },
+        {
+          "id": "Play(FxHandle, Vector3, Vector3, float, Color)",
+          "summary": "Plays fx with a size (m) and a tint. A Game: effect keeps the game's own size and colour; a pack's effect without a DefaultSize ignores the size. The tint goes to the prefab's renderers as _Color (ForgeVisual's particle shader multiplies by it).",
+          "name": "Fx.Play",
+          "parameters": [
+            {
+              "name": "fx",
+              "type": "FxHandle",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "position",
+              "type": "Vector3",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "direction",
+              "type": "Vector3",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "size",
+              "type": "float",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "colour",
+              "type": "Color",
+              "summary": "",
+              "required": true
+            }
+          ]
+        },
+        {
+          "id": "Line(FxHandle, Vector3, Vector3)",
+          "summary": "Plays a line effect from from to to (the game's tracer reads its far end from FX_Manager.EffectTargetPosition, which is written first, the way a weapon does). A line effect registered with HoldSeconds is held like Hold: calling this again every frame moves and stretches the one live copy.",
+          "name": "Fx.Line",
+          "parameters": [
+            {
+              "name": "fx",
+              "type": "FxHandle",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "from",
+              "type": "Vector3",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "to",
+              "type": "Vector3",
+              "summary": "",
+              "required": true
+            }
+          ]
+        },
+        {
+          "id": "Tracer(Vector3, Vector3)",
+          "summary": "The game's bullet tracer from from to to (Game:FX_Tracer); very short shots (under half a metre) draw nothing.",
+          "name": "Fx.Tracer",
+          "parameters": [
+            {
+              "name": "from",
+              "type": "Vector3",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "to",
+              "type": "Vector3",
+              "summary": "",
+              "required": true
+            }
+          ]
+        },
+        {
+          "id": "Hold(FxHandle, Vector3, Vector3, float, Color)",
+          "summary": "Holds a sustained effect at a point: a hold near a live copy within HoldReach moves it and keeps it emitting; a copy not held again within HoldSeconds stops emitting, lets its particles finish and is free again.",
+          "name": "Fx.Hold",
+          "parameters": [
+            {
+              "name": "fx",
+              "type": "FxHandle",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "position",
+              "type": "Vector3",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "direction",
+              "type": "Vector3",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "size",
+              "type": "float",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "colour",
+              "type": "Color",
+              "summary": "",
+              "required": true
+            }
+          ]
+        },
+        {
+          "id": "Attach(FxHandle, Transform)",
+          "summary": "A copy of a Game: muzzle flash under parent (a gun hand, a muzzle), played with Play; null (logged once) when the flash is not loaded or fx is not a muzzle flash.",
+          "name": "Fx.Attach",
+          "parameters": [
+            {
+              "name": "fx",
+              "type": "FxHandle",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "parent",
+              "type": "Transform",
+              "summary": "",
+              "required": true
+            }
+          ]
+        },
+        {
+          "id": "FxOptions",
+          "summary": "The options an effect registered with Fx.Register plays with.",
+          "parameters": [
+            {
+              "name": "DefaultSize",
+              "type": "float",
+              "summary": "The size the prefab is authored at (m); a request's size scales it by size / this. NaN: the effect takes no size."
+            },
+            {
+              "name": "Line",
+              "type": "bool",
+              "summary": "The prefab's one-metre +Z length is stretched from the point to the end (Line).",
+              "default": false
+            },
+            {
+              "name": "HoldSeconds",
+              "type": "float",
+              "summary": "Above 0: a sustained effect (the prefab loops at its root). A hold keeps emitting this long after the last call.",
+              "default": 0
+            },
+            {
+              "name": "HoldReach",
+              "type": "float",
+              "summary": "A hold within this many metres of a live copy moves that copy instead of starting another.",
+              "default": 1.5
+            },
+            {
+              "name": "Copies",
+              "type": "int",
+              "summary": "Copies kept; a play past that restarts the oldest.",
+              "default": 16
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "outline",
+      "title": "Enemy outline",
+      "entries": [
+        {
+          "id": "EnemyOutlineStyle",
+          "summary": "How the automatic enemy outline looks and how far it reaches. Every value has a default.",
+          "parameters": [
+            {
+              "name": "Range",
+              "type": "number",
+              "summary": "Enemies farther than this many metres from the camera are not outlined.",
+              "min": 0,
+              "max": 500,
+              "default": 35
+            },
+            {
+              "name": "FadeDistance",
+              "type": "number",
+              "summary": "Over the last this many metres before Range the line fades out instead of popping.",
+              "min": 0,
+              "max": 500,
+              "default": 5
+            },
+            {
+              "name": "MaxEnemies",
+              "type": "integer",
+              "summary": "At most this many enemies, the nearest first, are outlined at once.",
+              "min": 1,
+              "max": 128,
+              "default": 24
+            },
+            {
+              "name": "Width",
+              "type": "number",
+              "summary": "Line width in pixels at 1080p; it scales with the screen height. One width is drawn per screen: this style's while it is on.",
+              "min": 0,
+              "max": 16,
+              "default": 1.6
+            },
+            {
+              "name": "Sleeping",
+              "type": "colour",
+              "summary": "Asleep (hibernating).",
+              "default": {
+                "a": 0.4,
+                "b": 0.44,
+                "g": 0.4,
+                "r": 0.23
+              }
+            },
+            {
+              "name": "Awake",
+              "type": "colour",
+              "summary": "Awake but not hunting: patrolling, scouting.",
+              "default": {
+                "a": 0.65,
+                "b": 0.22,
+                "g": 0.56,
+                "r": 0.8
+              }
+            },
+            {
+              "name": "Hunting",
+              "type": "colour",
+              "summary": "Hunting the players (aggressive).",
+              "default": {
+                "a": 0.8,
+                "b": 0.18,
+                "g": 0.18,
+                "r": 0.8
+              }
+            },
+            {
+              "name": "XRay",
+              "type": "boolean",
+              "summary": "True draws the line through walls too (round the whole silhouette): an opt-in for mods that mean to show what is behind a wall. False (the default) outlines only what the camera sees; Forge Frames' cockpit keeps it false.",
+              "default": false
+            },
+            {
+              "name": "Priority",
+              "type": "integer",
+              "summary": "Against outlines added to one enemy with Outlines.Add: an added outline of this priority or higher replaces the automatic one on that enemy; a lower one is not drawn while the automatic one is.",
+              "default": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

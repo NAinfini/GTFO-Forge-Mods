@@ -1,4 +1,4 @@
-Forge Weapon Energy Lab experimental model assets
+Forge Weapon Energy Lab model assets
 Copyright (c) 2026 NAinfini. Licensed under MIT; see ../../LICENSE.
 
 Derivation: CAD rebuild -> independent weapon parts -> Unity 2019.4.21f1

@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using ForgeWeaponEnergyLabExperimental.Presentation;
+using ForgeWeaponEnergyLab.Presentation;
 using UnityEngine;
 
-namespace ForgeWeaponEnergyLabExperimental.Native;
+namespace ForgeWeaponEnergyLab.Native;
 
 /// <summary>
 /// First-person energy weapons and the model each one shows. The donor keeps its own first-person settings;

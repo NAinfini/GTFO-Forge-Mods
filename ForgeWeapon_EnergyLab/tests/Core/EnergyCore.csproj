@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>ForgeWeaponEnergyLab.Tests</RootNamespace>
+    <AssemblyName>ForgeWeaponEnergyLab.Core.Tests</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The plugin's Core references no game or Unity assembly, so it is compiled straight into the test. -->
+    <Compile Include="../../Core/*.cs" Link="Core/%(Filename)%(Extension)" />
+    <Compile Include="../../../ForgeCore/Once/Fnv.cs;../../../ForgeCore/Once/StrictJson.cs" Link="ForgeCore/%(Filename)%(Extension)" />
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+</Project>
