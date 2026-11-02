@@ -2,8 +2,10 @@
 
 ## 1.0.0
 
-- Weapons are defined in `ForgeEnergyLab/*.json` data files (any mod folder named `ForgeEnergyLab`); the eight guns above are the first file, and others add guns the same way without code. A loadout that used an earlier build's guns must be chosen again.
+First stable release.
+
 - Eight energy guns: Beam, Chain Arc, Flamethrower, Charge Orb, Shock Orb, Blast Gun, Ricochet Disc and Gravity Core.
+- Weapons are defined in `ForgeEnergyLab/*.json` data files (any mod folder named `ForgeEnergyLab`); the eight built-in guns are the first file, and others add guns the same way without code. A loadout that used an earlier build's guns must be chosen again.
 - Beam and Flamethrower have no recoil; the other six have light recoil.
 - Back hits, weakspots and armor work the same as with normal guns.
 - Bots can use all eight guns, with their effects and sounds.
