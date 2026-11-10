@@ -5,18 +5,27 @@ using ForgeCore;
 
 namespace ForgeOrdnanceArsenal;
 
-/// <summary>The grenade a heavy weapon fires instead of a bullet: its explosion and flight. A weapon without one fires its own bullets.</summary>
-public sealed record GrenadeSpec(float Damage, float Radius, float Speed)
+/// <summary>The grenade a heavy weapon fires instead of a bullet: its explosion and flight. A weapon without one fires its own bullets.
+/// <paramref name="TrueDamage"/>: the explosion hurts each enemy's body directly (no armour or weak spot step), falling off in a line from
+/// <paramref name="Damage"/> at the centre to <paramref name="EdgeShare"/> of it at the radius; players are not hurt.</summary>
+internal sealed record GrenadeSpec(float Damage, float Radius, float Speed, bool TrueDamage = false, float EdgeShare = 0.5f)
 {
     internal const double DamageMax = 20000, RadiusMin = 0.5, RadiusMax = 20, SpeedMin = 5, SpeedMax = 150;
 
     /// <summary>All three values are inside what a payload may write.</summary>
-    internal bool Valid => Damage >= 0f && Damage <= DamageMax && Radius >= RadiusMin && Radius <= RadiusMax && Speed >= SpeedMin && Speed <= SpeedMax;
+    internal bool Valid => EdgeShare >= 0f && EdgeShare <= 1f && Damage >= 0f && Damage <= DamageMax && Radius >= RadiusMin && Radius <= RadiusMax && Speed >= SpeedMin && Speed <= SpeedMax;
+}
+
+/// <summary>A weapon whose bullets are steered at an enemy near the crosshair: the widest angle off the aim (degrees) and the farthest enemy (metres).</summary>
+internal sealed record HomingSpec(float Angle, float Range)
+{
+    internal const double AngleMax = 30, RangeMax = 100;
+    internal bool Valid => Angle >= 1f && Angle <= AngleMax && Range >= 5f && Range <= RangeMax;
 }
 
 /// <summary>Validated parameters of payload type <see cref="TypeName"/>: a game gear block lent into the special weapon slot,
 /// shown with a ForgeVisual model, taken from the drop pod's rack.</summary>
-public sealed class HeavyWeaponSpec
+internal sealed class HeavyWeaponSpec
 {
     public const string TypeName = "arsenal.HeavyWeapon";
 
@@ -29,15 +38,27 @@ public sealed class HeavyWeaponSpec
     /// <summary>The offline gear block: a persistentID or a block name (exactly one is set).</summary>
     public uint? GearId { get; private set; }
     public string? GearName { get; private set; }
-    /// <summary>Ammunition given with the weapon, as a fraction of the special slot's full reserve.</summary>
+    /// <summary>How many of this weapon lie in one pod (one per weapon bay).</summary>
+    public int Count { get; private set; } = 1;
+    /// <summary>The most weapons one pod holds: the built-in pod has two weapon bays.</summary>
+    public const int MaxCount = 2;
+    /// <summary>Ammunition given with the weapon besides its full magazine, as a fraction of the special slot's full reserve; 0 is the magazine alone.</summary>
     public float AmmoRatio { get; private set; }
     /// <summary>The grenade the weapon fires, or null for a weapon that fires bullets.</summary>
     public GrenadeSpec? Grenade { get; private set; }
+    /// <summary>Set for a weapon whose bullets home in on enemies near the aim, or null.</summary>
+    public HomingSpec? Homing { get; private set; }
+    /// <summary>The muzzle flash drawn when it fires: <c>"Muzzle"</c> of the payload, <c>none</c>, <c>mg</c> (default) or <c>amr</c>.</summary>
+    public HeavyMuzzle Muzzle { get; private set; } = HeavyMuzzle.Mg;
+    /// <summary>How hard the gun kicks, as a share of the lent gear's own recoil.</summary>
+    public float RecoilScale { get; private set; } = 1f;
+    internal const double RecoilScaleMin = 0.1, RecoilScaleMax = 5;
     /// <summary>The factory numbers laid over the lent gear's archetype; unset fields keep the game's own value.</summary>
     public ArchetypeTuning Tuning { get; private set; } = ArchetypeTuning.None;
 
-    private static readonly string[] Known = Concat(new[] { "Model", "Gear", "AmmoRatio", "Grenade" }, ArchetypeTuning.Names);
-    private static readonly string[] GrenadeFields = { "Damage", "Radius", "Speed" };
+    private static readonly string[] Known = Concat(new[] { "Model", "Gear", "Count", "AmmoRatio", "RecoilScale", "Muzzle", "Grenade", "Homing" }, ArchetypeTuning.Names);
+    private static readonly string[] HomingFields = { "Angle", "Range" };
+    private static readonly string[] GrenadeFields = { "Damage", "Radius", "Speed", "TrueDamage", "EdgeShare" };
 
     private static readonly string[] TypeField = { "Type" };
 
@@ -49,30 +70,61 @@ public sealed class HeavyWeaponSpec
             throw new StrictJsonException("Model", "is required: a ForgeVisual model id written Pack:item.");
         var spec = WithModel(model.GetString()!);
         (spec.GearId, spec.GearName) = StrictJson.Reference(payload, "", "Gear");
-        spec.AmmoRatio = (float)StrictJson.Number(payload, "", "AmmoRatio", 1, 0.05, 1);
+        spec.AmmoRatio = (float)StrictJson.Number(payload, "", "AmmoRatio", 1, 0, 1);
+        spec.Count = (int)StrictJson.Integer(payload, "", "Count", 1, 1, MaxCount);
+        spec.RecoilScale = (float)StrictJson.Number(payload, "", "RecoilScale", 1, RecoilScaleMin, RecoilScaleMax);
         spec.Tuning = ArchetypeTuning.Parse(payload);
+        if (payload.TryGetProperty("Muzzle", out var muzzle))
+            spec.Muzzle = muzzle.ValueKind == JsonValueKind.String && muzzle.GetString() is "none" or "mg" or "amr"
+                ? Enum.Parse<HeavyMuzzle>(muzzle.GetString()!, true)
+                : throw new StrictJsonException("Muzzle", "must be \"none\", \"mg\" or \"amr\".");
         if (payload.TryGetProperty("Grenade", out var grenade))
         {
             StrictJson.OnlyKnown(grenade, "Grenade.", GrenadeFields);
             spec.Grenade = new GrenadeSpec(
                 (float)StrictJson.Number(grenade, "Grenade.", "Damage", 140, 0, GrenadeSpec.DamageMax),
                 (float)StrictJson.Number(grenade, "Grenade.", "Radius", 4, GrenadeSpec.RadiusMin, GrenadeSpec.RadiusMax),
-                (float)StrictJson.Number(grenade, "Grenade.", "Speed", 32, GrenadeSpec.SpeedMin, GrenadeSpec.SpeedMax));
+                (float)StrictJson.Number(grenade, "Grenade.", "Speed", 32, GrenadeSpec.SpeedMin, GrenadeSpec.SpeedMax),
+                StrictJson.Bool(grenade, "Grenade.", "TrueDamage", false),
+                (float)StrictJson.Number(grenade, "Grenade.", "EdgeShare", 0.5, 0, 1));
+        }
+        if (payload.TryGetProperty("Homing", out var homing))
+        {
+            StrictJson.OnlyKnown(homing, "Homing.", HomingFields);
+            spec.Homing = new HomingSpec(
+                (float)StrictJson.Number(homing, "Homing.", "Angle", 12, 1, HomingSpec.AngleMax),
+                (float)StrictJson.Number(homing, "Homing.", "Range", 60, 5, HomingSpec.RangeMax));
         }
         return spec;
     }
 
     /// <summary>A spec rebuilt from a rack record (<see cref="Wire.TryRack"/>), the gear already resolved to
     /// <paramref name="gearId"/> and the model hash to its id; null when a value is outside what <see cref="Parse"/> accepts.</summary>
-    public static HeavyWeaponSpec? Restore(string model, uint gearId, float ammoRatio, GrenadeSpec? grenade, ArchetypeTuning? tuning)
+    public static HeavyWeaponSpec? Restore(string model, uint gearId, float ammoRatio, GrenadeSpec? grenade, ArchetypeTuning? tuning, HomingSpec? homing = null, float recoilScale = 1f, float count = 1f)
     {
-        if (!HeavyModels.IsId(model) || gearId == 0 || !(ammoRatio >= 0.05f && ammoRatio <= 1f) || tuning == null || grenade is { Valid: false }) return null;
+        if (!HeavyModels.IsId(model) || gearId == 0 || !(ammoRatio >= 0f && ammoRatio <= 1f) || tuning == null || grenade is { Valid: false } || homing is { Valid: false } || !(recoilScale >= RecoilScaleMin && recoilScale <= RecoilScaleMax)
+            || !(count >= 1f && count <= MaxCount) || count != MathF.Floor(count)) return null;
         var spec = WithModel(model);
         spec.GearId = gearId;
+        spec.Muzzle = HeavyModels.MuzzleOf(model);
         spec.AmmoRatio = ammoRatio;
         spec.Grenade = grenade;
+        spec.Homing = homing;
+        spec.RecoilScale = recoilScale;
         spec.Tuning = tuning;
+        spec.Count = (int)count;
         return spec;
+    }
+
+    internal const double MagazineMin = 1, MagazineMax = 1000;
+
+    /// <summary>A copy with the ammunition a placement sets (null keeps the definition's): the reserve share, the rounds loaded and the reserve one shot spends.</summary>
+    public HeavyWeaponSpec WithAmmo(float? ammoRatio, float? magazine, float? ammoCost)
+    {
+        var copy = (HeavyWeaponSpec)MemberwiseClone();
+        if (ammoRatio is { } ratio) copy.AmmoRatio = ratio;
+        copy.Tuning = Tuning.With(magazine, ammoCost);
+        return copy;
     }
 
     private static HeavyWeaponSpec WithModel(string model)
@@ -93,14 +145,16 @@ public sealed class HeavyWeaponSpec
 
 /// <summary>The archetype numbers a heavy weapon's factory settings may set (absolute values). A NaN entry is "not set". The same
 /// type carries the game block's readings, so the host and the lending client compute the effective numbers with one function.</summary>
-public sealed class ArchetypeTuning
+internal sealed class ArchetypeTuning
 {
     public const int Count = 12;
+    /// <summary>The range of <see cref="AmmoCost"/>, the reserve one shot spends (the block's CostOfBullet).</summary>
+    internal const double AmmoCostMin = 0.01, AmmoCostMax = 1000;
     private static readonly (string Name, double Min, double Max, bool Whole)[] Table =
     {
         ("Damage", 0.01, 20000, false), ("ShotDelay", 0.02, 10, false), ("Cooldown", 0, 30, false), ("Chargeup", 0, 10, false),
         ("Magazine", 1, 1000, true), ("Reload", 0.1, 30, false), ("PrecisionMultiplier", 0, 10, false), ("StaggerMultiplier", 0, 20, false),
-        ("Pierce", 0, 20, true), ("AmmoCost", 0.01, 1000, false), ("FalloffStart", 0, 1000, false), ("FalloffEnd", 0.01, 1000, false),
+        ("Pierce", 0, 20, true), ("AmmoCost", AmmoCostMin, AmmoCostMax, false), ("FalloffStart", 0, 1000, false), ("FalloffEnd", 0.01, 1000, false),
     };
 
     public static readonly string[] Names = Array.ConvertAll(Table, row => row.Name);
@@ -133,6 +187,18 @@ public sealed class ArchetypeTuning
     public float FalloffStart => _v[10];
     /// <summary>Metres at which the damage falloff bottoms out (the game's own minimum factor).</summary>
     public float FalloffEnd => _v[11];
+
+    /// <summary>A copy whose magazine and per-shot cost are the given values where not null.</summary>
+    public ArchetypeTuning With(float? magazine, float? ammoCost)
+    {
+        var values = (float[])_v.Clone();
+        if (magazine is { } rounds) values[4] = rounds;
+        if (ammoCost is { } cost) values[9] = cost;
+        return new ArchetypeTuning(values);
+    }
+
+    /// <summary>The values as text: two tunings with the same key are the same numbers (a cache key).</summary>
+    public string Key => string.Join(",", _v);
 
     public bool IsEmpty { get { foreach (var v in _v) if (!float.IsNaN(v)) return false; return true; } }
 
@@ -190,18 +256,21 @@ public sealed class ArchetypeTuning
 }
 
 /// <summary>Why a lent heavy weapon goes back.</summary>
-public enum LoanEnd : byte { None = 0, Empty = 1, Dropped = 2, Down = 3 }
+internal enum LoanEnd : byte { None = 0, Empty = 1, Dropped = 2, Down = 3 }
 
 /// <summary>The local player's lent heavy weapon: decides from plain readings when the original gear comes back.</summary>
-public sealed class HeavyLoan
+internal sealed class HeavyLoan
 {
     /// <summary>Readings right after the swap can still show the old slot's ammunition; ignore emptiness this long.</summary>
     public const float SettleSeconds = 1.5f;
+    /// <summary>A gun that has just fired its last round stays this long: the kick is seen and the shot reaches the host while the gun is still in the hand.</summary>
+    public const float LastShotSeconds = 0.6f;
 
     public HeavyLoan(float startedAt) => StartedAt = startedAt;
 
     public float StartedAt { get; }
     public LoanEnd Ended { get; private set; }
+    private float _emptySince = float.NaN;
 
     /// <summary>One reading per frame. <paramref name="clip"/> rounds in the weapon, <paramref name="reserve"/> rounds left in
     /// the pool. Returns the reason once, the first frame the weapon must go back.</summary>
@@ -210,7 +279,9 @@ public sealed class HeavyLoan
         if (Ended != LoanEnd.None) return LoanEnd.None;
         if (down) Ended = LoanEnd.Down;
         else if (dropPressed) Ended = LoanEnd.Dropped;
-        else if (now - StartedAt >= SettleSeconds && clip <= 0 && reserve <= 0) Ended = LoanEnd.Empty;
+        else if (clip > 0 || reserve > 0) _emptySince = float.NaN;
+        else if (float.IsNaN(_emptySince)) _emptySince = now;
+        else if (now - StartedAt >= SettleSeconds && now - _emptySince >= LastShotSeconds) Ended = LoanEnd.Empty;
         return Ended;
     }
 }
@@ -219,7 +290,7 @@ public sealed class HeavyLoan
 internal sealed class LauncherLoan
 {
     internal const float OriginTolerance = 2.4f;
-    internal readonly Guid Identity = Guid.NewGuid();
+    internal readonly Guid Identity;
     internal readonly HeavyWeaponSpec Spec;
     internal readonly uint GearChecksum;
     internal int Remaining { get; private set; }
@@ -227,10 +298,12 @@ internal sealed class LauncherLoan
     private float _nextShot;
     private uint _lastShot;
 
-    internal LauncherLoan(HeavyWeaponSpec spec, uint gearChecksum, int ammunition, float interval, float createdAt)
+    /// <summary><paramref name="identity"/> is the identity the borrower already holds (a loan a new host adopts); null makes a new one.</summary>
+    internal LauncherLoan(HeavyWeaponSpec spec, uint gearChecksum, int ammunition, float interval, float createdAt, Guid? identity = null)
     {
         if (spec.Grenade == null || ammunition <= 0 || !float.IsFinite(interval) || interval <= 0 || !float.IsFinite(createdAt))
             throw new ArgumentException("Invalid host launcher budget or cadence.");
+        Identity = identity ?? Guid.NewGuid();
         Spec = spec;
         GearChecksum = gearChecksum;
         Remaining = ammunition;
@@ -262,7 +335,7 @@ internal sealed class LauncherLoan
 
 /// <summary>The host's installed loans: which borrower holds which rack's weapon, and who has switched to their own special weapon.
 /// The rack's claim (reservation, install, commit) is ForgeOrdnance's; a committed claim becomes a loan here.</summary>
-public sealed class LoanBook
+internal sealed class LoanBook
 {
     private readonly Dictionary<ulong, (ulong Summoner, uint ThrowId, uint Attempt)> _loans = new();
     /// <summary>Borrowers who switched to their own special weapon; the value is whether the host has already read that weapon in their slot.</summary>
@@ -327,4 +400,4 @@ public sealed class LoanBook
 }
 /// <summary>The heavy weapon's own magazine and reserve (the pool's raw ammunition value) while another gun is in the slot. The player's
 /// own special weapon is kept by ForgeCore's shared special weapon slot (<c>Gear.SpecialSlot</c>).</summary>
-public sealed record AmmoStash(float Pool, int Clip);
+internal sealed record AmmoStash(float Pool, int Clip);

@@ -1,16 +1,18 @@
 #Requires -Version 7
 # Renders the lobby picker icon of every Arsenal call-in (tools/render_icon.py in Blender) into -Out (Assets/icons, the package's own
 # icon source), one transparent 256 x 256 PNG per definition, named as the definition's "Icon" field. A file already there is kept (the
-# owner's hand-made icons live there); only missing icons are rendered, and -Redo <file>[,<file>] or -Redo all re-renders on purpose. Supplies show the game's own pickups exactly as the definition delivers them (one picture per item, the Count of each line,
-# read from the Item payload; tools/extract_pickups.py reads their meshes and textures from the game files), turrets their own look (M04 to M06), strikes their shell, canister or emitter, heavy weapons their model.
+# owner's hand-made icons live there); only missing icons are rendered, and -Redo <file>[,<file>] or -Redo all re-renders on purpose; -Only <regex on the id> limits the run. Supplies show the game's own pickups exactly as the definition delivers them (one picture per item, the Count of each line,
+# read from the Item payload; tools/extract_pickups.py reads their meshes and textures from the game files), turrets and devices their own master, strikes their shell, canister or emitter, heavy weapons their model.
 # Sources are only read. Run from the repository root:
 #   pwsh Mods/ForgeOrdnance_Arsenal/tools/build_icons.ps1
 param(
-    [string]$Models = 'Source/mods/ordnance-assets/models',
+    [string]$Models = 'Source/mods/ordnance-assets',
     [string]$Pickups = 'Source/mods/pod-native/meshes',
-    [string]$GameData = '<GTFO install>\GTFO_Data',
+    # The game's GTFO_Data folder; defaults to the install FORGE_GTFO_GAME names.
+    [string]$GameData = $(if ($env:FORGE_GTFO_GAME) { Join-Path $env:FORGE_GTFO_GAME 'GTFO_Data' } else { throw 'Pass -GameData or set FORGE_GTFO_GAME to the GTFO install.' }),
     [string]$Out = 'Mods/ForgeOrdnance_Arsenal/Assets/icons',
     [string[]]$Redo = @(),
+    [string]$Only = '',
     [string]$Blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 )
 $ErrorActionPreference = 'Stop'
@@ -18,35 +20,46 @@ $Models = [IO.Path]::GetFullPath($Models)
 $Pickups = [IO.Path]::GetFullPath($Pickups)
 $Out = [IO.Path]::GetFullPath($Out)
 $script = Join-Path $PSScriptRoot 'render_icon.py'
-$definitions = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../ForgeOrdnance/arsenal.json') -Raw | ConvertFrom-Json
+$definitions = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../ForgeOrdnance/arsenal.forge') -Raw | ConvertFrom-Json
 
-# Id -> model file (relative to -Models; '' for none), layout, glow colour.
+# Id -> model file (relative to -Models; '' for none), layout, glow colour, optional second model standing in front (render_icon.py --also: file,size[,count]) and 'foam' for lumps of C-Foam around it.
+# The turrets, shells, munitions and devices come from the masters the bundle is built from; the heavy weapons from their gun masters.
 $looks = @{
     'arsenal.supply.mixed'           = @('', 'supply', '')
     'arsenal.supply.ammo'            = @('', 'supply', '')
     'arsenal.supply.medical'         = @('', 'supply', '')
     'arsenal.supply.tool'            = @('', 'supply', '')
     'arsenal.supply.consumables'     = @('', 'supply', '')
-    'arsenal.turret.watch'           = @('M04/M04.blend', 'single', '')
-    'arsenal.turret.bulwark'         = @('M05/M05.blend', 'single', '')
-    'arsenal.turret.scythe'          = @('M06/M06.blend', 'single', '')
-    'arsenal.strike.precision'       = @('M11/M11.blend', 'single', '')
-    'arsenal.strike.area'            = @('M11/M11.blend', 'scatter', '')
-    'arsenal.strike.creeping'        = @('M11/M11.blend', 'row', '')
-    'arsenal.strike.cluster'         = @('M12/M12.blend', 'line', '')
-    'arsenal.strike.incendiary'      = @('M11/M11.blend', 'single', '')
-    'arsenal.strike.gas'             = @('M13/M13.blend', 'single', '0.45,1,0.2')
-    'arsenal.strike.stasis'          = @('M14/M14.blend', 'single', '0.3,0.85,1')
+    'arsenal.supply.syringe'         = @('', 'supply', '')
+    'arsenal.supply.mines'           = @('', 'supply', '')
+    'arsenal.supply.utility'         = @('', 'supply', '')
+    'arsenal.turret.watch'           = @('masters/turret-burst/turret-burst.blend', 'single', '')
+    'arsenal.turret.bulwark'         = @('masters/turret-sniper/turret-sniper.blend', 'single', '')
+    'arsenal.turret.scythe'          = @('masters/turret-shotgun/turret-shotgun.blend', 'single', '')
+    'arsenal.deploy.foam'            = @('masters/dispenser/dispenser.blend', 'single', '', 'masters/glue-mine/glue-mine.blend,0.55', 'foam')
+    'arsenal.deploy.mines'           = @('masters/dispenser/dispenser.blend', 'single', '', 'masters/mine/mine.blend,0.4,4')
+    'arsenal.deploy.scanner'         = @('masters/radar/radar.blend', 'single', '')
+    'arsenal.deploy.floodlight'      = @('masters/floodlight/floodlight.blend', 'single', '1,0.85,0.5')
+    'arsenal.strike.precision'       = @('masters/shell-precision/shell-precision.blend', 'single', '')
+    'arsenal.strike.area'            = @('masters/shell/shell.blend', 'scatter', '')
+    'arsenal.strike.creeping'        = @('masters/shell/shell.blend', 'row', '')
+    'arsenal.strike.cluster'         = @('masters/bomblet/bomblet.blend', 'line', '')
+    'arsenal.strike.incendiary'      = @('masters/shell-incendiary/shell-incendiary.blend', 'single', '')
+    'arsenal.strike.gas'             = @('masters/gas-canister/gas-canister.blend', 'single', '0.45,1,0.2')
+    'arsenal.strike.stasis'          = @('masters/stasis-emitter/stasis-emitter.blend', 'single', '0.3,0.85,1')
     'arsenal.strike.beam'            = @('', 'beam', '')
-    'arsenal.strike.hunter'          = @('M11/M11.blend', 'single', '')
-    'arsenal.weapon.machinegun'      = @('M08/M08.blend', 'single', '')
-    'arsenal.weapon.antimateriel'    = @('M09/M09.blend', 'single', '')
-    'arsenal.weapon.grenadelauncher' = @('M10/M10.blend', 'single', '')
+    'arsenal.strike.strafe'          = @('masters/rocket/rocket.blend', 'row', '')
+    'arsenal.strike.hunter'          = @('masters/shell-hunter/shell-hunter.blend', 'single', '')
+    'arsenal.weapon.machinegun'      = @('models/M08/M08.blend', 'single', '')
+    'arsenal.weapon.antimateriel'    = @('models/M09/M09.blend', 'single', '')
+    'arsenal.weapon.grenadelauncher' = @('models/M10/M10.blend', 'single', '')
+    'arsenal.weapon.recoilless'      = @('masters/recoilless/recoilless.blend', 'single', '')
+    'arsenal.weapon.tracking'        = @('models/M20/M20.blend', 'single', '')
 }
 
 # Item data block id -> the pickup kind tools/extract_pickups.py extracts. A supply picture is built from its payload: one pickup per
 # Count of every Items line, so a changed delivery re-renders into a changed picture.
-$pickupKinds = @{ 101 = 'ammo'; 102 = 'medi'; 127 = 'tool'; 132 = 'disinfect'; 115 = 'cfoam' }
+$pickupKinds = @{ 101 = 'ammo'; 102 = 'medi'; 127 = 'tool'; 132 = 'disinfect'; 115 = 'cfoam'; 140 = 'syringe'; 142 = 'meleesyringe'; 139 = 'tripmine'; 144 = 'foammine'; 117 = 'fogrepeller'; 116 = 'lockmelter' }
 function Get-SupplyKinds($definition) {
     $kinds = foreach ($line in $definition.Payload.Items) {
         $id = [int]$line.Item
@@ -61,15 +74,16 @@ $tinted = @('arsenal.strike.precision', 'arsenal.strike.incendiary', 'arsenal.st
 # The three red shells look alike, so each carries a sign drawn into its picture (render_icon.py --mark).
 # Gunmetal models render near black; they get more light in their own colours (render_icon.py --exposure), each as much as its own
 # textures take: the M82's pale-blue finish washes out to flat grey above about 1.2.
-$exposure = @{ 'arsenal.weapon.machinegun' = '2.0'; 'arsenal.weapon.antimateriel' = '1.2'; 'arsenal.weapon.grenadelauncher' = '2.0' }
+$exposure = @{ 'arsenal.weapon.machinegun' = '2.0'; 'arsenal.weapon.antimateriel' = '1.2'; 'arsenal.weapon.grenadelauncher' = '2.0'; 'arsenal.weapon.recoilless' = '1.2'; 'arsenal.weapon.tracking' = '2.0' }
 $marks = @{ 'arsenal.strike.precision' = 'crosshair'; 'arsenal.strike.incendiary' = 'flame'; 'arsenal.strike.hunter' = 'lock' }
 
 New-Item -ItemType Directory -Force $Out | Out-Null
 $redoAll = $Redo -contains 'all'
 foreach ($d in $definitions) {
+    if ($Only -and $d.Id -notmatch $Only) { continue }
     if (!$looks.ContainsKey($d.Id)) { throw "No icon look for $($d.Id); add it to this script." }
     if (!$d.Icon) { throw "$($d.Id) has no Icon field." }
-    $model, $layout, $glow = $looks[$d.Id]
+    $model, $layout, $glow, $also, $foam = $looks[$d.Id]
     $png = Join-Path $Out $d.Icon
     if ((Test-Path -LiteralPath $png) -and !$redoAll -and ($Redo -notcontains $d.Icon)) { Write-Host "Kept $($d.Icon) (already present; -Redo $($d.Icon) or -Redo all re-renders it)."; continue }
     $arguments = @('-b')
@@ -80,6 +94,8 @@ foreach ($d in $definitions) {
     }
     $arguments += @('--factory-startup', '--python-exit-code', '1', '--python', $script, '--', '--out', $png, '--layout', $layout)
     if ($glow) { $arguments += @('--glow', $glow) }
+    if ($also) { $path, $rest = $also -split ',', 2; $arguments += @('--also', ((Join-Path $Models $path) + $(if ($rest) { ',' + $rest }))) }
+    if ($foam) { $arguments += '--foam' }
     if ($layout -eq 'supply') {
         if (!(Test-Path -LiteralPath (Join-Path $Pickups 'medi.obj'))) {
             if (!$env:PYTHONPATH) { throw 'Set PYTHONPATH to a folder holding UnityPy so the game pickups can be extracted.' }

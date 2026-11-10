@@ -5,7 +5,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>ForgeOrdnanceArsenal</AssemblyName>
-    <Version>1.0.0</Version>
     <RootNamespace>ForgeOrdnanceArsenal</RootNamespace>
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -28,6 +27,8 @@
     <ProjectReference Include="../ForgeAudio/ForgeAudio.csproj" Private="false" />
     <ProjectReference Include="../ForgeVisual/ForgeVisual.csproj" Private="false" />
     <Compile Include="Core/*.cs;Native/**/*.cs" />
+    <EmbeddedResource Include="Data/gun-grips.json" LogicalName="ForgeOrdnanceArsenal.Data.gun-grips.json" />
+    <EmbeddedResource Include="Data/gun-sights.json" LogicalName="ForgeOrdnanceArsenal.Data.gun-sights.json" />
     <Reference Include="BepInEx.Core" HintPath="$(GTFOBepInExPath)/core/BepInEx.Core.dll" Private="false" />
     <Reference Include="GTFO-API" HintPath="$(GTFOApiPath)" Private="false" />
     <Reference Include="BepInEx.Unity.IL2CPP" HintPath="$(GTFOBepInExPath)/core/BepInEx.Unity.IL2CPP.dll" Private="false" />

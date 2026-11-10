@@ -4,7 +4,7 @@
 # Layouts: single, scatter (five copies spread out), row (three copies stepping forward), line (five copies in a line),
 # beam (no model: a beacon pole under a column of light), supply (no model file: the game's own pickups, one per name in --supply,
 # read from --pickups <dir>/<name>.obj + <name>.json as tools/extract_pickups.py wrote them from the game files: ammo, medi, tool,
-# disinfect, cfoam). --tint r,g,b turns the finished picture into one colour (its own light and dark kept, drawn in that
+# disinfect, cfoam, syringe, meleesyringe, tripmine, foammine, fogrepeller, lockmelter). --tint r,g,b turns the finished picture into one colour (its own light and dark kept, drawn in that
 # colour). --glow adds a coloured light under the model (fire, target, freeze) or,
 # with --glow-at front, in front of it (tints the whole model). --exposure E brightens a dark model in its own colours (stops of light, with a matching
 # front fill) so it reads on the picker's dark rows.
@@ -25,6 +25,8 @@ args.add_argument("--mark", default="", choices=["", "crosshair", "flame", "lock
 args.add_argument("--view", default="0.85,-1,0.65")
 args.add_argument("--glow", default="")
 args.add_argument("--glow-at", default="below", choices=["below", "front"])
+args.add_argument("--also", default="")  # <blend>[,fit[,count]]: a second model (a munition) standing in front, fit = its size as a share of the first model's, count copies fanned out across the front (thrown)
+args.add_argument("--foam", action="store_true")  # lumps of C-Foam heaped beside the model and flung around it
 args.add_argument("--exposure", type=float, default=0.0)
 args.add_argument("--size", type=int, default=256)
 a = args.parse_args(sys.argv[sys.argv.index("--") + 1:])
@@ -158,6 +160,64 @@ elif a.layout == "supply":
     for obj in meshes:
         bpy.data.objects.remove(obj, do_unlink=True)
     meshes = place_pickups([k for k in a.supply.split(",") if k], a.pickups)
+if a.also and meshes:
+    also_path, _, also_rest = a.also.partition(",")
+    also_fit, _, also_count = also_rest.partition(",")
+    with bpy.data.libraries.load(also_path) as (source, loaded):
+        loaded.objects = list(source.objects)
+    extra = [o for o in loaded.objects if o is not None and o.type == "MESH"]
+    for o in extra:
+        scene.collection.objects.link(o)
+    bpy.context.view_layer.update()
+    lo, hi = Vector((math.inf,) * 3), Vector((-math.inf,) * 3)
+    for o in meshes:
+        for corner in o.bound_box:
+            w = o.matrix_world @ Vector(corner)
+            lo, hi = Vector(map(min, lo, w)), Vector(map(max, hi, w))
+    elo, ehi = Vector((math.inf,) * 3), Vector((-math.inf,) * 3)
+    for o in extra:
+        for corner in o.bound_box:
+            w = o.matrix_world @ Vector(corner)
+            elo, ehi = Vector(map(min, elo, w)), Vector(map(max, ehi, w))
+    ecentre = (elo + ehi) / 2
+    scale = (max(hi - lo) * float(also_fit or 0.45)) / max(max(ehi - elo), 1e-6)
+    target = Vector(((lo.x + hi.x) / 2 - (hi.x - lo.x) * 0.35, lo.y - (hi.y - lo.y) * 0.15 - (ehi.y - elo.y) * scale * 0.5, lo.z + (ehi.z - elo.z) * scale * 0.5))
+    count = int(also_count or 1)
+    width, half = hi.x - lo.x, (ehi.y - elo.y) * scale * 0.5
+    groups = [extra] + [[e.copy() for e in extra] for _ in range(count - 1)]  # copies before any is moved
+    placed = []
+    for k in range(count):
+        if count == 1:
+            spot = target
+        else:  # an arc of thrown ones: spread across the front, the middle ones nearer, each lying a little differently
+            u = (k - (count - 1) / 2) / ((count - 1) / 2)
+            spot = Vector(((lo.x + hi.x) / 2 + u * width * 0.95, lo.y - (hi.y - lo.y) * (0.12 + 0.2 * (1 - abs(u))) - half, lo.z + (ehi.z - elo.z) * scale * 0.5))
+        for o in groups[k]:
+            if k:
+                scene.collection.objects.link(o)
+            o.location = (o.location - ecentre) * scale + spot
+            o.scale = o.scale * scale
+            if k:
+                o.rotation_euler[2] += k * 1.9
+            placed.append(o)
+    extra = placed
+    meshes = meshes + extra
+if a.foam and meshes:
+    lo, hi = Vector((math.inf,) * 3), Vector((-math.inf,) * 3)
+    for o in meshes:
+        for corner in o.bound_box:
+            w = o.matrix_world @ Vector(corner)
+            lo, hi = Vector(map(min, lo, w)), Vector(map(max, hi, w))
+    foam = solid("foam", (0.78, 0.93, 1.0), 0.25, 0.85)
+    w, d, h = hi.x - lo.x, hi.y - lo.y, hi.z - lo.z
+    cx = (lo.x + hi.x) / 2
+    # (x, y, z as shares of the model's width, depth, height; radius as a share of its height): a heap on the ground right of the glue
+    # grenade, and clumps flung up and out around the dispenser
+    for x, y, z, r in ((0.62, -0.30, 0.00, 0.13), (0.80, -0.38, 0.00, 0.10), (0.70, -0.52, 0.00, 0.09), (0.55, -0.50, 0.00, 0.08), (0.78, -0.18, 0.00, 0.07),
+                       (0.66, -0.36, 0.11, 0.08), (-0.75, 0.10, 0.70, 0.07), (0.78, 0.05, 0.55, 0.06), (-0.55, -0.15, 0.95, 0.05), (0.60, 0.00, 0.85, 0.05)):
+        lump = part("sphere", (cx + x * w, lo.y + d * (0.5 + y), lo.z + h * z + r * h * 1.0), foam, r=r * h * 1.5)
+        lump.scale = (1.0, 1.0, 0.8)
+        meshes.append(lump)
 if not meshes:
     raise SystemExit("No visible mesh in this file.")
 

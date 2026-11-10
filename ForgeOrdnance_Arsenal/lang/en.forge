@@ -1,0 +1,10 @@
+{
+  "strike.noTarget": "No target",
+  "strike.noTargetRefund": "No target in that room. Use returned, {0} s cooldown",
+  "strike.danger": "You are in the strike zone. Get out!",
+  "rack.pickUp": "Pick up {0}",
+  "rack.inHand": "Heavy weapon in hand",
+  "rack.slotTaken": "{0}: cannot take it",
+  "keys.group": "Forge Arsenal",
+  "keys.drop": "Return weapon"
+}

@@ -1,5 +1,4 @@
 using ForgeCore;
-using SNetwork;
 
 namespace ForgeOrdnanceArsenal;
 
@@ -14,10 +13,11 @@ internal static class ArsenalNetwork
 
     internal static void Register()
     {
-        _channel =Net.Open(Plugin.Id, InboxLimit);
+        _channel = Net.Open(Plugin.Id, InboxLimit);
         _channel.On<LoanNotice>(LoanNotice.Name, HeavyWeapons.OnLoanNotice);
         _channel.On<GrenadeShot>(GrenadeShot.Name, Grenades.OnShot);
         _channel.On<GrenadeBurst>(GrenadeBurst.Name, Grenades.OnBurst);
+        _channel.On<HomingShot>(HomingShot.Name, HomingFire.OnShot);
     }
 
     internal static void Clear() => _channel?.Clear();
@@ -33,8 +33,5 @@ internal static class ArsenalNetwork
     /// <summary>To every other peer.</summary>
     internal static void Broadcast<T>(string name, T message) where T : unmanaged => Channel.Broadcast(name, message);
 
-    /// <summary>True when <paramref name="lookup"/> is a human player in this session.</summary>
-    internal static bool IsPlayer(ulong lookup) => SNet.TryGetPlayer(lookup, out var p) && p != null && !p.IsBot;
-
-    private static NetChannel Channel => _channel ?? throw new System.InvalidOperationException("Arsenal's network channel is not open.");
+    internal static NetChannel Channel => _channel ?? throw new System.InvalidOperationException("Arsenal's network channel is not open.");
 }

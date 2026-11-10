@@ -1,6 +1,6 @@
 #Requires -Version 7
-# Builds forge-ordnance-arsenal.bundle with ForgeOrdnance's asset pipeline (Mods/ForgeOrdnance/tools): the shell (M11),
-# bomblet (M12), gas canister (M13), stasis emitter (M14), heavy weapon (M08, M09, M10) and turret look (M04 burst, M05 sniper, M06 shotgun) models, plus the strike effect
+# Builds forge-ordnance-arsenal.bundle with ForgeOrdnance's asset pipeline (Mods/ForgeOrdnance/tools): the heavy weapons (M08, M09, M10, M20), and from their masters under
+# <Assets>/masters (tripo_masters.py) the munitions, the recoilless rifle, the turret looks and the devices, plus the strike effect
 # textures of <Assets>/vfx (staged under textures/). Sources are only read; everything is written under -Build.
 # Run from the repository root:
 #   pwsh Mods/ForgeOrdnance_Arsenal/tools/build_assets.ps1 [-Install <BepInEx plugins folder of a test profile>]
@@ -21,28 +21,34 @@ $stage = Join-Path $Build 'stage'
 $out = Join-Path $Build 'out'
 $manifest = Join-Path $out 'forge-ordnance-arsenal.manifest.json'
 New-Item -ItemType Directory -Force $out | Out-Null
-# Invalidate the previous receipt before any step can fail. The previous bundle may remain for comparison, but cannot ship.
-if (Test-Path -LiteralPath $manifest) { Remove-Item -LiteralPath $manifest }
+# Invalidate the previous receipt before any step can fail: package_release.py reads the copy kept in the package, so that one goes too.
+# The previous bundle may remain for comparison, but without its receipt it cannot ship.
+$kept = Join-Path $PSScriptRoot '../Assets/Models'
+foreach ($stale in @($manifest, (Join-Path $kept 'forge-ordnance-arsenal.manifest.json'))) {
+    if (Test-Path -LiteralPath $stale) { Remove-Item -LiteralPath $stale }
+}
 # Prefab name -> model folder. Keep in step with ArsenalArt.cs.
-$models = [ordered]@{ 'shell' = 'M11'; 'bomblet' = 'M12'; 'gas-canister' = 'M13'; 'stasis-emitter' = 'M14'; 'heavy-mg' = 'M08'; 'anti-materiel-rifle' = 'M09'; 'grenade-launcher' = 'M10'; 'turret-burst' = 'M04'; 'turret-sniper' = 'M05'; 'turret-shotgun' = 'M06' }
+$masters = 'shell', 'shell-precision', 'shell-hunter', 'shell-incendiary', 'bomblet', 'rocket', 'grenade-40', 'gas-canister', 'stasis-emitter', 'mine', 'glue-mine', 'recoilless', 'turret-burst', 'turret-sniper', 'turret-shotgun', 'dispenser', 'radar', 'floodlight'
+$models = [ordered]@{ 'heavy-mg' = 'M08'; 'tracking-rifle' = 'M20'; 'anti-materiel-rifle' = 'M09'; 'grenade-launcher' = 'M10' }
+$blends = @{}
+foreach ($prefab in $masters) { $blends[$prefab] = "$Assets/masters/$prefab/$prefab.blend" }
+foreach ($prefab in $models.Keys) { $blends[$prefab] = "$Assets/models/$($models[$prefab])/$($models[$prefab]).blend" }
 # Turret looks (ArsenalTurrets): base and yaw origins on the ground at the yaw axis, head origin on the pitch axis, muzzle at the barrel tip.
 $turretParts = 'base,yaw,head,muzzle'
 $inputs = @($Unity, $Blender, "$pipeline/export_blender.py", "$pipeline/OrdnanceBundleBuild.cs")
-foreach ($m in $models.Values) { $inputs += "$Assets/models/$m/$m.blend" }
+foreach ($b in $blends.Values) { $inputs += $b }
 # Effect texture names. Keep in step with ArsenalArt.cs.
-$effects = @('vfx-flare', 'vfx-spark', 'vfx-mist', 'vfx-fire', 'vfx-smoke', 'vfx-ring', 'vfx-scorch', 'vfx-streak', 'vfx-glow', 'vfx-blast', 'vfx-fireball', 'vfx-flash', 'vfx-flame')
+$effects = @('vfx-flare', 'vfx-spark', 'vfx-smoke', 'vfx-ring', 'vfx-scorch', 'vfx-streak', 'vfx-glow', 'vfx-fireball')
 foreach ($e in $effects) { $inputs += "$Assets/vfx/$e.png" }
 foreach ($path in $inputs) { if (!(Test-Path -LiteralPath $path)) { throw "Missing required input: $path" } }
 
 if (Test-Path -LiteralPath $stage) { Remove-SafeTree -Target $stage -Root $Build }
 New-Item -ItemType Directory -Force (Join-Path $stage 'models'), (Join-Path $stage 'textures'), $out | Out-Null
 foreach ($e in $effects) { Copy-Item -LiteralPath "$Assets/vfx/$e.png" -Destination (Join-Path $stage "textures/$e.png") }
-foreach ($prefab in $models.Keys) {
-    $m = $models[$prefab]
-    $textureSize = if ($prefab -in @('shell', 'bomblet', 'gas-canister', 'stasis-emitter')) { 512 } else { 1024 }
-    $require = if ($prefab -like 'turret-*') { @('--require', $turretParts) } else { @() }
-    & $Blender --background --factory-startup "$Assets/models/$m/$m.blend" --python-exit-code 1 --python "$pipeline/export_blender.py" -- --prefab $prefab --out "$stage/models/$prefab" --max-texture $textureSize @require
-    if ($LASTEXITCODE -ne 0) { throw "Export of $m ($prefab) failed." }
+foreach ($prefab in $blends.Keys) {
+    $require = if ($prefab -like 'turret-*') { @('--require', $turretParts) } elseif ($prefab -eq 'dispenser') { @('--require', 'ring,column,plate1,plate6,mount1,mount36') } elseif ($prefab -eq 'radar') { @('--require', 'base,yaw,head,petal1') } elseif ($prefab -eq 'floodlight') { @('--require', 'base,yaw,head,fan') } else { @() }
+    & $Blender --background --factory-startup $blends[$prefab] --python-exit-code 1 --python "$pipeline/export_blender.py" -- --prefab $prefab --out "$stage/models/$prefab" --max-texture 2048 @require
+    if ($LASTEXITCODE -ne 0) { throw "Export of $prefab failed." }
 }
 $project = Join-Path $Build 'unity'
 if (!(Test-Path -LiteralPath (Join-Path $project 'ProjectSettings'))) {
@@ -70,7 +76,6 @@ $receipt = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
 if ($receipt.bundle -ne $bundleName -or $receipt.bytes -ne $length -or $receipt.sha256 -ne $hash) { throw "The Unity build receipt does not match $bundleName." }
 Write-Host "Built and verified $bundle ($length bytes, $hash)."
 # The package keeps the verified bundle and its Unity receipt in its own Assets/Models, where package_release.py reads them (the build folder is disposable).
-$kept = Join-Path $PSScriptRoot '../Assets/Models'
 New-Item -ItemType Directory -Force $kept | Out-Null
 foreach ($file in @($bundle, $manifest)) { Copy-Item -LiteralPath $file -Destination $kept -Force }
 

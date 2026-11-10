@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using AIGraph;
 using Enemies;
 using ForgeOrdnance;
 using GTFO.API;
-using HarmonyLib;
 using Player;
 using UnityEngine;
 
@@ -17,12 +17,24 @@ internal sealed class StrikePayload : IOrdnancePayload
 {
     public StrikePayload() => LevelAPI.OnBuildDone += StrikeVisuals.BeginLevel;
 
-    public void OnBeaconLanded(OrdnancePresentation presentation) => StrikeVisuals.AdmitBeam(presentation);
+    public void OnBeaconLanded(OrdnancePresentation presentation)
+    {
+        StrikeVisuals.AdmitBeam(presentation);
+        if (ForgeCore.Session.IsHost) Strikes.Announce(presentation);
+    }
+
+    /// <summary>A level's developer drop has no beacon, so its beam is admitted here, the same as a landed beacon would admit it (a beam update
+    /// that came first is only dropped; the host sends the beam's state again every few seconds).</summary>
+    public void OnArrived(OrdnancePresentation presentation) => StrikeVisuals.AdmitBeam(presentation);
 
     public object Parse(JsonElement payload) => StrikeSpec.Parse(payload);
 
     /// <summary>Strikes shake the camera on each impact instead of once on arrival.</summary>
     public bool HasOwnArrival => true;
+
+    /// <summary>A strike has no vehicle to leave out: a level's developer drop has no beacon and its shells start at the point at once, so
+    /// <c>Direct</c> and <c>Drop</c> are the same arrival. Declared so a level may place a strike at an author-written point, once, like any other call-in.</summary>
+    public bool SupportsDirect => true;
 
     public void Execute(OrdnanceExecution execution) => Strikes.Start(execution);
 
@@ -48,11 +60,14 @@ internal static class Strikes
     private sealed class Call
     {
         internal StrikeSpec Spec = null!;
+        internal OrdnanceDefinition Definition = null!;
         internal ulong Summoner;
         internal uint ThrowId;
         internal Guid Generation;
         internal PlayerAgent? Source;
         internal Vector3 Landing;
+        /// <summary>The course node the strike landed in (null: none found); the hunter reaches only enemies in it.</summary>
+        internal AIG_CourseNode? Room;
     }
 
     private sealed class Shell
@@ -86,48 +101,154 @@ internal static class Strikes
         internal bool WasMoving;
     }
 
+    /// <summary>The hunter's laser while it looks for its target or stays on it; its shell is an ordinary <see cref="Shell"/>.</summary>
+    private sealed class Hunt
+    {
+        internal Call Call = null!;
+        internal Vector3 Beacon, LastPoint;
+        internal EnemyAgent? Target;
+        /// <summary>The lock runs out at <see cref="LockUntil"/> (0: none yet); with no target the laser gives up at <see cref="GivesUpAt"/>.</summary>
+        internal float LockUntil, GivesUpAt, NextScan, NextSend, LastSend;
+    }
+
+    /// <summary>A strafing run: the strip from the beacon along its direction, swept by the head that advances at the spec's speed.</summary>
+    private sealed class Run
+    {
+        internal Call Call = null!;
+        internal Vector3 Origin, Direction;
+        internal float StartsAt, NextTick, Along;
+        /// <summary>The strip's length after the first wall ahead cut it.</summary>
+        internal float Length;
+        /// <summary>The enemies this run has already hit (by instance id): one that walks on with the head is hit once.</summary>
+        internal readonly HashSet<int> Hit = new();
+    }
+
+    /// <summary>Metres above and below the beacon's height the run still hits.</summary>
+    private const float RunReachHeight = 4f;
+    /// <summary>Metres above the floor a blast starts, so a bump in the floor does not shadow what it should reach.</summary>
+    private const float BlastLift = 0.25f;
+    /// <summary>Metres above the floor the line that looks for the wall ahead runs (over crates, under most ceilings), and how far before the wall it stops.</summary>
+    private const float WallLookHeight = 1.6f, WallMargin = 0.4f;
+    /// <summary>Which way each call faces, fixed when its beacon lands (not where the thrower walked to since).</summary>
+    private static readonly Dictionary<(ulong Summoner, uint ThrowId), Quaternion> Facing = new();
+
+    private static readonly List<Run> Runs = new();
     private static Guid _generation = Guid.NewGuid();
     private static readonly List<Shell> Shells = new();
     private static readonly List<Zone> Zones = new();
     private static readonly List<Beam> Beams = new();
-    private static readonly float[] HealthBuffer = new float[256];
+    private static readonly List<Hunt> Hunts = new();
     private static readonly float[] DistanceBuffer = new float[256];
     private static readonly float[] ScratchBuffer = new float[256];
     private static readonly EnemyAgent?[] Candidates = new EnemyAgent?[256];
+
+    /// <summary>The beacon landed: the call's direction is fixed now and every peer is told the ground it can hurt.</summary>
+    internal static void Announce(OrdnancePresentation p)
+    {
+        if (p.Parameters is not StrikeSpec spec) return;
+        var rotation = Quaternion.identity;
+        var thrower = ForgeCore.Level.PlayerByLookup(p.SummonerLookup);
+        if (thrower != null)
+        {
+            var flat = p.Position - thrower.transform.position;
+            flat.y = 0f;
+            if (flat.sqrMagnitude > 0.01f) rotation = Quaternion.LookRotation(flat.normalized);
+        }
+        Facing[(p.SummonerLookup, p.ThrowId)] = rotation;
+        SendDanger(spec, p.SummonerLookup, p.ThrowId, p.Position, rotation, p.Delay);
+    }
+
+    private static void SendDanger(StrikeSpec spec, ulong summoner, uint throwId, Vector3 at, Quaternion rotation, float delay)
+    {
+        var direction = Ahead(rotation);
+        var length = spec.Kind == StrikeKind.Strafe ? ClearAhead(at, direction, spec.Length) : spec.Length;
+        if (StrikeFootprint.Of(spec, length, delay) is not { } footprint) return;
+        OrdnanceApi.SendData(StrikeSpec.TypeName, summoner, throwId, (byte)DataTag.Danger, Wire.Danger(new DangerRecord(spec.Kind, at.x, at.y, at.z, direction.x, direction.z, footprint)));
+    }
+
+    private static Vector3 Ahead(Quaternion rotation)
+    {
+        var direction = rotation * new Vector3(0f, 0f, 1f);
+        direction.y = 0f;
+        return direction.sqrMagnitude < 0.0001f ? new Vector3(0f, 0f, 1f) : direction.normalized;
+    }
+
+    /// <summary>How many metres from a floor point the way along <paramref name="direction"/> is open, at most <paramref name="length"/>.</summary>
+    private static float ClearAhead(Vector3 from, Vector3 direction, float length)
+    {
+        var lift = ForgeCore.Level.LiftUnderRoof(from, WallLookHeight, 0.2f);
+        return Physics.Raycast(from + Vector3.up * lift, direction, out var wall, length, LayerManager.MASK_WORLD, QueryTriggerInteraction.Ignore)
+            ? Math.Max(1f, wall.distance - WallMargin) : length;
+    }
+
+    /// <summary>The planned point, brought back to this side of the first wall between it and the beacon: a shell of the pattern lands in the room it was called into
+    /// or through an opening, never in rock or behind a wall.</summary>
+    private static Vector3 WithinWalls(Vector3 origin, Vector3 point)
+    {
+        var offset = point - origin;
+        offset.y = 0f;
+        var distance = offset.magnitude;
+        if (distance < 0.01f) return origin;
+        var direction = offset * (1f / distance);
+        return origin + direction * Math.Min(distance, ClearAhead(origin, direction, distance));
+    }
 
     internal static void Start(OrdnanceExecution e)
     {
         var spec = (StrikeSpec)e.Parameters;
         var now = Time.time;
-        var call = new Call { Generation = _generation, Spec = spec, Summoner = e.SummonerLookup, ThrowId = e.ThrowId, Source = e.Summoner, Landing = e.Position };
+        var call = new Call { Generation = _generation, Spec = spec, Definition = e.Definition, Summoner = e.SummonerLookup, ThrowId = e.ThrowId, Source = e.Summoner, Landing = e.Position, Room = e.CourseNode };
+        // A call with no beacon (a level's developer drop) or one a new host took over shows its ground now.
+        if (!Facing.Remove((e.SummonerLookup, e.ThrowId), out var rotation))
+        {
+            rotation = e.Rotation;
+            SendDanger(spec, e.SummonerLookup, e.ThrowId, e.Position, rotation, 0f);
+        }
         switch (spec.Kind)
         {
             case StrikeKind.Beam:
-            {
-                var top = Top(e.Position);
-                var active = now + StrikeTiming.BeamChargeSeconds;
-                Beams.Add(new Beam { Call = call, Top = top, Route = new BeamRoute(e.Position.x, e.Position.y, e.Position.z), Floor = e.Position.y, Started = now, ActiveAt = active, EndsAt = active + spec.Duration, NextTick = active, NextSend = now, NextScan = active, LastStep = now });
-                return;
-            }
+                {
+                    var top = Top(e.Position);
+                    var active = now + StrikeTiming.BeamChargeSeconds;
+                    Beams.Add(new Beam { Call = call, Top = top, Route = new BeamRoute(e.Position.x, e.Position.y, e.Position.z), Floor = e.Position.y, Started = now, ActiveAt = active, EndsAt = active + spec.Duration, NextTick = active, NextSend = now, NextScan = active, LastStep = now });
+                    return;
+                }
+            case StrikeKind.Strafe:
+                {
+                    var direction = Ahead(rotation);
+                    var starts = now + StrikeTiming.StrafeLeadSeconds;
+                    var length = ClearAhead(e.Position, direction, spec.Length);
+                    Runs.Add(new Run { Call = call, Origin = e.Position, Direction = direction, StartsAt = starts, NextTick = starts, Length = length });
+                    Send(call, DataTag.Strafe, Wire.Strafe(new StrafeRecord(e.Position.x, e.Position.y, e.Position.z, direction.x, direction.z, length, spec.Speed, StrikeTiming.StrafeLeadSeconds, spec.Width * 0.5f)));
+                    return;
+                }
             case StrikeKind.Hunter:
-            {
-                var target = LargestNear(e.Position, spec.Spread);
-                var impact = target != null ? Ground(target.Position) : e.Position;
-                Shells.Add(new Shell { Call = call, Impact = impact, LaunchAt = now, ImpactAt = now + StrikeTiming.FallSeconds, Target = target });
-                return;
-            }
+                {
+                    Hunts.Add(new Hunt { Call = call, Beacon = e.Position, LastPoint = e.Position, GivesUpAt = now + StrikeTiming.HunterSearchSeconds, LastSend = now });
+                    return;
+                }
         }
         var plan = StrikePlan.Build(spec, StrikePlan.Seed(e.SummonerLookup, e.ThrowId));
         foreach (var p in plan)
         {
-            var offset = e.Rotation * new Vector3(p.Right, 0f, p.Forward);
-            var impact = p.Right == 0f && p.Forward == 0f ? e.Position : Ground(e.Position + offset);
-            Shells.Add(new Shell { Call = call, Impact = impact, LaunchAt = now + p.Time, ImpactAt = now + p.Time + StrikeTiming.FallSeconds });
+            var offset = rotation * new Vector3(p.Right, 0f, p.Forward);
+            var impact = p.Right == 0f && p.Forward == 0f ? e.Position : Ground(WithinWalls(e.Position, e.Position + offset));
+            Shells.Add(new Shell { Call = call, Impact = impact, LaunchAt = now + p.Time, ImpactAt = now + p.Time + StrikeTiming.Pace(spec.Kind).Lead });
         }
     }
 
     internal static void Tick(float now)
     {
+        for (var i = Hunts.Count - 1; i >= 0; i--)
+        {
+            var hunt = Hunts[i];
+            try { if (HuntTick(hunt, now)) Hunts.RemoveAt(i); }
+            catch (Exception error)
+            {
+                Hunts.RemoveAt(i);
+                Plugin.Logger.ErrorOnce("Hunter laser of throw " + hunt.Call.ThrowId + " failed: " + error);
+            }
+        }
         for (var i = Shells.Count - 1; i >= 0; i--)
         {
             var s = Shells[i];
@@ -137,7 +258,7 @@ internal static class Strikes
                 {
                     s.Launched = true;
                     Send(s.Call, DataTag.Shell, Wire.Shell(new ShellRecord(StrikePlan.Look(s.Call.Spec.Kind), s.Call.Spec.Kind, s.Impact.x, s.Impact.y, s.Impact.z,
-                        Top(s.Impact).y, Math.Max(0f, s.ImpactAt - now), s.Call.Spec.Kind is StrikeKind.Gas or StrikeKind.Stasis ? s.Call.Spec.ZoneRadius : s.Call.Spec.BlastRadius)));
+                        Top(s.Impact).y, Math.Max(0f, s.ImpactAt - now), s.Call.Spec.Kind is StrikeKind.Gas or StrikeKind.Stasis or StrikeKind.Incendiary ? s.Call.Spec.ZoneRadius : s.Call.Spec.BlastRadius)));
                 }
                 if (now < s.ImpactAt) continue;
                 Impact(s, now);
@@ -148,7 +269,7 @@ internal static class Strikes
                 Shells.RemoveAt(i);
                 if (s.Call.Spec.Kind is StrikeKind.Gas or StrikeKind.Stasis or StrikeKind.Incendiary)
                     End(s.Call, DataTag.ZoneEnd);
-                Plugin.Error(s.Call.Spec.Kind + " shell of throw " + s.Call.ThrowId + " failed: " + error);
+                Plugin.Logger.ErrorOnce(s.Call.Spec.Kind + " shell of throw " + s.Call.ThrowId + " failed: " + error);
             }
         }
         for (var i = Zones.Count - 1; i >= 0; i--)
@@ -182,7 +303,17 @@ internal static class Strikes
             {
                 Zones.RemoveAt(i);
                 End(z.Call, DataTag.ZoneEnd);
-                Plugin.Error(z.Call.Spec.Kind + " area of throw " + z.Call.ThrowId + " failed: " + error);
+                Plugin.Logger.ErrorOnce(z.Call.Spec.Kind + " area of throw " + z.Call.ThrowId + " failed: " + error);
+            }
+        }
+        for (var i = Runs.Count - 1; i >= 0; i--)
+        {
+            var run = Runs[i];
+            try { if (RunTick(run, now)) Runs.RemoveAt(i); }
+            catch (Exception error)
+            {
+                Runs.RemoveAt(i);
+                Plugin.Logger.ErrorOnce("Strafing run of throw " + run.Call.ThrowId + " failed: " + error);
             }
         }
         for (var i = Beams.Count - 1; i >= 0; i--)
@@ -207,9 +338,64 @@ internal static class Strikes
             {
                 Beams.RemoveAt(i);
                 End(b.Call, DataTag.BeamEnd);
-                Plugin.Error("Cutting beam of throw " + b.Call.ThrowId + " failed: " + error);
+                Plugin.Logger.ErrorOnce("Cutting beam of throw " + b.Call.ThrowId + " failed: " + error);
             }
         }
+    }
+
+    /// <summary>The laser stays on the largest enemy near the beacon (the next largest when it dies) for the lock's time, then the shell
+    /// drops on it; with no enemy it sweeps around the beacon and gives up. True when the laser is over.</summary>
+    private static bool HuntTick(Hunt h, float now)
+    {
+        var spec = h.Call.Spec;
+        var target = h.Target;
+        // It reaches only the room it landed in: a target that walks out is dropped like a dead one.
+        if (target != null && (target.WasCollected || !target.Alive || target.CourseNode != h.Call.Room))
+        {
+            target = h.Target = null;
+            h.NextScan = 0f;
+            h.GivesUpAt = Math.Max(h.GivesUpAt, now + 1f);
+        }
+        if (target == null && now >= h.NextScan)
+        {
+            h.NextScan = now + BeamScanSeconds;
+            target = h.Target = ArsenalCombat.Largest(h.Beacon, spec.Spread, h.Call.Room);
+            if (target != null) h.LockUntil = Math.Max(h.LockUntil, now + (h.LockUntil <= 0f ? StrikeTiming.HunterLockSeconds : StrikeTiming.HunterRelockSeconds));
+        }
+        if (target == null && now >= h.GivesUpAt)
+        {
+            SendLaser(h, LaserPhase.Abort, h.Beacon + Vector3.up * 0.1f, h.Beacon.y, 0f, now);
+            OrdnanceApi.RefundCall(h.Call.Summoner, h.Call.Definition, StrikeTiming.HunterMissCooldown);
+            return true;
+        }
+        if (target != null && now >= h.LockUntil)
+        {
+            var impact = Ground(target.Position);
+            var drop = StrikeTiming.Pace(StrikeKind.Hunter).Drop;
+            SendLaser(h, LaserPhase.Fire, ForgeCore.Enemies.AimPoint(target), impact.y, drop, now);
+            Shells.Add(new Shell { Call = h.Call, Impact = impact, LaunchAt = now, ImpactAt = now + drop, Target = target });
+            return true;
+        }
+        if (now < h.NextSend) return false;
+        if (target != null)
+        {
+            SendLaser(h, LaserPhase.Lock, ForgeCore.Enemies.AimPoint(target), Ground(target.Position).y, Math.Max(0f, h.LockUntil - now), now);
+            return false;
+        }
+        var angle = now * 2.4f;
+        var sweep = Ground(h.Beacon + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * Math.Min(4f, spec.Spread * 0.25f));
+        SendLaser(h, LaserPhase.Search, sweep + Vector3.up * 0.1f, sweep.y, 0f, now);
+        return false;
+    }
+
+    private static void SendLaser(Hunt h, LaserPhase phase, Vector3 point, float floor, float left, float now)
+    {
+        var dt = now - h.LastSend;
+        var velocity = dt > 0.01f ? (point - h.LastPoint) * (1f / dt) : default;
+        h.LastPoint = point;
+        h.LastSend = now;
+        h.NextSend = now + StrikeTiming.HunterSendSeconds;
+        Send(h.Call, DataTag.Laser, Wire.Laser(new LaserRecord(phase, point.x, point.y, point.z, floor, Top(new Vector3(point.x, floor, point.z)).y, velocity.x, velocity.z, left)));
     }
 
     private static void Impact(Shell s, float now)
@@ -222,17 +408,18 @@ internal static class Strikes
                 PlanZone(s.Call, s.Impact, now);
                 break;
             case StrikeKind.Incendiary:
-                ForgeCore.Combat.Explode(s.Impact, spec.BlastRadius, spec.Damage, spec.Force);
+                ForgeCore.Combat.Explode(s.Impact + Vector3.up * BlastLift, spec.BlastRadius, spec.Damage, spec.Force);
                 PlanZone(s.Call, s.Impact, now);
                 break;
             case StrikeKind.Hunter:
                 var target = s.Target;
-                if (target != null && !target.WasCollected && target.Alive)
+                // The direct hit stays in the room too: during the shell's fall the target may have stepped through a door.
+                if (target != null && !target.WasCollected && target.Alive && (target.CourseNode == s.Call.Room || ForgeCore.Level.HasSight(s.Impact, ForgeCore.Enemies.AimPoint(target))))
                     ForgeCore.Combat.ExplosionDamage(target.Damage, spec.Damage, s.Impact, Vector3.up * spec.Force);
-                ForgeCore.Combat.Explode(s.Impact, spec.BlastRadius, spec.TickDamage, spec.Force);
+                ForgeCore.Combat.AreaDamage(s.Impact, spec.BlastRadius, spec.TickDamage, 0.5f, spec.Force, ForgeCore.BlastLine.FromFloor, s.Call.Room);
                 break;
             default:
-                ForgeCore.Combat.Explode(s.Impact, spec.BlastRadius, spec.Damage, spec.Force);
+                ForgeCore.Combat.Explode(s.Impact + Vector3.up * BlastLift, spec.BlastRadius, spec.Damage, spec.Force);
                 break;
         }
     }
@@ -262,7 +449,7 @@ internal static class Strikes
             var enemy = Candidates[index]!;
             if (ReferenceEquals(enemy, Beam.Blocked) && Now < Beam.BlockedUntil) return false;
             if (!TryRoute(Here, enemy, Beam.Call.Spec.Spread, Beam.Route)) return false;
-            if (ForgeCore.Level.HasSight(Here, AimPoint(enemy))) return true;
+            if (ForgeCore.Level.HasSight(Here, ForgeCore.Enemies.AimPoint(enemy))) return true;
             Beam.Route.Begin();
             return false;
         }
@@ -275,9 +462,6 @@ internal static class Strikes
     }
 
     private static readonly Vector3[] RouteCorners = new Vector3[BeamRoute.Capacity];
-
-    /// <summary>Where the beam looks at an enemy: its aim point, else a metre above its feet.</summary>
-    private static Vector3 AimPoint(EnemyAgent enemy) => enemy.AimTarget != null ? enemy.AimTarget.position : enemy.Position + Vector3.up;
 
     /// <summary>The game's navigation path from the floor point to the enemy (<c>Level.TryRoute</c>, at most <paramref name="maxLength"/>
     /// metres) written into <paramref name="route"/>, which is left empty when there is none or the path has more corners than a route holds.</summary>
@@ -295,6 +479,7 @@ internal static class Strikes
     {
         var found = ForgeCore.Enemies.Near(here, b.Call.Spec.Spread);
         var n = Math.Min(found.Length, DistanceBuffer.Length);
+        if (found.Length > n) Plugin.Logger.ErrorOnce("arsenal-beam-candidates", "A strike beam looked at " + n + " of the " + found.Length + " enemies in reach; the rest were not considered.");
         for (var i = 0; i < n; i++)
         {
             Candidates[i] = found[i];
@@ -369,10 +554,43 @@ internal static class Strikes
         var target = b.Target;
         if (target == null || target.WasCollected || !target.Alive) return;
         var here = new Vector3(b.Route.X, b.Floor, b.Route.Z);
-        if (Flat(target.Position, here) > BeamHitRadius || !ForgeCore.Level.HasSight(here, AimPoint(target))) return;
-        var point = AimPoint(target);
+        if (Flat(target.Position, here) > BeamHitRadius || !ForgeCore.Level.HasSight(here, ForgeCore.Enemies.AimPoint(target))) return;
+        var point = ForgeCore.Enemies.AimPoint(target);
         var direction = (point - b.Top).normalized;
         ForgeCore.Combat.BulletDamage(target.Damage, b.Call.Spec.TickDamage, Alive(b.Call.Source), point, direction, -direction);
+    }
+
+    /// <summary>Every <c>Tick</c> seconds the head has moved on: each enemy standing in the strip between the head's last and new place
+    /// takes one bullet hit through the game's own request (armour, weak spots, replication and hit reactions stay the game's), so every
+    /// enemy is hit once as the head passes. True when the run is over.</summary>
+    private static bool RunTick(Run run, float now)
+    {
+        var spec = run.Call.Spec;
+        if (now < run.NextTick) return false;
+        run.NextTick = now + spec.Tick;
+        var from = run.Along;
+        var to = Math.Min(run.Length, Math.Max(0f, now - run.StartsAt) * spec.Speed);
+        run.Along = to;
+        var mid = run.Origin + run.Direction * ((from + to) * 0.5f);
+        var half = spec.Width * 0.5f;
+        var radius = MathF.Sqrt((to - from) * (to - from) * 0.25f + half * half + RunReachHeight * RunReachHeight) + 0.5f;
+        var source = Alive(run.Call.Source);
+        foreach (var enemy in ForgeCore.Enemies.Near(mid, radius))
+        {
+            if (enemy == null || !enemy.Alive) continue;
+            var offset = enemy.Position - run.Origin;
+            var along = Vector3.Dot(offset, run.Direction);
+            if (along < from || along >= to && to < run.Length) continue;
+            if (along > run.Length) continue;
+            var lateral = run.Direction.z * offset.x - run.Direction.x * offset.z;
+            if (MathF.Abs(lateral) > half || MathF.Abs(offset.y) > RunReachHeight) continue;
+            var point = ForgeCore.Enemies.AimPoint(enemy);
+            // The strip is drawn on the floor of its own room: one standing beside it behind a wall is not in it.
+            if (!ForgeCore.Level.HasSight(run.Origin + run.Direction * along, point)) continue;
+            if (!run.Hit.Add(enemy.GetInstanceID())) continue;
+            ForgeCore.Combat.BulletDamage(enemy.Damage, spec.Damage, source, point, Vector3.down, Vector3.up);
+        }
+        return to >= run.Length;
     }
 
     private static PlayerAgent? Alive(PlayerAgent? player) => player == null || player.WasCollected ? null : player;
@@ -394,26 +612,12 @@ internal static class Strikes
         OrdnanceApi.ClearState(StrikeSpec.TypeName, call.Summoner, call.ThrowId);
     }
 
-    private static EnemyAgent? LargestNear(Vector3 centre, float radius)
-    {
-        var enemies = ForgeCore.Enemies.Near(centre, radius);
-        var n = Math.Min(enemies.Length, HealthBuffer.Length);
-        for (var i = 0; i < n; i++)
-        {
-            HealthBuffer[i] = enemies[i]!.Damage.HealthMax;
-            DistanceBuffer[i] = (enemies[i]!.Position - centre).magnitude;
-        }
-        var best = Targeting.Largest(HealthBuffer.AsSpan(0, n), DistanceBuffer.AsSpan(0, n));
-        return best < 0 ? null : enemies[best];
-    }
-
     /// <summary>The floor under a point. The downward ray starts at most 3 m up and always below whatever is overhead, so a
     /// low ceiling (indoors, corridors) is never taken for the floor; without a floor within 9 m below, the point itself.</summary>
     internal static Vector3 Ground(Vector3 point)
     {
-        var lift = 3f;
-        if (Physics.Raycast(point + Vector3.up * 0.1f, Vector3.up, out var roof, 2.9f, LayerManager.MASK_WORLD, QueryTriggerInteraction.Ignore))
-            lift = Math.Max(0.1f, roof.point.y - point.y - 0.15f);
+        var lift = ForgeCore.Level.LiftUnderRoof(point, 3f, 0.1f);
+
         return ForgeCore.Level.FloorBelow(point + Vector3.up * lift, lift + 9f, out var hit) ? hit.point : point;
     }
 
@@ -428,5 +632,8 @@ internal static class Strikes
         Shells.Clear();
         Zones.Clear();
         Beams.Clear();
+        Runs.Clear();
+        Hunts.Clear();
+        Facing.Clear();
     }
 }

@@ -1,0 +1,306 @@
+{
+ "Slots": {
+  "foam.rise": {
+   "Item": "Recipe_rise_foam_a49276",
+   "Scale": 1.3,
+   "AxisUp": true
+  },
+  "foam.spray": {
+   "Item": "Compose_foam_spray_f91ab52e",
+   "Scale": 1.0,
+   "Size": 2.72,
+   "Seconds": 0.33,
+   "AxisUp": true
+  },
+  "heavy.amr.muzzle": {
+   "Item": "War_FX_c888f0c9_50dafc",
+   "Scale": 0.2826,
+   "Seconds": 0.12,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.6902,
+     0.3765
+    ],
+    "Range": 3.5,
+    "Peak": 5,
+    "Life": 0.08,
+    "Flicker": 0.15
+   }
+  },
+  "heavy.gl.muzzle": {
+   "Item": "War_FX_b0a227fc_50dafc",
+   "Scale": 0.3893,
+   "Seconds": 0.12,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.6902,
+     0.3765
+    ],
+    "Range": 2.5,
+    "Peak": 3,
+    "Life": 0.06,
+    "Flicker": 0.15
+   }
+  },
+  "heavy.mg.muzzle": {
+   "Item": "War_FX_c888f0c9_50dafc",
+   "Scale": 0.2569,
+   "Seconds": 0.12,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.6902,
+     0.3765
+    ],
+    "Range": 2.5,
+    "Peak": 3,
+    "Life": 0.05,
+    "Flicker": 0.2
+   }
+  },
+  "light.tower": {
+   "None": true
+  },
+  "mine.arm": {
+   "Item": "Recipe_arm_blink_38e618",
+   "Scale": 1,
+   "AxisUp": true,
+   "Copies": 40
+  },
+  "mine.blast": {
+   "AlwaysDraw": true,
+   "Item": "Compose_mine_blast_117908c2",
+   "Scale": 1.0,
+   "Size": 14,
+   "AxisUp": true,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.6471,
+     0.3216
+    ],
+    "Range": 6,
+    "Peak": 5,
+    "Life": 0.25,
+    "Flicker": 0.15
+   }
+  },
+  "mine.rise": {
+   "Item": "Recipe_rise_mine_29565b",
+   "Scale": 1.3,
+   "AxisUp": true
+  },
+  "mine.scatter": {
+   "Item": "Recipe_scatter_pop_0e2aa3",
+   "Scale": 1,
+   "AxisUp": true
+  },
+  "rocket.backblast": {
+   "Item": "Compose_rocket_backblast_fc476332",
+   "Scale": 1.0,
+   "Seconds": 0.12,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.6471,
+     0.3216
+    ],
+    "Range": 4,
+    "Peak": 4,
+    "Life": 0.15
+   }
+  },
+  "rocket.blast": {
+   "AlwaysDraw": true,
+   "Item": "Compose_rocket_blast_4091601f",
+   "Scale": 1.1086,
+   "AxisUp": true,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.6471,
+     0.3216
+    ],
+    "Range": 8,
+    "Peak": 6,
+    "Life": 0.45,
+    "Flicker": 0.15
+   }
+  },
+  "rocket.muzzle": {
+   "Item": "War_FX_c888f0c9_50dafc",
+   "Scale": 0.274,
+   "Seconds": 0.12,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.6471,
+     0.3216
+    ],
+    "Range": 3,
+    "Peak": 4,
+    "Life": 0.08,
+    "Flicker": 0.15
+   }
+  },
+  "scan.sweep": {
+   "None": true
+  },
+  "strike.beam": {
+   "Item": "Recipe_strike_beam_fb6006",
+   "Line": true,
+   "Hold": 0.15,
+   "Scale": 1,
+   "Size": 1
+  },
+  "strike.beam.burn": {
+   "Item": "Recipe_beam_burn_4fecd1",
+   "Scale": 1,
+   "AxisUp": true
+  },
+  "strike.beam.charge": {
+   "Item": "Compose_strike_beam_charge_e81a4c98",
+   "Scale": 0.1881,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.4157,
+     0.2275
+    ],
+    "Range": 5,
+    "Peak": 3,
+    "Life": 0.6,
+    "Flicker": 0.1
+   }
+  },
+  "strike.big": {
+   "AlwaysDraw": true,
+   "Item": "Compose_strike_big_1d545138",
+   "Scale": 2.1,
+   "Size": 7.2,
+   "AxisUp": true
+  },
+  "strike.cluster": {
+   "AlwaysDraw": true,
+   "Item": "Compose_strike_cluster_5fb1457e",
+   "Scale": 0.7,
+   "Size": 7,
+   "AxisUp": true
+  },
+  "strike.fire": {
+   "AlwaysDraw": true,
+   "Item": "Inferno_VFX_493501c2_5023de",
+   "Hold": 0.15,
+   "Size": 10,
+   "AxisUp": true
+  },
+  "strike.gas.burst": {
+   "Item": "Recipe_gas_burst_d61e67_fe6b1f",
+   "Scale": 1,
+   "Size": 1,
+   "AxisUp": true
+  },
+  "strike.gas.cloud": {
+   "AlwaysDraw": true,
+   "Item": "Master_MagicFX_Bundle_1_2f6a8959_105d18",
+   "Hold": 0.15,
+   "Size": 8.4,
+   "AxisUp": true
+  },
+  "strike.hunter": {
+   "Item": "Compose_strike_hunter_1417f637",
+   "Hold": 0.15,
+   "Scale": 0.2991
+  },
+  "strike.incendiary": {
+   "AlwaysDraw": true,
+   "Item": "Compose_strike_incendiary_b8de9da5",
+   "Scale": 1.41,
+   "Size": 12,
+   "Seconds": 0.33,
+   "AxisUp": true
+  },
+  "strike.return": {
+   "Item": "Recipe_return_glint_5da3ce",
+   "Scale": 1
+  },
+  "strike.shell": {
+   "Item": "Compose_strike_shell_fe6b3ed3",
+   "Hold": 0.15,
+   "Scale": 0.4547
+  },
+  "strike.small": {
+   "AlwaysDraw": true,
+   "Item": "Compose_strike_small_cd9d84a6",
+   "Scale": 1.6,
+   "Size": 6.075,
+   "AxisUp": true
+  },
+  "strike.stasis.field": {
+   "AlwaysDraw": true,
+   "None": true
+  },
+  "strike.stasis.pulse": {
+   "Item": "Recipe_pulse_ring_f867ee",
+   "Scale": 1,
+   "Size": 1,
+   "AxisUp": true
+  },
+  "strike.stasis.slow": {
+   "None": true
+  },
+  "strike.strafe": {
+   "AlwaysDraw": true,
+   "Item": "Compose_strike_strafe_235e6e3e",
+   "Scale": 0.5,
+   "AxisUp": true
+  },
+  "turret.rapid.muzzle": {
+   "Item": "War_FX_c888f0c9_50dafc",
+   "Scale": 0.5995,
+   "Seconds": 0.12,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.6902,
+     0.3765
+    ],
+    "Range": 2,
+    "Peak": 2.5,
+    "Life": 0.04
+   }
+  },
+  "turret.shotgun.muzzle": {
+   "Item": "Compose_turret_shotgun_muzzle_83c0de93",
+   "Scale": 0.8564,
+   "Seconds": 0.12,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.6902,
+     0.3765
+    ],
+    "Range": 2.5,
+    "Peak": 3.5,
+    "Life": 0.06
+   }
+  },
+  "turret.sniper.muzzle": {
+   "Item": "Compose_turret_sniper_muzzle_a621fef2",
+   "Scale": 1.1133,
+   "Seconds": 0.12,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.6902,
+     0.3765
+    ],
+    "Range": 3,
+    "Peak": 4,
+    "Life": 0.08
+   }
+  }
+ }
+}

@@ -1,0 +1,68 @@
+{
+  "format": "forge-gun-sights",
+  "schemaVersion": "1.0.0",
+  "about": "Which ForgeVisual sight (Data/sights.json) each heavy weapon model wears (ForgeVisual GunSights, embedded). at is where the middle of the sight's base stands, in the model's export frame (front -Z, metres, model size): on the highest part of the gun under the base, the line through the window clear of the gun from 0.3 m behind it. replace names the model's own sight parts it takes the place of.",
+  "models": {
+    "heavy-mg": {
+      "sight": "holo-1x",
+      "at": [
+        0.0,
+        0.0797,
+        -0.1
+      ],
+      "replace": [
+        "sight",
+        "reticle"
+      ],
+      "about": "holographic 1x: the wide window finds targets fast while the machine gun sweeps; in place of the download's reflex sight"
+    },
+    "anti-materiel-rifle": {
+      "sight": "scope-2x",
+      "at": [
+        0.0,
+        0.1464,
+        -0.07
+      ],
+      "replace": [
+        "sight",
+        "reticle"
+      ],
+      "about": "2x prism scope: the precision rifle shoots far; its aim had a sniper's zoom behind an open reflex sight"
+    },
+    "grenade-launcher": {
+      "sight": "red-dot-1x",
+      "at": [
+        0.0,
+        0.1014,
+        -0.14
+      ],
+      "replace": [
+        "sight",
+        "reticle"
+      ],
+      "about": "red dot 1x: small, keeps the drum and tube in view for lobbed shots; in place of the download's reflex sight (1.4 cm back, where the top tube carries the whole base)"
+    },
+    "recoilless": {
+      "sight": "red-dot-1x",
+      "at": [
+        0.0,
+        0.2365,
+        -0.035
+      ],
+      "about": "red dot 1x on the top block: the tube had no optic and its SightLook floated 7 cm left of the tube, so aiming looked past the tube's edge at nothing"
+    },
+    "tracking-rifle": {
+      "sight": "holo-1x",
+      "at": [
+        0.0,
+        0.112,
+        -0.151
+      ],
+      "replace": [
+        "sight",
+        "reticle"
+      ],
+      "about": "holographic 1x: the homing rifle locks on, it needs a wide view more than magnification"
+    }
+  }
+}

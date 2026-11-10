@@ -1,6 +1,6 @@
 # Reads the game's own supply pickups out of its asset files (UnityPy) into --out as <kind>.obj + <kind>.json + the albedo pngs, for
 # tools/render_icon.py's supply layout. Kinds follow the item data blocks Arsenal pods deliver: ammo (101), medi (102), tool (127),
-# disinfect (132), cfoam (115). The files are local working copies of game assets: they stay out of Git and out of every package.
+# disinfect (132), cfoam (115), syringe (140), meleesyringe (142), tripmine (139), foammine (144), fogrepeller (117), lockmelter (116). The files are local working copies of game assets: they stay out of Git and out of every package.
 # Run by build_icons.ps1 with PYTHONPATH set to a folder holding UnityPy:  python extract_pickups.py --game <GTFO_Data> --out <dir>
 #
 # Every active mesh renderer under the pickup prefab is taken with its whole transform chain and every sub-mesh with its own material
@@ -119,3 +119,9 @@ export("ammo", "sharedassets16.assets", 181)  # AmmoPackWeaponPickup
 export("tool", "sharedassets16.assets", 138)  # AmmoPackToolPickup
 export("disinfect", "sharedassets16.assets", 137)  # DisinfectonPackPickup
 export("cfoam", "sharedassets7.assets", 120)  # Consumable_GlueGrenade_Pickup: grenade body, lug, pin, switch, trigger and the foam payload canister
+export("syringe", "sharedassets6.assets", 223)  # Consumable_Syringe_Health_Pickup (item 140)
+export("meleesyringe", "sharedassets6.assets", 224)  # Consumable_Syringe_MeleeBuff_Pickup (item 142)
+export("tripmine", "sharedassets9.assets", 207)  # Consumable_Tripmine_Pickup (item 139)
+export("foammine", "sharedassets9.assets", 205)  # Consumable_Tripmine_Glue_Pickup (item 144)
+export("fogrepeller", "sharedassets9.assets", 154)  # Consumable_FogRepeller_Pickup (item 117)
+export("lockmelter", "sharedassets8.assets", 23)  # Consumable_LockMelter_Pickup (item 116)

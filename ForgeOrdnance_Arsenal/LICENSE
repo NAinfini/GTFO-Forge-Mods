@@ -24,27 +24,18 @@ SOFTWARE.
 
 Third-party assets
 
-Models, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), re-oriented, scaled and re-exported for the game:
-- "M249 Machine Gun [Game-ready Download]" by Oskar "K1TT3N" Adamczyk
-  (https://sketchfab.com/3d-models/m249-machine-gun-game-ready-download-631d0a61696a4703914d6b598b47505a), modified:
-  scope replaced with the reflex sight below, carry handle folded, mesh reduced
-- "Barrett M82 Baked/Textured" by Shariff Butler Jr.
-  (https://sketchfab.com/3d-models/barrett-m82-bakedtextured-416849efe5cb454a8e538188d5a300d1), modified:
-  scope replaced with the reflex sight below
+Gun models, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), re-oriented, scaled and re-exported for the game:
 - "RG-6 Grenade Launcher" by Sassiska
   (https://sketchfab.com/3d-models/rg-6-grenade-launcher-d911c28d568c4dec838d67760f323d98), modified:
   leaf and front sights removed, the reflex sight below added
-- "Artillery Shell" by SomeGuyUsingBlender
-- "Low-Poly VOG-25 and VOG-25P" by notcplkerry
-- "SciFi Cylinder Canisters" by Billy Jackman
-- "Combat Turret" by Danila
-- "Sci-fi Turret 3" by everlasting17th
-- "Sci-Fi Turret" by JonasDelnaye
 
-Reflex sight on the three heavy weapons, CC0 (https://creativecommons.org/publicdomain/zero/1.0/):
+Gun models, CC0 1.0 on the project owner's statement of 2026-11-05 (no author or page is recorded in the downloads):
+- Minimi, B&T SPR 300 and Honey Badger: reflex sight fitted, sights, handles and optics removed, SPR 300 mesh reduced
+
+Reflex sight on the four guns, CC0 (https://creativecommons.org/publicdomain/zero/1.0/):
 - "Red Dot Sight" by Jean PFP (https://opengameart.org/content/red-dot-sight), recoloured, red dot added
 
-The stasis emitter is this mod's own model.
+The shells, bomblet, rocket, 40 mm grenade, gas canister, stasis emitter, mines, recoilless rifle, turrets, dispenser, radar and floodlight were generated for this project by its owner with Tripo (paid membership).
 
 Effect textures:
 - Kenney Particle Pack (CC0)
@@ -59,4 +50,4 @@ Sounds, converted for the game:
 - "Sci-fi Grenade Launcher" by ValhallaProject, CC BY 4.0 (https://freesound.org/people/ValhallaProject/sounds/771167/)
 - "2 High Quality Explosions" by Michel Baradari, apollo-music.de, CC BY 3.0 (https://opengameart.org/content/2-high-quality-explosions)
 
-Every clip and its source is listed in `Audio/License.txt`; every model and texture in `Models/License.txt`.
+Every clip and its source is listed in `Audio/LICENSE.forge`; every model and texture in `Models/LICENSE.forge`.

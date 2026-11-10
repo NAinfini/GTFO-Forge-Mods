@@ -1,15 +1,14 @@
-using System;
 using ForgeVisual;
 using UnityEngine;
 
 namespace ForgeOrdnanceArsenal;
 
 /// <summary>
-/// The strike effects themselves, one method per moment: what each draws is a set of sprites for ForgeVisual's shared pool
-/// (<see cref="SpritePool"/>) and flat marks for its decal rings, with Arsenal's own sheets, colours, sizes and timings. Each states its
-/// particle budget (live sprites at the peak, plus long-lived decals from their own rings). They only read the numbers they are
-/// given, so every peer shows the same event from the same host data; the one thing that must agree between peers (where a cluster
-/// bomblet's sparklets land) is decided by the caller from the call's seed. Purely visual and local.
+/// The strike effects themselves, one method per moment: the library effect of the moment's slot (<see cref="ArsenalFxSlots"/>; a slot the
+/// table does not list logs its error and draws nothing, no moment has a second look) and what the library does not draw: the warnings, light
+/// flashes, reach rings, scorch marks and a bomblet's small blast, as sprites for ForgeVisual's shared pool (<see cref="SpritePool"/>) and flat
+/// marks for its decal rings, with Arsenal's own sheets. They only read the numbers they are given, so every peer shows the same event from
+/// the same host data. Purely visual and local.
 /// </summary>
 internal static class StrikeFx
 {
@@ -17,20 +16,41 @@ internal static class StrikeFx
     /// <summary>The soft smoke sheet is faint by itself (its alpha peaks low); every smoke tint's alpha is multiplied by this and
     /// the blend clamps it at 1.</summary>
     private const float SmokeGain = 2.4f;
-    private const int ScorchCount = 6, MarkCount = 48;
+    private const int MarkCount = 48;
+    /// <summary>Where the ring sheet's bright band lies, as a share of the sprite's half width (tools/make_fx_textures.py): a ring of radius R is a sprite 2R / this across.</summary>
+    private const float RingRim = 0.84f;
 
-    private static readonly Color Smoke0 = new(0.74f, 0.72f, 0.7f, 0.7f), Smoke1 = new(0.78f, 0.77f, 0.75f, 0f);
-    private static readonly Color Soot0 = new(0.52f, 0.5f, 0.48f, 0.85f), Soot1 = new(0.66f, 0.64f, 0.6f, 0f);
     private static readonly Color Dust0 = new(0.7f, 0.62f, 0.5f, 0.75f), Dust1 = new(0.72f, 0.65f, 0.54f, 0f);
     private static readonly Color Hot0 = new(1f, 0.85f, 0.55f, 1f), Hot1 = new(1f, 0.4f, 0.08f, 0f);
     private static readonly Color Scorch0 = new(0.035f, 0.03f, 0.028f, 0.82f), Scorch1 = new(0.05f, 0.045f, 0.04f, 0f);
     private static readonly Color White = new(1f, 1f, 1f, 1f);
-    private static readonly SpriteEnd PopAt = Pop;
 
     private static ArsenalSheets _sheets = null!;
-    private static DecalRing? _scorches, _marks;
+    private static DecalRing? _marks;
+    private const float ShakeRange = 35f;
+    /// <summary>The camera shake of a landing, by weight.</summary>
+    private static readonly ShakeSpec BigShake = new(0.6f, ShakeRange, 0.6f, 20f), ShellShake = new(0.35f, ShakeRange, 0.6f, 20f), ClusterShake = new(0.2f, ShakeRange, 0.6f, 20f);
+    /// <summary>The landings ForgeVisual's <see cref="Impacts"/> plays whole (the library effect, the light, the scorch on the shared marks and the camera shake), one look per kind.</summary>
+    private static ImpactLook? _big, _small, _fire, _gas;
 
     internal static bool Ready => _sheets != null;
+
+    /// <summary>A straight line of light as one sprite that lives <paramref name="life"/> seconds: from <paramref name="from"/> to
+    /// <paramref name="to"/>, <paramref name="width"/> metres wide, turned toward the camera, keeping <paramref name="colour0"/> for the first
+    /// <paramref name="hold"/> of its life and then fading to <paramref name="colour1"/>.</summary>
+    private static void Line(SpriteSheet sheet, Vector3 from, Vector3 to, float width, float life, Color colour0, Color colour1, float hold = 0f)
+    {
+        var along = to - from;
+        var length = along.magnitude;
+        if (length < 1e-3f || width <= 0f) return;
+        var s = SpriteSpawn.Of(sheet, SpriteFace.Streak, to, life, width, width, colour0, colour1);
+        // A speed far too small to see only gives the streak its direction.
+        s.Velocity = along * (0.01f / length);
+        s.Aspect = length / width;
+        s.Hold = hold;
+        s.FadeIn = 0.03f;
+        SpritePool.Emit(in s);
+    }
 
     internal static void Init(ArsenalSheets sheets) => _sheets = sheets;
 
@@ -84,14 +104,34 @@ internal static class StrikeFx
 
     private static void Flash(Vector3 at, Color colour, float range, float peak, float life)
     {
-        if (Plugin.ExtraLights.Value) PointLights.Flash(at, new PointLightSpec(colour, range, peak, life, 0f), Time.time);
+        PointLights.Flash(at, new PointLightSpec(colour, range, peak, life, 0f), Time.time);
     }
 
-    /// <summary>A long-lived flat mark from the ring of scorches or of beam burns (the oldest of its own ring is replaced, so
+    /// <summary>The look of one kind of landing, made again only when its library effect changed: <paramref name="fx"/> at <paramref name="fxSize"/> metres times the play's scale, the light a flash <paramref name="lift"/> metres up,
+    /// a scorch of <paramref name="decalSize"/> metres times the scale that stays <paramref name="decalLife"/> s (full for its first <paramref name="decalHold"/> share), and the shake.</summary>
+    private static ImpactLook Look(ref ImpactLook? look, FxHandle? fx, float fxSize, in PointLightSpec light, float lift, ShakeSpec shake, float decalSize = 0f, float decalLife = 0f, float decalHold = 0f)
+    {
+        if (look != null && ReferenceEquals(look.Fx, fx)) return look;
+        return look = new ImpactLook
+        {
+            Fx = fx,
+            FxSize = fxSize,
+            Light = light,
+            LightLift = lift,
+            Shake = shake,
+            Decal = decalSize > 0f ? _sheets.Scorch : null,
+            DecalSize = decalSize,
+            DecalLife = decalLife,
+            DecalFade = decalLife * (1f - decalHold),
+            DecalColour = Scorch0,
+        };
+    }
+
+    /// <summary>A long-lived flat mark from the ring of beam burns or, with <paramref name="beamMark"/> false, the shared marks (the oldest of its ring is replaced, so
     /// marks never starve the transient sprites and never grow).</summary>
     private static void Decal(bool beamMark, Vector3 pos, Vector3 normal, float life, float size, Color c0, Color c1, float hold)
     {
-        var ring = beamMark ? _marks ??= SpritePool.CreateDecals(MarkCount) : _scorches ??= SpritePool.CreateDecals(ScorchCount);
+        var ring = beamMark ? Rings(ref _marks, MarkCount) : ForgeVisual.Decals.Shared;
         if (ring == null) return;
         var s = SpriteSpawn.Of(_sheets.Scorch, SpriteFace.Floor, pos, life, size, size, c0, c1);
         s.Normal = normal;
@@ -103,109 +143,132 @@ internal static class StrikeFx
     /// <summary>Makes the decal rings now (level load) instead of in the first strike's frame.</summary>
     internal static void Prepare()
     {
-        _scorches ??= SpritePool.CreateDecals(ScorchCount);
-        _marks ??= SpritePool.CreateDecals(MarkCount);
+        Rings(ref _marks, MarkCount);
     }
+
+    /// <summary>The ring kept in <paramref name="ring"/>, made once and kept across levels (ForgeVisual's pool keeps it and clears its marks
+    /// with the level); made again only when the pool was rebuilt and its quads are gone.</summary>
+    private static DecalRing? Rings(ref DecalRing? ring, int capacity)
+        => ring is { Alive: true } ? ring : ring = SpritePool.CreateDecals(capacity);
 
     /// <summary>Draws one barely visible, tiny sprite of every sheet at <paramref name="at"/> (in front of the camera) for a moment, so
     /// the first real strike does not pay for the GPU's first use of each material in its landing frame.</summary>
     internal static void Warm(Vector3 at) => SpritePool.Warm(at, _sheets.All);
 
-    /// <summary>Forgets the decal rings (ForgeVisual rebuilt its pool); the next mark makes new ones.</summary>
-    internal static void Reset() => _scorches = _marks = null;
-
     private static Vector3 Settle(Vector3 at, out Vector3 normal) => SpritePool.Settle(at, out normal);
 
-    // ---- shell falling: smoke trail and tail flame ---------------------------------------------------------------------
+    // ---- warning: where it lands ---------------------------------------------------------------------------------------
 
-    /// <summary>The look of a falling shell's trail at <paramref name="scale"/>: a looping flame flipbook, base at the shell, tip
-    /// trailing up the way it came, a glow, and a grey smoke band (a bomblet's band is a quarter as dense: a cluster strike has ten
-    /// falling at once).</summary>
-    internal static TrailStyle ShellTrail(float scale) => new()
+    /// <summary>The colour a kind's warning and dropped tracer are drawn in.</summary>
+    internal static Color WarnColour(StrikeKind kind) => kind switch
     {
-        Flame = _sheets.Flame, FlameFps = 30f, FlameSize = 0.55f * scale, FlameAspect = 2.2f, FlameGrowth = 1.3f, FlameColour = new Color(1f, 0.85f, 0.6f, 1f),
-        Glow = _sheets.Glow, GlowSize = 0.9f * scale, GlowColour = new Color(1f, 0.6f, 0.25f, 0.7f),
-        HeadBack = 0.25f * scale, Flicker = 0.15f,
-        Puffs = new[]
-        {
-            new TrailPuff
-            {
-                Sheet = _sheets.Smoke, PerSecond = scale < 0.6f ? 1f / 0.28f : 1f / 0.07f, Offset = Vector3.up * (0.95f * scale),
-                Velocity = new Vector3(0f, 0.3f, 0f), VelocityJitter = new Vector3(0.25f, 0.2f, 0.25f),
-                Size = 0.75f * scale, SizeEnd = 1.9f / 0.75f, Life = 1.25f, LifeJitter = 0.12f,
-                Colour0 = new Color(Smoke0.r, Smoke0.g, Smoke0.b, Smoke0.a * SmokeGain), Colour1 = new Color(Smoke1.r, Smoke1.g, Smoke1.b, 0f),
-                Drag = 1.2f, Flip = true, Spin = 25f * Deg,
-            },
-        },
+        StrikeKind.Gas => new Color(0.55f, 1f, 0.3f, 1f),
+        StrikeKind.Stasis => new Color(0.4f, 0.8f, 1f, 1f),
+        StrikeKind.Incendiary => new Color(1f, 0.45f, 0.1f, 1f),
+        StrikeKind.Precision => new Color(1f, 0.16f, 0.1f, 1f),
+        _ => new Color(1f, 0.6f, 0.15f, 1f),
     };
 
-    // ---- big blast: shockwave, fireball, smoke column, scorch ----------------------------------------------------------
+    /// <summary>A shell's warning for <paramref name="seconds"/>: a ring standing at exactly the shell's reach and a glow filling it from the middle, so the rim says how far and the fill says
+    /// how soon; a single shell (not a barrage) also a line of light along the way it will come. An incendiary shell has no fill: an orange glow on the floor reads as the fire itself
+    /// before the shell has landed. 2 sprites, 3 with the line.</summary>
+    internal static void Warn(StrikeKind kind, Vector3 at, Vector3 from, float radius, float seconds)
+    {
+        var ground = Settle(at, out var normal);
+        var colour = WarnColour(kind);
+        var fade = new Color(colour.r, colour.g, colour.b, 0f);
+        var across = Mathf.Max(radius, 0.5f) * 2f / RingRim;
+        var rim = Quad(_sheets.Ring, SpriteFace.Floor, ground + normal * 0.05f, Vector3.zero, seconds, across, across, colour, fade);
+        rim.Normal = normal;
+        rim.Hold = 0.9f;
+        rim.FadeIn = 0.04f;
+        SpritePool.Emit(in rim);
+        if (kind != StrikeKind.Incendiary)
+        {
+            var fill = Quad(_sheets.Glow, SpriteFace.Floor, ground + normal * 0.07f, Vector3.zero, seconds, across * 0.1f, across * 0.95f, new Color(colour.r, colour.g, colour.b, 0.55f), new Color(colour.r, colour.g, colour.b, 0.2f));
+            fill.Normal = normal;
+            SpritePool.Emit(in fill);
+        }
+        if (kind is StrikeKind.Area or StrikeKind.Creeping or StrikeKind.Cluster) return;
+        Line(_sheets.Streak, ground, from, 0.14f, seconds, new Color(colour.r, colour.g, colour.b, 0.8f), fade, 0.85f);
+    }
 
-    /// <summary>The big shell's explosion: a white shockwave ring running out over the floor, a flash, a flipbook explosion with
-    /// a fireball inside it, a column of smoke that climbs to about 8 m and mushrooms out at the top, a dust ring and a scorch
-    /// mark that stays. Peak about 1 flash + 1 explosion + 1 fireball + 1 ring + 8 dust + 14 column = 26 sprites for 4 s, plus 1
-    /// scorch of its ring of 6 (stays 24 s).</summary>
+    // ---- shell falling --------------------------------------------------------------------------------------------------
+
+    /// <summary>A dropped canister's or emitter's trail: only a tracer and a glow in <paramref name="colour"/>.</summary>
+    internal static TrailStyle DropTrail(Color colour) => new()
+    {
+        Glow = _sheets.Glow,
+        GlowSize = 0.9f,
+        GlowColour = new Color(colour.r, colour.g, colour.b, 0.7f),
+        HeadBack = 0.1f,
+        Flicker = 0.1f,
+        RibbonPoints = 9,
+        RibbonWidth = 0.22f,
+        RibbonHead = new Color(colour.r, colour.g, colour.b, 1f),
+        RibbonTail = new Color(colour.r, colour.g, colour.b, 0f),
+        RibbonBlend = FxBlend.Additive,
+    };
+
+    // ---- big blast -------------------------------------------------------------------------------------------------------
+
+    /// <summary>The blow of a big shell: a column of white light up the way it came, gone in a quarter second. 2 sprites.</summary>
+    internal static void ImpactColumn(Vector3 at, Vector3 from, float radius)
+    {
+        var ground = Settle(at, out _);
+        var width = Mathf.Clamp(radius, 2f, 9f) * 0.35f;
+        var up = from;
+        Line(_sheets.Streak, ground, up, width, 0.28f, new Color(1f, 0.92f, 0.75f, 1f), new Color(1f, 0.5f, 0.2f, 0f));
+        Line(_sheets.Streak, ground, up, width * 0.3f, 0.16f, White, new Color(1f, 1f, 1f, 0f));
+    }
+
+    /// <summary>The big shell's explosion: a light flash, the library's blast (its fireball about four fifths of the blast's width; a barrage shell's is two thirds: the heavy shell must not
+    /// look the smaller), a ring running out to exactly its reach and a scorch mark that stays 24 s (1 of a ring of 6).</summary>
     internal static void BigBlast(Vector3 at, float radius)
     {
         var ground = Settle(at, out var normal);
         var s = Mathf.Clamp(radius, 2f, 9f);
-        Flash(at + Vector3.up * 1.2f, new Color(1f, 0.7f, 0.35f), s * 2.6f, 7f, 0.5f);
-        Flipbook(_sheets.Flash, ground + Vector3.up * s * 0.35f, Vector3.zero, 0.4f, s * 1.6f, s * 3.4f, White, new Color(1f, 0.8f, 0.5f, 0f));
-        // The explosion flipbook (fireball into smoke) and, over its first second, a hotter fireball inside it.
-        Flipbook(_sheets.Blast, ground + Vector3.up * s * 0.9f, Vector3.up * 0.4f, 0.9f, s * 2.6f, s * 3.2f, White, new Color(1f, 0.75f, 0.5f, 0f), 0f, 0.5f, Range(-6f, 6f) * Deg, 7);
-        Flipbook(_sheets.Fireball, ground + Vector3.up * s * 0.55f, Vector3.up * 0.8f, 1.1f, s * 1.5f, s * 2.6f, new Color(1f, 0.85f, 0.6f, 1f), new Color(1f, 0.55f, 0.25f, 0f), 0f, 0.8f, Range(-20f, 20f) * Deg);
-        Ring(ground, normal, 0.6f, 0.8f, s * 4.4f, new Color(1f, 0.97f, 0.9f, 0.95f), new Color(1f, 0.93f, 0.85f, 0f));
-        for (var i = 0; i < 8; i++)
-        {
-            var a = i * 0.7854f + Range(-0.2f, 0.2f);
-            Smoke(ground + Radial(a) * (0.35f * s) + Vector3.up * 0.5f, Radial(a) * (s * Range(1.4f, 2.0f)) + Vector3.up * 0.4f, Range(1.2f, 1.7f),
-                0.8f * s, 1.9f * s, Dust0, Dust1, 0f, 1.9f, Range(-20f, 20f) * Deg);
-        }
-        const int puffs = 14;
-        for (var i = 0; i < puffs; i++)
-        {
-            var f = i / (float)(puffs - 1);
-            var height = Mathf.Lerp(1.8f, 8f, f);
-            var vel = Vector3.up * (height * 0.9f);
-            // The top of the column mushrooms: its last puffs also push outward.
-            if (f > 0.6f) vel += Radial(Rnd() * 6.2832f) * ((f - 0.55f) * 6.5f);
-            Smoke(ground + Radial(Rnd() * 6.2832f) * Range(0f, 0.4f) + Vector3.up * 0.4f, vel, Range(3.4f, 4.2f),
-                s * 0.65f, s * (1.15f + 0.9f * f), Soot0, Soot1, 0.3f + 0.04f * i, 0.9f, Range(-12f, 12f) * Deg);
-        }
-        Decal(false, ground, normal, 24f, s * 1.7f, Scorch0, Scorch1, 0.65f);
+        // The light reaches 13 m at a 5 m blast and shines the stronger the wider the blast.
+        Impacts.Play(Look(ref _big, ArsenalFxSlots.BigBlast, 1.6f, new PointLightSpec(new Color(1f, 0.7f, 0.35f), 13f, 7f, 0.5f, 0f), 1.2f, BigShake, 1.7f, 24f, 0.65f), ground, normal, s, Mathf.Clamp(s / 5f, 0.5f, 1.8f));
+        // Only the effect's size is held to what the library draws well; the ring is the real reach, so a larger authored radius shows where it hurts.
+        ReachRing(ground, normal, radius);
     }
 
-    // ---- small blast: dust ring and sparks -----------------------------------------------------------------------------
+    /// <summary>The blast's edge: a thin ring running out to exactly <paramref name="radius"/> and fading there. 1 sprite for 0.45 s.</summary>
+    private static void ReachRing(Vector3 ground, Vector3 normal, float radius)
+        => Ring(ground + normal * 0.05f, normal, 0.45f, 1f, radius * 2f / RingRim, new Color(1f, 0.92f, 0.78f, 0.75f), new Color(1f, 0.85f, 0.65f, 0f));
 
-    /// <summary>The small shell's explosion: a fireball flipbook (no smoke frames), a soft dust ring, a low dust ring, a short burst of
-    /// sparks, a faint scorch. Peak 1 explosion + 1 flash + 8 dust + 8 sparks + 2 smoke = 20 sprites for 1.5 s, plus 1 scorch.
-    /// A cluster bomblet's blast (<paramref name="cluster"/>, ten of them within a second or two) is the fireball, 2 dust and 2 sparks:
-    /// 5 sprites, no flash light and no scorch (the strike has one of each at its centre, <see cref="ClusterCentre"/>).</summary>
-    internal static void SmallBlast(Vector3 at, float radius, bool cluster = false)
+    // ---- small blast -----------------------------------------------------------------------------------------------------
+
+    /// <summary>A barrage shell's explosion: a light flash, the library's blast, a ring to its reach and a scorch that stays 12 s.</summary>
+    internal static void SmallBlast(Vector3 at, float radius)
+    {
+        var ground = Settle(at, out var normal);
+        var s = Mathf.Clamp(radius, 1.5f, 6f) / 4.5f * 1.35f;
+        Impacts.Play(Look(ref _small, ArsenalFxSlots.SmallBlast, 4.5f, new PointLightSpec(new Color(1f, 0.72f, 0.4f), 6f, 5f, 0.35f, 0f), 0.8f, ShellShake, 1.9f, 12f, 0.6f), ground, normal, s);
+        ReachRing(ground, normal, radius);
+    }
+
+    /// <summary>A cluster bomblet's blast (ten of them within a second or two; the library plays once for the strike, <see cref="ClusterCentre"/>): a small ring, a fireball, 2 dust and 3 sparks.
+    /// 7 sprites, no flash light and no scorch.</summary>
+    internal static void BombletBlast(Vector3 at, float radius)
     {
         var ground = Settle(at, out var normal);
         var s = Mathf.Clamp(radius, 1.5f, 6f) / 4.5f;
-        var dust = cluster ? 2 : 8;
-        var sparks = cluster ? 2 : 8;
-        var soot = cluster ? 0 : 2;
-        if (!cluster) Flash(at + Vector3.up * 0.8f, new Color(1f, 0.72f, 0.4f), 6f * s, 5f, 0.35f);
-        if (!cluster) Flipbook(_sheets.Flash, ground + Vector3.up * 0.7f * s, Vector3.zero, 0.25f, 1.2f * s, 3f * s, White, new Color(1f, 0.8f, 0.5f, 0f));
+        CameraShake.Shake(ground, ClusterShake);
+        Ring(ground, normal, 0.3f, 0.6f, 3.5f * s, new Color(1f, 0.95f, 0.85f, 0.9f), new Color(1f, 0.9f, 0.8f, 0f));
         Flipbook(_sheets.Fireball, ground + Vector3.up * 1.2f * s, Vector3.up * 0.5f, 0.8f, 2.6f * s, 4.2f * s, new Color(1f, 0.85f, 0.6f, 1f), new Color(1f, 0.5f, 0.2f, 0f), 0f, 0.5f, Range(-30f, 30f) * Deg);
-        for (var i = 0; i < dust; i++)
+        for (var i = 0; i < 2; i++)
         {
-            var a = i * 6.2832f / dust + Range(-0.25f, 0.25f);
+            var a = i * 3.1416f + Range(-0.25f, 0.25f);
             Smoke(ground + Radial(a) * (0.3f * s) + Vector3.up * 0.25f, Radial(a) * (3.4f * s * Range(0.8f, 1.2f)), Range(0.9f, 1.2f),
                 0.5f * s, 1.5f * s, Dust0, Dust1, 0f, 2.3f, Range(-20f, 20f) * Deg);
         }
-        for (var i = 0; i < sparks; i++)
+        for (var i = 0; i < 3; i++)
         {
             var a = Rnd() * 6.2832f;
             Spark(ground + Vector3.up * 0.15f, Radial(a) * Range(3f, 7f) * s + Vector3.up * Range(2.5f, 6f), Range(0.35f, 0.6f));
         }
-        for (var i = 0; i < soot; i++)
-            Smoke(ground + Vector3.up * 0.4f, new Vector3(Range(-0.4f, 0.4f), Range(0.8f, 1.6f), Range(-0.4f, 0.4f)), 1.3f,
-                0.6f * s, 1.7f * s, Soot0, Soot1, 0.3f, 1.1f);
-        if (!cluster) Decal(false, ground, normal, 12f, 1.9f * s, Scorch0, Scorch1, 0.6f);
     }
 
     /// <summary>The one light flash and one scorch of a whole cluster strike, at its centre: a short warm flash and a mark of the
@@ -213,6 +276,7 @@ internal static class StrikeFx
     internal static void ClusterCentre(Vector3 at, float radius)
     {
         var ground = Settle(at, out var normal);
+        ArsenalFxSlots.Play(ArsenalFxSlots.Cluster, ground, normal, Mathf.Clamp(radius, 1.5f, 6f) * 2f);
         Flash(at + Vector3.up * 1.2f, new Color(1f, 0.72f, 0.4f), 9f, 4f, 0.4f);
         Decal(false, ground, normal, 12f, Mathf.Clamp(radius, 1.5f, 6f) * 1.6f, Scorch0, Scorch1, 0.6f);
     }
@@ -225,124 +289,56 @@ internal static class StrikeFx
         SpritePool.Emit(in s);
     }
 
-    /// <summary>The end of a sparklet: a small burst of fire. 1 sprite for 0.5 s.</summary>
-    private static void Pop(Vector3 at, float scale)
-    {
-        Flipbook(_sheets.Fireball, at + Vector3.up * 0.45f * scale, new Vector3(Range(-0.3f, 0.3f), Range(0.5f, 1.2f), Range(-0.3f, 0.3f)), 0.5f,
-            1.0f * scale, 1.7f * scale, new Color(1f, 0.85f, 0.6f, 1f), new Color(1f, 0.5f, 0.2f, 0f), 0f, 1.5f);
-    }
-
     // ---- cluster airburst ----------------------------------------------------------------------------------------------
 
-    /// <summary>The bomblet splits in the air: <paramref name="count"/> sparklets streak from the burst point to the points
-    /// <paramref name="offsets"/> (metres east/north of <paramref name="impact"/>, pairs, the same on every peer: derived from the
-    /// call's seed) and pop there as they arrive, <paramref name="flight"/> seconds later. Per sparklet 1 streak + 1 at its pop = 2;
-    /// plus 1 burst flash and 1 puff: 8 for 3 sparklets, and no light.</summary>
-    internal static void ClusterBurst(Vector3 burst, Vector3 impact, float[] offsets, int count, float flight, float scale)
-    {
-        var f = Math.Max(0.06f, flight);
-        Flipbook(_sheets.Flash, burst, Vector3.zero, 0.3f, 0.8f * scale, 2.6f * scale, White, new Color(1f, 0.8f, 0.5f, 0f));
-        Smoke(burst, new Vector3(0f, 0.3f, 0f), 1f, 0.7f * scale, 1.9f * scale, Smoke0, Smoke1, 0f, 1.2f);
-        for (var i = 0; i < count; i++)
-        {
-            var target = Settle(impact + new Vector3(offsets[2 * i], 0f, offsets[2 * i + 1]), out _);
-            var velocity = (target - burst) * (1f / f);
-            var sparklet = Quad(_sheets.Streak, SpriteFace.Streak, burst, velocity, f, 0.13f * scale, 0.1f * scale, Hot0, new Color(1f, 0.5f, 0.12f, 0.7f));
-            sparklet.Stretch = 0.045f;
-            sparklet.OnEnd = PopAt;
-            sparklet.EndScale = scale;
-            sparklet.FadeIn = 0f;
-            SpritePool.Emit(in sparklet);
-        }
-    }
+    /// <summary>The bomblet splits in the air.</summary>
+    internal static void ClusterBurst(Vector3 burst) => ArsenalFxSlots.Play(ArsenalFxSlots.Cluster, burst, Vector3.up, 2f);
 
     // ---- incendiary landing --------------------------------------------------------------------------------------------
 
-    /// <summary>The fire shell bursts into a fireball that splashes burning tongues over the floor out to <paramref name="reach"/>
-    /// (the burn area's edge) and hands over to the area's flames. Peak 3 fireball + 1 flash + 10 flung fire + 8 tongues +
-    /// 7 smoke = 29 sprites for 2 s, plus 1 scorch.</summary>
+    /// <summary>The fire shell bursts: a light flash and the library's splash out to <paramref name="reach"/> (the burn area's edge), handing over to the area's flames.</summary>
     internal static void FireSplash(Vector3 at, float reach)
     {
         var ground = Settle(at, out var normal);
         var r = Mathf.Clamp(reach, 2f, 10f);
-        Flash(at + Vector3.up * 0.8f, new Color(1f, 0.45f, 0.1f), r * 1.5f, 6f, 0.6f);
-        Flipbook(_sheets.Flash, ground + Vector3.up * 0.6f, Vector3.zero, 0.4f, 1f, r * 0.9f, new Color(1f, 0.8f, 0.5f, 1f), new Color(1f, 0.5f, 0.2f, 0f));
-        for (var i = 0; i < 3; i++)
-            Flipbook(_sheets.Fireball, ground + new Vector3(Range(-0.4f, 0.4f), Range(0.5f, 0.9f), Range(-0.4f, 0.4f)), Vector3.up * Range(1.5f, 3f), Range(0.9f, 1.2f),
-                1.2f, Range(3.2f, 4.2f), new Color(1f, 0.8f, 0.55f, 1f), new Color(1f, 0.5f, 0.2f, 0f), 0f, 1.4f, Range(-40f, 40f) * Deg);
-        var drag = 2f;
-        for (var i = 0; i < 10; i++)
-        {
-            var a = i * 0.6283f + Range(-0.2f, 0.2f);
-            var speed = drag * r * Range(0.55f, 1f) * 1.15f;
-            Flipbook(_sheets.Fireball, ground + Radial(a) * 0.4f + Vector3.up * 0.3f, Radial(a) * speed + Vector3.up * Range(0.5f, 1.5f), Range(1.5f, 2f),
-                0.9f, Range(1.8f, 2.6f), new Color(1f, 0.7f, 0.4f, 0.9f), new Color(0.9f, 0.35f, 0.1f, 0f), 0f, drag, Range(-30f, 30f) * Deg);
-        }
-        for (var i = 0; i < 8; i++)
-        {
-            var a = i * 0.7854f + Range(-0.2f, 0.2f);
-            var speed = drag * r * Range(0.7f, 1f) * 1.15f;
-            var tongue = Quad(_sheets.Streak, SpriteFace.Streak, ground + Radial(a) * 0.5f + Vector3.up * 0.15f, Radial(a) * speed, 1.3f, 0.5f, 0.3f,
-                new Color(1f, 0.7f, 0.25f, 0.95f), new Color(1f, 0.35f, 0.06f, 0f), 0f, drag);
-            tongue.Stretch = 0.3f;
-            tongue.FadeIn = 0.02f;
-            SpritePool.Emit(in tongue);
-        }
-        for (var i = 0; i < 7; i++)
-            Smoke(ground + Radial(Rnd() * 6.2832f) * Range(0f, 0.5f) + Vector3.up * 0.6f, new Vector3(Range(-0.5f, 0.5f), Range(1.2f, 2.4f), Range(-0.5f, 0.5f)),
-                Range(1.6f, 2f), 1.1f, Range(2.6f, 3.4f), new Color(0.45f, 0.43f, 0.42f, 0.75f), new Color(0.6f, 0.58f, 0.56f, 0f), 0.05f * i, 1f);
-        Decal(false, ground, normal, 14f, r * 1.2f, Scorch0, Scorch1, 0.6f);
+        Impacts.Play(Look(ref _fire, ArsenalFxSlots.Incendiary, 2f, new PointLightSpec(new Color(1f, 0.45f, 0.1f), 7.5f, 6f, 0.6f, 0f), 0.8f, ShellShake), ground, normal, r);
     }
 
     // ---- gas release ---------------------------------------------------------------------------------------------------
 
-    /// <summary>The canister lands and vents: a ring of fast green fog that settles into the cloud. 15 puffs + 1 ring = 16
-    /// sprites for 1 s.</summary>
-    internal static void GasBurst(Vector3 at)
+    /// <summary>The canister slams down and vents: a light flash and the library's burst out to the cloud's edge.</summary>
+    internal static void GasBurst(Vector3 at, float radius)
     {
         var ground = Settle(at, out var normal);
-        Flash(at + Vector3.up * 0.5f, new Color(0.5f, 1f, 0.3f), 5f, 3f, 0.3f);
-        Ring(ground, normal, 0.4f, 0.6f, 4.2f, new Color(0.55f, 1f, 0.35f, 0.75f), new Color(0.5f, 0.95f, 0.3f, 0f));
-        for (var i = 0; i < 15; i++)
-        {
-            var a = i * 0.41888f + Range(-0.12f, 0.12f);
-            Smoke(ground + Radial(a) * 0.3f + Vector3.up * Range(0.2f, 0.5f), Radial(a) * Range(6f, 9f), Range(0.9f, 1.1f),
-                0.8f, Range(2.2f, 2.8f), new Color(0.52f, 0.95f, 0.28f, 0.75f), new Color(0.38f, 0.72f, 0.2f, 0f), 0f, 3.3f, Range(-30f, 30f) * Deg);
-        }
+        var r = Mathf.Clamp(radius, 2f, 14f);
+        Impacts.Play(Look(ref _gas, ArsenalFxSlots.GasBurst, 2f, new PointLightSpec(new Color(0.5f, 1f, 0.3f), 8.4f, 3.5f, 0.35f, 0f), 0.5f, ClusterShake), ground, normal, r);
     }
 
     // ---- stasis field deployment ---------------------------------------------------------------------------------------
 
-    /// <summary>The emitter lands and a blue shockwave sweeps the whole field to its edge, leaving mist that settles into the
-    /// steady fog. 1 ring + 12 puffs = 13 sprites for 1.5 s.</summary>
+    /// <summary>The field beats while it runs: one ring sweeping to its edge. 1 sprite for 1 s.</summary>
+    internal static void StasisBeat(Vector3 centre, float radius)
+    {
+        var ground = Settle(centre, out var normal);
+        Ring(ground, normal, 1f, 0.8f, radius * 2.1f, new Color(0.6f, 0.88f, 1f, 0.55f), new Color(0.45f, 0.75f, 1f, 0f));
+    }
+
+    /// <summary>The emitter slams down: a light flash and the library's pulse over the whole field.</summary>
     internal static void StasisPulse(Vector3 centre, float radius)
     {
         var ground = Settle(centre, out var normal);
         var r = Mathf.Clamp(radius, 2f, 14f);
         Flash(centre + Vector3.up * 0.6f, new Color(0.35f, 0.7f, 1f), r * 1.4f, 4f, 0.7f);
-        Ring(ground, normal, 1.05f, 0.8f, r * 2.1f, new Color(0.7f, 0.92f, 1f, 0.9f), new Color(0.45f, 0.75f, 1f, 0f));
-        for (var i = 0; i < 12; i++)
-        {
-            var a = i * 0.5236f + Range(-0.15f, 0.15f);
-            Smoke(ground + Radial(a) * 0.5f + Vector3.up * Range(0.3f, 0.9f), Radial(a) * (r * Range(1.05f, 1.2f)), Range(1.3f, 1.6f),
-                1.2f, 0.28f * r, new Color(0.55f, 0.82f, 1f, 0.45f), new Color(0.5f, 0.8f, 1f, 0f), 0f, 1f, Range(-15f, 15f) * Deg);
-        }
+        if (ArsenalFxSlots.StasisPulse is { } library) Fx.Play(library, ground, normal, r * 2f, WarnColour(StrikeKind.Stasis));
+        CameraShake.Shake(ground, ClusterShake);
     }
 
     // ---- cutting beam: charge and burn marks ---------------------------------------------------------------------------
 
-    /// <summary>The beam gathers light where it will come from: a glow at the ceiling swelling for half a second. 2 sprites.</summary>
-    internal static void BeamCharge(Vector3 at, Color colour)
+    /// <summary>The beam gathers light where it will come from, for the whole charge (<see cref="StrikeTiming.BeamChargeSeconds"/>).</summary>
+    internal static void BeamCharge(Vector3 at)
     {
-        var bright = new Color(Mathf.Lerp(colour.r, 1f, 0.6f), Mathf.Lerp(colour.g, 1f, 0.6f), Mathf.Lerp(colour.b, 1f, 0.6f), 0f);
-        // The glow grows over the whole charge (StrikeTiming.BeamChargeSeconds), up to the moment the beam drops.
-        var charge = StrikeTiming.BeamChargeSeconds;
-        var glow = Quad(_sheets.Glow, SpriteFace.Camera, at, Vector3.zero, charge, 0.2f, 2.6f, new Color(bright.r, bright.g, bright.b, 0.95f), new Color(colour.r, colour.g, colour.b, 0.4f));
-        SpritePool.Emit(in glow);
-        var flare = Quad(_sheets.Flare, SpriteFace.Camera, at, Vector3.zero, charge, 0.1f, 1.4f, new Color(1f, 1f, 1f, 0.9f), new Color(bright.r, bright.g, bright.b, 0.3f),
-            0f, 0f, 0f, 3f * 0.5f / charge);
-        SpritePool.Emit(in flare);
-        Flash(at + Vector3.down * 0.4f, colour, 9f, 3f, charge);
+        ArsenalFxSlots.Play(ArsenalFxSlots.BeamCharge, at, Vector3.up);
     }
 
     /// <summary>One burn mark on the floor where the beam stood; the line it draws over its route fades from glowing to dark in
@@ -350,17 +346,24 @@ internal static class StrikeFx
     internal static void BeamMark(Vector3 at, Color colour)
     {
         var ground = Settle(at, out var normal);
+        ArsenalFxSlots.Play(ArsenalFxSlots.BeamBurn, ground, normal);
         var hot = new Color(Mathf.Lerp(colour.r, 1f, 0.35f), Mathf.Lerp(colour.g, 0.6f, 0.5f), Mathf.Lerp(colour.b, 0.25f, 0.5f), 0.8f);
         Decal(true, ground, normal, 4.5f, Range(1.1f, 1.5f), hot, new Color(0.03f, 0.028f, 0.026f, 0f), 0.2f);
     }
 
+    // ---- strafing run ---------------------------------------------------------------------------------------------------
+
+    /// <summary>One burst of the run hits: a tracer slanting in along the run and the library's hit.</summary>
+    internal static void RunHit(Vector3 at, Vector3 direction, Color colour)
+    {
+        var ground = Settle(at, out _);
+        var hot = new Color(Mathf.Lerp(colour.r, 1f, 0.5f), Mathf.Lerp(colour.g, 1f, 0.5f), Mathf.Lerp(colour.b, 1f, 0.5f), 1f);
+        Line(_sheets.Streak, ground - direction * 7f + Vector3.up * 5f, ground, 0.1f, 0.09f, hot, new Color(hot.r, hot.g, hot.b, 0f));
+        if (ArsenalFxSlots.StrafeHit is { } library) Fx.Play(library, ground, Vector3.up, 1f, colour);
+    }
+
     // ---- heavy weapon return -------------------------------------------------------------------------------------------
 
-    /// <summary>A small blue-white shimmer at the gun's place in the hand as it is taken back. 1 sprite for 0.4 s, kept small
-    /// and thin so it never covers the view.</summary>
-    internal static void ReturnGlow(Vector3 at)
-    {
-        var s = Quad(_sheets.Glow, SpriteFace.Camera, at, Vector3.zero, 0.4f, 0.12f, 0.5f, new Color(0.75f, 0.9f, 1f, 0.55f), new Color(0.55f, 0.8f, 1f, 0f));
-        SpritePool.Emit(in s);
-    }
+    /// <summary>The library's small shimmer at the gun's place in the hand as it is taken back.</summary>
+    internal static void ReturnGlow(Vector3 at) => ArsenalFxSlots.Play(ArsenalFxSlots.StrikeReturn, at, Vector3.up);
 }

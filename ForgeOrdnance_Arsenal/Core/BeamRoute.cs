@@ -3,18 +3,18 @@ using System;
 namespace ForgeOrdnanceArsenal;
 
 /// <summary>Whether a candidate target can be reached (a path to it, short enough, in sight), asked in order of distance.</summary>
-public interface IReach { bool Reaches(int index); }
+internal interface IReach { bool Reaches(int index); }
 
 /// <summary>Whether the straight move between two points runs into the level (wall, closed door, anything solid).</summary>
-public interface IBlocker { bool Blocked(float ax, float ay, float az, float bx, float by, float bz); }
+internal interface IBlocker { bool Blocked(float ax, float ay, float az, float bx, float by, float bz); }
 
-public enum RouteStep { Moving, Arrived, Blocked }
+internal enum RouteStep { Moving, Arrived, Blocked }
 
 /// <summary>The cutting beam's floor point and the path it follows, on plain numbers so it is testable. The corners come from
 /// the game's navigation mesh (<c>Begin</c>, then <c>Add</c> for every corner after the start); the point walks them at a constant
 /// speed and before every move asks the blocker about that very move, so it never crosses anything solid even where the path and
 /// the level disagree. Buffers are fixed: nothing allocates while the beam moves.</summary>
-public sealed class BeamRoute
+internal sealed class BeamRoute
 {
     /// <summary>Most corners one route holds; a longer path is refused rather than cut short.</summary>
     public const int Capacity = 48;

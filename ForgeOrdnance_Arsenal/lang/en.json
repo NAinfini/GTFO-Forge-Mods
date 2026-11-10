@@ -1,7 +1,0 @@
-{
-  "rack.pickUp": "Pick up {0}",
-  "rack.inHand": "Heavy weapon in hand",
-  "rack.slotTaken": "{0}: cannot take it",
-  "keys.group": "Forge Arsenal",
-  "keys.drop": "Give back heavy weapon"
-}

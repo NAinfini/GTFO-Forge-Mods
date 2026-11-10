@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.Json;
 using ForgeOrdnance;
 using GameData;
@@ -28,11 +29,20 @@ internal sealed class HeavyWeaponPayload : IOrdnancePayload
             throw new PayloadParameterException("Gear", "gear block " + block.persistentID + " is not a special slot weapon (base item " + baseItem + ").");
         // Last, so a refused definition holds no hash: the model's id must not share a hash with another accepted model (the hash is
         // what travels and what marks the lent gear).
-        if (HeavyModels.Register(spec.Model) is { } clash) throw new PayloadParameterException("Model", clash);
+        if (HeavyModels.Register(spec.Model, spec.Muzzle) is { } clash) throw new PayloadParameterException("Model", clash);
         return new HeavyParameters(spec, block.persistentID);
     }
 
     public bool HasOwnArrival => true;
+
+    private static readonly OrdnanceOverrideField[] Fields =
+    {
+        new("AmmoRatio", 0, 1), new("Magazine", HeavyWeaponSpec.MagazineMin, HeavyWeaponSpec.MagazineMax, true), new("AmmoCost", ArchetypeTuning.AmmoCostMin, ArchetypeTuning.AmmoCostMax)
+    };
+
+    /// <summary>A placement may set the ammunition: <c>AmmoRatio</c> (reserve as a share of the special slot's full reserve) and <c>Magazine</c> (rounds loaded) and <c>AmmoCost</c> (reserve one shot spends, the block's CostOfBullet).
+    /// The racks' record carries the result to every peer.</summary>
+    public IReadOnlyList<OrdnanceOverrideField> OverrideFields => Fields;
 
     /// <summary>A direct arrival lays the weapon on the ground at the landing point, ready to take at once.</summary>
     public bool SupportsDirect => true;

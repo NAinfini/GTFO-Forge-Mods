@@ -6,18 +6,17 @@ using Object = UnityEngine.Object;
 
 namespace ForgeOrdnanceArsenal;
 
-/// <summary>Every peer, the host included: what the host's strike data shows. Shells fall from above the ceiling through the
-/// level (no collision) onto the host's impact point, then flash, sound and shake; gas canisters and stasis emitters stay for
+/// <summary>Every peer, the host included: what the host's strike data shows. From the moment the beacon lands the ground the call can hurt is drawn at its true size
+/// (<see cref="DangerRecord"/>), and a player standing on it is told. A shell's landing is marked and heard for its warning
+/// (<see cref="StrikeTiming.Pace"/>), then it falls, gaining speed, from above the ceiling through the level (no collision) onto the host's impact point, on the call's slant, nose first,
+/// then flash, sound and shake; the hunter's laser follows the host's reports (<see cref="TargetLaser"/>); gas canisters and stasis emitters stay for
 /// their area's lifetime; areas show a coloured light, a ring and their cloud (<see cref="StrikeEffects"/>), and stasis areas
 /// slow the enemies inside on this peer (<see cref="StasisSlow"/>); the beam runs from above the ceiling down to the ground
 /// or its target. Damage is never decided here.</summary>
 internal static class StrikeVisuals
 {
-    private const float ShakeRange = 35f;
     /// <summary>Strike areas with a point light at once; the newest areas keep theirs.</summary>
     private const int MaxAreaLights = 2;
-    private static readonly ForgeVisual.ShakeSpec BigShake = new(0.6f, ShakeRange, 0.6f, 20f), ShellShake = new(0.35f, ShakeRange, 0.6f, 20f),
-        ClusterShake = new(0.2f, ShakeRange, 0.6f, 20f);
     /// <summary>The cutting beam's light where it burns (ForgeVisual's shared effect lights).</summary>
     private static readonly ForgeVisual.PointLightSpec BeamLight = new(StrikeEffects.BeamColour, 6f, 3f, 0f, 0f);
     /// <summary>Metres above the floor where a cluster bomblet splits into its sparklets.</summary>
@@ -59,10 +58,11 @@ internal static class StrikeVisuals
         internal uint ThrowId;
         internal ShellRecord Record;
         internal Vector3 From, To;
-        internal float Start, Lands;
-        internal bool Landed;
+        /// <summary>Until <see cref="DropAt"/> only the landing mark and the whistle exist; the shell itself falls from then to <see cref="Lands"/>.</summary>
+        internal float DropAt, Lands;
+        internal bool Landed, Dropping;
         internal float RemoveAt;
-        /// <summary>The smoke trail's slot (-1: none) and, for a cluster bomblet, when it splits in the air (0: it does not).</summary>
+        /// <summary>The smoke trail's slot (-1: none) and, for a cluster bomblet, above 0 until it splits in the air (at <see cref="BurstHeight"/> above the floor).</summary>
         internal int Trail = -1;
         internal float BurstAt;
     }
@@ -79,19 +79,37 @@ internal static class StrikeVisuals
         internal float Start, Ends;
         internal GameObject? Prop;
         internal StrikeEffects.Cloud? Cloud;
+        internal ForgeVisual.FxField? Field;
+        internal StrikeKind Kind;
+        internal Vector3 Centre;
+        internal float Radius, NextBeat;
+    }
+
+    /// <summary>The hunter's laser as this peer shows it, and the object its sounds ride on.</summary>
+    private sealed class LaserLook
+    {
+        internal ulong Summoner;
+        internal uint ThrowId;
+        internal TargetLaser? Fx;
+        internal GameObject? Sound;
+        internal LaserPhase Phase;
+        internal float LastUpdate, FadeEnds, Lock, LockEnds;
+        internal bool LockHeard;
     }
 
     private sealed class BeamLook
     {
+        /// <summary>This beam's own hold key for its line.</summary>
+        internal readonly int Key = ForgeVisual.Fx.NewKey();
         internal ulong Summoner;
         internal uint ThrowId;
         internal GameObject? Root;
-        internal StrikeEffects.Beam? Fx;
         /// <summary>The beam's held light (0 while it has none), and the object its loop sound rides on, kept where the beam burns.</summary>
         internal int Light;
         internal GameObject? Loop;
-        internal Vector3 From, To, ShownTo, LastMark;
-        internal bool HasTarget, FxFailed, Marked;
+        /// <summary>The top moves over the floor point with the host's reports, so the beam stays upright as it walks instead of leaning through the ceiling.</summary>
+        internal Vector3 From, FromTarget, To, ShownTo, LastMark;
+        internal bool HasTarget, Marked;
         internal float LastUpdate;
         /// <summary>The beam is drawn from this time on; before it the sky glow charges (none on a late joiner).</summary>
         internal float ShowAt;
@@ -103,6 +121,30 @@ internal static class StrikeVisuals
     private static readonly List<Falling> Shells = new();
     private static readonly List<Area> Areas = new();
     private static readonly List<BeamLook> Beams = new();
+    private static readonly List<RunLook> Runs = new();
+    private static readonly List<LaserLook> Lasers = new();
+    private static readonly List<StrikeEffects.Danger> Dangers = new();
+    /// <summary>A laser whose host stopped reporting is taken away after this long.</summary>
+    private const float LaserSilenceSeconds = 0.8f;
+    /// <summary>How long a laser that found nothing takes to flicker out.</summary>
+    private const float LaserGiveUpSeconds = 0.5f;
+
+    /// <summary>A strafing run as this peer shows it: a tracer streak with its ground point racing along the strip, and a scorch mark
+    /// left on the ground every <see cref="RunMarkSpacing"/> metres.</summary>
+    private sealed class RunLook
+    {
+        internal Vector3 Origin, Direction;
+        internal float Length, Speed, HalfWidth, StartsAt, LastMark, LastBeat;
+        internal StrikeEffects.Beam? Fx;
+        /// <summary>The object the run's gun sound rides on, moving with the ground point.</summary>
+        internal GameObject? Sound;
+    }
+
+    private const float RunMarkSpacing = 1.5f;
+    private const float RunTailMetres = 6f;
+    /// <summary>Metres between the run's impact sounds.</summary>
+    private const float RunBeatSpacing = 4.5f;
+    private static readonly Color RunColour = new(1f, 0.78f, 0.25f, 1f);
 
     internal static void Receive(OrdnancePayloadData d)
     {
@@ -110,44 +152,207 @@ internal static class StrikeVisuals
         {
             switch ((DataTag)d.Tag)
             {
+                case DataTag.Danger when Wire.TryDanger(d.Data, out var danger): ShowDanger(danger); break;
                 case DataTag.Shell when Wire.TryShell(d.Data, out var shell): ShowShell(d, shell); break;
                 case DataTag.Zone when Wire.TryZone(d.Data, out var zone): StartArea(d, zone); break;
                 case DataTag.Beam when Wire.TryBeam(d.Data, out var beam): AimBeam(d, beam); break;
+                case DataTag.Strafe when Wire.TryStrafe(d.Data, out var run): StartRun(run); break;
+                case DataTag.Laser when Wire.TryLaser(d.Data, out var laser): AimLaser(d, laser); break;
                 case DataTag.BeamEnd: EndBeam(d); break;
                 case DataTag.ZoneEnd: EndArea(d); break;
                 default: break;
             }
         }
-        catch (Exception error) { Plugin.Error("Showing strike data (tag " + d.Tag + ") failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Showing strike data (tag " + d.Tag + ") failed: " + error); }
+    }
+
+    /// <summary>The ground a call can hurt, from its beacon's landing until its last shell. Stasis and the gun run do not hurt players: they are drawn, but nobody is told to run.</summary>
+    private static void ShowDanger(in DangerRecord r)
+    {
+        var look = StrikeEffects.PlaceDanger(r, Time.time);
+        if (look != null) Dangers.Add(look);
+        if (r.Kind is StrikeKind.Stasis or StrikeKind.Strafe) return;
+        var agent = ForgeCore.Players.Local;
+        if (agent == null || agent.WasCollected) return;
+        var at = agent.Position;
+        if (r.Covers(at.x, at.y, at.z)) OrdnanceApi.PostNotice(ArsenalText.T("strike.danger"));
+    }
+
+    private static void StartRun(in StrafeRecord r)
+    {
+        var now = Time.time;
+        Runs.Add(new RunLook
+        {
+            Origin = new Vector3(r.X, r.Y, r.Z),
+            Direction = new Vector3(r.DirX, 0f, r.DirZ),
+            Length = r.Length,
+            Speed = r.Speed,
+            HalfWidth = r.HalfWidth,
+            StartsAt = now + r.Lead,
+            LastMark = -RunMarkSpacing,
+            LastBeat = -RunBeatSpacing,
+        });
+        ArsenalAudio.PlayAt(ArsenalAudio.Cue.Incoming, new Vector3(r.X, r.Y, r.Z), StrikeTiming.WhistleStart(r.Lead));
+    }
+
+    /// <summary>A report of the hunter's laser. Every peer follows the same point, so every peer sees the same target.</summary>
+    private static void AimLaser(OrdnancePayloadData d, in LaserRecord r)
+    {
+        var now = Time.time;
+        var look = Lasers.Find(l => l.Summoner == d.SummonerLookup && l.ThrowId == d.ThrowId);
+        if (look == null)
+        {
+            look = new LaserLook { Summoner = d.SummonerLookup, ThrowId = d.ThrowId, Fx = StrikeEffects.CreateLaser() };
+            look.Sound = new GameObject("ForgeOrdnanceArsenal.LaserSound");
+            look.Sound.transform.position = new Vector3(r.X, r.Y, r.Z);
+            ArsenalAudio.PlayLoop(ArsenalAudio.Cue.BeamLoop, look.Sound);
+            Lasers.Add(look);
+        }
+        look.Phase = r.Phase;
+        look.LastUpdate = now;
+        look.Fx?.Aim(r.Top, new Vector3(r.X, r.Y, r.Z), r.Floor, new Vector3(r.VelocityX, 0f, r.VelocityZ));
+        switch (r.Phase)
+        {
+            case LaserPhase.Lock:
+                look.LockEnds = now + r.Left;
+                // The swell peaks as the lock runs out and the shell is released.
+                if (!look.LockHeard && look.Sound != null)
+                {
+                    look.LockHeard = true;
+                    ArsenalAudio.PlayOn(ArsenalAudio.Cue.HunterLock, look.Sound);
+                }
+                break;
+            case LaserPhase.Fire:
+                look.Lock = 1f;
+                look.Fx?.Flare();
+                look.FadeEnds = now + r.Left;
+                break;
+            case LaserPhase.Abort:
+                look.FadeEnds = now + LaserGiveUpSeconds;
+                ArsenalAudio.PlayAt(ArsenalAudio.Cue.BeamEnd, new Vector3(r.X, r.Y, r.Z));
+                StrikeBursts.NoTarget(new Vector3(r.X, r.Floor, r.Z), now);
+                if (d.SummonerLookup == SNetwork.SNet.LocalPlayer?.Lookup)
+                    OrdnanceApi.PostNotice(ArsenalText.T("strike.noTargetRefund", (int)StrikeTiming.HunterMissCooldown));
+                break;
+        }
+    }
+
+    private static void TickLasers(float now)
+    {
+        for (var i = Lasers.Count - 1; i >= 0; i--)
+        {
+            var l = Lasers[i];
+            var over = l.Phase is LaserPhase.Fire or LaserPhase.Abort ? now >= l.FadeEnds : now - l.LastUpdate >= LaserSilenceSeconds;
+            if (over)
+            {
+                RemoveLaser(l);
+                Lasers.RemoveAt(i);
+                continue;
+            }
+            if (l.Phase == LaserPhase.Lock) l.Lock = Math.Clamp(1f - (l.LockEnds - now) / StrikeTiming.HunterLockSeconds, 0f, 1f);
+            if (l.Fx != null)
+            {
+                l.Fx.Lock = l.Lock;
+                // Giving up: it flickers out.
+                l.Fx.Opacity = l.Phase == LaserPhase.Abort ? Math.Clamp((l.FadeEnds - now) / LaserGiveUpSeconds, 0f, 1f) * (Mathf.Sin(now * 70f) > 0f ? 1f : 0.25f) : 1f;
+                l.Fx.Draw(now);
+                if (l.Sound != null && !l.Sound.WasCollected) l.Sound.transform.position = l.Fx.Shown;
+            }
+        }
+    }
+
+    private static void RemoveLaser(LaserLook l)
+    {
+        l.Fx?.Release();
+        Destroy(l.Sound);
+    }
+
+    private static void TickRuns(float now)
+    {
+        for (var i = Runs.Count - 1; i >= 0; i--)
+        {
+            var run = Runs[i];
+            if (now < run.StartsAt) continue;
+            var travelled = (now - run.StartsAt) * run.Speed;
+            var along = Math.Min(run.Length, travelled);
+            var head = Strikes.Ground(run.Origin + run.Direction * along);
+            if (run.Sound == null)
+            {
+                run.Sound = new GameObject("ForgeOrdnanceArsenal.StrafeSound");
+                run.Sound.transform.position = head;
+                ArsenalAudio.PlayOn(ArsenalAudio.Cue.StrafeLine, run.Sound);
+            }
+            else if (!run.Sound.WasCollected) run.Sound.transform.position = head;
+            if (along - run.LastBeat >= RunBeatSpacing && along < run.Length)
+            {
+                run.LastBeat = along;
+                ArsenalAudio.PlayAt(ArsenalAudio.Cue.StrafeImpact, head);
+            }
+            if (travelled >= run.Length + RunTailMetres)
+            {
+                Destroy(run.Sound);
+                run.Fx?.Release();
+                Runs.RemoveAt(i);
+                continue;
+            }
+            run.Fx ??= StrikeEffects.CreateBeam(RunColour, now);
+            var tail = Strikes.Ground(run.Origin + run.Direction * Math.Clamp(travelled - RunTailMetres, 0f, run.Length));
+            run.Fx?.Show(tail + Vector3.up * 0.25f, head + Vector3.up * 0.25f, now);
+            if (along - run.LastMark >= RunMarkSpacing && along < run.Length)
+            {
+                run.LastMark = along;
+                // The rounds walk over the whole strip, not one line down its middle; the same on every peer, and never through a wall beside it.
+                var side = new Vector3(run.Direction.z, 0f, -run.Direction.x) * (run.HalfWidth * 0.8f * Mathf.Sin(along * 7.3f));
+                var hit = ForgeCore.Level.Blocked(head, head + side) ? head : head + side;
+                StrikeBursts.BeamMark(hit, RunColour, now);
+                StrikeBursts.RunHit(hit, run.Direction, RunColour, now);
+            }
+        }
     }
 
     private static void ShowShell(OrdnancePayloadData d, in ShellRecord r)
     {
         var to = new Vector3(r.X, r.Y, r.Z);
         var from = new Vector3(r.X, Math.Max(r.Top, r.Y + 2f), r.Z);
+        if (StrikeTiming.Slants(r.Kind))
+        {
+            var (sideX, sideZ) = StrikePlan.ApproachSide(d.SummonerLookup, d.ThrowId);
+            var run = (from.y - to.y) * StrikeTiming.ApproachSlant;
+            from.x += sideX * run;
+            from.z += sideZ * run;
+        }
+        var now = Time.time;
+        var drop = Math.Min(StrikeTiming.Pace(r.Kind).Drop, r.Fall);
+        var falling = new Falling { Summoner = d.SummonerLookup, ThrowId = d.ThrowId, Record = r, From = from, To = to, DropAt = now + r.Fall - drop, Lands = now + r.Fall };
+        // A cluster bomblet splits a little above the floor; it needs room to fall first.
+        var height = from.y - to.y;
+        if (r.Kind == StrikeKind.Cluster && r.Fall > 0f && height > BurstHeight + 1.5f)
+            falling.BurstAt = 1f;
+        Shells.Add(falling);
+        if (r.Fall > drop) StrikeBursts.Warn(r.Kind, to, from, r.Blast, r.Fall - drop, now);
+        ArsenalAudio.PlayAt(ArsenalAudio.Cue.Incoming, to, StrikeTiming.WhistleStart(r.Fall));
+    }
+
+    /// <summary>The shell starts falling: its model and trail appear above the ceiling. (A shell whose area started first is settled by <see cref="Land"/> and starts here too.)</summary>
+    private static void BeginDrop(Falling s, float now)
+    {
+        s.Dropping = true;
+        var r = s.Record;
         var model = ArsenalArt.Look(r.Look);
-        GameObject? root = null;
         if (model != null)
         {
             var upright = r.Look is ShellLook.Canister or ShellLook.Emitter;
-            root = model.Spawn(from, upright ? Quaternion.identity : ArsenalArt.NoseDown);
-            if (root != null) root.name = "ForgeOrdnanceArsenal." + r.Look;
+            s.Root = model.Spawn(s.From, upright ? Quaternion.identity : ArsenalArt.NoseAlong(s.To - s.From));
+            if (s.Root != null) s.Root.name = "ForgeOrdnanceArsenal." + r.Look;
         }
-        var now = Time.time;
-        var falling = new Falling { Root = root, Summoner = d.SummonerLookup, ThrowId = d.ThrowId, Record = r, From = from, To = to, Start = now, Lands = now + r.Fall };
-        falling.Trail = StrikeBursts.BeginTrail(r.Look, r.Kind, from, now);
-        // A cluster bomblet splits a little above the floor (position follows the square-time fall); it needs room to fall first.
-        var height = from.y - to.y;
-        if (r.Kind == StrikeKind.Cluster && r.Fall > 0f && height > BurstHeight + 1.5f)
-            falling.BurstAt = now + r.Fall * (float)Math.Sqrt(1f - BurstHeight / height);
-        Shells.Add(falling);
-        ArsenalAudio.PlayAt(ArsenalAudio.Cue.Incoming, to);
+        s.Trail = StrikeBursts.BeginTrail(r.Look, r.Kind, s.From, now);
     }
 
     private static void Land(Falling s)
     {
         s.Landed = true;
         var r = s.Record;
+        if (!s.Dropping) BeginDrop(s, Time.time);
         if (s.Root != null) s.Root.transform.position = s.To;
         StrikeBursts.EndTrail(s.Trail);
         s.Trail = -1;
@@ -155,7 +360,8 @@ internal static class StrikeVisuals
         switch (r.Kind)
         {
             case StrikeKind.Gas:
-                StrikeBursts.GasBurst(s.To, now);
+                // r.Blast carries the cloud's radius, as for the stasis field below.
+                StrikeBursts.GasBurst(s.To, r.Blast, now);
                 ArsenalAudio.PlayAt(ArsenalAudio.Cue.GasRelease, s.To);
                 s.RemoveAt = Time.time + StrikeTiming.ZoneStartDelay(r.Kind) + 2f; // bounded waiting for the area message
                 return;
@@ -170,11 +376,11 @@ internal static class StrikeVisuals
         // The big shells (precision, hunter) and the small ones draw their own blast; the game's trip mine explosion is not borrowed.
         if (r.Kind == StrikeKind.Cluster) MarkClusterCentre(s, now);
         StrikeBursts.Blast(r.Kind, s.To, r.Blast, now);
+        if (big) StrikeBursts.ImpactColumn(s.To, s.From, r.Blast, now);
         ArsenalAudio.PlayAt(r.Kind == StrikeKind.Cluster ? ArsenalAudio.Cue.ClusterSplit
             : big ? ArsenalAudio.Cue.BigBoom : ArsenalAudio.Cue.SmallBoom, s.To);
         Echoes.Add((now + StrikeTiming.DebrisDelay, s.To, false));
         if (r.Kind == StrikeKind.Incendiary) Echoes.Add((now + StrikeTiming.IgniteDelay, s.To, true));
-        ForgeVisual.CameraShake.Shake(s.To, big ? BigShake : r.Kind == StrikeKind.Cluster ? ClusterShake : ShellShake);
         s.RemoveAt = Time.time;
     }
 
@@ -203,20 +409,21 @@ internal static class StrikeVisuals
         root.transform.position = centre + Vector3.up * 0.6f;
         var lightSpec = new ForgeVisual.PointLightSpec(colour, z.Radius * 1.6f, 1f, 0f, 0f);
         var now = Time.time;
-        var cloud = StrikeEffects.CreateCloud(z.Kind, centre, z.Radius, colour, now, now + z.Seconds, d.ThrowId);
-        if (cloud == null) Plugin.Error(z.Kind + " area of throw " + d.ThrowId + " has no cloud (the effect error above says why).");
+        // The ground mark at the area's true radius; the library's field stands over it.
+        var cloud = StrikeEffects.CreateCloud(z.Kind, centre, z.Radius, colour, now, now + z.Seconds);
         if (z.Kind == StrikeKind.Stasis)
         {
             StasisSlow.Add(d.SummonerLookup, d.ThrowId, centre, z.Radius, z.Slow, z.Seconds);
         }
+        // An area never starts before its shell has landed: the host sends the zone before this frame's visual tick, so settle the shell now, regardless of tick order.
         // The canister or emitter that landed here stays as the area's prop.
         GameObject? prop = null;
         foreach (var shell in Shells)
         {
             if (shell.Summoner != d.SummonerLookup || shell.ThrowId != d.ThrowId
-                || shell.Record.Kind is not (StrikeKind.Gas or StrikeKind.Stasis)) continue;
-            // The host sends the zone before this frame's visual tick. Settle and transfer it now, regardless of tick order.
+                || shell.Record.Kind is not (StrikeKind.Gas or StrikeKind.Stasis or StrikeKind.Incendiary)) continue;
             if (!shell.Landed) Land(shell);
+            if (shell.Record.Kind == StrikeKind.Incendiary) break;
             prop = shell.Root;
             shell.Root = null;
             shell.RemoveAt = 0f;
@@ -229,9 +436,29 @@ internal static class StrikeVisuals
             if (model != null) { prop = model.Spawn(centre, Quaternion.identity); if (prop != null) prop.name = "ForgeOrdnanceArsenal." + StrikePlan.Look(z.Kind); }
         }
         // A replayed area shows for its full time at most; the host's ZoneEnd removes it when it really ends.
-        Areas.Add(new Area { Summoner = d.SummonerLookup, ThrowId = d.ThrowId, Root = root, LightSpec = lightSpec, Colour = colour, Start = now, Ends = now + z.Seconds, Prop = prop, Cloud = cloud });
-        ArsenalAudio.PlayLoop(z.Kind switch { StrikeKind.Gas => ArsenalAudio.Cue.GasLoop,
-            StrikeKind.Stasis => ArsenalAudio.Cue.StasisLoop, _ => ArsenalAudio.Cue.FireLoop }, root);
+        Areas.Add(new Area
+        {
+            Summoner = d.SummonerLookup,
+            ThrowId = d.ThrowId,
+            Root = root,
+            LightSpec = lightSpec,
+            Colour = colour,
+            Start = now,
+            Ends = now + z.Seconds,
+            Prop = prop,
+            Cloud = cloud,
+            Field = ArsenalFxSlots.FieldOf(z.Kind, centre + Vector3.up * 0.1f, z.Radius),
+            Kind = z.Kind,
+            Centre = centre,
+            Radius = z.Radius,
+            NextBeat = now + StrikeTiming.StasisBeatSeconds
+        });
+        ArsenalAudio.PlayLoop(z.Kind switch
+        {
+            StrikeKind.Gas => ArsenalAudio.Cue.GasLoop,
+            StrikeKind.Stasis => ArsenalAudio.Cue.StasisLoop,
+            _ => ArsenalAudio.Cue.FireLoop
+        }, root);
     }
 
     private static void EndArea(OrdnancePayloadData d)
@@ -268,10 +495,7 @@ internal static class StrikeVisuals
         // ForgeOrdnance protocol 9 rejects transport epochs from before a reset. Local admission protects
         // callbacks already handed to us; retaining every past generation is unnecessary.
         if ((_beamGeneration != Guid.Empty && _beamGeneration != r.Generation)
-            || (!BeamCalls.Contains((d.SummonerLookup, d.ThrowId)) && !(d.Replayed && _beamReplayAllowed && !ForgeCore.Checkpoint.Recalling)))
-        {
-            return;
-        }
+            || (!BeamCalls.Contains((d.SummonerLookup, d.ThrowId)) && !(d.Replayed && _beamReplayAllowed && !ForgeCore.Checkpoint.Recalling))) return;
         // A retained update adopts this call on a late joiner. Its following live updates are ordinary messages, so the
         // replay must establish the same admission that seeing the original beacon would have established.
         if (d.Replayed) BeamCalls.Add((d.SummonerLookup, d.ThrowId));
@@ -285,14 +509,14 @@ internal static class StrikeVisuals
             loop.transform.SetParent(root.transform, false);
             var now = Time.time;
             // The sky gathers light for BeamChargeSeconds before the beam drops; a late joiner sees the beam already running.
-            beam = new BeamLook { Summoner = d.SummonerLookup, ThrowId = d.ThrowId, Root = root, Loop = loop, From = root.transform.position, ShowAt = d.Replayed ? now : now + StrikeTiming.BeamChargeSeconds };
+            beam = new BeamLook { Summoner = d.SummonerLookup, ThrowId = d.ThrowId, Root = root, Loop = loop, From = root.transform.position, FromTarget = root.transform.position, ShowAt = d.Replayed ? now : now + StrikeTiming.BeamChargeSeconds };
             beam.ShownTo = beam.From;
             Beams.Add(beam);
             if (!d.Replayed)
             {
                 // The shell start is 3 m above the ceiling: the glow gathers just under it, where the player can see it.
-                StrikeBursts.BeamCharge(new Vector3(r.OX, Math.Max(r.OY - 3.15f, r.TY + 2f), r.OZ), StrikeEffects.BeamColour, now);
-                ArsenalAudio.PlayAt(ArsenalAudio.Cue.BeamStart, new Vector3(r.TX, r.TY, r.TZ));
+                StrikeBursts.BeamCharge(new Vector3(r.OX, Math.Max(r.OY - 3.15f, r.TY + 2f), r.OZ), now);
+                ArsenalAudio.PlayAt(ArsenalAudio.Cue.BeamStart, new Vector3(r.TX, r.TY, r.TZ), StrikeTiming.ChargeStart(StrikeTiming.BeamChargeSeconds));
             }
             ArsenalAudio.PlayLoop(ArsenalAudio.Cue.BeamLoop, loop);
         }
@@ -300,6 +524,7 @@ internal static class StrikeVisuals
         beam.HasTarget = r.HasTarget;
         beam.LastUpdate = Time.time;
         beam.To = new Vector3(r.TX, r.TY, r.TZ);
+        beam.FromTarget = new Vector3(r.OX, r.OY, r.OZ);
         SetCuttingAudio(beam);
     }
 
@@ -311,7 +536,6 @@ internal static class StrikeVisuals
         if (index < 0) return;
         var beam = Beams[index];
         ArsenalAudio.PlayAt(ArsenalAudio.Cue.BeamEnd, beam.ShownTo);
-        beam.Fx?.Release();
         ForgeVisual.PointLights.Release(ref beam.Light);
         Destroy(beam.CuttingAudio);
         Destroy(beam.Root);
@@ -331,19 +555,21 @@ internal static class StrikeVisuals
             var s = Shells[i];
             if (!s.Landed)
             {
-                var t = s.Lands <= s.Start ? 1f : Math.Clamp((now - s.Start) / (s.Lands - s.Start), 0f, 1f);
-                var at = Vector3.Lerp(s.From, s.To, t * t);
+                if (now < s.DropAt) continue;
+                if (!s.Dropping) BeginDrop(s, now);
+                var t = s.Lands <= s.DropAt ? 1f : Math.Clamp((now - s.DropAt) / (s.Lands - s.DropAt), 0f, 1f);
+                var at = Vector3.Lerp(s.From, s.To, StrikeTiming.FallCurve(t));
                 if (s.Root != null && !s.Root.WasCollected) s.Root.transform.position = at;
-                if (s.Trail >= 0) StrikeBursts.MoveTrail(s.Trail, at, t, now);
-                if (s.BurstAt > 0f && now >= s.BurstAt && t < 1f)
+                if (s.Trail >= 0) StrikeBursts.MoveTrail(s.Trail, at, s.To - s.From, t, now);
+                if (s.BurstAt > 0f && at.y - s.To.y <= BurstHeight && t < 1f)
                 {
-                    // The cluster bomblet splits: the carrier is gone, its sparklets fly on to the points every peer derives from the call's seed.
+                    // The cluster bomblet splits: the carrier is gone.
                     s.BurstAt = 0f;
                     StrikeBursts.EndTrail(s.Trail);
                     s.Trail = -1;
                     Destroy(s.Root);
                     s.Root = null;
-                    StrikeBursts.ClusterBurst(s.Summoner, s.ThrowId, at, s.To, s.Record.Blast, Math.Max(0f, s.Lands - now), now);
+                    StrikeBursts.ClusterBurst(at, now);
                 }
                 if (t >= 1f)
                 {
@@ -376,7 +602,7 @@ internal static class StrikeVisuals
                 RemoveArea(i);
                 continue;
             }
-            if (Plugin.ExtraLights.Value && lit < MaxAreaLights && a.Root != null && !a.Root.WasCollected)
+            if (lit < MaxAreaLights && a.Root != null && !a.Root.WasCollected)
             {
                 lit++;
                 var fade = Math.Clamp((a.Ends - now) / 1.5f, 0f, 1f);
@@ -385,38 +611,39 @@ internal static class StrikeVisuals
             }
             else ForgeVisual.PointLights.Release(ref a.Light);
             a.Cloud?.Tick(now);
+            a.Field?.Hold();
+            if (a.Kind == StrikeKind.Stasis && now >= a.NextBeat)
+            {
+                a.NextBeat = now + StrikeTiming.StasisBeatSeconds;
+                StrikeBursts.StasisBeat(a.Centre, a.Radius, now);
+            }
         }
+        for (var i = Dangers.Count - 1; i >= 0; i--)
+            if (!Dangers[i].Tick(now)) Dangers.RemoveAt(i);
         StrikeBursts.Tick(now);
         StasisSlow.Tick(now);
+        TickRuns(now);
+        TickLasers(now);
         for (var i = Beams.Count - 1; i >= 0; i--)
         {
             var b = Beams[i];
             if (now - b.LastUpdate >= BeamSilenceSeconds)
             {
                 BeamCalls.Remove((b.Summoner, b.ThrowId));
-                b.Fx?.Release();
                 ForgeVisual.PointLights.Release(ref b.Light);
                 Destroy(b.CuttingAudio);
                 Destroy(b.Root);
                 Beams.RemoveAt(i);
-                Plugin.Error("Cutting beam of throw " + b.ThrowId + " stopped after " + ForgeCore.Log.Num(BeamSilenceSeconds) + " s without a host update.");
+                Plugin.Logger.ErrorOnce("Cutting beam of throw " + b.ThrowId + " stopped after " + ForgeCore.Log.Num(BeamSilenceSeconds) + " s without a host update.");
                 continue;
             }
             if (b.Root == null || b.Root.WasCollected) continue;
             b.ShownTo = Vector3.Lerp(b.ShownTo, b.To, Math.Min(1f, Time.deltaTime * (b.HasTarget ? 10f : 4f)));
+            b.From = Vector3.Lerp(b.From, b.FromTarget, Math.Min(1f, Time.deltaTime * (b.HasTarget ? 10f : 4f)));
             if (b.CuttingAudio != null && !b.CuttingAudio.WasCollected) b.CuttingAudio.transform.position = b.ShownTo;
             var drawn = now >= b.ShowAt;
-            if (drawn && b.Fx == null && !b.FxFailed)
-            {
-                b.Fx = StrikeEffects.CreateBeam(StrikeEffects.BeamColour, now);
-                if (b.Fx == null)
-                {
-                    b.FxFailed = true;
-                    Plugin.Error("Cutting beam of throw " + b.ThrowId + " is not drawn (the effect error above says why).");
-                }
-            }
-            b.Fx?.Show(b.From, b.ShownTo, now);
-            if (drawn && b.Fx != null && Vector3.Distance(b.ShownTo, b.To) < 1.5f && (!b.Marked || Vector3.Distance(b.ShownTo, b.LastMark) >= BeamMarkSpacing))
+            if (drawn) ArsenalFxSlots.LineBeam(b.Key, b.From, b.ShownTo);
+            if (drawn && Vector3.Distance(b.ShownTo, b.To) < 1.5f && (!b.Marked || Vector3.Distance(b.ShownTo, b.LastMark) >= BeamMarkSpacing))
             {
                 // The route the beam walks stays scorched for a few seconds, glowing first and then dark.
                 b.Marked = true;
@@ -425,7 +652,7 @@ internal static class StrikeVisuals
             }
             var burn = b.ShownTo + Vector3.up * 0.4f;
             if (b.Loop != null && !b.Loop.WasCollected) b.Loop.transform.position = burn;
-            if (drawn && Plugin.ExtraLights.Value) ForgeVisual.PointLights.Hold(ref b.Light, burn, in BeamLight, now);
+            if (drawn) ForgeVisual.PointLights.Hold(ref b.Light, burn, in BeamLight, now);
             else ForgeVisual.PointLights.Release(ref b.Light);
         }
     }
@@ -464,9 +691,15 @@ internal static class StrikeVisuals
         ClusterCentres.Clear();
         ClusterMarked.Clear();
         Echoes.Clear();
+        foreach (var danger in Dangers) danger.Release();
+        Dangers.Clear();
+        foreach (var run in Runs) { run.Fx?.Release(); Destroy(run.Sound); }
+        Runs.Clear();
+        foreach (var l in Lasers) RemoveLaser(l);
+        Lasers.Clear();
         foreach (var s in Shells) Destroy(s.Root);
         foreach (var a in Areas) { a.Cloud?.Release(); ForgeVisual.PointLights.Release(ref a.Light); Destroy(a.Root); Destroy(a.Prop); }
-        foreach (var b in Beams) { b.Fx?.Release(); ForgeVisual.PointLights.Release(ref b.Light); Destroy(b.CuttingAudio); Destroy(b.Root); }
+        foreach (var b in Beams) { ForgeVisual.PointLights.Release(ref b.Light); Destroy(b.CuttingAudio); Destroy(b.Root); }
         Shells.Clear();
         Areas.Clear();
         Beams.Clear();

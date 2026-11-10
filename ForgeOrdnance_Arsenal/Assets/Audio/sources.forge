@@ -45,6 +45,15 @@
     "weapon": {
       "category": "weapon",
       "seats": 1
+    },
+    "device": {
+      "category": "device"
+    },
+    "device-loop": {
+      "category": "device"
+    },
+    "impact": {
+      "category": "debris"
     }
   },
   "cues": [
@@ -90,7 +99,7 @@
               "file": "音效/预告片设计/各式转场嗖声音效/DS 15 Quick Pan.wav",
               "sha256": "c4c503aa100ca60889a3988e10a16bb83157cdb6c8d527bb671e40a7e865c38e",
               "pack": "各式转场嗖声音效",
-              "licence": "来源不明（音效库索引未标注授权；所有者在选音台中选定）",
+              "licence": "所有者 2026-11-05 说明为开源素材（授权类型未逐件记录）",
               "title": "DS 15 Quick Pan",
               "startSeconds": 0.46,
               "seconds": 1.14
@@ -354,7 +363,7 @@
               "file": "音效/预告片设计/电影低频轰鸣重击音效/INTRO-HD.NET--ESE - QUANTUM - BOOM - JC - Take Me To Church-INTRO-HD.NET-.wav",
               "sha256": "461c0be10722d813872156191e210fe72d1de4e46771615d018e4f7a77ea9e1e",
               "pack": "电影低频轰鸣重击音效",
-              "licence": "来源不明（音效库索引未标注授权；所有者在选音台中选定）",
+              "licence": "所有者 2026-11-05 说明为开源素材（授权类型未逐件记录）",
               "title": "INTRO-HD.NET--ESE - QUANTUM - BOOM - JC - Take Me To Church-INTRO-HD.NET-",
               "startSeconds": 0.174,
               "seconds": 4.486
@@ -363,7 +372,7 @@
               "file": "音效/预告片设计/电影低频轰鸣重击音效/INTRO-HD.NET--ESE - QUANTUM - BOOM - KP - Thunderous-INTRO-HD.NET-.wav",
               "sha256": "386e8aa44aff0cebcc68ed3681f60577e7d5d071d9b63e576b75e09e0c03b484",
               "pack": "电影低频轰鸣重击音效",
-              "licence": "来源不明（音效库索引未标注授权；所有者在选音台中选定）",
+              "licence": "所有者 2026-11-05 说明为开源素材（授权类型未逐件记录）",
               "title": "INTRO-HD.NET--ESE - QUANTUM - BOOM - KP - Thunderous-INTRO-HD.NET-",
               "startSeconds": 0.0,
               "seconds": 5.12
@@ -488,7 +497,7 @@
               "file": "音效/拟音日常/玻璃碎裂坠落拟音/Glass Crumble.wav",
               "sha256": "1ccb9060119ae9bf7ad0f3b5179eaf9f9d45ef7cd6b97d532bed0eb0bb8de96e",
               "pack": "玻璃碎裂坠落拟音",
-              "licence": "来源不明（音效库索引未标注授权；所有者在选音台中选定）",
+              "licence": "所有者 2026-11-05 说明为开源素材（授权类型未逐件记录）",
               "title": "Glass Crumble",
               "startSeconds": 0.0,
               "seconds": 1.04
@@ -497,7 +506,7 @@
               "file": "音效/拟音日常/玻璃碎裂坠落拟音/Glass Drop.wav",
               "sha256": "ed8d3c5d5d06e6275d30c43fe137c7ef828bc837a91b0f9fb31fb6a3939a8361",
               "pack": "玻璃碎裂坠落拟音",
-              "licence": "来源不明（音效库索引未标注授权；所有者在选音台中选定）",
+              "licence": "所有者 2026-11-05 说明为开源素材（授权类型未逐件记录）",
               "title": "Glass Drop",
               "startSeconds": 0.029,
               "seconds": 0.591
@@ -802,7 +811,7 @@
               "file": "音效/机械机器人/设计师机械伺服与金属拟音工具包/GL_Hydraulic_AirRelease12_CT.wav",
               "sha256": "94433ba35ffe8146e1f92effdc5f31e6d115088aed5a12b19fb21b20f7b0933a",
               "pack": "8600 高质量音效合集（GL_*_CT）",
-              "licence": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
               "title": "GL_Hydraulic_AirRelease12_CT",
               "startSeconds": 0.0,
               "seconds": 5.505
@@ -840,7 +849,7 @@
               "file": "音效/科幻能量/科幻飞船武器与机械界面设计音效/Door & Hatch/GL_FuturisticDoor_Opening_CT.wav",
               "sha256": "7845591ae248782f5464160bed6f3c6e338e29c1c68a5dd41ba34b2607eb91ec",
               "pack": "8600 高质量音效合集（GL_*_CT）",
-              "licence": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
               "title": "GL_FuturisticDoor_Opening_CT",
               "startSeconds": 0.015,
               "seconds": 1.945
@@ -849,7 +858,7 @@
               "file": "音效/科幻能量/科幻飞船武器与机械界面设计音效/Door & Hatch/GL_FuturisticHydraulicHatch_Opening_CT.wav",
               "sha256": "2ec0957ab2ead11beb599acb9ac064c185519ec8731e194a3052bcc4adc1f768",
               "pack": "8600 高质量音效合集（GL_*_CT）",
-              "licence": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
               "title": "GL_FuturisticHydraulicHatch_Opening_CT",
               "startSeconds": 0.0,
               "seconds": 1.49
@@ -884,7 +893,7 @@
               "file": "音效/科幻能量/科幻飞船武器与机械界面设计音效/Computer & Telemetry/GL_MothershipControlRoom_CT.wav",
               "sha256": "f1eddd6d1ae90b89c8d7e26a8bfa06bac37e80c3673838c478b7301c06613944",
               "pack": "8600 高质量音效合集（GL_*_CT）",
-              "licence": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
               "title": "GL_MothershipControlRoom_CT",
               "startSeconds": 0.0,
               "seconds": 17.84
@@ -1441,7 +1450,7 @@
               "file": "音效/机械机器人/设计师机械伺服与金属拟音工具包/GL_Hydraulic_AirRelease_CT.wav",
               "sha256": "61fce6b6a49ceafb8fb9e63469dc8887f691df09e973a6472c343b8892e93ae7",
               "pack": "8600 高质量音效合集（GL_*_CT）",
-              "licence": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
               "title": "GL_Hydraulic_AirRelease_CT",
               "startSeconds": 0.0,
               "seconds": 1.01
@@ -1450,7 +1459,7 @@
               "file": "音效/机械机器人/设计师机械伺服与金属拟音工具包/GL_Servo12_small10_short_CT.wav",
               "sha256": "b1a83f80000ca5aab8acb72725e7a2f6fa108bbe4e040101a3a8a35b46381690",
               "pack": "8600 高质量音效合集（GL_*_CT）",
-              "licence": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
               "title": "GL_Servo12_small10_short_CT",
               "startSeconds": 0.0,
               "seconds": 0.994
@@ -1487,7 +1496,7 @@
               "file": "音效/科幻能量/科幻飞船武器与机械界面设计音效/Calibration & Maintenance/GL_MalfunctioningSturtup_CT.wav",
               "sha256": "a4025ca965ca6a4e42244d0ffa431bdf7dbc61ba354e28af446d3b1b0e647e8e",
               "pack": "8600 高质量音效合集（GL_*_CT）",
-              "licence": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
               "title": "GL_MalfunctioningSturtup_CT",
               "startSeconds": 0.0,
               "seconds": 2.5
@@ -1496,7 +1505,7 @@
               "file": "音效/科幻能量/科幻飞船武器与机械界面设计音效/Calibration & Maintenance/GL_SmallServoCalibration_CT.wav",
               "sha256": "fd3b8e3f450dc30ce19b0a0a5389ff7937fb71a53f7257cec3d5380a1b202eaa",
               "pack": "8600 高质量音效合集（GL_*_CT）",
-              "licence": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
               "title": "GL_SmallServoCalibration_CT",
               "startSeconds": 0.0,
               "seconds": 1.584
@@ -1568,7 +1577,7 @@
               "file": "音效/科幻能量/科幻飞船武器与机械界面设计音效/Servos & Machines/GL_MediumServoShutdown_CT.wav",
               "sha256": "78dcee96b979949fde2180f9e321291467b7b4dc687f54eb1a695bea0fc1727f",
               "pack": "8600 高质量音效合集（GL_*_CT）",
-              "licence": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
               "title": "GL_MediumServoShutdown_CT",
               "startSeconds": 0.0,
               "seconds": 2.5
@@ -1577,7 +1586,7 @@
               "file": "音效/科幻能量/科幻飞船武器与机械界面设计音效/Servos & Machines/GL_SmallServoShutdown_CT.wav",
               "sha256": "a13c8e8853aef16c8f62825b64a7c5685bf7d54e0dd0ba5384e180bf4a2b46e8",
               "pack": "8600 高质量音效合集（GL_*_CT）",
-              "licence": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
               "title": "GL_SmallServoShutdown_CT",
               "startSeconds": 0.0,
               "seconds": 2.8
@@ -1586,10 +1595,786 @@
               "file": "音效/科幻能量/科幻飞船武器与机械界面设计音效/Servos & Machines/GL_MediumServoShutdown2_CT.wav",
               "sha256": "7cbe7204b9f88bd75254a33d9c856ea01bf0efc23c38fc1d3333f58259114967",
               "pack": "8600 高质量音效合集（GL_*_CT）",
-              "licence": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
               "title": "GL_MediumServoShutdown2_CT",
               "startSeconds": 0.0,
               "seconds": 3.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "device.toss_spin",
+      "gain": 0.7,
+      "loop": true,
+      "pitchRange": [
+        1.0,
+        1.0
+      ],
+      "distance": {
+        "near": 3,
+        "far": 30
+      },
+      "priority": 90,
+      "maxVoices": 6,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "bus": "device-loop",
+      "layers": [
+        {
+          "sources": [
+            {
+              "file": "音效/机械机器人/设计师机械伺服与金属拟音工具包/GL_Hydraulic_PoolMotor2_CT.wav",
+              "sha256": "bcabeddcc17ae51072fc0899bc6defc028e16409c7821737bde1f774882e6992",
+              "pack": "8600 高质量音效合集（GL_*_CT）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
+              "title": "GL_Hydraulic_PoolMotor2_CT",
+              "startSeconds": 0,
+              "seconds": 11.47
+            }
+          ]
+        }
+      ],
+      "exact": true
+    },
+    {
+      "id": "device.toss_one",
+      "gain": 1.0,
+      "loop": false,
+      "pitchRange": [
+        0.98,
+        1.02
+      ],
+      "distance": {
+        "near": 4,
+        "far": 45
+      },
+      "priority": 150,
+      "maxVoices": 12,
+      "maxPerEmitter": 4,
+      "environment": true,
+      "bus": "device",
+      "maxSeconds": 1,
+      "exact": true,
+      "layers": [
+        {
+          "gainDb": -7.7,
+          "fadeOutMs": 120,
+          "sources": [
+            {
+              "file": "音效/科幻能量/freesound-energylab/FS162402_M203-Grenade-Launcher-1-flac.mp3",
+              "sha256": "ee89ac24568c6a669a32ce922be91bcdd9013699e68390f955c073e890dfff69",
+              "pack": "freesound-energylab",
+              "licence": "CC0 1.0",
+              "title": "FS162402_M203-Grenade-Launcher-1-flac",
+              "startSeconds": 0,
+              "seconds": 0.42
+            }
+          ]
+        },
+        {
+          "gainDb": -7.8,
+          "fadeOutMs": 100,
+          "sources": [
+            {
+              "file": "音效/机械机器人/设计师机械伺服与金属拟音工具包/GL_Device_Mechanic4_CT.wav",
+              "sha256": "0782bf7aa597e3711440a3cc52571b0be509923bbe76692b0d9e0ac77769605b",
+              "pack": "8600 高质量音效合集（GL_*_CT）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
+              "title": "GL_Device_Mechanic4_CT",
+              "startSeconds": 0,
+              "seconds": 0.3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "radar.deploy",
+      "gain": 1.0,
+      "loop": false,
+      "pitchRange": [
+        0.98,
+        1.02
+      ],
+      "distance": {
+        "near": 4,
+        "far": 45
+      },
+      "priority": 140,
+      "maxVoices": 6,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "bus": "device",
+      "maxSeconds": 5,
+      "exact": true,
+      "layers": [
+        {
+          "sources": [
+            {
+              "file": "音效/科幻能量/动漫科幻音效包/ASF_MACHINE_Medium_Power_Up01.wav",
+              "sha256": "4cfd1e52bccc5674aa464a12efd03b43d7589ecb9c49bc26f2dc6f8c14845a71",
+              "pack": "动漫科幻音效包",
+              "licence": "所有者 2026-11-05 说明为开源素材（授权类型未逐件记录）",
+              "title": "ASF_MACHINE_Medium_Power_Up01",
+              "startSeconds": 0,
+              "seconds": 2.824
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "radar.sweep",
+      "gain": 0.3,
+      "loop": false,
+      "pitchRange": [
+        1.0,
+        1.0
+      ],
+      "distance": {
+        "near": 3,
+        "far": 20
+      },
+      "priority": 80,
+      "maxVoices": 6,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 0.8,
+      "bus": "device",
+      "layers": [
+        {
+          "sources": [
+            {
+              "file": "音效/科幻能量/动漫科幻音效包/ASF_COMPUTER_Scan07_Loop.wav",
+              "sha256": "8e3d2e3af4f3c53456c265f6901af8ceb1737324a5e73ce6f74ea2665fb50b0a",
+              "pack": "动漫科幻音效包",
+              "licence": "所有者 2026-11-05 说明为开源素材（授权类型未逐件记录）",
+              "title": "ASF_COMPUTER_Scan07_Loop",
+              "startSeconds": 0,
+              "seconds": 4.16
+            }
+          ]
+        }
+      ],
+      "exact": true
+    },
+    {
+      "id": "floodlight.fan",
+      "gain": 0.55,
+      "loop": true,
+      "pitchRange": [
+        1.0,
+        1.0
+      ],
+      "distance": {
+        "near": 3,
+        "far": 30
+      },
+      "priority": 80,
+      "maxVoices": 6,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "bus": "device-loop",
+      "layers": [
+        {
+          "sources": [
+            {
+              "file": "音效/环境氛围/城市/041 港口码头工业车间及周围环境音效/Harbor ＆ Industrial/NP04 0687 Industrial ventilation loop v3.wav",
+              "sha256": "7e3deada7ba3f6761f90bc15436af75c6f0ae80a17b90cf857a93109b1070b07",
+              "pack": "Boom Library - 041 港口码头工业车间及周围环境音效",
+              "licence": "Boom Library",
+              "title": "NP04 0687 Industrial ventilation loop v3",
+              "startSeconds": 0,
+              "seconds": 28.599
+            }
+          ]
+        }
+      ],
+      "exact": true
+    },
+    {
+      "id": "floodlight.on",
+      "gain": 1.0,
+      "loop": false,
+      "pitchRange": [
+        0.98,
+        1.02
+      ],
+      "distance": {
+        "near": 4,
+        "far": 45
+      },
+      "priority": 140,
+      "maxVoices": 6,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "bus": "device",
+      "maxSeconds": 3,
+      "exact": true,
+      "layers": [
+        {
+          "gainDb": -4,
+          "fadeOutMs": 200,
+          "sources": [
+            {
+              "file": "音效/科幻能量/动漫科幻音效包/ASF_MACHINE_Small_Power_Up01.wav",
+              "sha256": "0a52cb496eee62085d8fc41cb5c8a2cc7116317345b580e63bf4593e0dee2185",
+              "pack": "动漫科幻音效包",
+              "licence": "所有者 2026-11-05 说明为开源素材（授权类型未逐件记录）",
+              "title": "ASF_MACHINE_Small_Power_Up01",
+              "startSeconds": 0,
+              "seconds": 1.5
+            }
+          ]
+        },
+        {
+          "gainDb": -7.3,
+          "fadeOutMs": 150,
+          "sources": [
+            {
+              "file": "音效/机械机器人/设计师机械伺服与金属拟音工具包/GL_Electric_power4_CT.wav",
+              "sha256": "0d1327570761f9e92cba9754e3ab6da2611fef50b9e2b55b0f2a7e3a29b5ba2d",
+              "pack": "8600 高质量音效合集（GL_*_CT）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
+              "title": "GL_Electric_power4_CT",
+              "startSeconds": 0,
+              "seconds": 0.5
+            }
+          ]
+        },
+        {
+          "offsetMs": 200,
+          "gainDb": -10.7,
+          "fadeInMs": 200,
+          "fadeOutMs": 200,
+          "sources": [
+            {
+              "file": "音效/机械机器人/设计师机械伺服与金属拟音工具包/GL_Device_Electronic9_humming_CT.wav",
+              "sha256": "e843152e4cca1a3687c7d763e892166b52b1d1fcc7087c246e06ee59feb378bf",
+              "pack": "8600 高质量音效合集（GL_*_CT）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
+              "title": "GL_Device_Electronic9_humming_CT",
+              "startSeconds": 1.2,
+              "seconds": 1.3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mine.land",
+      "gain": 1.0,
+      "loop": false,
+      "pitchRange": [
+        0.98,
+        1.02
+      ],
+      "distance": {
+        "near": 3,
+        "far": 35
+      },
+      "priority": 120,
+      "maxVoices": 16,
+      "maxPerEmitter": 16,
+      "environment": true,
+      "bus": "device",
+      "maxSeconds": 1.2,
+      "exact": true,
+      "layers": [
+        {
+          "sources": [
+            {
+              "file": "音效/机械机器人/设计师机械伺服与金属拟音工具包/GL_Impact_Metal_Clang2_CT.wav",
+              "sha256": "1ee98ab0ad89ba5e539182b63f22eeb7fdc666d7103e60d296098a1d16e3c5bb",
+              "pack": "8600 高质量音效合集（GL_*_CT）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
+              "title": "GL_Impact_Metal_Clang2_CT",
+              "startSeconds": 0,
+              "seconds": 0.375
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mine.trigger",
+      "gain": 1.0,
+      "loop": false,
+      "pitchRange": [
+        0.98,
+        1.02
+      ],
+      "distance": {
+        "near": 3,
+        "far": 40
+      },
+      "priority": 200,
+      "maxVoices": 8,
+      "maxPerEmitter": 4,
+      "environment": true,
+      "bus": "device",
+      "maxSeconds": 1.4,
+      "exact": true,
+      "layers": [
+        {
+          "sources": [
+            {
+              "file": "音效/机械机器人/设计师机械伺服与金属拟音工具包/GL_Mechanical_Metal_Button_CT.wav",
+              "sha256": "1dcc109dce355df23e93341ef25edeb87a7b55ee2f18d9b30343bd2f5b9055ff",
+              "pack": "8600 高质量音效合集（GL_*_CT）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
+              "title": "GL_Mechanical_Metal_Button_CT",
+              "startSeconds": 0,
+              "seconds": 0.625
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mine.explode",
+      "gain": 1.0,
+      "loop": false,
+      "pitchRange": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 8,
+        "far": 180,
+        "curve": [
+          [
+            0,
+            1
+          ],
+          [
+            8,
+            1
+          ],
+          [
+            40,
+            0.61
+          ],
+          [
+            90,
+            0.3
+          ],
+          [
+            180,
+            0
+          ]
+        ]
+      },
+      "priority": 225,
+      "maxVoices": 12,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "bus": "boom",
+      "maxSeconds": 6.4,
+      "exact": true,
+      "layers": [
+        {
+          "gainDb": -4.5,
+          "fadeOutMs": 500,
+          "sources": [
+            {
+              "file": "音效/科幻能量/110 冲击粒子能量爆炸科幻元素音效/Matter - Sci-Fi Elements/EXPLDsgn_EXPLOSION LARGE-Hollow Burst_B00M_MATTER.wav",
+              "sha256": "4240525ebedd66ac2adf22e6ab03ed6af4e9b6998945f32059b6f81105353127",
+              "pack": "Boom Library - 110 冲击粒子能量爆炸科幻元素音效",
+              "licence": "Boom Library",
+              "title": "EXPLDsgn_EXPLOSION LARGE-Hollow Burst_B00M_MATTER",
+              "startSeconds": 0.347,
+              "seconds": 1.51
+            }
+          ]
+        },
+        {
+          "gainDb": -1.7,
+          "fadeOutMs": 500,
+          "sources": [
+            {
+              "file": "音效/冲击打击/115 动漫音效/BL_Anime_Essentials/EXPLDsgn_EXPLOSION SHORT-Punchy Thud_B00M_AE.wav",
+              "sha256": "7e21d44cdeb1bc67a24de3bdbd5c6e9d89c09c759e125f439885e228fd080638",
+              "pack": "Boom Library - 115 动漫音效",
+              "licence": "Boom Library",
+              "title": "EXPLDsgn_EXPLOSION SHORT-Punchy Thud_B00M_AE",
+              "startSeconds": 0.092,
+              "seconds": 1.3
+            }
+          ]
+        },
+        {
+          "offsetMs": 100,
+          "gainDb": -15.6,
+          "fadeInMs": 20,
+          "fadeOutMs": 1000,
+          "sources": [
+            {
+              "file": "音效/爆炸破坏/战斗音效合集/Explosion_hit_stone_1.wav",
+              "sha256": "0a78dd92c1710b3567fef6bcf97fc94a794ba2264038cbb59881ac5a594a35aa",
+              "pack": "战斗音效合集",
+              "licence": "所有者 2026-11-05 说明为开源素材（授权类型未逐件记录）",
+              "title": "Explosion_hit_stone_1",
+              "startSeconds": 0,
+              "seconds": 2.97
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "glue.land",
+      "gain": 1.0,
+      "loop": false,
+      "pitchRange": [
+        0.98,
+        1.02
+      ],
+      "distance": {
+        "near": 3,
+        "far": 35
+      },
+      "priority": 120,
+      "maxVoices": 16,
+      "maxPerEmitter": 16,
+      "environment": true,
+      "bus": "device",
+      "maxSeconds": 1.6,
+      "exact": true,
+      "layers": [
+        {
+          "fadeOutMs": 200,
+          "sources": [
+            {
+              "file": "音效/生物怪物/072 变异外星生物流体有机物音效/Mutate Organic CK/LIQImpt_IMPACT-Slime Throw Wobbly_B00M_MOCK.wav",
+              "sha256": "9d20f3648a649dac7cfb1ab5c3b5079a3a760ecd0c554024742b969fb2000d11",
+              "pack": "Boom Library - 072 变异外星生物流体有机物音效",
+              "licence": "Boom Library",
+              "title": "LIQImpt_IMPACT-Slime Throw Wobbly_B00M_MOCK",
+              "startSeconds": 0.375,
+              "seconds": 0.8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "glue.trigger",
+      "gain": 1.0,
+      "loop": false,
+      "pitchRange": [
+        0.98,
+        1.02
+      ],
+      "distance": {
+        "near": 3,
+        "far": 40
+      },
+      "priority": 190,
+      "maxVoices": 8,
+      "maxPerEmitter": 4,
+      "environment": true,
+      "bus": "device",
+      "maxSeconds": 1.2,
+      "exact": true,
+      "layers": [
+        {
+          "sources": [
+            {
+              "file": "音效/机械机器人/设计师机械伺服与金属拟音工具包/GL_Mechanical_Metal_Button_CT.wav",
+              "sha256": "1dcc109dce355df23e93341ef25edeb87a7b55ee2f18d9b30343bd2f5b9055ff",
+              "pack": "8600 高质量音效合集（GL_*_CT）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
+              "title": "GL_Mechanical_Metal_Button_CT",
+              "startSeconds": 0,
+              "seconds": 0.625
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "weapon.recoilless_fire",
+      "gain": 1.0,
+      "loop": false,
+      "pitchRange": [
+        0.98,
+        1.02
+      ],
+      "distance": {
+        "near": 6,
+        "far": 90
+      },
+      "priority": 215,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "bus": "weapon",
+      "maxSeconds": 3,
+      "mix": {
+        "self": {
+          "spatial": "2d"
+        },
+        "other": {
+          "spatial": "3d"
+        }
+      },
+      "exact": true,
+      "layers": [
+        {
+          "fadeOutMs": 375,
+          "sources": [
+            {
+              "file": "音效/武器枪械/033 狙击枪机枪开枪突击武器音效/Assault Weapons DS/AWDS Grenade Launcher Close Single.wav",
+              "sha256": "5829310855ac3f1f7f1d3c6b465a68bad8c3f7fe186df0042359f93baf4b94b6",
+              "pack": "Boom Library - 033 狙击枪机枪开枪突击武器音效",
+              "licence": "Boom Library",
+              "title": "AWDS Grenade Launcher Close Single",
+              "startSeconds": 0.205,
+              "seconds": 1.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "weapon.recoilless_backblast",
+      "gain": 1.0,
+      "loop": false,
+      "pitchRange": [
+        0.98,
+        1.02
+      ],
+      "distance": {
+        "near": 5,
+        "far": 70
+      },
+      "priority": 205,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "bus": "shell-flight",
+      "maxSeconds": 3,
+      "exact": true,
+      "layers": [
+        {
+          "sources": [
+            {
+              "file": "音效/武器枪械/092 汽油火焰喷射器音效/Flammable Liquid/Flamethrower Single Thick Short Burst.wav",
+              "sha256": "f0f213b970acf981d3030d5623b6bcc0a441ffd32e4f40b5ca5d2f9a24f9d5b3",
+              "pack": "Boom Library - 092 汽油火焰喷射器音效",
+              "licence": "Boom Library",
+              "title": "Flamethrower Single Thick Short Burst",
+              "startSeconds": 0,
+              "seconds": 1.698
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "weapon.recoilless_burst",
+      "gain": 1.0,
+      "loop": false,
+      "pitchRange": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 8,
+        "far": 180,
+        "curve": [
+          [
+            0,
+            1
+          ],
+          [
+            8,
+            1
+          ],
+          [
+            40,
+            0.61
+          ],
+          [
+            90,
+            0.3
+          ],
+          [
+            180,
+            0
+          ]
+        ]
+      },
+      "priority": 215,
+      "maxVoices": 12,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "bus": "boom",
+      "maxSeconds": 7,
+      "exact": true,
+      "layers": [
+        {
+          "fadeOutMs": 800,
+          "sources": [
+            {
+              "file": "音效/爆炸破坏/035 爆炸冲击破坏电影游戏音效/Destruction CK/DTCK EXPLOSION Fuel.wav",
+              "sha256": "144f33f958bf57265956cd2b66a3edfd97e36feaff29444c3ddeb25e36c78410",
+              "pack": "Boom Library - 035 爆炸冲击破坏电影游戏音效",
+              "licence": "Boom Library",
+              "title": "DTCK EXPLOSION Fuel",
+              "startSeconds": 0.225,
+              "seconds": 3.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "weapon.homing_fire",
+      "gain": 1.0,
+      "loop": false,
+      "pitchRange": [
+        0.98,
+        1.02
+      ],
+      "distance": {
+        "near": 6,
+        "far": 100
+      },
+      "priority": 190,
+      "maxVoices": 12,
+      "maxPerEmitter": 4,
+      "environment": true,
+      "bus": "shell-flight",
+      "maxSeconds": 1,
+      "mix": {
+        "self": {
+          "spatial": "2d"
+        },
+        "other": {
+          "spatial": "3d"
+        }
+      },
+      "exact": true,
+      "layers": [
+        {
+          "sources": [
+            {
+              "file": "音效/武器枪械/现代武器全套音效/Beretta ARX200 Assault Rifle/ARX200_OneShot_2.wav",
+              "sha256": "4b850ba1744847d9124fffeb9c1ad81eb98a732bbea7974ff17576e7f624d37b",
+              "pack": "现代武器全套音效",
+              "licence": "Unity Asset Store EULA",
+              "title": "ARX200_OneShot_2",
+              "startSeconds": 0,
+              "seconds": 0.673
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "strike.strafe_line",
+      "gain": 1.0,
+      "loop": false,
+      "pitchRange": [
+        0.98,
+        1.02
+      ],
+      "distance": {
+        "near": 10,
+        "far": 120
+      },
+      "priority": 190,
+      "maxVoices": 4,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "bus": "shell-flight",
+      "maxSeconds": 7,
+      "exact": true,
+      "layers": [
+        {
+          "sources": [
+            {
+              "file": "音效/科幻能量/科幻飞船武器与机械界面设计音效/武器 Weapons/GL_MeteorGatlingRifle3_CT.wav",
+              "sha256": "7f56f602fce280e15fd725bce3f0d24d0612ecac28f7a9aeae2b3430f78e4456",
+              "pack": "8600 高质量音效合集（GL_*_CT）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
+              "title": "GL_MeteorGatlingRifle3_CT",
+              "startSeconds": 0,
+              "seconds": 1.98
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "strike.strafe_impact",
+      "gain": 1.0,
+      "loop": false,
+      "pitchRange": [
+        0.98,
+        1.02
+      ],
+      "distance": {
+        "near": 6,
+        "far": 90
+      },
+      "priority": 150,
+      "maxVoices": 16,
+      "maxPerEmitter": 16,
+      "environment": true,
+      "bus": "impact",
+      "maxSeconds": 4,
+      "exact": true,
+      "layers": [
+        {
+          "sources": [
+            {
+              "file": "音效/爆炸破坏/战斗音效合集/Bullet_hit_grond_1.wav",
+              "sha256": "622991d3e9bce08ba01ca0a4e38bcbafc534ab5ba5307a65d3a43b15d14f43b4",
+              "pack": "战斗音效合集",
+              "licence": "所有者 2026-11-05 说明为开源素材（授权类型未逐件记录）",
+              "title": "Bullet_hit_grond_1",
+              "startSeconds": 0,
+              "seconds": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "strike.hunter_lock",
+      "gain": 1.0,
+      "loop": false,
+      "pitchRange": [
+        0.98,
+        1.02
+      ],
+      "distance": {
+        "near": 6,
+        "far": 80
+      },
+      "priority": 200,
+      "maxVoices": 4,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "bus": "beam",
+      "maxSeconds": 4,
+      "exact": true,
+      "layers": [
+        {
+          "sources": [
+            {
+              "file": "音效/科幻能量/动漫科幻音效包/ASF_UI_Laser_Scan01v2.wav",
+              "sha256": "a4a88a2c7ad047673853e98cc507164fd0cfbccbca715635abbcb5d4120e204a",
+              "pack": "动漫科幻音效包",
+              "licence": "所有者 2026-11-05 说明为开源素材（授权类型未逐件记录）",
+              "title": "ASF_UI_Laser_Scan01v2",
+              "startSeconds": 0,
+              "seconds": 2.763
             }
           ]
         }

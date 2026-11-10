@@ -1,54 +1,42 @@
 using System;
-using System.IO;
-using System.Runtime.CompilerServices;
 using BepInEx;
-using BepInEx.Configuration;
 using BepInEx.Unity.IL2CPP;
 using ForgeAudio;
-using ForgeCore;
 using ForgeOrdnance;
 using GTFO.API;
 using HarmonyLib;
-using SNetwork;
 using UnityEngine;
 
 namespace ForgeOrdnanceArsenal;
 
 [BepInPlugin(Id, "Forge Ordnance Arsenal", Version)]
 [BepInDependency("dev.gtfomodding.gtfo-api", ">=0.6.1")]
-[BepInDependency("NAinfini.ForgeCore")]
-[BepInDependency("NAinfini.ForgeOrdnance")]
-[BepInDependency(ForgeUI.UIKit.PluginId)]
-[BepInDependency(AudioKit.PluginId)]
-[BepInDependency("NAinfini.ForgeVisual")]
+[BepInDependency("NAinfini.ForgeCore", ">=1.0.0")]
+[BepInDependency("NAinfini.ForgeOrdnance", ">=1.0.1")]
+[BepInDependency(ForgeUI.UIKit.PluginId, ">=1.0.0")]
+[BepInDependency(AudioKit.PluginId, ">=1.0.0")]
+[BepInDependency("NAinfini.ForgeVisual", ">=1.0.0")]
 internal sealed class Plugin : BasePlugin
 {
     internal const string Id = "NAinfini.ForgeOrdnanceArsenal";
-    internal const string Version = "1.0.0";
+    internal const string Version = "1.0.1"; // package-version: NAinfini-ForgeOrdnance_Arsenal
 
-    private static readonly ForgeCore.ModLog _log = ForgeCore.Log.For(Id);
-    internal static ConfigEntry<bool> ExtraLights = null!;
-
-    /// <summary>Errors are the only log lines. Each exact text is written once.</summary>
-    internal static void Error(string message) => _log.ErrorOnce(message);
-
-    /// <summary>A message that has no repeating call site (a rejected network record, whose reason differs each time): written as it is.</summary>
-    internal static void Report(string message) => _log.Error(message);
+    /// <summary>This mod's ForgeCore log: errors are the only log lines, and `ErrorOnce` writes each exact text once.</summary>
+    internal static readonly ForgeCore.ModLog Logger = ForgeCore.Log.For(Id);
 
     public override void Load()
     {
         ArsenalKeys.Register();
-        ExtraLights = Config.Bind("Presentation", "Extra lights", true, "Point lights on strike areas and beams, and shell impact flashes.");
         // Registration is independent: a refused type must not strand the other registered type without its driver.
         var strike = OrdnanceApi.RegisterPayload(StrikeSpec.TypeName, new StrikePayload());
         var heavy = OrdnanceApi.RegisterPayload(HeavyWeaponSpec.TypeName, new HeavyWeaponPayload());
         if (!strike || !heavy)
-            Error("Forge Ordnance refused Arsenal payload type(s): " + (!strike ? StrikeSpec.TypeName + " " : "")
+            Logger.ErrorOnce("Forge Ordnance refused Arsenal payload type(s): " + (!strike ? StrikeSpec.TypeName + " " : "")
                 + (!heavy ? HeavyWeaponSpec.TypeName : "") + "; see its registration error. Accepted types remain available.");
-        if (!strike && !heavy)
-        {
-            return;
-        }
+        var deployable = OrdnanceApi.RegisterPayload(DeployableSpec.TypeName, new DeployablePayload());
+        if (!deployable)
+            Logger.ErrorOnce("Forge Ordnance refused Arsenal payload type " + DeployableSpec.TypeName + "; see its registration error. The standing devices are not available.");
+        if (!strike && !heavy && !deployable) return;
         ArsenalNetwork.Register();
         var harmony = new Harmony(Id);
         try
@@ -59,21 +47,26 @@ internal sealed class Plugin : BasePlugin
             // Heavy weapons are named once the definitions are read, so one already in a backpack after a save reload has its name.
             OrdnanceApi.DefinitionsReady += ArsenalText.NameHeavyWeapons;
             harmony.PatchAll(typeof(Plugin).Assembly);
+            ForgeCore.Items.Spawned += DeployableActions.OnItemSpawned;
+            HeavyWeapons.Subscribe();
             LauncherFire.Subscribe();
-            LauncherBullet.Subscribe();
+            WithheldBullet.Subscribe();
             LauncherReload.Subscribe();
+            HomingFire.Subscribe();
             ForgeCore.Frame.OnUpdate(Id, Tick);
             ForgeCore.Frame.OnQuit(Id, ArsenalAudio.Dispose);
             LevelAPI.OnBuildDone += ArsenalArt.Load;
             LevelAPI.OnEnterLevel += StrikeBursts.EnterLevel;
             ForgeCore.GameEvents.LevelEnded += () => { StrikeBursts.LeaveLevel(); Void("level cleanup"); };
-            EventAPI.OnCheckpointReloaded += () => { StrikeVisuals.CloseReplay(); Void("checkpoint reload"); };
+            ForgeCore.GameEvents.CheckpointReloaded += () => { StrikeVisuals.CloseReplay(); Void("checkpoint reload"); };
             ForgeCore.GameEvents.MasterChanged += HostChanged;
+            // A migration can end with the same master, which MasterChanged does not report; ForgeOrdnance voids its own state then as well.
+            ForgeCore.GameEvents.MasterMigrated += HostChanged;
         }
         catch (Exception error)
         {
             ArsenalAudio.Dispose();
-            Error("Forge Ordnance Arsenal initialization failed: " + error);
+            Logger.ErrorOnce("Forge Ordnance Arsenal initialization failed: " + error);
             harmony.UnpatchSelf();
             throw;
         }
@@ -81,7 +74,7 @@ internal sealed class Plugin : BasePlugin
 
     public override bool Unload() => false;
 
-    /// <summary>Everything in flight is dropped: shells, zones, beams, racks; a lent weapon goes back (except on level exit,
+    /// <summary>Everything in flight is dropped: shells, zones, beams, racks (not at a host change); a lent weapon goes back (except on level exit,
     /// where the game resets the inventory itself).</summary>
     private static void Void(string why)
     {
@@ -92,21 +85,26 @@ internal sealed class Plugin : BasePlugin
             StrikeVisuals.Clear();
             HeavyWeapons.Clear(why);
             Grenades.Clear();
+            HomingFire.Clear();
             ArsenalTurrets.Clear();
+            Deployables.Clear();
         }
-        catch (Exception error) { Error("Clearing the Arsenal state failed (" + why + "): " + error); }
+        catch (Exception error) { Logger.ErrorOnce("Clearing the Arsenal state failed (" + why + "): " + error); }
     }
 
-    /// <summary>The host changed on this peer too (a client that stays a client sees the new master as well): everything in flight is void.</summary>
+    /// <summary>The host changed on this peer too (a client that stays a client sees the new master as well): everything in flight is void, except the racks
+    /// still lying in their pods (<see cref="HeavyWeapons.Clear"/>).</summary>
     internal static void HostChanged() => Void("host change");
 
     internal static void Tick()
     {
         var now = Time.time;
         ArsenalNetwork.Pump();
-        if (SNet.IsMaster) Strikes.Tick(now);
+        if (ForgeCore.Session.IsHost) Strikes.Tick(now);
         StrikeVisuals.Tick(now);
         HeavyWeapons.Tick(now);
         Grenades.Tick(now);
+        Deployables.Tick(now);
+        ArcTrails.Tick();
     }
 }

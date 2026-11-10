@@ -4,19 +4,20 @@ mesh object per --split (a magazine). fit_sight.py then fits the reflex sight.
 The download is untrusted data: it is only imported as glTF, and the source file is never written.
 
 blender -b --factory-startup --python import_body.py -- --glb <file.glb> --name M08 --length 1.04 [--turn-z 0] [--grip x,y,z]
-    [--drop name,name] [--remove x0,x1,y0,y1,z0,z1 ...] [--split Name=x0,x1,y0,y1,z0,z1[,px,py,pz] ...]
+    [--drop name,name] [--remove x0,x1,y0,y1,z0,z1 ...] [--cut x0,x1,y0,y1,z0,z1 ...] [--split Name=x0,x1,y0,y1,z0,z1[,px,py,pz] ...]
     [--socket Name=x,y,z ...] [--max-tris 19000] [--ao 0.85] [--texture 2048] [--list-parts] --save <new.blend>
 
 - --drop removes the glTF objects whose own or parent name contains one of the words (a separate scope and its mounts);
 - the model turns --turn-z degrees about Z (front to -Y), takes --length along Y, and its bounding box centre goes to the origin;
   --grip (in that centred frame) then becomes the origin;
 - --remove deletes the loose parts lying wholly inside a box of the final frame (a scope or handle modelled into the single mesh);
+- --cut x0,x1,y0,y1,z0,z1 deletes the faces lying wholly inside a box of the final frame (a front sight post welded into the barrel);
 - --split moves the loose parts wholly inside a box into their own mesh object `Name` (a magazine the reload animation moves). Its origin
   is (px, py, pz), by default the box centre; it shares the gun's materials;
 - --socket adds an empty `Name` at x,y,z of the final frame: `RightHand` (the centre of the pistol grip) and `LeftHand` (the centre of the
   fore grip or handguard) are the palm points the game's hands are put on;
 - the bore is put on x = 0 after the removals (a part taken off one side does not move the gun sideways);
-- above --max-tris the mesh is welded and reduced with Blender's quadric (collapse) decimation, which keeps UVs, and its corner
+- above --max-tris the mesh is welded and reduced with Blender's quadric (collapse) decimation that does not collapse UV borders or material borders, and its corner
   normals are copied from the nearest face of the full mesh; at or below it the imported mesh and its normals are kept unchanged.
   The budget is shared between the gun and its split objects by triangle count;
 - each material keeps its base colour, metallic-roughness (glTF: G roughness, B metallic) and normal images, at most --texture
@@ -40,6 +41,7 @@ p.add_argument("--turn-z", type=float, default=0.0)
 p.add_argument("--grip", default="0,0,0")
 p.add_argument("--drop", default="")
 p.add_argument("--remove", action="append", default=[])
+p.add_argument("--cut", action="append", default=[])
 p.add_argument("--split", action="append", default=[])
 p.add_argument("--socket", action="append", default=[])
 p.add_argument("--max-tris", type=int, default=19000)
@@ -130,6 +132,11 @@ for box in a.remove:
 before = len(bm.faces)
 bmesh.ops.delete(bm, geom=list(set(doomed)), context="VERTS")
 print("BODY removed", before - len(bm.faces), "faces in", len(a.remove), "boxes")
+for box in a.cut:
+    x0, x1, y0, y1, z0, z1 = [float(c) for c in box.split(",")]
+    inside = [f for f in bm.faces if all(x0 <= q.co.x <= x1 and y0 <= q.co.y <= y1 and z0 <= q.co.z <= z1 for q in f.verts)]
+    bmesh.ops.delete(bm, geom=inside, context="FACES")
+    print("BODY cut", len(inside), "faces")
 bm.normal_update()
 if a.list_parts:
     for g in sorted(loose_parts(bm), key=lambda g: -max(q.co.z for q in g))[:60]:
@@ -188,6 +195,7 @@ def reduce(o, budget):
     welded = tri_count(me)
     mod = o.modifiers.new("decimate", "DECIMATE"); mod.decimate_type = "COLLAPSE"
     mod.ratio = budget / welded; mod.use_collapse_triangulate = True
+    mod.delimit = {"UV", "MATERIAL"}  # edges on a UV border or a material border are never collapsed
     bpy.context.view_layer.objects.active = o; o.select_set(True)
     bpy.ops.object.modifier_apply(modifier=mod.name)
     # Welding and collapsing bend the shading; the corner normals come back from the nearest face of the full mesh, so the

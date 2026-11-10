@@ -17,11 +17,10 @@
          weapon slot; none
          references a game or Unity assembly. -->
     <Compile Include="../../Core/*.cs" Link="Core/%(Filename)%(Extension)" />
-    <Compile Include="../../../ForgeCore/Once/Fnv.cs;../../../ForgeCore/Once/StrictJson.cs" Link="ForgeCore/%(Filename)%(Extension)" />
+    <Compile Include="../../../ForgeCore/Once/Fnv.cs;../../../ForgeCore/Once/StrictJson.cs;../../../ForgeCore/Once/PackItem.cs" Link="ForgeCore/%(Filename)%(Extension)" />
     <Compile Include="../../../ForgeOrdnance/Core/*.cs" Link="OrdnanceCore/%(Filename)%(Extension)" />
     <Compile Include="../../../ForgeCore/Core/SpecialSlot.cs;../../../ForgeCore/Core/NetEpoch.cs;../../../ForgeCore/Core/Log.cs;../../../ForgeCore/Once/OnceReporter.cs" Link="ForgeCore/%(Filename)%(Extension)" />
-    <Compile Include="../../../ForgeCore/Core/FrameBook.cs;../../../ForgeCore/Native/Frame.cs;../../../ForgeCore/Native/LogVector.cs" Link="ForgeCore/%(Filename)%(Extension)" />
-    <Compile Include="*.cs" />
-    <Compile Include="../../Native/HeavyWeapons.cs;../../Native/ArsenalKeys.cs;../../Native/StrikeVisuals.cs;../../Native/Plugin.cs;../../Native/Grenades.cs;../../Native/StrikePayload.cs;../../Native/VanillaCombat.cs;../../Native/ArsenalNetwork.cs;../../../ForgeOrdnance/Native/Delivery/OrdnanceClaims.cs;../../../ForgeCore/Native/LoanedGun.cs" Link="Native/%(Filename)%(Extension)" />
+    <Compile Include="../../../ForgeCore/Core/FrameBook.cs" Link="ForgeCore/%(Filename)%(Extension)" />
+    <Compile Include="Program.cs" />
   </ItemGroup>
 </Project>

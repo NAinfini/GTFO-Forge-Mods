@@ -1,0 +1,36 @@
+Third-party models and effect textures in forge-ordnance-arsenal.bundle. Each was downloaded free under the
+licence shown on its page, then re-oriented, scaled and re-exported for the game (flat colours of the low-poly models merged
+into one small palette texture; textured models keep their own textures, resized, with the ambient occlusion multiplied into the
+base colour; effect textures converted to white-on-alpha and packed into atlases). The originals are not included.
+
+Gun models, from Sketchfab per the project owner (the downloads hold no licence text and no record of author or page):
+
+- "heavy-mg": Minimi light machine gun (file "minimi.fbx").
+  Modified: the carry handle, rear sight and front sight post are removed, the ammo box is a separate part, and the reflex sight below is fitted on the top cover.
+- "anti-materiel-rifle": B&T SPR 300 (file "B&T SPR 300.fbx").
+  Modified: the telescopic sight is removed, the mesh is reduced from about 51,000 to about 42,000 triangles, the magazine is a separate part and the reflex sight below is fitted on the top rail.
+- "tracking-rifle": Honey Badger (file "game ready honeybadger").
+  Modified: the optic, its lens and the laser beam are removed, the magazine is a separate part, and the reflex sight below is fitted on the top rail.
+
+Gun model, Creative Commons Attribution 4.0 (https://creativecommons.org/licenses/by/4.0/):
+
+- "grenade-launcher": "RG-6 Grenade Launcher" by Sassiska (https://sketchfab.com/Sassiska),
+  https://sketchfab.com/3d-models/rg-6-grenade-launcher-d911c28d568c4dec838d67760f323d98, CC BY 4.0.
+  Modified: the folding leaf sight and the front sight post are removed and the reflex sight below is fitted on the top tube.
+
+Models generated for this project by its owner with a paid Tripo subscription (commercial use included) and repaired for the game: "shell", "shell-precision", "shell-hunter", "shell-incendiary", "bomblet", "rocket",
+"grenade-40", "gas-canister", "stasis-emitter", "mine", "glue-mine", "recoilless", "turret-burst", "turret-sniper", "turret-shotgun", "dispenser", "radar", "floodlight".
+
+Sight on the four guns, Creative Commons Zero (public domain dedication; credit given anyway):
+
+- "Red Dot Sight" by Jean PFP, https://opengameart.org/content/red-dot-sight, CC0 1.0
+  (https://creativecommons.org/publicdomain/zero/1.0/). Modified: scaled to 10 cm, recoloured dark, a red dot added at the window centre.
+
+Effect textures, Creative Commons Zero (public domain dedication; credit given anyway):
+
+- vfx-flare, vfx-spark: from "Particle Pack" by Kenney (https://kenney.nl/assets/particle-pack), CC0.
+- vfx-smoke: "Smoke Aura" by Beast, posted by tehwave (https://opengameart.org/content/smoke-aura), CC0.
+- vfx-fireball: frames of the Unity Labs VFX image sequence (FireBall02), CC0 1.0 (https://unity.com/blog/engine-platform/free-vfx-image-sequences-flipbooks), downsized and packed by tools/make_unitylabs_atlases.py.
+- vfx-ring, vfx-scorch, vfx-streak, vfx-glow: drawn for this package by tools/make_fx_textures.py (own work, CC0).
+
+Downloaded on 2026-10-24 (grenade-launcher), 2026-10-28 (the sight) and 2026-11-04 (heavy-mg, anti-materiel-rifle, tracking-rifle).

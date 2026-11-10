@@ -1,4 +1,4 @@
-The converted Ogg Vorbis files are derived from the exact owner-selected recordings in sources.json.
+The converted Ogg Vorbis files are derived from the exact owner-selected recordings in sources.forge.
 The original recordings are not included in Git or the release package.
 
 Sonniss GameAudioGDC bundles (the owner's licensed royalty-free bundles; the original bundle licence remains authoritative):
@@ -58,6 +58,13 @@ Boom Library:
 - weapon.grenade_burst - Boom Library - 035 爆炸冲击破坏电影游戏音效 - DTCK EXPLOSION Stone Pit Distant.wav
 - weapon.grenade_burst - Boom Library - 045 城市建筑物爆炸音效 - UEDS EXPLOSION INDOOR FAST Large 2.0.wav
 - turret.idle - Boom Library - 034 未来科幻机器人音效 - SF-DS Ambience Computerroom Low 02.wav
+- floodlight.fan - Boom Library - 041 港口码头工业车间及周围环境音效 - NP04 0687 Industrial ventilation loop v3.wav
+- mine.explode - Boom Library - 110 冲击粒子能量爆炸科幻元素音效 - EXPLDsgn_EXPLOSION LARGE-Hollow Burst_B00M_MATTER.wav
+- mine.explode - Boom Library - 115 动漫音效 - EXPLDsgn_EXPLOSION SHORT-Punchy Thud_B00M_AE.wav
+- glue.land - Boom Library - 072 变异外星生物流体有机物音效 - LIQImpt_IMPACT-Slime Throw Wobbly_B00M_MOCK.wav
+- weapon.recoilless_fire - Boom Library - 033 狙击枪机枪开枪突击武器音效 - AWDS Grenade Launcher Close Single.wav
+- weapon.recoilless_backblast - Boom Library - 092 汽油火焰喷射器音效 - Flamethrower Single Thick Short Burst.wav
+- weapon.recoilless_burst - Boom Library - 035 爆炸冲击破坏电影游戏音效 - DTCK EXPLOSION Fuel.wav
 
 Attribution (Creative Commons Attribution; converted and trimmed for game use):
 
@@ -68,27 +75,45 @@ Public domain (CC0 1.0, no attribution required), recorded for provenance:
 
 - weapon.grenade_fire - "163458_2263027-hq.mp3" by LeMudCrab (https://freesound.org/people/LeMudCrab/sounds/163458/)
 - weapon.grenade_reload - "561471_12429869-hq.mp3" by GameWithBepis (https://freesound.org/people/GameWithBepis/sounds/561471/)
+- device.toss_one - "M203 Grenade Launcher 1.flac" (https://freesound.org/s/162402/)
 
-Owner-confirmed open source (8600 high-quality sound collection):
+Sonniss (GameAudioGDC 2026), per the owner (collection: 8600 high-quality sound collection):
 
-- strike.gas_loop - GL_Hydraulic_AirRelease12_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
-- strike.stasis_pulse - GL_FuturisticDoor_Opening_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
-- strike.stasis_pulse - GL_FuturisticHydraulicHatch_Opening_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
-- strike.stasis_loop - GL_MothershipControlRoom_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
-- weapon.return - GL_Hydraulic_AirRelease_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
-- weapon.return - GL_Servo12_small10_short_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
-- turret.deploy - GL_MalfunctioningSturtup_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
-- turret.deploy - GL_SmallServoCalibration_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
-- turret.expire - GL_MediumServoShutdown_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
-- turret.expire - GL_SmallServoShutdown_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
-- turret.expire - GL_MediumServoShutdown2_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- strike.gas_loop - GL_Hydraulic_AirRelease12_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- strike.stasis_pulse - GL_FuturisticDoor_Opening_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- strike.stasis_pulse - GL_FuturisticHydraulicHatch_Opening_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- strike.stasis_loop - GL_MothershipControlRoom_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- weapon.return - GL_Hydraulic_AirRelease_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- weapon.return - GL_Servo12_small10_short_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- turret.deploy - GL_MalfunctioningSturtup_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- turret.deploy - GL_SmallServoCalibration_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- turret.expire - GL_MediumServoShutdown_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- turret.expire - GL_SmallServoShutdown_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- turret.expire - GL_MediumServoShutdown2_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- device.toss_spin - GL_Hydraulic_PoolMotor2_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- device.toss_one - GL_Device_Mechanic4_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- floodlight.on - GL_Electric_power4_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- floodlight.on - GL_Device_Electronic9_humming_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- mine.land - GL_Impact_Metal_Clang2_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- mine.trigger - GL_Mechanical_Metal_Button_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- glue.trigger - GL_Mechanical_Metal_Button_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- strike.strafe_line - GL_MeteorGatlingRifle3_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
 
-Origin not recorded in the sound library index (selected by the owner; confirm the licence before a public release):
+Sonniss (GameAudioGDC 2026), per the owner; the original collection name is kept after the cue name, and no author or URL is given:
 
 - strike.incoming_shell - 各式转场嗖声音效 - DS 15 Quick Pan.wav
 - strike.big_boom - 电影低频轰鸣重击音效 - INTRO-HD.NET--ESE - QUANTUM - BOOM - JC - Take Me To Church-INTRO-HD.NET-.wav
 - strike.big_boom - 电影低频轰鸣重击音效 - INTRO-HD.NET--ESE - QUANTUM - BOOM - KP - Thunderous-INTRO-HD.NET-.wav
 - strike.cluster_split - 玻璃碎裂坠落拟音 - Glass Crumble.wav
 - strike.cluster_split - 玻璃碎裂坠落拟音 - Glass Drop.wav
+- radar.deploy - 动漫科幻音效包 - ASF_MACHINE_Medium_Power_Up01.wav
+- radar.sweep - 动漫科幻音效包 - ASF_COMPUTER_Scan07_Loop.wav
+- floodlight.on - 动漫科幻音效包 - ASF_MACHINE_Small_Power_Up01.wav
+- mine.explode - 战斗音效合集 - Explosion_hit_stone_1.wav
+- strike.strafe_impact - 战斗音效合集 - Bullet_hit_grond_1.wav
+- strike.hunter_lock - 动漫科幻音效包 - ASF_UI_Laser_Scan01v2.wav
 
-Pack, source file, source SHA-256 and processing section of every clip are recorded in sources.json.
+Unity Asset Store (EULA; the owner's licensed asset, not included in Git or the release package):
+- weapon.homing_fire - 现代武器全套音效 - ARX200_OneShot_2.wav
+
+Pack, source file, source SHA-256 and processing section of every clip are recorded in sources.forge.

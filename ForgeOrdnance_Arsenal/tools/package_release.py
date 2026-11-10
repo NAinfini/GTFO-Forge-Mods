@@ -8,48 +8,40 @@ Run from the repository root after the Release build, art build, audio build and
     python Mods/ForgeOrdnance_Arsenal/tools/package_release.py
 
 The zip holds manifest.json, icon.png, README.md, CHANGELOG.md, ForgeOrdnanceArsenal.dll and forge-ordnance-arsenal.bundle
-at its root, the AudioKit audio folder (cues.json and <cue>.ogg files) under audio/, and definitions with their icons in ForgeOrdnance/ (r2modman installs it all into
+at its root, the AudioKit audio folder (cues.forge and <cue>.ogg files) under audio/, and definitions with their icons in ForgeOrdnance/ (r2modman installs it all into
 BepInEx/plugins/NAinfini-ForgeOrdnance_Arsenal/, where ForgeOrdnance finds the folder). Fixed timestamps: the same inputs
 give the same bytes. The Thunderstore manifest and Unity's hash-bound bundle receipt are checked before packaging.
 """
 import argparse
-import hashlib
+from pathlib import Path
 import json
 import os
-import re
-import struct
 import sys
-import tempfile
-import zipfile
 
-REPO = os.getcwd()
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Build"))
+import package_common  # noqa: E402
+from package_common import media_file, media_path, vfx_files  # noqa: E402  (one per-file media rule for every package)
+
+REPO = str(package_common.REPO)
 PACKAGE = os.path.join(REPO, "Mods", "ForgeOrdnance_Arsenal")
 OUT = os.path.join(REPO, "artifacts", "work", "ordnance-release")
-# The verified bundle and its Unity receipt stay in the package (build_assets.ps1 copies them there); a worktree points at the main checkout with FORGE_MODS_ROOT.
-BUNDLE = os.path.join(os.environ.get("FORGE_MODS_ROOT") or os.path.join(REPO, "Mods"), "ForgeOrdnance_Arsenal", "Assets", "Models", "forge-ordnance-arsenal.bundle")
-BUNDLE_MANIFEST = os.path.join(os.path.dirname(BUNDLE), "forge-ordnance-arsenal.manifest.json")
+# The verified bundle and its Unity receipt stay in the package (build_assets.ps1 copies them there); each is read through media_path
+# (this checkout's file, else the main checkout's).
+BUNDLE = str(media_path("ForgeOrdnance_Arsenal/Assets/Models/forge-ordnance-arsenal.bundle", REPO))
+BUNDLE_MANIFEST = str(media_path("ForgeOrdnance_Arsenal/Assets/Models/forge-ordnance-arsenal.manifest.json", REPO))
 ICONS = os.path.join(PACKAGE, "Assets", "icons")
-TEAM = "NAinfini"
 
 
 def fail(message):
     sys.exit("package_release: " + message)
 
 
-def png_size(path):
-    with open(path, "rb") as image:
-        head = image.read(24)
-    if head[:8] != b"\x89PNG\r\n\x1a\n":
-        fail(path + " is not a PNG")
-    return struct.unpack(">II", head[16:24])
-
-
-def file_sha256(path):
-    digest = hashlib.sha256()
-    with open(path, "rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+# Every prefab ArsenalArt loads by name (the masters and models of build_assets.ps1); a bundle built before one existed is stale.
+REQUIRED_PREFABS = (
+    "shell", "shell-precision", "shell-hunter", "shell-incendiary", "bomblet", "rocket", "grenade-40", "gas-canister", "stasis-emitter",
+    "mine", "glue-mine", "recoilless", "turret-burst", "turret-sniper", "turret-shotgun", "dispenser", "radar", "floodlight",
+    "heavy-mg", "tracking-rifle", "anti-materiel-rifle", "grenade-launcher",
+)
 
 
 def check_bundle_receipt():
@@ -63,142 +55,68 @@ def check_bundle_receipt():
     except (OSError, ValueError) as error:
         fail("invalid bundle build receipt: " + str(error))
     size = os.path.getsize(BUNDLE)
-    digest = file_sha256(BUNDLE)
+    digest = package_common.sha256_file(BUNDLE)
     if receipt.get("bundle") != os.path.basename(BUNDLE) or receipt.get("bytes") != size or receipt.get("sha256") != digest:
         fail("bundle does not match its Unity build receipt; rebuild it with tools/build_assets.ps1")
-
-
-def check_manifest():
-    with open(os.path.join(PACKAGE, "manifest.json"), encoding="utf-8") as source:
-        manifest = json.load(source)
-    for key in ("name", "version_number", "website_url", "description", "dependencies"):
-        if key not in manifest:
-            fail("manifest.json lacks " + key)
-    if not re.fullmatch(r"[A-Za-z0-9_]+", manifest["name"]):
-        fail("the name may hold only letters, digits and _")
-    if not re.fullmatch(r"\d+\.\d+\.\d+", manifest["version_number"]):
-        fail("version_number must be major.minor.patch")
-    if len(manifest["description"]) > 250:
-        fail("the description is longer than 250 characters")
-    for dependency in manifest["dependencies"]:
-        if not re.fullmatch(r"[A-Za-z0-9_]+-[A-Za-z0-9_]+-\d+\.\d+\.\d+", dependency):
-            fail("dependency '" + dependency + "' is not Team-Name-1.2.3")
-    if png_size(os.path.join(PACKAGE, "icon.png")) != (256, 256):
-        fail("icon.png must be 256 x 256")
-    return manifest
+    names = {prefab["name"] for prefab in receipt.get("profile", {}).get("prefabs", [])}
+    missing = [name for name in REQUIRED_PREFABS if name not in names]
+    if missing:
+        fail("the bundle lacks the prefabs " + ", ".join(missing) + " the plugin loads by name; rebuild it with tools/build_assets.ps1")
 
 
 def audio_files():
-    """The AudioKit audio folder: cues.json, every <cue>.ogg it names, and the source and licence records."""
-    audio = os.path.join(PACKAGE, "Assets", "Audio")
-    settings_path = os.path.join(audio, "cues.json")
-    sources_path = os.path.join(audio, "sources.json")
-    licence_path = os.path.join(audio, "License.txt")
-    for path in (settings_path, sources_path, licence_path):
-        if not os.path.isfile(path):
-            fail("missing " + path + " (run tools/build_audio.ps1)")
-    with open(settings_path, encoding="utf-8") as source:
-        settings = json.load(source)
-    cues = settings.get("cues") if isinstance(settings, dict) else None
-    if not isinstance(cues, dict) or not cues:
-        fail("invalid AudioKit cues.json " + settings_path)
-    files = {
-        "audio/cues.json": settings_path,
-        "audio/sources.json": sources_path,
-        "audio/License.txt": licence_path,
-    }
-    for cue, entry in cues.items():
-        for layer in entry.get("layers", [{"clips": [cue + ".ogg"]}]):
-            for clip in layer["clips"]:
-                path = os.path.join(audio, clip)
-                if not re.fullmatch(r"[a-z0-9_.-]+\.ogg", clip) or not os.path.isfile(path):
-                    fail("missing audio file " + path + " for cue " + cue + " (run tools/build_audio.ps1)")
-                files["audio/" + clip] = path
-    stray = sorted(set(name for name in os.listdir(audio) if name.endswith(".ogg")) - set(key[6:] for key in files))
-    if stray:
-        fail("Ogg files not named by cues.json would load as extra cues: " + ", ".join(stray))
-    return files
-
-
-def language_files(source, into):
-    """The language files ForgeUI reads (<code>.json, key -> text) from source; zh and en must both be there."""
-    names = sorted(name for name in os.listdir(source) if name.endswith(".json")) if os.path.isdir(source) else []
-    if not {"en.json", "zh.json"} <= set(names):
-        fail(source + " must hold en.json and zh.json")
-    files = {}
-    for name in names:
-        path = os.path.join(source, name)
-        with open(path, encoding="utf-8") as handle:
-            texts = json.load(handle)
-        if not isinstance(texts, dict) or not all(isinstance(text, str) for text in texts.values()):
-            fail(path + " must be a JSON object of key -> text")
-        files[into + "/" + name] = path
-    return files
+    """The AudioKit audio folder: cues.forge, every <cue>.ogg it names, and the source and licence records."""
+    try:
+        return {entry: str(path) for entry, path in package_common.media_audio_files(os.path.join(PACKAGE, "Assets", "Audio"), ("sources.forge", "LICENSE.forge")).items()}
+    except ValueError as error:
+        fail(str(error))
 
 
 def build_package(artifacts_path):
     if not os.path.isdir(PACKAGE):
         fail("run from the repository root")
-    manifest = check_manifest()
     check_bundle_receipt()
-    files = {name: os.path.join(PACKAGE, name) for name in ("manifest.json", "icon.png", "README.md", "CHANGELOG.md", "LICENSE")}
+    files = {name: os.path.join(PACKAGE, name) for name in ("manifest.json", "icon.png", "README.md", "CHANGELOG.md", "LICENSE", "NOTICE")}
     files["ForgeOrdnanceArsenal.dll"] = os.path.join(artifacts_path, "bin", "ForgeOrdnanceArsenal", "release", "ForgeOrdnanceArsenal.dll")
     files["forge-ordnance-arsenal.bundle"] = BUNDLE
-    files["models/License.txt"] = os.path.join(PACKAGE, "Assets", "Models", "License.txt")
+    files["models/LICENSE.forge"] = os.path.join(PACKAGE, "Assets", "Models", "LICENSE.forge")
     files.update(audio_files())
-    definitions = os.path.join(PACKAGE, "ForgeOrdnance", "arsenal.json")
+    files.update(vfx_files("ForgeOrdnance_Arsenal", "arsenal", REPO))
+    definitions = os.path.join(PACKAGE, "ForgeOrdnance", "arsenal.forge")
     if not os.path.isfile(definitions):
         fail("missing " + definitions)
-    files["ForgeOrdnance/arsenal.json"] = definitions
-    files.update(language_files(os.path.join(PACKAGE, "lang"), "lang"))
-    files.update(language_files(os.path.join(PACKAGE, "ForgeOrdnance", "lang"), "ForgeOrdnance/lang"))
+    files["ForgeOrdnance/arsenal.forge"] = definitions
+    try:
+        files.update({entry: str(path) for entry, path in package_common.lang_files(Path(PACKAGE)).items()})
+        files.update({entry: str(path) for entry, path in package_common.lang_files(Path(PACKAGE) / "ForgeOrdnance", "ForgeOrdnance/lang").items()})
+    except ValueError as error:
+        fail(str(error))
     with open(definitions, encoding="utf-8") as source:
         entries = json.load(source)
     for entry in entries:
         icon = entry.get("Icon")
         if not icon:
             fail(entry["Id"] + " has no Icon")
-        source = os.path.join(ICONS, icon)
+        source = str(media_file(os.path.join(ICONS, icon)))
         if not os.path.isfile(source):
             fail("missing icon " + source + " (run tools/build_icons.ps1)")
-        if png_size(source) != (256, 256):
+        if package_common.png_size(source) != (256, 256):
             fail(source + " is not 256 x 256")
         files["ForgeOrdnance/" + icon] = source
-    for source in files.values():
-        if not os.path.isfile(source):
-            fail("missing " + source)
-
-    os.makedirs(OUT, exist_ok=True)
-    name = TEAM + "-" + manifest["name"] + "-" + manifest["version_number"] + ".zip"
-    path = os.path.join(OUT, name)
-    handle, temporary = tempfile.mkstemp(prefix=name + ".", suffix=".tmp", dir=OUT)
-    os.close(handle)
     try:
-        with zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED) as archive:
-            for entry, source in sorted(files.items()):
-                info = zipfile.ZipInfo(entry, date_time=(2026, 1, 1, 0, 0, 0))
-                info.compress_type = zipfile.ZIP_DEFLATED
-                info.external_attr = 0o644 << 16
-                with open(source, "rb") as data:
-                    archive.writestr(info, data.read())
-        os.replace(temporary, path)
-    except BaseException:
-        try:
-            os.remove(temporary)
-        except FileNotFoundError:
-            pass
-        raise
-
-    digest = file_sha256(path)
-    return name, path, digest, len(files)
+        package_common.package_files(Path(PACKAGE), "ForgeOrdnance_Arsenal", files, Path(OUT))
+    except (OSError, ValueError) as error:
+        fail(str(error))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifacts-path", default="artifacts/dotnet-arsenal", help="dotnet build artifacts root")
+    parser.add_argument("--output", help="folder that receives the zip")
     args = parser.parse_args()
-    name, path, digest, count = build_package(args.artifacts_path)
-    print(name + ": " + str(os.path.getsize(path)) + " bytes, sha256 " + digest + ", " + str(count) + " files")
+    global OUT
+    OUT = os.path.abspath(args.output) if args.output else OUT
+    build_package(os.path.join(REPO, args.artifacts_path))
 
 
 if __name__ == "__main__":

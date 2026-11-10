@@ -25,12 +25,45 @@ points of the pistol grip (`RightHand`) and the fore grip or handguard (`LeftHan
        fit_sight.py --gun M08 --mount=0,-0.053
   M09  import_body.py --glb anti-materiel-rifle/barrett_m82_bakedtextured.glb --name M09 --length 1.126 --turn-z -90
          --grip 0,0.225,0 --drop telescope,knob,_len_,optic_mount
-         (the Magazine box, hand sockets: see the pipeline record in VALIDATION.md)
+         (the Magazine box and hand sockets are set with import_body.py's --split and --socket, as for M08)
        fit_sight.py --gun M09 --mount=0,-0.12
   M10  import_body.py --glb grenade-launcher/rg-6_grenade_launcher.glb --name M10 --length 0.778 --grip 0,0.133,0
          --remove=-0.03,0.03,-0.463,-0.378,0.03,0.2 --remove=-0.03,0.03,-0.523,-0.49,0.045,0.14
          --socket=RightHand=0,0.02,-0.03 --socket=LeftHand=0,-0.43,-0.075
        fit_sight.py --gun M10 --mount=0,-0.07
+  M20  (2026-11-04, CC0 M4A1 from Source/mods/ordnance-assets/homing-rifle: the FBX with its PBR textures saved as m4a1.glb, ORM packed)
+       import_body.py --glb homing-rifle/m4a1.glb --name M20 --length 0.90 --turn-z 180 --grip 0,0.185,0
+         --remove=-0.03,0.03,-0.03,0.03,0.08,0.14 --remove=-0.03,0.03,-0.45,-0.395,0.07,0.14
+         --split=Magazine=-0.03,0.03,-0.20,-0.07,-0.15,0.06 --socket=RightHand=0,0.01,-0.037 --socket=LeftHand=0,-0.30,0.075
+       fit_sight.py --gun M20 --mount=0,-0.07
+
+Masters of 2026-11-04 (M08, M09, M20; M10 is unchanged): bodies from FBX downloads in Source/mods/ordnance-assets/downloads/<name>-1104/
+(unzipped; no licence text came with them). tools/fbx_to_glb.py first builds a glTF from the FBX and its PNG textures
+(--metal-cap 0.4 on the honey badger, whose metallic map is 1 everywhere), then import_body.py and this script as above. No mesh is reduced
+except the sniper; the previous masters are in Source/mods/replaced-arsenal-1104/models/.
+  M08  fbx_to_glb.py --fbx lmg-1104/unz/source/minimi.fbx --tex lmg-1104/unz/textures
+         --mat minimi=minimiColor.png,minimiRoughness.png,minimiMetallic.png,minimiNormal.png,minimiAO.png --out lmg.glb
+       import_body.py --glb lmg.glb --name M08 --length 1.02 --grip 0,0.157,0.015 --max-tris 100000
+         --cut=-0.03,0.03,-0.49,-0.41,0.058,0.12 --cut=-0.04,0.04,-0.04,0.05,0.08,0.14
+         --cut=-0.0615,-0.006,-0.2368,-0.1845,0.0469,0.0954 --cut=-0.0634,-0.0444,-0.2226,-0.2126,0.0784,0.0973
+         --cut=-0.0674,-0.0404,-0.2211,-0.2111,0.0743,0.1013 --cut=-0.069,-0.0388,-0.2211,-0.1344,0.0727,0.1029
+         --cut=-0.0639,-0.0439,-0.2226,-0.2111,0.0778,0.0978
+         --split=Magazine=-0.07,0.07,-0.17,-0.07,-0.13,0.03 --socket=RightHand=0,0.02,-0.035 --socket=LeftHand=0,-0.272,0.03
+       fit_sight.py --gun M08 --mount=0,0.02
+  M09  (B&T SPR 300) fbx_to_glb.py with one --mat per material (_low_<Name>_BaseColor/Roughness/Metallic/Normal.png)
+       import_body.py --glb spr.glb --name M09 --length 1.1 --turn-z 180 --grip 0,0.205,-0.044 --max-tris 42000 --drop Scope
+         --split=Magazine=-0.03,0.03,-0.215,-0.13,-0.02,0.075 --socket=RightHand=0,0.025,-0.035 --socket=LeftHand=0,-0.33,0.09
+       fit_sight.py --gun M09 --mount=0,-0.15
+  M20  (Honey Badger) fbx_to_glb.py --metal-cap 0.4 with --mat gun1=... and --mat Gun2=...
+       import_body.py --glb hb.glb --name M20 --length 0.9 --turn-z 90 --grip 0,0.224,0.024 --max-tris 100000 --drop "laser light,glass,UHG"
+         --split=Magazine=-0.04,0.04,-0.22,-0.095,-0.17,0.06 --socket=RightHand=0,0.01,-0.037 --socket=LeftHand=0,-0.294,0.07
+       fit_sight.py --gun M20 --mount=0,-0.13
+
+LeftHand in the masters now (moved after the steps above; Blender frame, metres): M08 0,-0.272,-0.100; M09 0,-0.33,-0.010;
+M20 0,-0.294,-0.055; M10 0,-0.28,-0.148 (under the drum). Its height puts the wrist ForgeVisual's gun-hold rule derives from it
+(8.7 cm left of and 1.3 cm above the point, at 0.85 size, the replaced game gun's left-hand rotation) about as far below the bore as the
+same class of vanilla gun holds it (machine gun 10.3-11.0 cm, rifle 7.9 cm), so the thumb stays under the bore and the sight line; the
+masters before the move are in models/<M>/replaced-arsenal-lefthand-1105/<M>.blend.
 """
 import argparse, math, sys
 import bpy, bmesh

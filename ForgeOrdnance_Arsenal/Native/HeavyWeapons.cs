@@ -19,16 +19,22 @@ internal static class HeavyWeapons
 {
     private const float SwapTimeout = 6f;
     private const float SkinScanSeconds = 0.5f;
+    /// <summary>How long a raise waits for a model that is not ready.</summary>
+    private const float ModelWait = 1.5f;
+    /// <summary>Part spawns of the incoming gun done per frame of a switch: the game builds a gun one part a frame (a dozen frames, hand empty);
+    /// every part in one frame was the hitch of a switch, so a few a frame keep each frame short and the hand is empty for a few frames.</summary>
+    private const int PartsPerFrame = 3;
+    private static readonly Dictionary<string, ArchetypeDataBlock> OwnBlocks = new();
+    private static readonly Dictionary<string, RecoilDataBlock> OwnRecoil = new();
     /// <summary>The look on each lent weapon in a player's hands, by the weapon item.</summary>
     private static readonly Dictionary<IntPtr, WornLook> Skins = new();
 
-    /// <summary>A look and the game's own sight nodes it replaced (put back when the look comes off).</summary>
+    /// <summary>A look on a lent weapon.</summary>
     private sealed class WornLook
     {
-        internal Dressed Dressed = null!;
-        /// <summary>The weapon whose sight nodes point at the model; null while they are the game's own.</summary>
-        internal ItemEquippable? Gear;
-        internal Transform? Sight, NativeHolderSight, NativeWeaponSight;
+        internal GunMount Gun = null!;
+        /// <summary>The model id of the heavy weapon this look stands for (<c>Arsenal:heavy-mg</c>).</summary>
+        internal string Heavy = "";
     }
 
     private sealed class Rack
@@ -45,6 +51,9 @@ internal static class HeavyWeapons
         internal int Bay;
         internal GameObject? Look;
         internal Vector3 Fallback;
+        /// <summary>Where the call landed and which way it faced: what a new host writes into the rack's kept record.</summary>
+        internal Vector3 Landing;
+        internal float Yaw;
         internal bool Presented;
         /// <summary>Host: the launcher loan built from the claimant's installed gear, kept until the claim is committed.</summary>
         internal LauncherLoan? PendingLauncher;
@@ -59,8 +68,15 @@ internal static class HeavyWeapons
 
     private static readonly List<Rack> Racks = new();
     private static readonly HashSet<(ulong Summoner, uint ThrowId)> UnavailableRacks = new();
+    /// <summary>Host: the racks of each call still lying in their pod (bay to kept record).</summary>
+    private static readonly Dictionary<(ulong Summoner, uint ThrowId), Dictionary<int, byte[]>> HostRacks = new();
     private static readonly LoanBook Loans = new();
     private static readonly Dictionary<ulong, LauncherLoan> Launchers = new();
+    /// <summary>Host after a host change: borrowers whose launcher loan was adopted from their first shot (the old host's book is gone).</summary>
+    private static readonly HashSet<ulong> AdoptedLaunchers = new();
+    private static bool _adoptLaunchers;
+    /// <summary>Host after a host change: racks that were not yet open to take when it took over, opened as their pods open.</summary>
+    private static readonly List<Rack> HostOpenPending = new();
     private static Guid _launcherIdentity;
     private static float _nextSkinScan;
     private static Rack? _promptRack;
@@ -98,6 +114,11 @@ internal static class HeavyWeapons
     /// <summary>The local player's lent weapon when it fires grenades, for <see cref="Grenades"/>; null otherwise.</summary>
     internal static HeavyParameters? ActiveLauncher => _phase == Phase.Active && _lent?.Spec.Grenade != null ? _lent : null;
 
+    /// <summary>The local player's lent weapon when its bullets home in on enemies, for <see cref="HomingFire"/>; null otherwise.</summary>
+    /// <summary>The model id of the lent weapon while it is in hand (<c>Arsenal:heavy-mg</c>), or null.</summary>
+    internal static string? ActiveModel => _phase == Phase.Active ? _lent?.Spec.Model : null;
+    internal static HomingSpec? ActiveHoming => _phase == Phase.Active ? _lent?.Spec.Homing : null;
+
     internal static Guid ActiveLauncherIdentity => _launcherIdentity;
 
     /// <summary>Only the host's committed loan and native gear definition can authorize a grenade.</summary>
@@ -105,9 +126,9 @@ internal static class HeavyWeapons
     {
         delay = 0f;
         reason = "sender is not the shooter or not a human player";
-        if (sender != shot.Shooter || !ArsenalNetwork.IsPlayer(sender)) return false;
+        if (sender != shot.Shooter || !ArsenalNetwork.Channel.IsPlayer(sender)) return false;
         reason = "no active host launcher loan";
-        if (!Launchers.TryGetValue(sender, out var loan)) return false;
+        if (!Launchers.TryGetValue(sender, out var loan) && !TryAdoptLauncher(sender, shot.Loan, out loan)) return false;
         var agent = ForgeCore.Level.PlayerByLookup(sender);
         reason = "launcher is not held by a live borrower";
         if (agent == null || !agent.Alive || agent.Inventory?.WieldedItem?.ItemDataBlock?.inventorySlot != InventorySlot.GearSpecial
@@ -120,14 +141,20 @@ internal static class HeavyWeapons
         if (!float.IsFinite(direction.sqrMagnitude) || direction.sqrMagnitude < 0.9f || direction.sqrMagnitude > 1.1f) return false;
         var origin = new Vector3(shot.OX, shot.OY, shot.OZ);
         if (!loan.TrySchedule(shot.Loan, shot.Sequence, Time.time, (origin - agent.EyePosition).sqrMagnitude, out delay, out reason)) return false;
-        // The submitted origin is only a reach proof. Launch from the host-observed eye so the tolerance cannot move the
-        // grenade through a thin wall.
-        shot.OX = agent.EyePosition.x; shot.OY = agent.EyePosition.y; shot.OZ = agent.EyePosition.z;
+        // The submitted origin is the shooter's muzzle (or the eye plus the spawn offset on a gun with no muzzle point), inside the reach
+        // proof above. The host flies from it only when nothing solid lies between its own eye and it, so the tolerance cannot move the
+        // grenade through a thin wall; otherwise it flies from the eye.
+        var eye = agent.EyePosition;
+        var launch = origin;
+        var reach = (launch - eye).magnitude;
+        if (reach > 0.01f && Grenades.Blocked(eye, (launch - eye) * (1f / reach), reach)) launch = eye;
+        shot.OX = launch.x; shot.OY = launch.y; shot.OZ = launch.z;
         var grenade = loan.Spec.Grenade!;
         var velocity = direction.normalized * grenade.Speed + Vector3.up * 1.5f;
         shot.VX = velocity.x; shot.VY = velocity.y; shot.VZ = velocity.z;
         shot.Damage = grenade.Damage;
         shot.Radius = grenade.Radius;
+        shot.TrueEdge = grenade.TrueDamage ? grenade.EdgeShare : -1f;
         return true;
     }
 
@@ -135,21 +162,34 @@ internal static class HeavyWeapons
 
     internal static void ShowRack(OrdnancePresentation p)
     {
-        if (UnavailableRacks.Remove((p.SummonerLookup, p.ThrowId)))
-        {
-            return;
-        }
-        var rack = new Rack { Summoner = p.SummonerLookup, ThrowId = p.ThrowId, P = (HeavyParameters)p.Parameters, Id = p.Definition.Id, Definition = p.Definition, Fallback = p.Position, Presented = true };
-        Racks.Add(rack);
+        if (UnavailableRacks.Remove((p.SummonerLookup, p.ThrowId))) return;
+        var parameters = (HeavyParameters)p.Parameters;
         var pod = OrdnanceDelivery.StartPod(p);
-        rack.Pod = pod;
-        rack.Claim = AddClaimable(rack, pod, p.Position + Vector3.up * 0.4f, OrdnanceDelivery.PodContentsDelay(p.Arrival));
-        if (pod == null)
+        // One rack per weapon bay of the pod; a direct arrival (or no pod art) lays them side by side on the landing point.
+        var count = pod == null ? parameters.Spec.Count : Math.Min(parameters.Spec.Count, pod.WeaponBayCount);
+        for (var bay = 0; bay < count; bay++)
         {
-            // A direct arrival, or no drop pod art: the weapon lies on the landing point from the moment its contents are due.
-            return;
+            var spot = p.Position + p.Rotation * Vector3.right * Spread(bay, count);
+            var rack = new Rack { Summoner = p.SummonerLookup, ThrowId = p.ThrowId, P = parameters, Id = p.Definition.Id, Definition = p.Definition, Fallback = spot, Landing = p.Position, Yaw = p.Rotation.eulerAngles.y, Presented = true, Bay = bay };
+            Racks.Add(rack);
+            rack.Pod = pod;
+            rack.Claim = AddClaimable(rack, pod, spot + Vector3.up * 0.4f, OrdnanceDelivery.PodContentsDelay(p.Arrival));
         }
     }
+
+    /// <summary>Sideways offset of rack <paramref name="bay"/> of <paramref name="count"/> lying side by side without a pod.</summary>
+    private static float Spread(int bay, int count) => (bay - (count - 1) * 0.5f) * 0.9f;
+
+    /// <summary>One line per rack lying in a pod or on the ground: call number, bay, ammunition numbers (the driver's readback).</summary>
+    internal static string Describe()
+    {
+        if (Racks.Count == 0) return "no racks";
+        return string.Join("\n", Racks.Select(r => "rack " + r.Id + " throw " + r.ThrowId + " bay " + r.Bay + " ammoRatio=" + r.P.Spec.AmmoRatio.ToString("0.##") + " magazine=" + (float.IsNaN(r.P.Spec.Tuning.Magazine) ? "default" : r.P.Spec.Tuning.Magazine.ToString("0")) + " ammoCost=" + (float.IsNaN(r.P.Spec.Tuning.AmmoCost) ? "default" : r.P.Spec.Tuning.AmmoCost.ToString("0.##")) + (r.Taken ? " taken" : "")));
+    }
+
+    private static byte Tag(int bay) => (byte)((int)DataTag.Rack + bay);
+
+    private static int BayOf(byte tag) => tag - (int)DataTag.Rack;
 
     /// <summary>Hands the rack to ForgeOrdnance's claims: the pod's weapon bay (or the landing point without a pod) is where it can be taken.</summary>
     private static OrdnanceClaimable AddClaimable(Rack rack, OrdnancePod? pod, Vector3 position, float openAfter)
@@ -165,8 +205,7 @@ internal static class HeavyWeapons
             Opened = () => OpenRack(rack),
             Removed = () => RemoveRack(rack),
         };
-        if (pod == null) return OrdnanceDelivery.AddClaimable(rack.Summoner, rack.ThrowId, position, openAfter, spec);
-        rack.Bay = (int)(rack.ThrowId % (uint)pod.WeaponBayCount);
+        if (pod == null) return OrdnanceDelivery.AddClaimable(rack.Summoner, rack.ThrowId, position, openAfter, spec, rack.Bay);
         return pod.AddClaimable(rack.Bay, spec);
     }
 
@@ -197,18 +236,44 @@ internal static class HeavyWeapons
         var summoner = e.SummonerLookup;
         var throwId = e.ThrowId;
         var p = (HeavyParameters)e.Parameters;
+        if (e.Overrides.Count != 0)
+            p = p with { Spec = p.Spec.WithAmmo(e.Overrides.TryGetValue("AmmoRatio", out var ratio) ? (float)ratio : null, e.Overrides.TryGetValue("Magazine", out var rounds) ? (float)rounds : null, e.Overrides.TryGetValue("AmmoCost", out var cost) ? (float)cost : null) };
         var record = Wire.Rack(new RackRecord(p.Spec, p.GearId, e.Position.x, e.Position.y, e.Position.z, e.Rotation.eulerAngles.y, e.Definition.Id));
         OrdnanceDelivery.HostAfter(OrdnanceDelivery.PodContentsDelay(e.Arrival), () =>
         {
-            // Kept until the weapon is taken, so a player who joins meanwhile sees it and can take it.
-            if (!OrdnanceApi.SendState(HeavyWeaponSpec.TypeName, summoner, throwId, (byte)DataTag.Rack, record))
+            // Kept until the weapon is taken, so a player who joins meanwhile sees it and can take it. The pod leaves once every
+            // rack of it has been taken (RackTaken), the same rule as a supply pod.
+            var kept = new Dictionary<int, byte[]>();
+            for (var bay = 0; bay < p.Spec.Count; bay++)
             {
-                OrdnanceApi.SendData(HeavyWeaponSpec.TypeName, summoner, throwId, (byte)DataTag.RackUnavailable, Array.Empty<byte>());
-                OrdnanceDelivery.HostReportPodEmpty(summoner, throwId);
-                return;
+                if (!OrdnanceApi.SendState(HeavyWeaponSpec.TypeName, summoner, throwId, Tag(bay), record))
+                {
+                    OrdnanceApi.ClearState(HeavyWeaponSpec.TypeName, summoner, throwId);
+                    OrdnanceApi.SendData(HeavyWeaponSpec.TypeName, summoner, throwId, (byte)DataTag.RackUnavailable, Array.Empty<byte>());
+                    OrdnanceDelivery.HostReportPodEmpty(summoner, throwId);
+                    return;
+                }
+                kept[bay] = record;
             }
-            OrdnanceDelivery.HostOpenClaim(summoner, throwId);
+            HostRacks[(summoner, throwId)] = kept;
+            foreach (var bay in kept.Keys) OrdnanceDelivery.HostOpenClaim(summoner, throwId, bay);
         });
+    }
+
+    /// <summary>Host: a rack was taken. Late joiners see only the racks still lying there; when none is left the pod is told it is
+    /// empty and leaves after its linger time.</summary>
+    private static void RackTaken(Rack rack)
+    {
+        var key = (rack.Summoner, rack.ThrowId);
+        OrdnanceApi.ClearState(HeavyWeaponSpec.TypeName, rack.Summoner, rack.ThrowId);
+        if (HostRacks.TryGetValue(key, out var left))
+        {
+            left.Remove(rack.Bay);
+            foreach (var (bay, record) in left) OrdnanceApi.SendState(HeavyWeaponSpec.TypeName, rack.Summoner, rack.ThrowId, Tag(bay), record);
+            if (left.Count != 0) return;
+            HostRacks.Remove(key);
+        }
+        OrdnanceDelivery.HostReportPodEmpty(rack.Summoner, rack.ThrowId);
     }
 
     /// <summary>Host, after the platform's checks (alive, in reach, open, not reserved): a borrower cannot take a second weapon, and the
@@ -219,7 +284,7 @@ internal static class HeavyWeapons
         try { LoanedGun.Require(BorrowedRange(rack.P)); }
         catch (Exception error)
         {
-            Plugin.Error("Host refused unloaded heavy weapon effects: " + error);
+            Plugin.Logger.ErrorOnce("Host refused unloaded heavy weapon effects: " + error);
             return "the host has not loaded the heavy weapon's effects";
         }
         return null;
@@ -236,7 +301,7 @@ internal static class HeavyWeapons
         if (_phase != Phase.None) { claim.Failed(); return; }
         _claim = claim;
         try { BeginLoan(rack.P); }
-        catch (Exception error) { Plugin.Error("Heavy weapon installation refused: " + error); Abort(); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Heavy weapon installation refused: " + error); Abort(); }
     }
 
     /// <summary>Host, every frame once the claimant reported the gear installed: its public name and checksum must be the borrowed gear's;
@@ -251,38 +316,68 @@ internal static class HeavyWeapons
         LauncherLoan? launcher = null;
         if (rack.P.Spec.Grenade != null)
         {
-            var category = GearCategoryDataBlock.GetBlock(expected.GetCompID(eGearComponent.Category));
-            var archetypeId = category == null ? 0u : (eWeaponFireMode)expected.GetCompID(eGearComponent.FireMode) switch
-            {
-                eWeaponFireMode.Semi => category.SemiArchetype,
-                eWeaponFireMode.Burst => category.BurstArchetype,
-                eWeaponFireMode.Auto => category.AutoArchetype,
-                eWeaponFireMode.SemiBurst => category.SemiBurstArchetype,
-                _ => 0u,
-            };
-            var archetype = ArchetypeDataBlock.GetBlock(archetypeId);
             var pool = pack.AmmoStorage.SpecialAmmo;
-            // The same numbers the borrower's weapon is given (Tune): the vanilla block with this call-in's factory settings over it.
-            var effective = archetype == null ? null : rack.P.Spec.Tuning.Over(Readings(archetype));
-            if (effective == null || !effective.Valid()) return ClaimVerdict.Refuse("host gear has invalid ammunition or cadence");
-            var rounds = effective.Rounds(rack.P.Spec.AmmoRatio, pool.AmmoMaxCap);
-            if (!(rounds > 0 && rounds <= int.MaxValue)) return ClaimVerdict.Refuse("host gear has invalid ammunition or cadence");
+            var effective = EffectiveNumbers(rack.P, expected);
+            var rounds = effective == null ? 0 : effective.Rounds(rack.P.Spec.AmmoRatio, pool.AmmoMaxCap);
+            if (effective == null || !(rounds > 0 && rounds <= int.MaxValue)) return ClaimVerdict.Refuse("host gear has invalid ammunition or cadence");
             launcher = new LauncherLoan(rack.P.Spec, expected.GetChecksum(), (int)rounds, effective.ShotDelay, Time.time);
         }
         rack.PendingLauncher = launcher;
         return ClaimVerdict.Accept(launcher?.Identity ?? Guid.Empty);
     }
 
+    /// <summary>The numbers a borrower's weapon is given (<see cref="Tune"/>): the vanilla block of the gear's archetype with this call-in's factory
+    /// settings over it; null when that gives no valid ammunition or cadence.</summary>
+    private static ArchetypeTuning? EffectiveNumbers(HeavyParameters p, GearIDRange gear)
+    {
+        var category = GearCategoryDataBlock.GetBlock(gear.GetCompID(eGearComponent.Category));
+        var archetypeId = category == null ? 0u : (eWeaponFireMode)gear.GetCompID(eGearComponent.FireMode) switch
+        {
+            eWeaponFireMode.Semi => category.SemiArchetype,
+            eWeaponFireMode.Burst => category.BurstArchetype,
+            eWeaponFireMode.Auto => category.AutoArchetype,
+            eWeaponFireMode.SemiBurst => category.SemiBurstArchetype,
+            _ => 0u,
+        };
+        var archetype = ArchetypeDataBlock.GetBlock(archetypeId);
+        var effective = archetype == null ? null : p.Spec.Tuning.Over(Readings(archetype));
+        return effective != null && effective.Valid() ? effective : null;
+    }
+
+    /// <summary>Host, after a host change: the old host's loan book is gone, so a borrower's first shot is the proof of a loan this host never saw.
+    /// It is adopted only when the host's own replicated backpack shows that borrower holding a launcher's marker whose gear checksum is the
+    /// checksum of the one definition with that model, with the identity the shot names; the budget is what that backpack still holds.</summary>
+    private static bool TryAdoptLauncher(ulong sender, Guid identity, out LauncherLoan loan)
+    {
+        loan = null!;
+        if (!_adoptLaunchers || !ForgeCore.Session.IsHost || identity == Guid.Empty) return false;
+        var agent = ForgeCore.Level.PlayerByLookup(sender);
+        if (agent == null || !agent.Alive || !PlayerBackpackManager.TryGetBackpack(agent.Owner, out var pack) || pack == null
+            || !pack.TryGetBackpackItem(InventorySlot.GearSpecial, out var item) || item == null || !item.IsLoaded || item.GearIDRange == null
+            || !TryMarker(item.GearIDRange.PublicGearName, out var model)) return false;
+        foreach (var definition in OrdnanceApi.Definitions)
+        {
+            if (definition.Parameters is not HeavyParameters p || p.Spec.Grenade == null || p.Spec.Model != model) continue;
+            var expected = BorrowedRange(p);
+            if (expected.GetChecksum() != item.GearIDRange.GetChecksum() || EffectiveNumbers(p, expected) is not { } effective) continue;
+            var rounds = Math.Floor(pack.AmmoStorage.SpecialAmmo.AmmoInPack / effective.AmmoCost) + effective.Magazine;
+            if (!(rounds > 0 && rounds <= int.MaxValue)) return false;
+            loan = Launchers[sender] = new LauncherLoan(p.Spec, expected.GetChecksum(), (int)rounds, effective.ShotDelay, Time.time, identity);
+            AdoptedLaunchers.Add(sender);
+            return true;
+        }
+        return false;
+    }
+
     /// <summary>Every peer: the rack was taken. The host starts the loan; the claimant's weapon becomes active.</summary>
     private static void Committed(Rack rack, ClaimResult result)
     {
-        if (SNet.IsMaster)
+        if (ForgeCore.Session.IsHost)
         {
             Loans.Commit(rack.Summoner, rack.ThrowId, result.Player, result.Attempt);
             if (rack.PendingLauncher != null) Launchers[result.Player] = rack.PendingLauncher;
             rack.PendingLauncher = null;
-            OrdnanceApi.ClearState(HeavyWeaponSpec.TypeName, rack.Summoner, rack.ThrowId);
-            OrdnanceDelivery.HostReportPodEmpty(rack.Summoner, rack.ThrowId);
+            RackTaken(rack);
         }
         Destroy(rack.Look);
         rack.Look = null;
@@ -290,7 +385,7 @@ internal static class HeavyWeapons
         _launcherIdentity = result.Token;
         _phase = Phase.Active;
         _loan = new HeavyLoan(Time.time);
-        var agent = PlayerManager.GetLocalPlayerAgent();
+        var agent = ForgeCore.Players.Local;
         if (agent != null) ArsenalAudio.PlayAttached(ArsenalAudio.Cue.Handover, agent.gameObject,
             (int)agent.DimensionIndex, agent.IsLocallyOwned);
     }
@@ -298,9 +393,10 @@ internal static class HeavyWeapons
     /// <summary>Host: a borrower's loan notice (returned, or switched to their own weapon).</summary>
     internal static void OnLoanNotice(ulong sender, LoanNotice m)
     {
-        if (!SNet.IsMaster || !ArsenalNetwork.IsPlayer(sender)) return;
+        // An action outside the enum is a malformed packet and is dropped, not read as Returned.
+        if (!ForgeCore.Session.IsHost || !ArsenalNetwork.Channel.IsPlayer(sender) || !Enum.IsDefined(m.Action)) return;
         if (m.Action == LoanAction.Stashed) Loans.Stash(m.Summoner, m.ThrowId, sender, m.Attempt);
-        else if (Loans.Release(m.Summoner, m.ThrowId, sender, m.Attempt)) Launchers.Remove(sender);
+        else if (Loans.Release(m.Summoner, m.ThrowId, sender, m.Attempt) || AdoptedLaunchers.Remove(sender)) Launchers.Remove(sender);
     }
 
     internal static void OnData(OrdnancePayloadData d)
@@ -320,15 +416,19 @@ internal static class HeavyWeapons
             if (presentationPending) UnavailableRacks.Add((d.SummonerLookup, d.ThrowId));
             return;
         }
-        if ((DataTag)d.Tag == DataTag.Rack)
+        if (BayOf(d.Tag) is >= 0 and < HeavyWeaponSpec.MaxCount)
         {
+            var bay = BayOf(d.Tag);
             if (!Wire.TryRack(d.Data, out var record))
             {
                 if (Wire.UnknownRackModel(d.Data, out var hash))
-                    Plugin.Report("A heavy weapon rack was dropped: its model hash " + hash.ToString("x8") + " is not one of this install's heavy weapon models (the host's heavy weapon packs must be installed here too).");
+                    Plugin.Logger.Error("A heavy weapon rack was dropped: its model hash " + hash.ToString("x8") + " is not one of this install's heavy weapon models (the host's heavy weapon packs must be installed here too).");
                 return;
             }
-            if (!Racks.Exists(r => r.Summoner == d.SummonerLookup && r.ThrowId == d.ThrowId)) RackFromState(d, record);
+            var existing = Racks.Find(r => r.Summoner == d.SummonerLookup && r.ThrowId == d.ThrowId && r.Bay == bay);
+            // A rack shown from the arrival holds the definition's numbers; the host's record is the placement's (its Overrides), the same one a late joiner builds from.
+            if (existing == null) RackFromState(d, record, bay);
+            else existing.P = new HeavyParameters(record.Spec, record.GearId);
         }
     }
 
@@ -342,14 +442,17 @@ internal static class HeavyWeapons
 
     /// <summary>A rack this peer did not see arrive (it joined later): the weapon where the pod's weapon anchor is, open to take.
     /// Track the replayed pod's departure when one is available.</summary>
-    private static void RackFromState(OrdnancePayloadData d, in RackRecord record)
+    private static void RackFromState(OrdnancePayloadData d, in RackRecord record, int bay)
     {
         var landing = new Vector3(record.X, record.Y, record.Z);
-        var rack = new Rack { Summoner = d.SummonerLookup, ThrowId = d.ThrowId, P = new HeavyParameters(record.Spec, record.GearId), Id = record.Id, Fallback = landing };
-        Racks.Add(rack);
         var pod = OrdnanceDelivery.FindPod(d.SummonerLookup, d.ThrowId);
+        // The same spacing the arrival used (ShowRack): by the racks the call laid down, not by the most a pod could hold.
+        var count = pod == null ? record.Spec.Count : Math.Min(record.Spec.Count, pod.WeaponBayCount);
+        var spot = landing + Quaternion.Euler(0f, record.Yaw, 0f) * Vector3.right * Spread(bay, count);
+        var rack = new Rack { Summoner = d.SummonerLookup, ThrowId = d.ThrowId, P = new HeavyParameters(record.Spec, record.GearId), Id = record.Id, Fallback = spot, Landing = landing, Yaw = record.Yaw, Bay = bay };
+        Racks.Add(rack);
         rack.Pod = pod;
-        rack.Claim = AddClaimable(rack, pod, landing + Vector3.up * 0.4f, 0f);
+        rack.Claim = AddClaimable(rack, pod, spot + Vector3.up * 0.4f, 0f);
         // Without a replayed pod nothing will open it: the weapon lies where it landed.
         if (pod == null) OpenRack(rack);
     }
@@ -360,14 +463,15 @@ internal static class HeavyWeapons
     {
         // The replicated backpack is authoritative for whether a loan still exists. A return notice is only the fast
         // path; this also releases the loan if that message was dropped or there was no master while it was sent.
-        if (SNet.IsMaster && Loans.Any) Loans.ReconcileLoans(HostLoanStillPresent, ReleaseHostLoan);
+        if (ForgeCore.Session.IsHost && Loans.Any) Loans.ReconcileLoans(HostLoanStillPresent, ReleaseHostLoan);
+        if (HostOpenPending.Count != 0 && ForgeCore.Session.IsHost) OpenAdopted();
         try { LocalLoan(now); }
-        catch (Exception error) { Plugin.Error("Heavy weapon loan failed: " + error); Abort(); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Heavy weapon loan failed: " + error); Abort(); }
         if (now >= _nextSkinScan)
         {
             _nextSkinScan = now + SkinScanSeconds;
             try { ScanSkins(); }
-            catch (Exception error) { Plugin.Error("Heavy weapon look update failed: " + error); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("arsenal-heavy-look-failed", "heavy weapon look update failed: " + error); }
         }
     }
 
@@ -385,7 +489,7 @@ internal static class HeavyWeapons
             _promptRefusal = refusal;
             _promptText = refusal != null ? ArsenalText.T("rack.slotTaken", refusal.Refusal)
                 : _phase == Phase.None ? ArsenalText.T("rack.pickUp", rack.Definition != null ? OrdnanceApi.DisplayName(rack.Definition) : ArsenalText.CallIn(rack.Id)) : ArsenalText.T("rack.inHand");
-            _promptKey = refusal == null && _phase == Phase.None ? "[E]" : "";
+            _promptKey = refusal == null && _phase == Phase.None ? "[" + ForgeUI.UIKitKeys.Binding(InputAction.Use, "E") + "]" : "";
         }
         return new ClaimPrompt(_promptText, _promptKey, refusal == null && _phase == Phase.None);
     }
@@ -405,11 +509,6 @@ internal static class HeavyWeapons
         b.DamageFalloff.x, b.DamageFalloff.y,
     });
 
-    /// <summary>The block's copyable properties, listed once (reflection is not repeated in the frame the gun is raised).</summary>
-    private static readonly System.Reflection.PropertyInfo[] BlockProperties = typeof(ArchetypeDataBlock)
-        .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly)
-        .Where(p => p.CanRead && p.CanWrite && p.GetIndexParameters().Length == 0).ToArray();
-
     /// <summary>The lent instance gets its own copy of the archetype with the call-in's factory settings over it (the shared block also
     /// drives the stock weapon and stays as the game has it). Everything not set stays native, and the game's own firing, hit and ammunition
     /// code reads the copy. Returns the numbers now in force, or null when the weapon has no archetype to tune.</summary>
@@ -417,25 +516,31 @@ internal static class HeavyWeapons
     {
         var archetype = weapon.m_archeType;
         var vanilla = archetype?.m_archetypeData;
-        if (archetype == null || vanilla == null) { Plugin.Error("The heavy weapon has no archetype; its factory settings cannot be applied."); return null; }
+        if (archetype == null || vanilla == null) { Plugin.Logger.ErrorOnce("The heavy weapon has no archetype; its factory settings cannot be applied."); return null; }
+        Kick(weapon, spec);
         var native = Readings(vanilla);
         var effective = spec.Tuning.Over(native);
         if (spec.Tuning.IsEmpty) return effective;
-        var own = new ArchetypeDataBlock();
-        foreach (var property in BlockProperties) property.SetValue(own, property.GetValue(vanilla));
-        own.Damage = effective.Damage;
-        own.ShotDelay = effective.ShotDelay;
-        own.SpecialCooldownTime = effective.Cooldown;
-        own.SpecialChargetupTime = effective.Chargeup;
-        own.DefaultClipSize = (int)effective.Magazine;
-        own.DefaultReloadTime = effective.Reload;
-        own.PrecisionDamageMulti = effective.Precision;
-        own.StaggerDamageMulti = effective.Stagger;
-        own.PiercingBullets = effective.Pierce > 0f;
-        if (effective.Pierce > 0f) own.PiercingDamageCountLimit = (int)effective.Pierce;
-        own.CostOfBullet = effective.AmmoCost;
-        own.DamageFalloff = new UnityEngine.Vector2(effective.FalloffStart, effective.FalloffEnd);
-        own.persistentID = vanilla.persistentID;
+        // The copy is built once per weapon (the reflection copy of every property is the slow part) and handed to each new instance of it.
+        // Two definitions may share a model, so the key is the base block and the numbers in force, not the model alone.
+        var key = Marker(spec) + "|" + vanilla.persistentID + "|" + effective.Key;
+        if (!OwnBlocks.TryGetValue(key, out var own))
+        {
+            own = ForgeCore.Gear.CopyArchetype(vanilla);
+            own.Damage = effective.Damage;
+            own.ShotDelay = effective.ShotDelay;
+            own.SpecialCooldownTime = effective.Cooldown;
+            own.SpecialChargetupTime = effective.Chargeup;
+            own.DefaultClipSize = (int)effective.Magazine;
+            own.DefaultReloadTime = effective.Reload;
+            own.PrecisionDamageMulti = effective.Precision;
+            own.StaggerDamageMulti = effective.Stagger;
+            own.PiercingBullets = effective.Pierce > 0f;
+            if (effective.Pierce > 0f) own.PiercingDamageCountLimit = (int)effective.Pierce;
+            own.CostOfBullet = effective.AmmoCost;
+            own.DamageFalloff = new UnityEngine.Vector2(effective.FalloffStart, effective.FalloffEnd);
+            OwnBlocks[key] = own;
+        }
         // The weapon holds the block twice and the game reads the two for different numbers: the archetype's copy for the firing rhythm and
         // spread, the item's copy (ItemEquippable.ArchetypeData) for damage, weak-spot and stagger multipliers, piercing and reload.
         // Swapping only the archetype's left a tuned damage and precision with no effect on the hit.
@@ -443,9 +548,26 @@ internal static class HeavyWeapons
         weapon.ArchetypeData = own;
         if (archetype.m_archetypeData == null || weapon.ArchetypeData == null
             || !Readings(archetype.m_archetypeData).SameAs(effective) || !Readings(weapon.ArchetypeData).SameAs(effective))
-            Plugin.Error("The heavy weapon's archetype did not read back with its factory settings.");
+            Plugin.Logger.ErrorOnce("The heavy weapon's archetype did not read back with its factory settings.");
         return effective;
     }
+    /// <summary>How hard the gun kicks: the game's own recoil of the lent gun, scaled, on a copy this weapon keeps (the block is shared with the stock gun).</summary>
+    private static void Kick(BulletWeapon weapon, HeavyWeaponSpec spec)
+    {
+        if (spec.RecoilScale == 1f) return;
+        var archetype = weapon.m_archeType;
+        // The base gear and the scale decide the copy (two definitions may share a model); a copy is never scaled again.
+        var key = Marker(spec) + "|" + (spec.GearId?.ToString() ?? spec.GearName) + "|" + spec.RecoilScale;
+        if (!OwnRecoil.TryGetValue(key, out var own))
+        {
+            var source = archetype != null && archetype.m_recoilData != null ? archetype.m_recoilData : ((ItemEquippable)weapon).RecoilData;
+            if (source == null) { Plugin.Logger.ErrorOnce("arsenal-heavy-recoil-missing", "the heavy weapon has no recoil block; it kicks as the game's gun does."); return; }
+            OwnRecoil[key] = own = ForgeCore.Gear.ScaledRecoil(source, spec.RecoilScale);
+        }
+        ((ItemEquippable)weapon).RecoilData = own;
+        if (archetype != null) archetype.m_recoilData = own;
+    }
+
     private static void BeginLoan(HeavyParameters p)
     {
         if (_phase != Phase.None) throw new InvalidOperationException("This player already holds a loan.");
@@ -470,7 +592,7 @@ internal static class HeavyWeapons
     {
         if (_claim == null || SNet.LocalPlayer == null) return;
         var message = new LoanNotice { Summoner = _claim.Summoner, ThrowId = _claim.ThrowId, Attempt = _claim.Attempt, Action = action };
-        if (SNet.IsMaster) OnLoanNotice(SNet.LocalPlayer.Lookup, message);
+        if (ForgeCore.Session.IsHost) OnLoanNotice(SNet.LocalPlayer.Lookup, message);
         else if (SNet.Master != null) ArsenalNetwork.ToHost(LoanNotice.Name, message);
     }
 
@@ -487,18 +609,18 @@ internal static class HeavyWeapons
         bool ReconciliationTimedOut()
         {
             if (_phase != Phase.Reconciling || now - _phaseStarted <= SwapTimeout) return false;
-            Plugin.Error("Checkpoint special weapon did not finish assembling; restoring the saved original weapon.");
+            Plugin.Logger.ErrorOnce("Checkpoint special weapon did not finish assembling; restoring the saved original weapon.");
             Return();
             return true;
         }
-        var agent = PlayerManager.GetLocalPlayerAgent();
+        var agent = ForgeCore.Players.Local;
         if (agent == null || agent.WasCollected) { ReconciliationTimedOut(); return; }
         if (_phase is Phase.Equipping or Phase.AwaitingCommit && now - _phaseStarted > SwapTimeout)
             throw new InvalidOperationException("Heavy weapon installation/commit timed out.");
         if (_phase == Phase.Returning && now - _phaseStarted > SwapTimeout)
         {
             // Retain the managed restoration record and retry; never silently forget a broken return.
-            Plugin.Error("Special weapon restoration is still pending; retrying.");
+            Plugin.Logger.ErrorOnce("Special weapon restoration is still pending; retrying.");
             _returnRequested = false;
             _phaseStarted = now;
         }
@@ -506,7 +628,7 @@ internal static class HeavyWeapons
         if (!LoanedGun.TryLocalSpecial(out var backpack, out var item)) { ReconciliationTimedOut(); return; }
         var name = item!.GearIDRange?.PublicGearName;
         // The game spawns the incoming gun's parts one per frame, with the hand empty meanwhile; they come in the frame the gun stands in the slot.
-        if (_phase is Phase.Equipping or Phase.Returning) LoanedGun.FinishParts(item!);
+        if (_phase is Phase.Equipping or Phase.Returning) LoanedGun.FinishParts(item!, PartsPerFrame);
         var ready = LoanedGun.Settled(item!, out var instance);
 
         if (_phase == Phase.Reconciling)
@@ -527,16 +649,17 @@ internal static class HeavyWeapons
                 if (!agent.Alive && _heavyStash != null) { Abort(); return; }
                 if (ready && name == Marker(_lent!.Spec) && item.GearIDRange!.GetChecksum() == _expected!.GetChecksum())
                 {
+                    // The hand never raises the bare game gun: the wield waits for the model (a short while, for a model that cannot load).
+                    ScanSkins();
+                    if (!Skins.ContainsKey(instance!.Pointer) && ArsenalArt.Weapon(_lent.Spec.Model) is { Ready: false } && now - _phaseStarted < ModelWait) return;
                     var resume = _heavyStash;
                     var tuned = Tune(instance!, _lent.Spec);
+                    // The pool took its price of a round from the game's gun when the item was made; it must charge what this weapon charges.
+                    if (tuned != null) ForgeCore.Gear.SetLocalAmmoType(AmmoType.Special, tuned.AmmoCost, (int)tuned.Magazine);
                     // A weapon taken back from the stash keeps exactly the magazine and reserve it was switched away with.
                     if (!ForgeCore.Gear.WriteLocalAmmo(AmmoType.Special, instance!, resume?.Pool ?? _lent.Spec.AmmoRatio * backpack.AmmoStorage.SpecialAmmo.AmmoMaxCap,
                             resume?.Clip ?? (_lent.Spec.Tuning.IsEmpty || tuned == null ? instance!.GetMaxClip() : (int)tuned.Magazine)))
-                        Plugin.Error("The heavy weapon's ammunition did not read back as written.");
-                    // The model's sight node replaces the game's before the wield: the game reads it once, while the gun is raised, to place the gun
-                    // and the arms. Dressed after the wield (the periodic scan) it left them where the hidden native sight put them until the
-                    // next raise or aim.
-                    ScanSkins();
+                        Plugin.Logger.ErrorOnce("The heavy weapon's ammunition did not read back as written.");
                     agent.Sync.WantsToWieldSlot(InventorySlot.GearSpecial);
                     if (resume != null)
                     {
@@ -595,7 +718,7 @@ internal static class HeavyWeapons
                 var saved = Slot.Own;
                 if (saved == null || !ready || TryMarker(name, out _) || item.GearIDRange!.GetChecksum() != saved.Checksum) return;
                 if (!ForgeCore.Gear.WriteLocalAmmo(AmmoType.Special, instance!, saved.Pool, saved.Clip))
-                    Plugin.Error("The special weapon's ammunition did not read back as written.");
+                    Plugin.Logger.ErrorOnce("The special weapon's ammunition did not read back as written.");
                 Slot.OwnReturned();
                 if (_heavyStash != null)
                 {
@@ -665,7 +788,7 @@ internal static class HeavyWeapons
     private static void Return()
     {
         if (Slot.Own == null) { End(); return; }
-        var agent = PlayerManager.GetLocalPlayerAgent();
+        var agent = ForgeCore.Players.Local;
         if (agent != null && !agent.WasCollected)
         {
             ArsenalAudio.PlayReturn(agent.gameObject, (int)agent.DimensionIndex);
@@ -718,7 +841,7 @@ internal static class HeavyWeapons
         if (_lease is { Suspended: true })
         {
             // The slot is another plugin's now: give the heavy weapon up without touching it.
-            Plugin.Error("Heavy weapon loan failed while another plugin held the special slot; the heavy weapon is given up.");
+            Plugin.Logger.ErrorOnce("Heavy weapon loan failed while another plugin held the special slot; the heavy weapon is given up.");
             SendLoan(LoanAction.Returned);
             End();
             return;
@@ -732,7 +855,7 @@ internal static class HeavyWeapons
         _phaseStarted = Time.time;
         _returnRequested = false;
         try { RequestReturn(); }
-        catch (Exception error) { Plugin.Error("Original special weapon restoration remains pending: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Original special weapon restoration remains pending: " + error); }
     }
 
     /// <summary>The loan is over: the slot's lease goes, and with no other lease left the own weapon is taken as being in the slot
@@ -740,6 +863,8 @@ internal static class HeavyWeapons
     private static void End()
     {
         var lease = _lease;
+        // A swap this loan asked for and left in flight stops collecting the game's part spawners; a suspended lease's slot, and any swap in it, is another plugin's.
+        if (lease is { Suspended: false }) LoanedGun.EndSwap();
         Reset();
         lease?.Dispose();
         if (!Slot.Taken && Slot.OwnAway) Slot.OwnReturned();
@@ -762,38 +887,59 @@ internal static class HeavyWeapons
 
     // ---- the look in every player's hands -----------------------------------------------------------------------
 
-    /// <summary>The game assembles a gun's parts over several frames, so a weapon is dressed only once its item reports it loaded, and
-    /// every scan hides parts the game added since (a sight or stock that showed through the model, or a second gun overlapping it).
-    /// When parts were added the look is put on again, so it takes the whole gun's length and place.</summary>
+    /// <summary>The moment any player's lent gun is assembled or raised it gets its model, so no peer sees the bare game gun. The scan is the retry for a model not yet ready.</summary>
+    internal static void Subscribe()
+    {
+        ForgeCore.GameHooks.GearPartsSpawned.After((parts, _) => SkinAtOnce(parts));
+        ForgeCore.GameHooks.BulletWeaponWielded.After((weapon, _) => SkinAtOnce(weapon.GearPartHolder));
+    }
+
+    private static void SkinAtOnce(GearPartHolder? parts)
+    {
+        try
+        {
+            if (parts == null || ArsenalArt.Bundle == null || GunMount.Of(parts) != null || !TryMarker(parts.GearIDRange?.PublicGearName, out var heavy)) return;
+            var gear = parts.GetComponentInParent<ItemEquippable>();
+            if (gear == null) return;
+            // Raised before its parts stand (another player's gun can be): nothing to seat on yet, and the parts-spawned hook comes.
+            var nodes = GunNodes.Of(parts, gear);
+            if (nodes.RightHand != null && nodes.LeftHand != null && nodes.Muzzle != null) Skin(gear, heavy);
+        }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("arsenal-heavy-look-failed", "heavy weapon look update failed: " + error); }
+    }
+
+    /// <summary>The game assembles a gun's parts over several frames, so a weapon gets its model only once its item reports it loaded,
+    /// and every scan lets the mount hide parts the game added since and take over replaced nodes.</summary>
     private static void ScanSkins()
     {
         if (ArsenalArt.Bundle == null) return;
         PruneSkins();
-        var players = PlayerManager.PlayerAgentsInLevel;
-        for (var i = 0; i < players.Count; i++)
+        ForgeCore.Players.Each(static info => ScanSkin(info.Agent));
+    }
+
+    private static void ScanSkin(PlayerAgent player)
+    {
+        if (player.Owner == null) return;
+        if (!PlayerBackpackManager.TryGetBackpack(player.Owner, out var backpack) || backpack == null) return;
+        if (!backpack.TryGetBackpackItem(InventorySlot.GearSpecial, out var item) || item == null || !item.IsLoaded) return;
+        if (!TryMarker(item.GearIDRange?.PublicGearName, out var heavy)) return;
+        var instance = item.Instance;
+        if (instance == null || instance.WasCollected) return;
+        if (Skins.TryGetValue(instance.Pointer, out var worn))
         {
-            var player = players[i];
-            if (player == null || player.WasCollected || player.Owner == null) continue;
-            if (!PlayerBackpackManager.TryGetBackpack(player.Owner, out var backpack) || backpack == null) continue;
-            if (!backpack.TryGetBackpackItem(InventorySlot.GearSpecial, out var item) || item == null || !item.IsLoaded) continue;
-            if (!TryMarker(item.GearIDRange?.PublicGearName, out var heavy)) continue;
-            var instance = item.Instance;
-            if (instance == null || instance.WasCollected) continue;
-            var late = 0;
-            if (Skins.TryGetValue(instance.Pointer, out var worn))
-            {
-                late = worn.Dressed.HideLate();
-                if (late == 0) continue;
-                RestoreSight(worn);
-                var look = worn.Dressed.Look;
-                worn.Dressed.Undo();
-                // Gone at once, so the new fit neither measures nor finds the old look.
-                Object.DestroyImmediate(look);
-                Skins.Remove(instance.Pointer);
-            }
-            else if (HasWeaponLook(instance.transform)) continue;
-            Skin(instance, heavy, player.IsLocallyOwned, late);
+            worn.Gun.Refresh();
+            return;
         }
+        Skin(instance, heavy);
+    }
+
+    /// <summary>The heavy weapon's model id when the game weapon at <paramref name="pointer"/> wears one of this package's looks (any player's).</summary>
+    internal static bool TryWornModel(IntPtr pointer, out string model)
+    {
+        // A look from a level that ended is pruned only at the next scan; its address may already be another gun's.
+        if (Skins.TryGetValue(pointer, out var worn) && worn.Gun.Alive) { model = worn.Heavy; return true; }
+        model = "";
+        return false;
     }
 
     private static void PruneSkins()
@@ -801,84 +947,44 @@ internal static class HeavyWeapons
         if (Skins.Count == 0) return;
         List<IntPtr>? gone = null;
         foreach (var pair in Skins)
-            if (!pair.Value.Dressed.Alive) (gone ??= new()).Add(pair.Key);
+            if (!pair.Value.Gun.Alive) (gone ??= new()).Add(pair.Key);
         if (gone != null) foreach (var key in gone) Skins.Remove(key);
     }
 
-    private static bool HasWeaponLook(Transform gear)
-    {
-        for (var i = 0; i < gear.childCount; i++)
-            if (gear.GetChild(i).gameObject.name == LookName) return true;
-        return false;
-    }
-
-    private const string LookName = "ForgeOrdnanceArsenal.WeaponLook";
-
-    /// <summary>The model goes where the game's hands are: its two hand sockets on the game gun's hand nodes (so the hands hold its pistol grip
-    /// and fore grip in the first and third person views) and its bore on the game's bore; its magazine hangs on the game's magazine node,
-    /// so the game's reload animation takes it off and puts it back.</summary>
-    private static DressOptions SkinLook(GunNodes gun) => new()
-    {
-        HideNative = true, Layer = true, Rotation = ArsenalArt.FrontToForward, Name = LookName, Gun = gun,
-    };
-
-    /// <summary>The game gun's hand, bore and magazine nodes: the aligns the hands are put on, from the weapon itself or else its part holder.</summary>
-    private static GunNodes NodesOf(ItemEquippable? weapon)
-    {
-        var parts = weapon != null ? weapon.GearPartHolder : null;
-        return new GunNodes
-        {
-            RightHand = weapon != null && weapon.m_rightHandGripAlign != null ? weapon.m_rightHandGripAlign : parts?.m_aRightHand,
-            LeftHand = weapon != null && weapon.m_leftHandGripAlign != null ? weapon.m_leftHandGripAlign : parts?.m_aLeftHand,
-            Muzzle = weapon != null && weapon.MuzzleAlign != null ? weapon.MuzzleAlign : parts?.m_aMuzzle,
-            Magazine = parts?.m_aMag,
-        };
-    }
-
-    /// <summary>The model's aim point: an empty at the centre of its optic's window, with the model's front as its forward.</summary>
-    internal const string SightSocket = "SightLook";
-
-    /// <summary>Hides the game gear's meshes (effects stay) and puts this package's model in its place, on the gear's layer. The game aims
-    /// a gun by lining its sight node up with the camera; the hidden game sight would put the camera inside the model, so the model's
-    /// own <see cref="SightSocket"/> takes that role.</summary>
-    private static void Skin(Item gear, string heavy, bool local, int late)
+    /// <summary>The model goes on through ForgeVisual's gun mount, the same way as every gun model: this package gives only the model
+    /// (its hand, bore and sight points are in the model), which way its export faces and how big it is in the hand.</summary>
+    private static void Skin(Item gear, string heavy)
     {
         var model = ArsenalArt.Weapon(heavy);
-        if (model == null) return;
-        var dressed = Models.Dress(gear.gameObject, model, SkinLook(NodesOf(gear.TryCast<ItemEquippable>())));
-        if (dressed == null) return;
-        var worn = new WornLook { Dressed = dressed };
-        Skins[gear.Pointer] = worn;
-        AimThroughSight(worn, gear, heavy);
-    }
-
-    private static void AimThroughSight(WornLook worn, Item item, string heavy)
-    {
-        // The model was checked for this socket when its payload was accepted (ArsenalArt.CheckWeaponModel).
-        var sight = Models.Find(worn.Dressed.Look.transform, SightSocket);
-        if (sight == null) return;
-        var gear = item.TryCast<ItemEquippable>();
-        if (gear == null)
+        if (model == null || !model.Ready) return;
+        var parts = gear.TryCast<ItemEquippable>()?.GearPartHolder;
+        if (parts == null)
         {
-            Plugin.Error("The " + heavy + " in a player's hands is not an equippable weapon; aiming lines up the game's hidden sight instead of the model's.");
+            Plugin.Logger.ErrorOnce("The " + heavy + " in a player's hands has no gear part holder, so it shows the game's gun.");
             return;
         }
-        var parts = gear.GearPartHolder;
-        worn.NativeHolderSight = parts != null ? parts.m_aSightLook : null;
-        worn.NativeWeaponSight = gear.SightLookAlign;
-        worn.Gear = gear;
-        worn.Sight = sight;
-        if (parts != null) parts.m_aSightLook = sight;
-        gear.SightLookAlign = sight;
+        if (GunMount.Of(parts) != null) return;
+        try { Skins[gear.Pointer] = new WornLook { Gun = GunMount.Create(parts, model.Prefab, Mount), Heavy = heavy }; }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("The " + heavy + " model could not go on the game's gun, which shows instead: " + error); }
     }
 
-    /// <summary>Before a look comes off: the game's sight nodes again, unless the game has set its own since.</summary>
-    private static void RestoreSight(WornLook worn)
+    /// <summary>Every heavy weapon model goes on the same way; its size and place in the hands are ForgeVisual's gun-holding rule.</summary>
+    private static readonly GunMountOptions Mount = new()
     {
-        if (worn.Gear == null || worn.Sight == null) return;
-        var parts = worn.Gear.GearPartHolder;
-        if (parts != null && parts.m_aSightLook == worn.Sight) parts.m_aSightLook = worn.NativeHolderSight!;
-        if (worn.Gear.SightLookAlign == worn.Sight) worn.Gear.SightLookAlign = worn.NativeWeaponSight!;
+        Front = ArsenalArt.FrontToForward,
+        Name = "ForgeOrdnanceArsenal.WeaponLook",
+        // Each model's game hold preset (Data/gun-grips.json); ForgeVisual keeps the model's hand sockets and derives a missing left hand from it.
+        Grips = GunGrips.Read(typeof(HeavyWeapons).Assembly, "ForgeOrdnanceArsenal.Data.gun-grips.json"),
+        // Which ForgeVisual sight each model wears (Data/gun-sights.json).
+        Sights = GunSights.Read(typeof(HeavyWeapons).Assembly, "ForgeOrdnanceArsenal.Data.gun-sights.json"),
+    };
+
+    /// <summary>The length (m) of the heavy weapon model in <paramref name="player"/>'s hands as the rule shows it (a launcher's tube: muzzle to back);
+    /// the rule's longest gun when that player holds no model here.</summary>
+    internal static float HeldLength(ulong player)
+    {
+        var item = ForgeCore.Level.PlayerByLookup(player)?.Inventory?.WieldedItem;
+        return item != null && Skins.TryGetValue(item.Pointer, out var worn) && worn.Gun.Alive ? worn.Gun.Hold.ShownLength : GunMount.Rules.LengthMax;
     }
 
     private static void Destroy(GameObject? root)
@@ -901,25 +1007,75 @@ internal static class HeavyWeapons
         Launchers.Remove(player);
     }
 
-    /// <summary>Deliveries are transient; installed loans and checkpoint restoration have separate lifetimes.</summary>
-    internal static void Clear(string why)
+    /// <summary>A host change. Every peer holds the same record of each rack still lying in its pod, so the racks stay and the new host opens them to
+    /// take again; the loan book does not survive (a returning former host cannot trust its pre-migration book). Native backpack markers still prevent
+    /// a player who is actually borrowing from taking another rack, and a launcher's borrower is adopted from the first shot (<see cref="TryAdoptLauncher"/>).
+    /// Active/returning loans survive migration.</summary>
+    private static void HostChanged()
     {
-        foreach (var rack in Racks) Destroy(rack.Look);
-        Racks.Clear();
         UnavailableRacks.Clear();
+        HostRacks.Clear();
+        HostOpenPending.Clear();
         Launchers.Clear();
+        AdoptedLaunchers.Clear();
+        _adoptLaunchers = true;
         _promptRack = null;
         _promptText = _promptKey = "";
         if (_phase == Phase.None) _claim = null;
-        if (why == "host change")
-        {
-            // A returning former host cannot trust its pre-migration loan book. Native backpack markers still prevent a
-            // player who is actually borrowing from taking another rack.
-            Loans.Clear();
-            if (_phase is Phase.Equipping or Phase.AwaitingCommit) Abort();
-            return; // Active/returning loans survive migration.
-        }
         Loans.Clear();
+        if (_phase is Phase.Equipping or Phase.AwaitingCommit) Abort();
+        var host = ForgeCore.Session.IsHost;
+        var held = new HashSet<(ulong, uint)>();
+        foreach (var rack in Racks) if (!rack.Taken) held.Add((rack.Summoner, rack.ThrowId));
+        // A call whose racks were all taken but whose old host never told the pod it was empty: the pod leaves now.
+        var emptied = new HashSet<(ulong, uint)>();
+        foreach (var rack in Racks) if (rack.Pod != null && !held.Contains((rack.Summoner, rack.ThrowId))) emptied.Add((rack.Summoner, rack.ThrowId));
+        Racks.RemoveAll(rack => rack.Taken);
+        if (!host) return;
+        foreach (var (summoner, throwId) in emptied) OrdnanceDelivery.HostReportPodEmpty(summoner, throwId);
+        foreach (var rack in Racks)
+        {
+            var key = (rack.Summoner, rack.ThrowId);
+            if (!HostRacks.TryGetValue(key, out var kept)) HostRacks[key] = kept = new Dictionary<int, byte[]>();
+            var record = Wire.Rack(new RackRecord(rack.P.Spec, rack.P.GearId, rack.Landing.x, rack.Landing.y, rack.Landing.z, rack.Yaw, rack.Id));
+            // Kept for a player who joins later, as the old host kept it.
+            if (!OrdnanceApi.SendState(HeavyWeaponSpec.TypeName, rack.Summoner, rack.ThrowId, Tag(rack.Bay), record)) continue;
+            kept[rack.Bay] = record;
+            HostOpenPending.Add(rack);
+        }
+    }
+
+    /// <summary>Host, every frame: opens to take the racks it adopted at a host change as soon as their pods are open.</summary>
+    private static void OpenAdopted()
+    {
+        for (var i = HostOpenPending.Count - 1; i >= 0; i--)
+        {
+            var rack = HostOpenPending[i];
+            if (rack.Claim == null || rack.Claim.IsTaken || !Racks.Contains(rack)) { HostOpenPending.RemoveAt(i); continue; }
+            if (!rack.Claim.IsReady) continue;
+            HostOpenPending.RemoveAt(i);
+            OrdnanceDelivery.HostOpenClaim(rack.Summoner, rack.ThrowId, rack.Bay);
+        }
+    }
+
+    /// <summary>Deliveries are transient; installed loans and checkpoint restoration have separate lifetimes.</summary>
+    internal static void Clear(string why)
+    {
+        if (why == "host change") { HostChanged(); return; }
+        foreach (var rack in Racks) Destroy(rack.Look);
+        Racks.Clear();
+        UnavailableRacks.Clear();
+        HostRacks.Clear();
+        HostOpenPending.Clear();
+        Launchers.Clear();
+        AdoptedLaunchers.Clear();
+        _adoptLaunchers = false;
+        _promptRack = null;
+        _promptText = _promptKey = "";
+        if (_phase == Phase.None) _claim = null;
+        Loans.Clear();
+        OwnBlocks.Clear();
+        OwnRecoil.Clear();
         if (why == "checkpoint reload")
         {
             // The framework has already put the shared slot back as it was at the checkpoint. A stashed heavy weapon does not survive

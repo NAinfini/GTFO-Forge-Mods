@@ -42,6 +42,15 @@
     "weapon": {
       "category": "weapon",
       "seats": 1
+    },
+    "device": {
+      "category": "device"
+    },
+    "device-loop": {
+      "category": "device"
+    },
+    "impact": {
+      "category": "debris"
     }
   },
   "cues": {
@@ -899,6 +908,545 @@
           ],
           "gainDb": -3.2,
           "fadeOutMs": 80
+        }
+      ]
+    },
+    "device.toss_spin": {
+      "gain": 0.7,
+      "loop": true,
+      "priority": 90,
+      "maxVoices": 6,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "bus": "device-loop",
+      "pitch": 1.0,
+      "space": {
+        "near": 3,
+        "far": 30
+      },
+      "layers": [
+        {
+          "clips": [
+            "device.toss_spin.ogg"
+          ]
+        }
+      ]
+    },
+    "device.toss_one": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 150,
+      "maxVoices": 12,
+      "maxPerEmitter": 4,
+      "environment": true,
+      "maxSeconds": 1,
+      "bus": "device",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 4,
+        "far": 45
+      },
+      "layers": [
+        {
+          "clips": [
+            "device.toss_one-l1-01.ogg"
+          ],
+          "gainDb": -7.7,
+          "fadeOutMs": 120
+        },
+        {
+          "clips": [
+            "device.toss_one-l2-01.ogg"
+          ],
+          "gainDb": -7.8,
+          "fadeOutMs": 100
+        }
+      ]
+    },
+    "radar.deploy": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 140,
+      "maxVoices": 6,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 5,
+      "bus": "device",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 4,
+        "far": 45
+      },
+      "layers": [
+        {
+          "clips": [
+            "radar.deploy.ogg"
+          ]
+        }
+      ]
+    },
+    "radar.sweep": {
+      "gain": 0.3,
+      "loop": false,
+      "priority": 80,
+      "maxVoices": 6,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 0.8,
+      "bus": "device",
+      "pitch": 1.0,
+      "space": {
+        "near": 3,
+        "far": 20
+      },
+      "layers": [
+        {
+          "clips": [
+            "radar.sweep.ogg"
+          ]
+        }
+      ]
+    },
+    "floodlight.fan": {
+      "gain": 0.55,
+      "loop": true,
+      "priority": 80,
+      "maxVoices": 6,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "bus": "device-loop",
+      "pitch": 1.0,
+      "space": {
+        "near": 3,
+        "far": 30
+      },
+      "layers": [
+        {
+          "clips": [
+            "floodlight.fan.ogg"
+          ]
+        }
+      ]
+    },
+    "floodlight.on": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 140,
+      "maxVoices": 6,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 3,
+      "bus": "device",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 4,
+        "far": 45
+      },
+      "layers": [
+        {
+          "clips": [
+            "floodlight.on-l1-01.ogg"
+          ],
+          "gainDb": -4,
+          "fadeOutMs": 200
+        },
+        {
+          "clips": [
+            "floodlight.on-l2-01.ogg"
+          ],
+          "gainDb": -7.3,
+          "fadeOutMs": 150
+        },
+        {
+          "clips": [
+            "floodlight.on-l3-01.ogg"
+          ],
+          "offsetMs": 200,
+          "gainDb": -10.7,
+          "fadeInMs": 200,
+          "fadeOutMs": 200
+        }
+      ]
+    },
+    "mine.land": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 120,
+      "maxVoices": 16,
+      "maxPerEmitter": 16,
+      "environment": true,
+      "maxSeconds": 1.2,
+      "bus": "device",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 3,
+        "far": 35
+      },
+      "layers": [
+        {
+          "clips": [
+            "mine.land.ogg"
+          ]
+        }
+      ]
+    },
+    "mine.trigger": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 200,
+      "maxVoices": 8,
+      "maxPerEmitter": 4,
+      "environment": true,
+      "maxSeconds": 1.4,
+      "bus": "device",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 3,
+        "far": 40
+      },
+      "layers": [
+        {
+          "clips": [
+            "mine.trigger.ogg"
+          ]
+        }
+      ]
+    },
+    "mine.explode": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 225,
+      "maxVoices": 12,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 6.4,
+      "bus": "boom",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 8,
+        "far": 180,
+        "curve": [
+          [
+            0,
+            1
+          ],
+          [
+            8,
+            1
+          ],
+          [
+            40,
+            0.61
+          ],
+          [
+            90,
+            0.3
+          ],
+          [
+            180,
+            0
+          ]
+        ]
+      },
+      "layers": [
+        {
+          "clips": [
+            "mine.explode-l1-01.ogg"
+          ],
+          "gainDb": -4.5,
+          "fadeOutMs": 500
+        },
+        {
+          "clips": [
+            "mine.explode-l2-01.ogg"
+          ],
+          "gainDb": -1.7,
+          "fadeOutMs": 500
+        },
+        {
+          "clips": [
+            "mine.explode-l3-01.ogg"
+          ],
+          "offsetMs": 100,
+          "gainDb": -15.6,
+          "fadeInMs": 20,
+          "fadeOutMs": 1000
+        }
+      ]
+    },
+    "glue.land": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 120,
+      "maxVoices": 16,
+      "maxPerEmitter": 16,
+      "environment": true,
+      "maxSeconds": 1.6,
+      "bus": "device",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 3,
+        "far": 35
+      },
+      "layers": [
+        {
+          "clips": [
+            "glue.land.ogg"
+          ],
+          "fadeOutMs": 200
+        }
+      ]
+    },
+    "glue.trigger": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 190,
+      "maxVoices": 8,
+      "maxPerEmitter": 4,
+      "environment": true,
+      "maxSeconds": 1.2,
+      "bus": "device",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 3,
+        "far": 40
+      },
+      "layers": [
+        {
+          "clips": [
+            "glue.trigger.ogg"
+          ]
+        }
+      ]
+    },
+    "weapon.recoilless_fire": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 215,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 3,
+      "bus": "weapon",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 6,
+        "far": 90
+      },
+      "place": {
+        "self": "2d",
+        "other": "auto"
+      },
+      "layers": [
+        {
+          "clips": [
+            "weapon.recoilless_fire.ogg"
+          ],
+          "fadeOutMs": 375
+        }
+      ]
+    },
+    "weapon.recoilless_backblast": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 205,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 3,
+      "bus": "shell-flight",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 5,
+        "far": 70
+      },
+      "layers": [
+        {
+          "clips": [
+            "weapon.recoilless_backblast.ogg"
+          ]
+        }
+      ]
+    },
+    "weapon.recoilless_burst": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 215,
+      "maxVoices": 12,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 7,
+      "bus": "boom",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 8,
+        "far": 180,
+        "curve": [
+          [
+            0,
+            1
+          ],
+          [
+            8,
+            1
+          ],
+          [
+            40,
+            0.61
+          ],
+          [
+            90,
+            0.3
+          ],
+          [
+            180,
+            0
+          ]
+        ]
+      },
+      "layers": [
+        {
+          "clips": [
+            "weapon.recoilless_burst.ogg"
+          ],
+          "fadeOutMs": 800
+        }
+      ]
+    },
+    "weapon.homing_fire": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 190,
+      "maxVoices": 12,
+      "maxPerEmitter": 4,
+      "environment": true,
+      "maxSeconds": 1,
+      "bus": "shell-flight",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 6,
+        "far": 100
+      },
+      "place": {
+        "self": "2d",
+        "other": "auto"
+      },
+      "layers": [
+        {
+          "clips": [
+            "weapon.homing_fire.ogg"
+          ]
+        }
+      ]
+    },
+    "strike.strafe_line": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 190,
+      "maxVoices": 4,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 7,
+      "bus": "shell-flight",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 10,
+        "far": 120
+      },
+      "layers": [
+        {
+          "clips": [
+            "strike.strafe_line.ogg"
+          ]
+        }
+      ]
+    },
+    "strike.strafe_impact": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 150,
+      "maxVoices": 16,
+      "maxPerEmitter": 16,
+      "environment": true,
+      "maxSeconds": 4,
+      "bus": "impact",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 6,
+        "far": 90
+      },
+      "layers": [
+        {
+          "clips": [
+            "strike.strafe_impact.ogg"
+          ]
+        }
+      ]
+    },
+    "strike.hunter_lock": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 200,
+      "maxVoices": 4,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 4,
+      "bus": "beam",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 6,
+        "far": 80
+      },
+      "layers": [
+        {
+          "clips": [
+            "strike.hunter_lock.ogg"
+          ]
         }
       ]
     }
