@@ -1,0 +1,14 @@
+{
+  "name": "ForgeReplay",
+  "version_number": "1.0.0",
+  "website_url": "https://github.com/NAinfini/GTFO-Forge-Mods",
+  "description": "Records every GTFO level you play and replays it in game: open Replays on the main menu, pick a run, then scrub the timeline and follow any player.",
+  "dependencies": [
+    "BepInEx-BepInExPack_GTFO-3.2.4",
+    "GTFOModding-GTFO_API-0.6.1",
+    "NAinfini-ForgeCore-1.0.0",
+    "NAinfini-ForgeUI-1.0.0",
+    "NAinfini-ForgeAudio-1.0.0",
+    "NAinfini-ForgeVisual-1.0.0"
+  ]
+}

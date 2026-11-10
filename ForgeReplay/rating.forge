@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0.0",
+  "minSeconds": 120,
+  "minDimensions": 3,
+  "grades": [
+    { "name": "S+", "from": 0.97 },
+    { "name": "S", "from": 0.94 },
+    { "name": "S-", "from": 0.91 },
+    { "name": "A+", "from": 0.86 },
+    { "name": "A", "from": 0.81 },
+    { "name": "A-", "from": 0.75 },
+    { "name": "B+", "from": 0.68 },
+    { "name": "B", "from": 0.61 },
+    { "name": "B-", "from": 0.54 },
+    { "name": "C+", "from": 0.46 },
+    { "name": "C", "from": 0.38 },
+    { "name": "C-", "from": 0.3 },
+    { "name": "D+", "from": 0.22 },
+    { "name": "D", "from": 0.14 },
+    { "name": "D-", "from": 0 }
+  ],
+  "metrics": {
+    "damagePerMinute": { "owner": 165.1626, "low": 38.8297 },
+    "killsPerMinute": { "owner": 2.7677, "low": 1.2342 },
+    "weakShare": { "owner": 0.1498, "low": 0.05 },
+    "takenPerMinute": { "owner": 3.3305, "low": 3.9493 },
+    "downsPerMinute": { "owner": 0.091, "low": 0.273 },
+    "rescuesPerMinute": { "owner": 0.0374, "low": 0 },
+    "gavePerMinute": { "owner": 0.819, "low": 0 },
+    "interactionsPerMinute": { "owner": 0.748, "low": 0.546 }
+  }
+}

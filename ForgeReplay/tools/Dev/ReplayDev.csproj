@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Development tools over recorded files (not tests): REPLAY_FILE, REPLAY_NOISE_DIR, REPLAY_CALIBRATE_DIR; see DEVELOPERS.md. -->
+  <PropertyGroup>
+    <RootNamespace>ForgeReplay.Dev</RootNamespace>
+    <AssemblyName>ForgeReplay.Dev</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Core/*.cs" Link="Core/%(Filename)%(Extension)" />
+    <Compile Include="../../../ForgeCore/Core/Compact.cs" Link="ForgeCore/Compact.cs" />
+    <Compile Include="../../../ForgeCore/Core/ChunkLog.cs" Link="ForgeCore/ChunkLog.cs" />
+    <Compile Include="../../../ForgeCore/Core/EnemyAlert.cs" Link="ForgeCore/EnemyAlert.cs" />
+    <Compile Include="../../../ForgeCore/Once/FormatVersion.cs" Link="ForgeCore/FormatVersion.cs" />
+    <Compile Include="../../../ForgeUI/Core/HudLayout.cs" Link="ForgeUI/HudLayout.cs" />
+    <Compile Include="Program.cs;DamageCalibration.cs;RatingCalibration.cs" />
+  </ItemGroup>
+</Project>
