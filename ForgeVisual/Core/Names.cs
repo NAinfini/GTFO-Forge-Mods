@@ -88,6 +88,11 @@ internal sealed class NameTable<T> where T : class
 /// <summary>How a named lookup ended, and why when it did not find anything.</summary>
 internal static class Missing
 {
+    private static readonly HashSet<(string Kind, string? Name)> Reported = new();
+
+    /// <summary>True the first time a lookup of <paramref name="name"/> as <paramref name="kind"/> failed, so the reason (a string build) is made once, not on every miss.</summary>
+    internal static bool First(string kind, string? name) => Reported.Add((kind, name));
+
     /// <summary>The reason a name was not found: not a name at all, a pack that is not installed, or an item its pack lacks.</summary>
     internal static string Why(string? name, Func<string, bool> packKnown, string kind)
     {

@@ -39,7 +39,7 @@ internal static class EngineReads
             catch (Exception error)
             {
                 _bounds = null;
-                Plugin.Logger.ErrorOnce("The renderer bounds call is missing, so an outline follows the enemy's agent instead of its drawn body during wake-up and climb-out animations: " + error);
+                Plugin.Logger.ErrorOnce("visual-renderer-bounds-call-missing-so-outline", "The renderer bounds call is missing, so an outline follows the enemy's agent instead of its drawn body during wake-up and climb-out animations: " + error);
             }
             return true;
         }

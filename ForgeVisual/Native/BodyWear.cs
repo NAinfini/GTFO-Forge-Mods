@@ -62,7 +62,7 @@ internal static class BodyConvert
 
     /// <summary>Whether <paramref name="agent"/> is this peer's own player (its wielded item is the first-person one).</summary>
     internal static bool IsLocal(PlayerAgent agent)
-        => agent.IsLocallyOwned && agent.Owner != null && SNet.LocalPlayer != null && agent.Owner.Lookup == SNet.LocalPlayer.Lookup;
+        => agent.IsLocallyOwned && agent.Owner != null && ForgeCore.Session.LocalLookup != 0 && agent.Owner.Lookup == ForgeCore.Session.LocalLookup;
 }
 
 /// <summary>
@@ -128,7 +128,8 @@ public sealed class FirstPersonWear
         if (bones.Count == 0) { Error(label, "lists no bones"); return null; }
         var body = agent.FPItemHolder == null ? null : agent.FPItemHolder.FPSArms;
         if (body == null || body.WasCollected) { Error(label, "the player has no first-person body"); return null; }
-        var root = look.Spawn(Vector3.zero, Quaternion.identity);
+        // Not reported to ForgeCore.Recording: only its owner's first-person view draws it.
+        var root = look.Make(Vector3.zero, Quaternion.identity);
         if (root == null) return null;
         root.name = "ForgeVisual.Wear." + look.Name;
         root.SetActive(false);
@@ -347,10 +348,10 @@ public sealed class FirstPersonWear
             if (renderer == null || renderer.WasCollected) continue;
             if (hide)
             {
-                _wasOff[i] = renderer.forceRenderingOff;
-                renderer.forceRenderingOff = true;
+                _wasOff[i] = HeldOff.IsOff(renderer);
+                HeldOff.SetUnder(renderer, true);
             }
-            else renderer.forceRenderingOff = _wasOff[i];
+            else HeldOff.SetUnder(renderer, _wasOff[i]);
         }
     }
 
@@ -445,5 +446,5 @@ public sealed class FirstPersonWear
     }
 
     private static void Error(string label, string why, bool fatal = true)
-        => Plugin.Logger.ErrorOnce("ForgeVisual first-person wear " + label + ": " + why + (fatal ? "; the game's own body stays." : "."));
+        => Plugin.Logger.ErrorOnce("visual-first-person-wear-games-own-body", "ForgeVisual first-person wear " + label + ": " + why + (fatal ? "; the game's own body stays." : "."));
 }

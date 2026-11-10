@@ -124,7 +124,7 @@ internal static class Shaders
             if (_particle == null || _marker == null || _outline == null) { _particle = _marker = _outline = null; return false; }
             if (!_particle.isSupported || !_marker.isSupported || !_outline.isSupported)
             {
-                Plugin.Logger.Error("ForgeVisual's shaders are not supported on this device; its sprites, particles, ground marks, beams and outlines are not drawn.");
+                Plugin.Logger.Error("visual-forgevisuals-shaders-are-not-supported", "ForgeVisual's shaders are not supported on this device; its sprites, particles, ground marks, beams and outlines are not drawn.");
                 _particle = _marker = _outline = null;
                 return false;
             }
@@ -132,7 +132,7 @@ internal static class Shaders
         }
         catch (Exception error)
         {
-            Plugin.Logger.Error("ForgeVisual's shaders could not be loaded; its sprites, particles, ground marks, beams and outlines are not drawn: " + error);
+            Plugin.Logger.Error("visual-forgevisuals-shaders-could-not-be-loaded", "ForgeVisual's shaders could not be loaded; its sprites, particles, ground marks, beams and outlines are not drawn: " + error);
             _particle = _marker = _outline = null;
             return false;
         }

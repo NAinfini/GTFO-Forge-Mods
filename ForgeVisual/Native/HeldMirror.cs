@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Player;
 using UnityEngine;
-using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
 namespace ForgeVisual;
@@ -11,7 +10,8 @@ namespace ForgeVisual;
 /// A copy of whatever a player holds, for another model's hand (<see cref="Models.MirrorHeld"/>): the item's mesh pieces (its shared
 /// meshes, materials and per-renderer properties, a skinned piece baked once; nothing of the game's item), laid out as on the item and
 /// scaled to the model. <see cref="Refresh"/> reads what the player wields (any slot but a carried heavy object), a few times a second;
-/// one copy is made per item (a gear item once its parts are built) and the last four are kept. <see cref="Place"/> puts the current
+/// one copy is made per item (a gear item once its parts are built) and the last four are kept. A gun with a <see cref="GunMount"/> is copied as its
+/// model, without the game's hidden meshes (made again when a mount comes or goes after the copy), and every copy draws world surfaces, never the item camera's. <see cref="Place"/> puts the current
 /// copy where the game holds the item against the body's hand, carried over to the model's hand: another peer's player by its
 /// third-person item, this peer's own player by its first-person item at the third-person body's <c>ItemAlign</c>. An item that
 /// cannot be copied is one error line and the hand holds nothing for it.
@@ -52,17 +52,26 @@ public sealed class HeldMirror
         if (item == null) { _source = null; return; }
         var model = _local ? _agent!.PlayerSyncModel : null;
         var source = _local ? model != null ? model.ItemAlign : null : item.transform;
-        if (source == null) Plugin.Logger.ErrorOnce("ForgeVisual held copy " + _label + ": the player's third-person body has no item align; the hand holds nothing.");
+        if (source == null) Plugin.Logger.ErrorOnce("visual-held-copy-players-third-person-body", "ForgeVisual held copy " + _label + ": the player's third-person body has no item align; the hand holds nothing.");
         _source = source;
     }
 
     private void Select(ItemEquippable? item)
     {
-        if (_current != null && (item == null || _current.Source != item.Pointer)) { _current.Show(false); _current = null; }
-        if (item == null || _current != null) return;
+        if (_current != null && (item == null || _current.SourceId != item.GetInstanceID())) { _current.Show(false); _current = null; }
+        if (item == null) return;
+        var mount = GunMount.Of(item.GearPartHolder);
+        for (var i = _copies.Count - 1; i >= 0; i--)
+        {
+            if (_copies[i].SourceId != item.GetInstanceID() || ReferenceEquals(_copies[i].Mount, mount)) continue;
+            if (_current == _copies[i]) _current = null;
+            _copies[i].Destroy();
+            _copies.RemoveAt(i);
+        }
+        if (_current != null) return;
         for (var i = 0; i < _copies.Count; i++)
-            if (_copies[i].Source == item.Pointer) { Use(_copies[i]); return; }
-        var made = HeldCopy.Build(item, _layer, !_local, _label);
+            if (_copies[i].SourceId == item.GetInstanceID()) { Use(_copies[i]); return; }
+        var made = HeldCopy.Build(item, mount, _layer, !_local, _label);
         // Null: the item's parts are still being built; asked again at the next refresh.
         if (made == null) return;
         if (_copies.Count >= Keep) { _copies[0].Destroy(); _copies.RemoveAt(0); }
@@ -129,9 +138,10 @@ internal sealed class HeldCopy
     private readonly float _itemScale;
     private bool _shadowOnly;
 
-    private HeldCopy(IntPtr source, GameObject? root, Renderer[] renderers, Mesh[] baked, Vector3 muzzle, float itemScale)
+    private HeldCopy(int sourceId, GunMount? mount, GameObject? root, Renderer[] renderers, Mesh[] baked, Vector3 muzzle, float itemScale)
     {
-        Source = source;
+        SourceId = sourceId;
+        Mount = mount;
         _root = root;
         _renderers = renderers;
         _baked = baked;
@@ -139,7 +149,10 @@ internal sealed class HeldCopy
         _itemScale = itemScale;
     }
 
-    internal IntPtr Source { get; }
+    /// <summary>The item's Unity instance id: unlike its native pointer it is never given to a later object, so a copy is never taken for another item's.</summary>
+    internal int SourceId { get; }
+    /// <summary>The gun model this copy was made of, if any.</summary>
+    internal GunMount? Mount { get; }
     internal bool Failed => _root == null;
     internal bool Shown => _root != null && !_root.WasCollected && _root.activeSelf;
     internal Vector3 Muzzle => _root!.transform.TransformPoint(_muzzle);
@@ -147,7 +160,7 @@ internal sealed class HeldCopy
     /// <summary>The hidden copy of <paramref name="item"/>; a failed copy (logged) when the item has no mesh or copying fails, or null
     /// while its gear parts are still being built. <paramref name="thirdPerson"/>: the item is the game's third-person item (its own
     /// scale is kept).</summary>
-    internal static HeldCopy? Build(ItemEquippable item, int layer, bool thirdPerson, string label)
+    internal static HeldCopy? Build(ItemEquippable item, GunMount? mount, int layer, bool thirdPerson, string label)
     {
         var name = item.name;
         GameObject? root = null;
@@ -159,7 +172,7 @@ internal sealed class HeldCopy
             var pieces = new List<(Renderer Renderer, SkinnedMeshRenderer? Skinned, Mesh? Mesh)>();
             foreach (var renderer in item.GetComponentsInChildren<Renderer>(true))
             {
-                if (renderer == null) continue;
+                if (renderer == null || (mount != null && mount.IsHiddenPart(renderer.transform))) continue;
                 var skinned = renderer.TryCast<SkinnedMeshRenderer>();
                 if (skinned != null) { if (skinned.sharedMesh != null) pieces.Add((renderer, skinned, null)); continue; }
                 if (renderer.TryCast<MeshRenderer>() == null) continue;
@@ -168,8 +181,8 @@ internal sealed class HeldCopy
             }
             if (pieces.Count == 0)
             {
-                Plugin.Logger.ErrorOnce("ForgeVisual held copy " + label + ": the item " + name + " has no mesh to copy; the hand holds nothing.");
-                return Failure(item);
+                Plugin.Logger.ErrorOnce("visual-held-copy-item-has-no-mesh", "ForgeVisual held copy " + label + ": the item " + name + " has no mesh to copy; the hand holds nothing.");
+                return Failure(item, mount);
             }
             var renderers = new List<Renderer>();
             var baked = new List<Mesh>();
@@ -198,24 +211,27 @@ internal sealed class HeldCopy
                 t.localScale = skinned != null ? Vector3.one : new Vector3(x.magnitude, y.magnitude, z.magnitude);
                 part.AddComponent<MeshFilter>().sharedMesh = mesh;
                 var copy = part.AddComponent<MeshRenderer>();
-                copy.sharedMaterials = renderer.sharedMaterials;
+                var surfaces = renderer.sharedMaterials;
+                for (var i = 0; i < surfaces.Length; i++)
+                    if (surfaces[i] != null) surfaces[i] = LitMaterial.ForWorld(surfaces[i]);
+                copy.sharedMaterials = surfaces;
                 renderer.GetPropertyBlock(block);
                 copy.SetPropertyBlock(block);
                 renderers.Add(copy);
             }
             var muzzleAlign = item.MuzzleAlign;
             var muzzle = muzzleAlign != null && !muzzleAlign.WasCollected ? source.InverseTransformPoint(muzzleAlign.position) : Vector3.forward * 0.5f;
-            return new HeldCopy(item.Pointer, root, renderers.ToArray(), baked.ToArray(), muzzle, thirdPerson ? source.lossyScale.x : 1f);
+            return new HeldCopy(item.GetInstanceID(), mount, root, renderers.ToArray(), baked.ToArray(), muzzle, thirdPerson ? source.lossyScale.x : 1f);
         }
         catch (Exception error)
         {
-            Plugin.Logger.ErrorOnce("ForgeVisual held copy " + label + ": copying the item " + name + " failed; the hand holds nothing: " + error);
+            Plugin.Logger.ErrorOnce("visual-held-copy-copying-item-failed-hand", "ForgeVisual held copy " + label + ": copying the item " + name + " failed; the hand holds nothing: " + error);
             if (root != null && !root.WasCollected) Object.Destroy(root);
-            return Failure(item);
+            return Failure(item, mount);
         }
     }
 
-    private static HeldCopy Failure(ItemEquippable item) => new(item.Pointer, null, Array.Empty<Renderer>(), Array.Empty<Mesh>(), Vector3.zero, 1f);
+    private static HeldCopy Failure(ItemEquippable item, GunMount? mount) => new(item.GetInstanceID(), mount, null, Array.Empty<Renderer>(), Array.Empty<Mesh>(), Vector3.zero, 1f);
 
     internal void Resize(float scale)
     {
@@ -238,9 +254,8 @@ internal sealed class HeldCopy
     {
         if (on == _shadowOnly) return;
         _shadowOnly = on;
-        var mode = on ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
         for (var i = 0; i < _renderers.Length; i++)
-            if (_renderers[i] != null && !_renderers[i].WasCollected) _renderers[i].shadowCastingMode = mode;
+            if (_renderers[i] != null && !_renderers[i].WasCollected) SurfaceLook.SetShadowOnly(_renderers[i], on);
     }
 
     internal void Destroy()

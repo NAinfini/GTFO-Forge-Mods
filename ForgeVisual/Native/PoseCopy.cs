@@ -14,9 +14,10 @@ public sealed class PoseTarget
     private readonly Vector3[] _restPosition;
     private readonly Quaternion[] _restRotation;
 
-    private PoseTarget(Transform root, IReadOnlyList<PoseLink> links, Transform[] bones, NQuaternion[] unframe, NVector3 rootRest)
+    private PoseTarget(Transform root, IReadOnlyList<PoseLink> links, Transform[] bones, NQuaternion[] unframe, NVector3 rootRest, float headHeight)
     {
         Root = root;
+        HeadHeight = headHeight;
         Links = links;
         _bones = bones;
         Unframe = unframe;
@@ -28,6 +29,10 @@ public sealed class PoseTarget
 
     /// <summary>The model's root (its size and turn are the copy's frame).</summary>
     public Transform Root { get; }
+
+    /// <summary>The height of the head bone at rest in the root's own units (the model standing on the root's floor); 0 without a head link.
+    /// A caller fits a model to a body by the ratio of the body's head height to this.</summary>
+    public float HeadHeight { get; }
 
     public IReadOnlyList<PoseLink> Links { get; }
 
@@ -71,15 +76,17 @@ public sealed class PoseTarget
             rotation[i] = BodyConvert.N(rest.rotation);
         }
         if (missing.Length > 0) { Error(label, "the model lacks the bones " + missing); return null; }
-        return new PoseTarget(root, links, found, PoseSolver.Unframe(links, position, rotation), position[0]);
+        var head = 0f;
+        for (var i = 0; i < links.Count; i++) if (links[i].Body == BodyBone.Head) head = position[i].Y;
+        return new PoseTarget(root, links, found, PoseSolver.Unframe(links, position, rotation), position[0], head);
     }
 
     internal static void Error(string label, string why)
-        => Plugin.Logger.ErrorOnce("ForgeVisual pose copy " + label + ": " + why + "; the model does not follow the body.");
+        => Plugin.Logger.ErrorOnce("visual-pose-copy-model-does-not-follow", "ForgeVisual pose copy " + label + ": " + why + "; the model does not follow the body.");
 }
 
 /// <summary>
-/// A body's humanoid pose copied onto a <see cref="PoseTarget"/> of other proportions (<see cref="Models.CopyPose"/>): the body's bones
+/// A body's humanoid pose copied onto a <see cref="PoseTarget"/> of other proportions (<see cref="Models.CopyPose(Animator, PoseTarget, IReadOnlyList{PoseReach}, string)"/>, or from bones the caller found): the body's bones
 /// in link order (by the game's own <c>Animator.GetBoneTransform</c>), each with its fixed correction to the model bone, read once from
 /// the body's bind poses. Call <see cref="Apply"/> every frame after the game animated the body: each model bone takes the turn of its
 /// body bone and the root its height and sway, scaled by root height over root height, then each <see cref="PoseReach"/> limb bends so
@@ -89,7 +96,7 @@ public sealed class PoseTarget
 /// </summary>
 public sealed class PoseCopy
 {
-    private readonly Animator _animator;
+    private readonly Animator? _animator;
     private readonly AnimatorCullingMode _culling;
     private readonly Transform _body;
     private readonly Transform[] _source;
@@ -99,11 +106,10 @@ public sealed class PoseCopy
     private readonly float _ratio;
     private readonly PoseReach[] _reach;
 
-    private PoseCopy(Animator animator, PoseTarget target, Transform[] source, Quaternion[] correction, NVector3 rootRest, float ratio, float scale, PoseReach[] reach)
+    private PoseCopy(Transform body, Animator? animator, PoseTarget target, Transform[] source, Quaternion[] correction, NVector3 rootRest, float ratio, float scale, PoseReach[] reach)
     {
         _animator = animator;
-        _culling = animator.cullingMode;
-        _body = animator.transform;
+        _body = body;
         _target = target;
         _source = source;
         _correction = correction;
@@ -111,6 +117,8 @@ public sealed class PoseCopy
         _ratio = ratio;
         _reach = reach;
         Scale = scale;
+        if (animator == null) return;
+        _culling = animator.cullingMode;
         animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
     }
 
@@ -133,19 +141,44 @@ public sealed class PoseCopy
         var body = animator.transform;
         var rest = BodyConvert.BindRest(animator, body);
         var source = new Transform[links.Count];
-        var position = new NVector3[links.Count];
-        var rotation = new NQuaternion[links.Count];
+        var pose = new Matrix4x4[links.Count];
         var toward = new NVector3?[links.Count];
         var missing = "";
         for (var i = 0; i < links.Count; i++)
-        {
-            if (!Resolve(animator, rest, links[i].Body, links[i].BodyAlt, out source[i], out var m)) { missing += (missing.Length > 0 ? ", " : "") + links[i].Body; continue; }
-            position[i] = BodyConvert.N(m.GetColumn(3));
-            rotation[i] = BodyConvert.N(m.rotation);
-        }
+            if (!Resolve(animator, rest, links[i].Body, links[i].BodyAlt, out source[i], out pose[i])) missing += (missing.Length > 0 ? ", " : "") + links[i].Body;
         if (missing.Length > 0) { PoseTarget.Error(label, "the body lacks the bones (or their bind poses) " + missing); return null; }
         for (var i = 0; i < links.Count; i++)
             if (links[i].TowardBody is { } t && Resolve(animator, rest, t, links[i].TowardBodyAlt, out _, out var m)) toward[i] = BodyConvert.N(m.GetColumn(3));
+        return Create(body, animator, target, source, pose, toward, reach, label);
+    }
+
+    /// <summary>A copy from body bones the caller resolved itself (<see cref="Models.CopyPose(Transform, IReadOnlyList{Transform}, IReadOnlyList{Matrix4x4}, Animator?, PoseTarget, string)"/>):
+    /// one per link, each with its rest pose in <paramref name="body"/>'s frame. No reach, no toward-body bones.</summary>
+    internal static PoseCopy? Bind(Transform body, IReadOnlyList<Transform> bones, IReadOnlyList<Matrix4x4> rest, Animator? animator, PoseTarget target, string label)
+    {
+        var links = target.Links;
+        if (bones.Count != links.Count || rest.Count != links.Count) { PoseTarget.Error(label, "the body has " + bones.Count + " bones for the " + links.Count + " links"); return null; }
+        var source = new Transform[links.Count];
+        var pose = new Matrix4x4[links.Count];
+        for (var i = 0; i < links.Count; i++)
+        {
+            if (bones[i] == null || bones[i].WasCollected) { PoseTarget.Error(label, "the body has no bone for " + links[i].Model); return null; }
+            source[i] = bones[i];
+            pose[i] = rest[i];
+        }
+        return Create(body, animator, target, source, pose, new NVector3?[links.Count], Array.Empty<PoseReach>(), label);
+    }
+
+    private static PoseCopy? Create(Transform body, Animator? animator, PoseTarget target, Transform[] source, Matrix4x4[] pose, NVector3?[] toward, IReadOnlyList<PoseReach> reach, string label)
+    {
+        var links = target.Links;
+        var position = new NVector3[links.Count];
+        var rotation = new NQuaternion[links.Count];
+        for (var i = 0; i < links.Count; i++)
+        {
+            position[i] = BodyConvert.N(pose[i].GetColumn(3));
+            rotation[i] = BodyConvert.N(pose[i].rotation);
+        }
         if (PoseSolver.Ratio(target.RootRest.Y, position[0].Y, out var ratio) is { } why) { PoseTarget.Error(label, why); return null; }
         var corrections = PoseSolver.Correct(links, position, rotation, toward, target.Unframe);
         var correction = new Quaternion[links.Count];
@@ -153,7 +186,7 @@ public sealed class PoseCopy
         var scale = ratio * target.Root.lossyScale.y / Math.Max(1e-4f, body.lossyScale.y);
         var reaches = new PoseReach[reach.Count];
         for (var i = 0; i < reaches.Length; i++) reaches[i] = reach[i];
-        return new PoseCopy(animator, target, source, correction, position[0], ratio, scale, reaches);
+        return new PoseCopy(body, animator, target, source, correction, position[0], ratio, scale, reaches);
     }
 
     /// <summary>The body bone <paramref name="first"/> (else <paramref name="second"/>) and its rest in the body's frame.</summary>
@@ -176,7 +209,7 @@ public sealed class PoseCopy
     public bool Apply()
     {
         var root = _target.Root;
-        if (_animator.WasCollected || _body.WasCollected || root == null || root.WasCollected) return false;
+        if (_animator is { WasCollected: true } || _body == null || _body.WasCollected || root == null || root.WasCollected) return false;
         var turn = root.rotation * Quaternion.Inverse(_body.rotation);
         Turn = turn;
         var bones = _target.Bones;
@@ -202,9 +235,43 @@ public sealed class PoseCopy
         end.rotation = keep;
     }
 
-    /// <summary>The body's animator back as it was (nothing to give back once the game has destroyed it, as a level unload does).</summary>
+    private static readonly List<PoseCopy> Following = new();
+    private bool _following;
+
+    /// <summary>From now on the library applies the copy every frame itself, after the game animated the body and after the joint clips
+    /// played on it (<see cref="JointPlayer"/>), until <see cref="Release"/>, the body or the model is gone, or the level ends. For a caller
+    /// with nothing of its own to do between (a skin on an enemy); a caller that poses more after the copy calls <see cref="Apply"/> itself.</summary>
+    public void Follow()
+    {
+        if (_following) return;
+        _following = true;
+        Following.Add(this);
+    }
+
+    /// <summary>Every following copy applied (LateUpdate, after the joint clips); a copy whose body or model is gone stops following.</summary>
+    internal static void TickAll()
+    {
+        for (var i = Following.Count - 1; i >= 0; i--)
+        {
+            var copy = Following[i];
+            try { if (copy.Apply()) continue; }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("visual-pose-copy-failed", "ForgeVisual pose copy failed and stopped following: " + error); }
+            copy._following = false;
+            Following.RemoveAt(i);
+        }
+    }
+
+    internal static void StopAll()
+    {
+        foreach (var copy in Following) copy._following = false;
+        Following.Clear();
+    }
+
+    /// <summary>The copy stops following and the body's animator is back as it was (nothing to give back once the game has destroyed it, as a
+    /// level unload does).</summary>
     public void Release()
     {
-        if (_animator != null) _animator.cullingMode = _culling;
+        if (_following) { _following = false; Following.Remove(this); }
+        if (_animator != null && !_animator.WasCollected) _animator.cullingMode = _culling;
     }
 }

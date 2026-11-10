@@ -10,7 +10,7 @@ namespace ForgeVisual;
 /// projectile, a line stretched between two points, one-shot bursts. Unlike <see cref="Fx"/>'s one-shot calls the caller keeps the copy
 /// (<see cref="FxInstance"/>), places it every frame, switches the prefab's layers and state children, and releases it. A copy is
 /// reused once none of its particle systems is alive; tinted and untinted copies are separate. Make one pool per owner and
-/// <see cref="Dispose"/> it with the owner; the library clears every pool at level end.
+/// <see cref="Dispose"/> it with the owner; the library clears every pool at level end. An effect that cannot be made never takes the caller down: the error is logged once and the caller gets a copy that draws nothing.
 /// </summary>
 public sealed class FxInstancePool : IDisposable
 {
@@ -29,35 +29,61 @@ public sealed class FxInstancePool : IDisposable
     }
 
     /// <summary>A free copy of <paramref name="model"/> (a prefab with a particle system at its root), made on the spot when none is
-    /// free, already reserved for the caller. <paramref name="tint"/> multiplies the start colour of every layer.</summary>
+    /// free, already reserved for the caller. <paramref name="tint"/> multiplies the start colour of every layer. A copy that cannot be made (logged once) draws nothing.</summary>
     public FxInstance Take(ModelHandle model, Color? tint = null)
     {
-        if (model == null) throw new ArgumentNullException(nameof(model));
         if (_disposed) throw new ObjectDisposedException(nameof(FxInstancePool));
+        if (model == null) return (Failed(null) ?? FxInstance.Blank).Reserve();
         for (var index = _instances.Count - 1; index >= 0; index--)
         {
             var instance = _instances[index];
             if (!instance.Valid) { _instances.RemoveAt(index); continue; }
             if (instance.Is(model, tint) && instance.Free) return instance.Reserve();
         }
-        return Create(model, tint).Reserve();
+        return (Create(model, tint) ?? FxInstance.Blank).Reserve();
     }
 
     /// <summary>Makes <paramref name="count"/> copies, one per step (including the scan of their particle systems and lights), so a
     /// level can fill its pools before the first use without one long frame.</summary>
     public IEnumerable<object?> Prepare(ModelHandle model, int count, Color? tint = null)
     {
-        for (var i = 0; i < count; i++) { Create(model, tint); yield return null; }
+        if (model == null) { Failed(null); yield break; }
+        for (var i = 0; i < count; i++)
+        {
+            if (Create(model, tint) == null) yield break;
+            yield return null;
+        }
     }
 
-    private FxInstance Create(ModelHandle model, Color? tint)
+    private FxInstance? Create(ModelHandle model, Color? tint)
     {
-        var made = model.Spawn(Vector3.zero, Quaternion.identity, _root.transform)
-            ?? throw new InvalidOperationException("ForgeVisual cannot make a copy of " + model.Name + ": its materials are not ready.");
-        made.name = tint is { } color ? model.Name + "#" + color : model.Name;
-        var created = new FxInstance(model, tint, made);
-        _instances.Add(created);
-        return created;
+        try
+        {
+            // A pooled copy is not reported to ForgeCore.Recording as a model: it is an effect its caller drives itself.
+            var made = model.Make(Vector3.zero, Quaternion.identity, _root.transform)
+                ?? throw new InvalidOperationException("ForgeVisual cannot make a copy of " + model.Name + ": its materials are not ready.");
+            made.name = tint is { } color ? model.Name + "#" + color : model.Name;
+            var created = new FxInstance(model, tint, made);
+            _instances.Add(created);
+            return created;
+        }
+        catch (Exception error) { return Failed(model.Name + ": " + error); }
+    }
+
+    private FxInstance? Failed(string? why)
+    {
+        Plugin.Logger.ErrorOnce("visual-pool-draws-nothing", "effect pool " + _root.name + " draws nothing for " + (why ?? "an effect that was not found") + ".");
+        return null;
+    }
+
+    private void Tick(float now)
+    {
+        for (var i = 0; i < _instances.Count; i++) _instances[i].Tick(now);
+    }
+
+    internal static void TickAll(float now)
+    {
+        for (var i = 0; i < Pools.Count; i++) Pools[i].Tick(now);
     }
 
     /// <summary>Stops every copy and hides it (level end, owner reset).</summary>
@@ -100,11 +126,29 @@ public sealed class FxInstance
     private readonly string[] _names;
     /// <summary>Layers whose emission <see cref="Emit"/> switched off.</summary>
     private readonly bool[] _muted;
+    /// <summary>One round of the prefab. A copy played once stops emitting after it, or a looping prefab would stay alive and out of the pool for ever (the game's build has stripped MainModule.loop, so loop cannot be read or switched off).</summary>
+    private readonly float _round;
+    /// <summary>When a copy played once stops emitting; 0: not due.</summary>
+    private float _stopAt;
     private readonly GameObject?[] _states = new GameObject?[StateCapacity];
     private readonly string?[] _stateNames = new string?[StateCapacity];
     private bool _held, _reserved, _started;
     private string? _emitPrefix;
     private bool _emitOn;
+
+    /// <summary>What <see cref="FxInstancePool.Take"/> hands out for a copy it could not make: every call does nothing.</summary>
+    internal static readonly FxInstance Blank = new();
+
+    private FxInstance()
+    {
+        _model = null!;
+        _object = null!;
+        _transform = null!;
+        _system = null!;
+        _layers = Array.Empty<ParticleSystem>();
+        _names = Array.Empty<string>();
+        _muted = Array.Empty<bool>();
+    }
 
     internal FxInstance(ModelHandle model, Color? tint, GameObject gameObject)
     {
@@ -117,6 +161,7 @@ public sealed class FxInstance
         _layers = new ParticleSystem[layers.Length];
         _names = new string[layers.Length];
         _muted = new bool[layers.Length];
+        _round = FxLayers.Longest(layers);
         for (var index = 0; index < layers.Length; index++)
         {
             var layer = _layers[index] = layers[index];
@@ -135,7 +180,7 @@ public sealed class FxInstance
     internal bool Valid => _object != null;
 
     /// <summary>True when the pool may hand this copy out: not reserved, not held, and nothing of it is still alive.</summary>
-    public bool Free => !_reserved && !_held && (!_started || !_system.IsAlive(true));
+    public bool Free => !_reserved && !_held && (!_started || !Valid || !_system.IsAlive(true));
 
     internal FxInstance Reserve()
     {
@@ -145,19 +190,29 @@ public sealed class FxInstance
         _reserved = true;
         _held = false;
         _started = false;
+        _stopAt = 0f;
         return this;
+    }
+
+    internal void Tick(float now)
+    {
+        if (_stopAt <= 0f || now < _stopAt) return;
+        _stopAt = 0f;
+        if (Valid) _system.Stop(true, ParticleSystemStopBehavior.StopEmitting);
     }
 
     /// <summary>Keeps the copy out of the pool until <see cref="Release"/> (a sustained effect).</summary>
     public FxInstance Hold()
     {
         _held = true;
+        _stopAt = 0f;
         return this;
     }
 
     /// <summary>Puts the copy at a pose and a uniform scale.</summary>
     public void Place(Vector3 position, Quaternion rotation, float scale = 1f)
     {
+        if (!Valid) return;
         _transform.SetPositionAndRotation(position, rotation);
         _transform.localScale = new Vector3(scale, scale, scale);
     }
@@ -165,6 +220,7 @@ public sealed class FxInstance
     /// <summary>A line member from <paramref name="start"/> to <paramref name="end"/>: its one-metre +Z length stretched.</summary>
     public void Stretch(Vector3 start, Vector3 end)
     {
+        if (!Valid) return;
         var travel = end - start;
         var length = travel.magnitude;
         _transform.SetPositionAndRotation(start, length > 0.0001f ? Quaternion.LookRotation(travel) : Quaternion.identity);
@@ -193,11 +249,13 @@ public sealed class FxInstance
     /// <summary>Shows the copy and plays it from the start.</summary>
     public void Start()
     {
+        _started = true;
+        _reserved = false;
+        if (!Valid) return;
         _object.SetActive(true);
         _system.Clear(true);
         _system.Play(true);
-        _started = true;
-        _reserved = false;
+        _stopAt = _held ? 0f : Scene.Now + Math.Max(_round, 0.01f);
     }
 
     /// <summary>Starts the copy when it has not been started yet; a held copy calls this every frame.</summary>
@@ -209,9 +267,10 @@ public sealed class FxInstance
     /// <summary>Lets a held copy go: emission stops, live particles finish, then the pool reuses it.</summary>
     public void Release()
     {
+        _reserved = false; // also a copy taken and never started goes back to the pool now
         if (!_held) return;
         _held = false;
-        _reserved = false;
+        _stopAt = 0f;
         if (_started && Valid) _system.Stop(true, ParticleSystemStopBehavior.StopEmitting);
     }
 
@@ -219,6 +278,7 @@ public sealed class FxInstance
     /// playing; a state already playing restarts. A missing child, or more than four states at once, throws.</summary>
     public void PlayState(string child)
     {
+        if (!Valid) return;
         var slot = -1;
         for (var index = 0; index < StateCapacity; index++)
         {
@@ -254,6 +314,8 @@ public sealed class FxInstance
     {
         ClearState();
         _held = _reserved = _started = false;
+        _stopAt = 0f;
+        if (!Valid) return;
         _system.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         _object.SetActive(false);
     }

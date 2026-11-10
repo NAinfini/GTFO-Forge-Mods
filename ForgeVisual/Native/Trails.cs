@@ -49,6 +49,8 @@ public sealed class TrailStyle
     public int RibbonPoints { get; set; }
     public float RibbonStep { get; set; } = 1f / 60f;
     public float RibbonWidth { get; set; } = 0.09f;
+    /// <summary>The ribbon's width at its tail over its width at the head (1: even; 0.1: a streak that thins to a tenth of its width behind the thing).</summary>
+    public float RibbonTaper { get; set; } = 1f;
     public Color RibbonHead { get; set; } = Color.white;
     public Color RibbonTail { get; set; } = new(1f, 1f, 1f, 0f);
     public FxBlend RibbonBlend { get; set; } = FxBlend.Alpha;
@@ -73,7 +75,9 @@ public sealed class TrailStyle
 }
 
 /// <summary>One trail behind a moving thing (a thrown ball, a falling shell, a rocket). Rent it, <see cref="Move"/> it every frame,
-/// <see cref="End"/> it; the ribbon collapses and the puffs already left finish on their own.</summary>
+/// <see cref="End"/> it. A trail is its path: the ribbon is the last positions of the thing in world space, so it stays where the thing
+/// has been, thinning behind it; at <see cref="End"/> the ribbon is eaten from its tail up to the last point over its own length of time
+/// and the puffs already left finish on their own. It is a local drawing that follows the position this peer already shows, and sends nothing.</summary>
 public sealed class Trail
 {
     private readonly TrailStyle _style;
@@ -83,7 +87,10 @@ public sealed class Trail
     private Sprite _flame = Sprite.None, _glow = Sprite.None;
     private Vector3 _last, _direction = Vector3.down;
     private float _lastTime = -1f;
+    // This journey's own number in reports to ForgeCore.Recording: a pooled trail used again is another trail.
+    private int _key;
     internal bool Live;
+    private float _fadeEnds;
 
     internal Trail(TrailStyle style)
     {
@@ -98,6 +105,7 @@ public sealed class Trail
     internal void Begin(Vector3 start, LineRenderer? line)
     {
         Live = true;
+        _key = Fx.NewKey();
         _last = start;
         _lastTime = -1f;
         _direction = Vector3.down;
@@ -105,6 +113,7 @@ public sealed class Trail
         _line = line;
         if (_ring != null && line != null)
         {
+            // A used trail starts from nothing: every point at the start, so no line is drawn from where the last journey ended.
             _ring.Reset(start, Scene.Now);
             line.gameObject.SetActive(true);
             for (var i = 0; i < _ring.Count; i++) line.SetPosition(i, start);
@@ -134,6 +143,7 @@ public sealed class Trail
     public void Move(Vector3 position, float progress)
     {
         if (!Live) return;
+        if (ForgeCore.Recording.Watched) ForgeCore.Recording.Effect(new ForgeCore.ShownEffect(ForgeCore.ShownKind.Trail, 0, _key, position, default, progress, Color.white, look: _style));
         var now = Scene.Now;
         var s = _style;
         var travel = position - _last;
@@ -150,11 +160,7 @@ public sealed class Trail
             SpritePool.Move(_glow, behind, Vector3.zero);
             SpritePool.Resize(_glow, s.GlowSize * (1f - s.Flicker * 0.5f + s.Flicker * flicker), 1f);
         }
-        if (_ring != null && _line != null && !_line.WasCollected)
-        {
-            _ring.Sample(position, now);
-            for (var i = 0; i < _ring.Count; i++) _line.SetPosition(i, _ring[i]);
-        }
+        DrawRibbon(position, now);
         if (_lastTime >= 0f)
         {
             var dt = Math.Min(now - _lastTime, 0.25f);
@@ -168,6 +174,25 @@ public sealed class Trail
         }
         _last = position;
         _lastTime = now;
+    }
+
+    private void DrawRibbon(Vector3 position, float now)
+    {
+        if (_ring == null || _line == null || _line.WasCollected) return;
+        _ring.Sample(position, now);
+        for (var i = 0; i < _ring.Count; i++) _line.SetPosition(i, _ring[i]);
+    }
+
+    /// <summary>Every frame after <see cref="End"/> until the ribbon has gathered into the last point; true when it has and the line is hidden.</summary>
+    internal bool Fade(float now)
+    {
+        if (_line == null || _line.WasCollected || now >= _fadeEnds)
+        {
+            if (_line != null && !_line.WasCollected) _line.gameObject.SetActive(false);
+            return true;
+        }
+        DrawRibbon(_last, now);
+        return false;
     }
 
     private static void Puff(TrailPuff puff, Vector3 at, float progress)
@@ -199,20 +224,41 @@ public sealed class Trail
 
     internal void Stop()
     {
+        if (ForgeCore.Recording.Watched) ForgeCore.Recording.Effect(new ForgeCore.ShownEffect(ForgeCore.ShownKind.Release, 0, _key, default, default, float.NaN, Color.white));
         Live = false;
         SpritePool.Kill(_flame);
         SpritePool.Kill(_glow);
         _flame = _glow = Sprite.None;
+        _fadeEnds = _ring == null ? 0f : Scene.Now + (_ring.Count + 1) * _ring.Step;
+    }
+
+    /// <summary>Hides the ribbon at once, without the fade (a level change).</summary>
+    internal void Hide()
+    {
+        _fadeEnds = 0f;
         if (_line != null && !_line.WasCollected) _line.gameObject.SetActive(false);
     }
 
+    /// <summary>Destroys the ribbon's line object (a level change, the trail is not rented again).</summary>
+    internal void Discard()
+    {
+        if (_line != null && !_line.WasCollected) Object.Destroy(_line.gameObject);
+        _line = null;
+    }
+
+    internal bool HasRibbon => _ring != null;
     internal LineRenderer? Line => _line;
 }
 
 /// <summary>The pool of trails: trails of the same style are reused, ribbons keep their line renderer.</summary>
 public static class Trails
 {
+    /// <summary>Most ribbon points a style may ask for.</summary>
+    public const int MaxRibbonPoints = 64;
+    /// <summary>Trails running or fading at once, every mod together; a rent past it returns null and that thing flies without a trail.</summary>
+    public const int Max = 64;
     private static readonly List<Trail> Live = new();
+    private static readonly List<Trail> Fading = new();
     private static readonly List<Trail> Free = new();
 
     /// <summary>A trail of <paramref name="style"/> starting at <paramref name="start"/>; null (logged once) when the library's shaders
@@ -220,6 +266,8 @@ public static class Trails
     public static Trail? Rent(Vector3 start, TrailStyle style)
     {
         if (style == null) throw new ArgumentNullException(nameof(style));
+        if (style.RibbonPoints > MaxRibbonPoints) throw new ArgumentOutOfRangeException(nameof(style), "A ribbon has at most " + MaxRibbonPoints + " points.");
+        if (Live.Count + Fading.Count >= Max) return null;
         Trail? trail = null;
         for (var i = Free.Count - 1; i >= 0; i--)
             if (ReferenceEquals(Free[i].Style, style)) { trail = Free[i]; Free.RemoveAt(i); break; }
@@ -233,7 +281,8 @@ public static class Trails
             Object.DontDestroyOnLoad(o);
             line = Beams.Line(o, "ribbon", material);
             line.positionCount = style.RibbonPoints;
-            line.widthMultiplier = style.RibbonWidth;
+            line.startWidth = style.RibbonWidth;
+            line.endWidth = style.RibbonWidth * style.RibbonTaper;
             line.startColor = style.RibbonHead;
             line.endColor = style.RibbonTail;
         }
@@ -247,11 +296,31 @@ public static class Trails
         if (!trail.Live) return;
         trail.Stop();
         Live.Remove(trail);
-        Free.Add(trail);
+        if (trail.HasRibbon) Fading.Add(trail); else Free.Add(trail);
+    }
+
+    /// <summary>Every frame: the ribbons of ended trails gather into their last point and, once gone, their trails are free to rent again.</summary>
+    internal static void Tick(float now)
+    {
+        for (var i = Fading.Count - 1; i >= 0; i--)
+        {
+            if (!Fading[i].Fade(now)) continue;
+            Free.Add(Fading[i]);
+            Fading.RemoveAt(i);
+        }
     }
 
     internal static void ClearAll()
     {
         for (var i = Live.Count - 1; i >= 0; i--) Return(Live[i]);
+        for (var i = Fading.Count - 1; i >= 0; i--)
+        {
+            Fading[i].Hide();
+            Free.Add(Fading[i]);
+        }
+        Fading.Clear();
+        // The pool is matched by style object and a style may be made per owner, so what a level leaves is not kept: the ribbons' line objects are destroyed with it.
+        foreach (var trail in Free) trail.Discard();
+        Free.Clear();
     }
 }

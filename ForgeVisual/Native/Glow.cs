@@ -69,7 +69,7 @@ public static partial class Glow
             owners.Add((renderer, original));
         }
         if (copies.Count != 0) return new GlowHandle(copies.ToArray(), owners.ToArray());
-        Plugin.Logger.ErrorOnce("ForgeVisual glow: " + what + " has no material that can glow" + (mode == GlowMode.Lit ? " (none has an emission map)" : "") + ".");
+        Plugin.Logger.ErrorOnce("visual-glow-has-no-material", "ForgeVisual glow: " + what + " has no material that can glow" + (mode == GlowMode.Lit ? " (none has an emission map)" : "") + ".");
         return null;
     }
 

@@ -10,7 +10,8 @@ namespace ForgeVisual;
 public enum GroundMarkerStyle
 {
     /// <summary>A crisp rim whose lit arc is the time left (<see cref="GroundMarker.Remaining"/>), 24 ticks, four turning brackets, a
-    /// dashed inner ring, a hot centre, a faint fill and a ping running out past the rim; tightens with <see cref="GroundMarker.Urgency"/>.</summary>
+    /// dashed inner ring, a small centre dot and a thin ring pinging out past the rim, all thin lines with no fill (so bloom never turns it
+    /// into a disc); tightens with <see cref="GroundMarker.Urgency"/>.</summary>
     Countdown,
     /// <summary>A hazard band of slanted stripes creeping round the rim and a faint drifting fill.</summary>
     Hatched,
@@ -47,6 +48,10 @@ public sealed class GroundMarker
     private Vector3 _laidAt;
     private float _born, _laidTime, _last, _ping, _blinkAt = float.NegativeInfinity, _reach;
     private bool _live;
+    // A strip: its direction, half length (0 for a disc) and whether chevrons walk along it.
+    private Vector3 _forward;
+    private float _halfLength;
+    private bool _chevrons;
 
     private GroundMarker(GameObject o, MeshFilter f, MeshRenderer r)
     {
@@ -77,11 +82,24 @@ public sealed class GroundMarker
     /// <summary>Lays a marker of <paramref name="style"/> and <paramref name="radius"/> metres around <paramref name="centre"/>, reaching
     /// <paramref name="reach"/> radii (NaN: the style's own). Null (logged once) when the library's shaders are not available.</summary>
     public static GroundMarker? Place(Vector3 centre, float radius, Color colour, GroundMarkerStyle style, float reach = float.NaN)
+        => Lay(centre, radius, 0f, Vector3.forward, false, colour, style, reach);
+
+    /// <summary>Lays a strip-shaped marker of <paramref name="style"/> (its rim the rectangle <paramref name="halfWidth"/> metres to each side of
+    /// <paramref name="centre"/> and <paramref name="halfLength"/> along <paramref name="forward"/>, drawn the way a disc's rim is), following the floor and
+    /// stopping at walls as a disc does; <paramref name="chevrons"/>: chevrons walk along it toward <paramref name="forward"/> (a strike that moves).
+    /// <see cref="Radius"/> is its half width. Null (logged once) when the library's shaders are not available.</summary>
+    public static GroundMarker? PlaceStrip(Vector3 centre, Vector3 forward, float halfWidth, float halfLength, Color colour, GroundMarkerStyle style, bool chevrons = false)
+        => Lay(centre, halfWidth, Math.Max(0.05f, halfLength), forward, chevrons, colour, style, float.NaN);
+
+    private static GroundMarker? Lay(Vector3 centre, float radius, float halfLength, Vector3 forward, bool chevrons, Color colour, GroundMarkerStyle style, float reach)
     {
         var material = Shaders.Marker();
         if (material == null) return null;
         var marker = Rent(material);
         radius = Math.Max(0.05f, radius);
+        marker._halfLength = halfLength;
+        marker._forward = forward;
+        marker._chevrons = chevrons;
         var countdown = style == GroundMarkerStyle.Countdown;
         marker._reach = float.IsNaN(reach) ? (countdown ? 1.32f : 1.26f) : Math.Max(1f, reach);
         marker.Style = style;
@@ -96,7 +114,7 @@ public sealed class GroundMarker
         marker._born = marker._last = Scene.Now;
         marker._ping = 0f;
         marker._blinkAt = float.NegativeInfinity;
-        marker._lay = Layer(style, radius * marker._reach);
+        marker._lay = Layer(style, Math.Max(radius, halfLength) * marker._reach, halfLength > 0f);
         marker._lay.InUse = true;
         marker._filter.sharedMesh = marker._lay.Mesh;
         marker.Relay(centre, Scene.Now);
@@ -136,7 +154,9 @@ public sealed class GroundMarker
 
     private void Relay(Vector3 centre, float now)
     {
-        _lay.Lay(centre, Radius, Radius * _reach);
+        // A strip reaches as far past its rim as a disc of its half width does past its own.
+        if (_halfLength > 0f) _lay.LayStrip(centre, _forward, Radius, _halfLength, Radius * (_reach - 1f));
+        else _lay.Lay(centre, Radius, Radius * _reach);
         _laidAt = centre;
         _laidTime = now;
         _object.transform.position = centre;
@@ -152,14 +172,14 @@ public sealed class GroundMarker
         {
             var at = _object.transform.position;
             var eye = Scene.Eye;
-            reveal = MarkerMath.Reveal(new Vector2(eye.x - at.x, eye.z - at.z).magnitude, eye.y - at.y, Radius * _reach);
+            reveal = MarkerMath.Reveal(new Vector2(eye.x - at.x, eye.z - at.z).magnitude, eye.y - at.y, Math.Max(Radius, _halfLength) * _reach);
         }
         Block.SetFloat(RevealId, reveal);
         Block.SetColor(ColorId, Colour);
         Block.SetColor(HotId, Hot);
         Block.SetVector(StateId, new Vector4(t, _ping, Urgency, Opacity));
         Block.SetVector(ShapeId, new Vector4(Radius, 1f, MarkerMath.Clamp01(Remaining), MarkerMath.Blink(now - _blinkAt)));
-        Block.SetVector(StyleId, new Vector4((float)Style, MarkerMath.Sweep(t, SweepSeconds), 0f, 0f));
+        Block.SetVector(StyleId, new Vector4((float)Style, MarkerMath.Sweep(t, SweepSeconds), _halfLength / Radius, _chevrons ? 1f : 0f));
         _renderer.SetPropertyBlock(Block);
     }
 
@@ -180,13 +200,15 @@ public sealed class GroundMarker
         return new GroundMarker(o, f, r);
     }
 
-    /// <summary>A free floor layer of the style's resolution for a disc reaching <paramref name="extent"/> metres: the countdown is fine
-    /// (64 spokes, a ring every 0.2 m), areas coarser (48 spokes, every 0.4 m), the reticle small (32 spokes, 3 rings).</summary>
-    private static GroundLay Layer(GroundMarkerStyle style, float extent)
+    /// <summary>A free floor layer of the style's resolution for a mark reaching <paramref name="extent"/> metres: the countdown is fine
+    /// (64 spokes, a ring every 0.2 m), areas coarser (48 spokes, every 0.4 m), the reticle small (32 spokes, 3 rings), a strip 96 spokes
+    /// round its longer outline and a ring every 0.6 m up to 20.</summary>
+    private static GroundLay Layer(GroundMarkerStyle style, float extent, bool strip)
     {
         int spokes, rings;
         switch (style)
         {
+            case var _ when strip: spokes = 96; rings = Math.Clamp((int)Math.Ceiling(extent / 0.6f), 5, 20); break;
             case GroundMarkerStyle.Countdown: spokes = 64; rings = Math.Clamp((int)Math.Ceiling(extent / 0.2f), 6, 24); break;
             case GroundMarkerStyle.Reticle: spokes = 32; rings = 3; break;
             default: spokes = 48; rings = Math.Clamp((int)Math.Ceiling(extent / 0.4f), 5, 16); break;

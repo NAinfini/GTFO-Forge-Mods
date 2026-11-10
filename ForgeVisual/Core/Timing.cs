@@ -2,13 +2,15 @@ using System;
 
 namespace ForgeVisual;
 
-/// <summary>The time windows of sustained effects (<c>Fx.Hold</c>): a hold near a live, still-emitting instance of the same effect
-/// moves that instance and keeps it emitting; an instance not held again within its window stops emitting, lets its particles finish
-/// and is then free again. Fixed arrays per effect, no allocation.</summary>
+/// <summary>The time windows of sustained effects (<c>Fx.Hold</c>): a hold with the key of a live, still-emitting copy of the same effect
+/// keeps that copy emitting; a copy not held again within its window stops emitting, lets its particles finish
+/// and is then free again. The key is the caller's own (a jet's number, an object's id), so two things close together never share a copy.
+/// Fixed arrays per effect, no allocation.</summary>
 internal sealed class HoldBook
 {
     private readonly bool[] _playing, _emitting;
-    private readonly float[] _until, _x, _y, _z;
+    private readonly float[] _until;
+    private readonly int[] _key;
     private readonly long[] _started;
     private long _sequence;
 
@@ -18,9 +20,7 @@ internal sealed class HoldBook
         _playing = new bool[copies];
         _emitting = new bool[copies];
         _until = new float[copies];
-        _x = new float[copies];
-        _y = new float[copies];
-        _z = new float[copies];
+        _key = new int[copies];
         _started = new long[copies];
     }
 
@@ -28,51 +28,40 @@ internal sealed class HoldBook
     internal bool Playing(int copy) => _playing[copy];
     internal bool Emitting(int copy) => _emitting[copy];
 
-    /// <summary>A playing, still-emitting copy within <paramref name="reach"/> metres of the point, or -1.</summary>
-    internal int Near(float x, float y, float z, float reach)
+    /// <summary>The playing, still-emitting copy held under <paramref name="key"/>, or -1.</summary>
+    internal int Find(int key)
     {
-        var best = -1;
-        var bestDistance = reach * reach;
         for (var i = 0; i < _playing.Length; i++)
-        {
-            if (!_playing[i] || !_emitting[i]) continue;
-            var dx = _x[i] - x;
-            var dy = _y[i] - y;
-            var dz = _z[i] - z;
-            var d = dx * dx + dy * dy + dz * dz;
-            if (d <= bestDistance) { bestDistance = d; best = i; }
-        }
-        return best;
+            if (_playing[i] && _emitting[i] && _key[i] == key) return i;
+        return -1;
     }
 
-    /// <summary>A free copy, or the oldest playing one when all play (it restarts).</summary>
-    internal int Take()
+    /// <summary>A free copy, else the oldest playing one that is not a hold still being kept (<paramref name="hold"/> says which copies were started as holds;
+    /// it restarts). When only kept holds are left: another hold gets -1 (it never takes a copy another key keeps alive, which would swap them every frame), a one-shot the oldest of them.</summary>
+    internal int Take(bool[] hold, bool forHold)
     {
-        var oldest = 0;
+        int oldest = -1, oldestAny = 0;
         for (var i = 0; i < _playing.Length; i++)
         {
             if (!_playing[i]) return i;
-            if (_started[i] < _started[oldest]) oldest = i;
+            if (_started[i] < _started[oldestAny]) oldestAny = i;
+            if (!(hold[i] && _emitting[i]) && (oldest < 0 || _started[i] < _started[oldest])) oldest = i;
         }
-        return oldest;
+        return oldest >= 0 ? oldest : forHold ? -1 : oldestAny;
     }
 
-    /// <summary>Starts <paramref name="copy"/>; a sustained start (<paramref name="window"/> above 0) emits until now + window.</summary>
-    internal void Start(int copy, float x, float y, float z, float now, float window)
+    /// <summary>Starts <paramref name="copy"/> under <paramref name="key"/>; a sustained start (<paramref name="window"/> above 0) emits until now + window.</summary>
+    internal void Start(int copy, int key, float now, float window)
     {
         _playing[copy] = true;
         _emitting[copy] = window > 0f;
         _until[copy] = window > 0f ? now + window : 0f;
         _started[copy] = ++_sequence;
-        Place(copy, x, y, z);
+        _key[copy] = key;
     }
 
     /// <summary>A held copy keeps emitting for another window from now.</summary>
-    internal void Extend(int copy, float x, float y, float z, float now, float window)
-    {
-        _until[copy] = now + window;
-        Place(copy, x, y, z);
-    }
+    internal void Extend(int copy, float now, float window) => _until[copy] = now + window;
 
     /// <summary>True when <paramref name="copy"/> has to stop emitting now (its window ran out); it keeps playing until its
     /// particles are gone (<see cref="Finished"/>).</summary>
@@ -90,13 +79,6 @@ internal sealed class HoldBook
     {
         _playing[copy] = false;
         _emitting[copy] = false;
-    }
-
-    private void Place(int copy, float x, float y, float z)
-    {
-        _x[copy] = x;
-        _y[copy] = y;
-        _z[copy] = z;
     }
 }
 
@@ -142,6 +124,39 @@ internal sealed class RibbonRing<T> where T : struct
 
     /// <summary>Point <paramref name="i"/>: 0 is the newest.</summary>
     internal T this[int i] => _ring[(_head - i + _ring.Length * 2) % _ring.Length];
+}
+
+/// <summary>Where the copies of an effect covering a round area stand.</summary>
+internal static class FieldPoints
+{
+    /// <summary>The points of a hexagonal grid <paramref name="spacing"/> metres apart inside <paramref name="radius"/>, as x, z pairs, nearest the centre first, at most
+    /// <paramref name="cap"/> (the spacing widens until they fit, so the whole area stays covered).</summary>
+    internal static float[] Disc(float radius, float spacing, int cap)
+    {
+        if (!(radius > 0f) || !(spacing > 0f) || cap < 1) return new[] { 0f, 0f };
+        // The disc's area over one hexagonal cell's (0.866 s^2) says how wide the cap allows.
+        var s = Math.Max(spacing, (float)Math.Sqrt(Math.PI * radius * radius / (0.866 * cap)));
+        var rows = (int)(radius / (s * 0.866f)) + 1;
+        var columns = (int)(radius / s) + 1;
+        var found = new System.Collections.Generic.List<(float D, float X, float Z)>();
+        for (var r = -rows; r <= rows; r++)
+            for (var c = -columns - 1; c <= columns + 1; c++)
+            {
+                var x = (c + (r & 1) * 0.5f) * s;
+                var z = r * s * 0.866f;
+                var d = x * x + z * z;
+                if (d <= radius * radius) found.Add((d, x, z));
+            }
+        found.Sort((a, b) => a.D.CompareTo(b.D));
+        var count = Math.Min(cap, found.Count);
+        var points = new float[count * 2];
+        for (var i = 0; i < count; i++)
+        {
+            points[i * 2] = found[i].X;
+            points[i * 2 + 1] = found[i].Z;
+        }
+        return points;
+    }
 }
 
 /// <summary>The numbers behind a ground marker's animation.</summary>

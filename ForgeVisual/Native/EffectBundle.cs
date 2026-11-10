@@ -16,7 +16,7 @@ internal static class EffectBundle
         using var stream = typeof(EffectBundle).Assembly.GetManifestResourceStream(Resource);
         if (stream == null)
         {
-            Plugin.Logger.ErrorOnce("ForgeVisual pack Forge was not registered: " + Resource + " is not embedded in this build, so the Forge effects are refused.");
+            Plugin.Logger.ErrorOnce("visual-forge-pack-missing", "ForgeVisual pack Forge was not registered: " + Resource + " is not embedded in this build, so the Forge effects are refused.");
             return;
         }
         using var bytes = new MemoryStream();
@@ -24,6 +24,6 @@ internal static class EffectBundle
         var bundle = Bundles.RegisterBuiltIn(File, bytes.ToArray());
         if (bundle == null) return;
         foreach (var effect in ForgeEffects.All)
-            Fx.Register(bundle, effect.Item, new FxOptions { DefaultSize = effect.DefaultSize, Line = effect.Line, HoldSeconds = effect.HoldSeconds, HoldReach = effect.HoldReach > 0f ? effect.HoldReach : 1.5f });
+            Fx.Register(bundle, effect.Item, new FxOptions { DefaultSize = effect.DefaultSize, Line = effect.Line, HoldSeconds = effect.HoldSeconds });
     }
 }

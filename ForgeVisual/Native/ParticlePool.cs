@@ -36,10 +36,10 @@ public sealed class ParticlePool
     public static ParticlePool? Register(string modId, string name, GameObject prefab)
     {
         var log = ForgeCore.Log.For(string.IsNullOrEmpty(modId) ? Plugin.Id : modId);
-        if (prefab == null) { log.ErrorOnce("ForgeVisual particle pool " + name + " not registered: no prefab."); return null; }
-        if (VisualNames.TrySplit(name, out var pack, out _, out _) && VisualNames.CheckPack(pack) is { } bad) { log.ErrorOnce("ForgeVisual particle pool " + name + " not registered: " + bad + "."); return null; }
+        if (prefab == null) { log.ErrorOnce("visual-particle-pool-not-registered-no-prefab", "ForgeVisual particle pool " + name + " not registered: no prefab."); return null; }
+        if (VisualNames.TrySplit(name, out var pack, out _, out _) && VisualNames.CheckPack(pack) is { } bad) { log.ErrorOnce("visual-particle-pool-not-registered", "ForgeVisual particle pool " + name + " not registered: " + bad + "."); return null; }
         var pool = new ParticlePool(modId, name, prefab);
-        if (All.Add(name, pool) is { } why) { log.ErrorOnce("ForgeVisual particle pool " + name + " not registered: " + why + "."); return null; }
+        if (All.Add(name, pool) is { } why) { log.ErrorOnce("visual-particle-pool-not-registered", "ForgeVisual particle pool " + name + " not registered: " + why + "."); return null; }
         Pools.Add(pool);
         return pool;
     }
@@ -50,7 +50,7 @@ public sealed class ParticlePool
         if (bundle == null) throw new ArgumentNullException(nameof(bundle));
         if (!bundle.TryModel(item, out var model))
         {
-            ForgeCore.Log.For(bundle.ModId).ErrorOnce("ForgeVisual particle pool " + bundle.Pack + ":" + item + " not registered: the bundle has no prefab " + item + ".");
+            ForgeCore.Log.For(bundle.ModId).ErrorOnce("visual-particle-pool-not-registered-bundle", "ForgeVisual particle pool " + bundle.Pack + ":" + item + " not registered: the bundle has no prefab " + item + ".");
             return null;
         }
         return Register(bundle.ModId, model.Name, model.Prefab);
@@ -60,7 +60,7 @@ public sealed class ParticlePool
     public static ParticlePool? Get(string name)
     {
         if (All.TryGet(name, out var pool)) return pool;
-        Plugin.Logger.ErrorOnce("ForgeVisual has no particle pool " + name + ": " + Missing.Why(name, Bundles.Known, "particle pool") + ".");
+        if (Missing.First("particle pool", name)) Plugin.Logger.ErrorOnce("visual-has-no-particle-pool-particle-pool", "ForgeVisual has no particle pool " + name + ": " + Missing.Why(name, Bundles.Known, "particle pool") + ".");
         return null;
     }
 
@@ -75,7 +75,7 @@ public sealed class ParticlePool
         var t = _prefab.transform.Find(child);
         if (t == null || t.GetComponent<ParticleSystem>() == null)
         {
-            ForgeCore.Log.For(ModId).ErrorOnce("ForgeVisual particle pool " + Name + " has no particle system " + child + ".");
+            ForgeCore.Log.For(ModId).ErrorOnce("visual-particle-pool-has-no-particle-system", "ForgeVisual particle pool " + Name + " has no particle system " + child + ".");
             return null;
         }
         var channel = new ParticleChannel(this, child, Math.Max(0, capacity));
@@ -105,7 +105,7 @@ public sealed class ParticlePool
         catch (Exception error)
         {
             _failed = true;
-            ForgeCore.Log.For(ModId).Error("ForgeVisual particle pool " + Name + " could not be made; it draws nothing: " + error);
+            ForgeCore.Log.For(ModId).Error("visual-particle-pool-could-not-be-made", "ForgeVisual particle pool " + Name + " could not be made; it draws nothing: " + error);
             return false;
         }
     }
@@ -174,18 +174,21 @@ public sealed class ParticleChannel
     private bool Usable()
     {
         var system = _system;
-        return system != null && !system.WasCollected && system.m_CachedPtr != IntPtr.Zero
-            && system.gameObject != null && system.gameObject.activeInHierarchy;
+        return !ForgeCore.NativeObjects.Gone(system)
+            && system!.gameObject != null && system.gameObject.activeInHierarchy;
     }
 
     private bool Admit(int priority)
     {
         if (!Usable() && (!_pool.Ensure() || !Usable()))
         {
-            ForgeCore.Log.For(_pool.ModId).ErrorOnce("ForgeVisual particle system " + _pool.Name + "/" + Child + " is destroyed, missing or inactive; its effects are skipped (rebuild the pack's bundle if the prefab is not active).");
+            ForgeCore.Log.For(_pool.ModId).ErrorOnce("visual-particle-system-destroyed-missing-or-inactive", "ForgeVisual particle system " + _pool.Name + "/" + Child + " is destroyed, missing or inactive; its effects are skipped (rebuild the pack's bundle if the prefab is not active).");
             return false;
         }
-        return ParticleBudget.Admits(_system!.particleCount, _capacity, priority);
+        // Below its budget every request is taken. At the budget a request of priority above 0 is taken too (Unity recycles the oldest particle of a
+        // full system, so the pool never grows past its capacity); priority 0 is refused and the caller counts it. A capacity of 0 means no budget was given.
+        var live = _system!.particleCount;
+        return _capacity <= 0 || live < _capacity || priority > 0;
     }
 
     internal void Bind(Transform holder)

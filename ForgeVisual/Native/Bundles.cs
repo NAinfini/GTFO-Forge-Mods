@@ -87,7 +87,7 @@ public static class Bundles
 
     private static BundleHandle? Fail(string modId, string pack, string why)
     {
-        ForgeCore.Log.For(string.IsNullOrEmpty(modId) ? Plugin.Id : modId).ErrorOnce("ForgeVisual pack " + pack + " was not registered: " + why + ".");
+        ForgeCore.Log.For(string.IsNullOrEmpty(modId) ? Plugin.Id : modId).ErrorOnce("visual-pack-not-registered", "ForgeVisual pack " + pack + " was not registered: " + why + ".");
         return null;
     }
 }
@@ -96,10 +96,7 @@ public static class Bundles
 /// and game-shaded surfaces can be read by name. Everything taken from it is kept across level changes.</summary>
 public sealed class BundleHandle
 {
-    internal const string GearShaderName = "Cell/Player/CustomGearShader";
-    private static readonly int MainTex = Shader.PropertyToID("_MainTex"), MetallicMap = Shader.PropertyToID("_MetallicGlossMap"),
-        BumpMap = Shader.PropertyToID("_BumpMap"), ShadingType = Shader.PropertyToID("_ShadingType"), IsGear = Shader.PropertyToID("_IsCustomGearMaterial"),
-        EnableEmissive = Shader.PropertyToID("_EnableEmissive"), EmissiveMap = Shader.PropertyToID("_EmissiveMap"), EmissiveColor = Shader.PropertyToID("_EmissiveColor");
+    private static readonly int BumpMap = Shader.PropertyToID("_BumpMap"), EnableEmissive = Shader.PropertyToID("_EnableEmissive");
 
     private readonly ModelProfile? _profile;
     // Unity lowercases the asset paths of a bundle built without addressable names (Assets/X/FramesFx.prefab is listed as
@@ -175,29 +172,21 @@ public sealed class BundleHandle
         if (_prepared) return true;
         if (_profile == null) return _prepared = true;
         if (_prepareFailed) return false;
-        var shader = Shader.Find(GearShaderName);
-        if (shader == null)
+        if (Shader.Find(LitMaterial.ShaderName) == null)
         {
-            ForgeCore.Log.For(ModId).ErrorOnce("ForgeVisual pack " + Pack + ": the game's gear shader is not loaded yet; its models show once a level has been built.");
+            ForgeCore.Log.For(ModId).ErrorOnce("visual-pack-games-gear-shader-not-loaded", "ForgeVisual pack " + Pack + ": the game's gear shader is not loaded yet; its models show once a level has been built.");
             return false;
         }
         try
         {
             foreach (var s in _profile.Surfaces)
             {
-                var material = ForgeCore.Assets.Keep(new Material(shader) { name = Pack + " " + s.key });
-                material.SetTexture(MainTex, Require<Texture2D>(s.albedo));
-                material.SetTexture(MetallicMap, Require<Texture2D>(s.metallic));
+                var material = ForgeCore.Assets.Keep(LitMaterial.Create(Pack + " " + s.key, Require<Texture2D>(s.albedo), Require<Texture2D>(s.metallic), false, 0f, out var why)
+                    ?? throw new InvalidOperationException(why));
                 if (s.normal.Length != 0) material.SetTexture(BumpMap, Require<Texture2D>(s.normal));
-                material.SetFloat(ShadingType, 4f);
-                material.SetFloat(IsGear, 1f);
-                material.SetFloat(EnableEmissive, s.Emissive ? 1f : 0f);
                 if (s.Emissive)
-                {
-                    material.SetTexture(EmissiveMap, Require<Texture2D>(s.emission));
-                    material.SetColor(EmissiveColor, new Color(s.emissionColor[0], s.emissionColor[1], s.emissionColor[2], 1f));
-                    material.EnableKeyword("ENABLE_EMISSIVE");
-                }
+                    Glow.Write(material, new Color(s.emissionColor[0], s.emissionColor[1], s.emissionColor[2], 1f), Require<Texture2D>(s.emission));
+                else material.SetFloat(EnableEmissive, 0f);
                 _surfaces[s.key] = material;
             }
             foreach (var p in _profile.Prefabs)
@@ -219,7 +208,7 @@ public sealed class BundleHandle
         catch (Exception error)
         {
             _prepareFailed = true;
-            ForgeCore.Log.For(ModId).ErrorOnce("ForgeVisual pack " + Pack + " could not prepare its materials; its models are not shown: " + error);
+            ForgeCore.Log.For(ModId).ErrorOnce("visual-pack-could-not-prepare-materials-models", "ForgeVisual pack " + Pack + " could not prepare its materials; its models are not shown: " + error);
             return false;
         }
     }

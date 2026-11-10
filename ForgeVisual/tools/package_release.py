@@ -10,5 +10,11 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "Build"))
 import package_common
 
+
+def extra(folder, built):
+    """The shared heavy-blast effect bundle and its slot table (the Forge effects bundle itself is embedded in the DLL)."""
+    return package_common.vfx_files("ForgeVisual", "visual")
+
+
 if __name__ == "__main__":
-    raise SystemExit(package_common.main("ForgeVisual", ("ForgeVisual.dll",)))
+    raise SystemExit(package_common.main("ForgeVisual", ("ForgeVisual.dll",), extra))

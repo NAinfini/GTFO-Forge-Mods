@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using UnityEngine;
 
 namespace ForgeVisual;
@@ -12,40 +11,42 @@ public sealed class ImageTextures : IDisposable
 {
     private readonly Dictionary<string, Texture2D> _textures = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _failures = new(StringComparer.Ordinal);
+    private readonly bool _surface, _keep;
 
-    /// <summary>The texture of <paramref name="png"/> (expected <paramref name="width"/> x <paramref name="height"/>); on failure
-    /// <paramref name="code"/> names why (<c>image-decode-failed</c>) and <paramref name="error"/> is the exception the decoder threw, if it threw.</summary>
-    public bool TryGet(string key, byte[] png, int width, int height, out Texture2D? texture, out string code, out Exception? error)
+    /// <param name="surface">Textures for a 3D surface (a model's): a mip chain, trilinear filtering and repeating UVs. Off, they are flat boards: no mips, bilinear, clamped.</param>
+    /// <param name="keep">Mark every texture with <see cref="ForgeCore.Assets.Keep"/>, for a cache that outlives a level's unused-asset sweep.</param>
+    public ImageTextures(bool surface = false, bool keep = false)
     {
-        code = ""; error = null;
-        if (_failures.TryGetValue(key, out var prior)) { texture = null; code = prior; return false; }
-        if (_textures.TryGetValue(key, out texture)) return true;
-        texture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
-        {
-            name = "Forge image " + key,
-            filterMode = FilterMode.Bilinear,
-            wrapMode = TextureWrapMode.Clamp
-        };
-        var native = new Il2CppStructArray<byte>(png);
-        try
-        {
-            if (!ImageConversion.LoadImage(texture, native, true) || texture.width != width || texture.height != height)
-                code = "image-decode-failed";
-        }
-        catch (Exception decodeError)
-        {
-            code = "image-decode-failed"; error = decodeError;
-        }
-        finally { GC.KeepAlive(native); }
-        if (code.Length != 0) { Fail(key, texture, code); texture = null; return false; }
-        _textures.Add(key, texture);
-        return true;
+        _surface = surface;
+        _keep = keep;
     }
 
-    private void Fail(string key, Texture2D texture, string code)
+    /// <summary>The texture of <paramref name="png"/> (expected <paramref name="width"/> x <paramref name="height"/>, checked against the PNG
+    /// header before anything decodes); on failure <paramref name="code"/> names why (<c>image-decode-failed</c>) and <paramref name="error"/> is the exception the decoder threw, if it threw.
+    /// <paramref name="linear"/> keeps the pixels as they are (a normal map's numbers are not colours); the default reads them as sRGB colour. One picture read both ways is two textures.</summary>
+    public bool TryGet(string key, byte[] png, int width, int height, out Texture2D? texture, out string code, out Exception? error, bool linear = false)
     {
-        UnityEngine.Object.Destroy(texture);
-        _failures[key] = code;
+        code = ""; error = null;
+        var slot = linear ? key + "|linear" : key;
+        if (_failures.TryGetValue(slot, out var prior)) { texture = null; code = prior; return false; }
+        if (_textures.TryGetValue(slot, out texture)) return true;
+        // ForgeCore reads the header first, so a PNG of another size is refused before it decodes, and destroys a texture the game could not decode.
+        texture = ForgeCore.Images.Decode(png, out var failure, linear, readable: _surface, mipChain: _surface, maxSide: Math.Max(width, height), width: width, height: height);
+        if (texture == null || texture.width != width || texture.height != height)
+        {
+            if (texture != null) UnityEngine.Object.Destroy(texture);
+            texture = null;
+            _failures[slot] = code = "image-decode-failed";
+            if (failure.Length != 0) error = new InvalidOperationException(failure);
+            return false;
+        }
+        texture.name = "Forge image " + slot;
+        texture.filterMode = _surface ? FilterMode.Trilinear : FilterMode.Bilinear;
+        texture.wrapMode = _surface ? TextureWrapMode.Repeat : TextureWrapMode.Clamp;
+        if (_surface) texture.Apply(true, true);
+        if (_keep) ForgeCore.Assets.Keep(texture);
+        _textures.Add(slot, texture);
+        return true;
     }
 
     /// <summary>Destroys every texture and forgets the failures.</summary>

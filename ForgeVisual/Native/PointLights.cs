@@ -113,7 +113,7 @@ public static class PointLights
     }
 
     /// <summary>Keeps the light <paramref name="handle"/> (0 = none) at <paramref name="position"/> this frame, taking a slot the first
-    /// time. A light not held again for a moment fades out and its handle goes stale. <paramref name="strength"/> scales the spec's
+    /// time; its colour, range and intensity follow the spec every frame. A light not held again for a moment fades out and its handle goes stale. <paramref name="strength"/> scales the spec's
     /// intensity this frame (a caller's own pulse or fade).</summary>
     public static void Hold(ref int handle, Vector3 position, in PointLightSpec spec, float now, float strength = 1f)
     {
@@ -127,6 +127,14 @@ public static class PointLights
             Born[slot] = now;
             handle = ((Generation[slot] & 0x7fffff) << 8) | (slot + 1);
         }
+        else
+        {
+            // a held light follows its caller's colour and reach every frame, as its position
+            var light = Lights[slot]!;
+            light.SetColor(spec.Color);
+            light.SetRange(spec.Range);
+            Peak[slot] = spec.Intensity;
+        }
         Positions[slot] = position;
         Seen[slot] = now;
         Strength[slot] = strength;
@@ -136,7 +144,8 @@ public static class PointLights
     public static void Release(ref int handle)
     {
         var slot = Resolve(handle);
-        if (slot >= 0 && Held[slot]) Seen[slot] = float.MinValue;
+        // Seen goes back to where the fade-out starts, so a released light dims over HoldFadeOut like one nobody holds any more.
+        if (slot >= 0 && Held[slot]) Seen[slot] = Mathf.Min(Seen[slot], Time.time - HoldGrace);
         handle = 0;
     }
 

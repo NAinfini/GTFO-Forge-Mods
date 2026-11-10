@@ -8,7 +8,8 @@
 //   _Shape.z  mode 0: edge sharpness; mode 1: remaining fraction of a countdown (1 at the start, 0 at the end)
 //   _Shape.w  mode 0: 1 = even along its length (0 = a column, brightest at its start); mode 1: blink of a tick (1 at the tick, fading)
 //   _State    x seconds since the mark appeared, y ping phase (0..1), z urgency (0..1), w opacity
-//   _Style    x ground style (0 countdown, 1 hatched, 2 flames, 3 dial, 4 reticle), y drawn-in sweep (0..1)
+//   _Style    x ground style (0 countdown, 1 hatched, 2 flames, 3 dial, 4 reticle), y drawn-in sweep (0..1),
+//             z 0 a disc, above 0 a strip: half its length over half its width (uv = local metres across, along / half width), w 1 = chevrons walking along a strip
 //   mode 1 vertex colour: alpha = brightness (dimmer past a step or over a drop), green = this side of every wall
 //   mode 1 uv2: x height up a step's drape, y that drape's height (the drape fades in its middle)
 // A second pass draws a ground mark's rim as a faint dashed line only where something hides it (behind a wall or crate), so the ring
@@ -70,6 +71,24 @@ Shader "ForgeVisual/Marker"
             // Drawn in: the mark sweeps on clockwise from the top.
             float Sweep(float u) { return _Style.y >= 1.0 ? 1.0 : 1.0 - smoothstep(_Style.y - 0.02, _Style.y, u); }
 
+            // Where a ground point lies against the mark's rim: r (1 on the rim, in half widths: a disc's radius or a strip's half width), u (turns
+            // clockwise from north) and arc, metres along the rim (a strip's: along the side the point is nearest, so stripes keep their spacing).
+            void Outline(float2 p, float R, out float r, out float u, out float arc)
+            {
+                u = frac(atan2(p.x, p.y) / TAU + 1.0);
+                if (_Style.z > 0.0)
+                {
+                    float2 q = abs(p) - float2(1.0, _Style.z);
+                    r = 1.0 + length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+                    arc = (q.x > q.y ? p.y * sign(p.x) : -p.x * sign(p.y)) * R;
+                }
+                else
+                {
+                    r = length(p);
+                    arc = u * TAU * R;
+                }
+            }
+
             float3 Beam(v2f i)
             {
                 float d = abs(i.uv.y * 2.0 - 1.0);
@@ -100,39 +119,39 @@ Shader "ForgeVisual/Marker"
             // it, so it reads unbroken.
             float Drape(v2f i, float rim) { return lerp(1.0 - smoothstep(0.12, 0.35, min(i.drape.x, i.drape.y - i.drape.x)), 1.0, 0.5 * rim); }
 
-            // A countdown: a crisp rim whose lit arc is the time left (emptying clockwise from north), 24 scale ticks, four brackets
-            // turning outside, a counter-rotating dashed inner ring, a hot centre, a faint fill and a ping running out past the rim.
+            // A countdown, drawn only in thin lines so the game's bloom never fills it into a disc: a crisp rim whose lit arc is the time
+            // left (emptying clockwise from north), 24 scale ticks (dimmer on the spent arc), four brackets turning outside, a
+            // counter-rotating dashed inner ring, a small centre dot and a thin ring pinging out past the rim. No fill and no soft glows.
             float3 Countdown(v2f i, float2 p, float r, float m, float px, float pxa, float u)
             {
                 float t = _State.x, pulse = _State.y, urgency = _State.z;
                 float remaining = _Shape.z, blink = _Shape.w;
-                float3 accent = lerp(_Color.rgb, _Hot.rgb, 0.35 * urgency);
+                float3 accent = lerp(_Color.rgb, _Hot.rgb, 0.25 * urgency);
                 float lit = 1.0 - smoothstep(remaining - pxa, remaining + pxa, u);
-                float rimLine = Band(r, 1.0, max(0.011 * m, 0.55 * px), px);
-                float rimHalo = Glow(r, 1.0, 0.09 * m);
-                float rim = rimLine * lerp(0.28, 1.0, lit) + rimHalo * lerp(0.07, 0.30, lit);
-                rim *= 1.0 + 0.9 * blink;
+                float rimLine = Band(r, 1.0, max(0.010 * m, 0.55 * px), px);
+                float rimHalo = Glow(r, 1.0, 0.035 * m);
+                float rim = rimLine * lerp(0.22, 1.0, lit) + rimHalo * 0.16 * lit;
+                rim *= 1.0 + 0.8 * blink;
                 float tickAng = Band(frac(u * 24.0), 0.5, max(0.006 * m / max(r, 0.02) / TAU * 24.0, 0.5 * pxa * 24.0), pxa * 24.0);
                 float isLong = Band(frac(u * 4.0), 0.5, 1.0 / 48.0, 1.0 / 96.0);
-                float tickLen = lerp(0.07, 0.16, isLong) * m;
-                float ticks = tickAng * Band(r, 1.0 - 0.035 * m - tickLen * 0.5, tickLen * 0.5, px) * (0.30 + 0.25 * isLong);
+                float tickLen = lerp(0.06, 0.14, isLong) * m;
+                float ticks = tickAng * Band(r, 1.0 - 0.035 * m - tickLen * 0.5, tickLen * 0.5, px) * (0.26 + 0.24 * isLong) * lerp(0.45, 1.0, lit);
                 float spin = t * (0.035 + 0.12 * urgency);
                 float bu = frac(u + spin);
-                float bracketR = 1.0 + lerp(0.16, 0.07, urgency) * m;
-                float bracket = Band(r, bracketR, max(0.009 * m, 0.5 * px), px) * Arc(frac(bu * 4.0), 0.5 - 0.075, 0.5 + 0.075, pxa * 4.0) * (0.55 + 0.35 * urgency);
-                float innerR = lerp(0.46, 0.30, urgency);
+                float bracketR = 1.0 + lerp(0.14, 0.07, urgency) * m;
+                float bracket = Band(r, bracketR, max(0.008 * m, 0.5 * px), px) * Arc(frac(bu * 4.0), 0.44, 0.56, pxa * 4.0) * (0.45 + 0.35 * urgency);
+                float innerR = lerp(0.42, 0.28, urgency);
                 float du = frac(u - t * 0.06 * (1.0 + 2.0 * urgency));
-                float inner = Band(r, innerR, max(0.007 * m, 0.5 * px), px) * Arc(frac(du * 10.0), 0.2, 0.8, pxa * 10.0) * 0.42;
-                float centre = Glow(r, 0.0, 0.05 * m) * 0.9 + Glow(r, 0.0, 0.32) * 0.10;
-                float fill = (0.020 + 0.050 * smoothstep(0.25, 1.0, r)) * (1.0 - smoothstep(1.0 - px, 1.0 + px, r)) * (1.0 + 1.5 * blink);
-                float pr = lerp(0.10, 1.22, pulse);
-                float ping = Glow(r, pr, (0.05 + 0.10 * pulse) * m + 0.02) * pow(1.0 - pulse, 1.4) * (0.35 + 0.35 * urgency);
-                float edge = 1.0 - smoothstep(1.24, 1.32, r);
-                return (accent * (rim * 0.85 + ticks + bracket + inner + fill + ping) + _Hot.rgb * (rimLine * lit * 0.35 + centre)) * edge;
+                float inner = Band(r, innerR, max(0.006 * m, 0.5 * px), px) * Arc(frac(du * 12.0), 0.25, 0.75, pxa * 12.0) * 0.30;
+                float dot = Band(r, 0.0, 0.025 * m, px) * 0.8;
+                float pr = lerp(0.15, 1.18, pulse);
+                float ping = Band(r, pr, max(0.006 * m, 0.5 * px), px) * pow(1.0 - pulse, 1.6) * (0.28 + 0.30 * urgency);
+                float edge = 1.0 - smoothstep(1.22, 1.28, r);
+                return (accent * (rim * 0.8 + ticks + bracket + inner + ping) + _Hot.rgb * (rimLine * lit * 0.25 + dot)) * edge;
             }
 
             // The area styles and the reticle, drawn in by the sweep.
-            float3 Area(v2f i, float2 p, float r, float R, float m, float px, float pxa, float u, float style)
+            float3 Area(v2f i, float2 p, float r, float R, float m, float px, float pxa, float u, float arc, float arcPx, float style)
             {
                 float t = _State.x;
                 float inside = 1.0 - smoothstep(1.0 - px, 1.0 + px, r);
@@ -143,8 +162,8 @@ Shader "ForgeVisual/Marker"
                     // Hatched: a band of slanted stripes creeping round the rim between two lines, and a faint drifting fill.
                     float bandW = 0.24 * m;
                     float inBand = smoothstep(1.0 - bandW - px, 1.0 - bandW + px, r) * inside;
-                    float along = u * TAU * R / 0.42 + (r * R) / 0.42 - t * 0.35;
-                    float sa = max((TAU * R * pxa + R * px) / 0.42, 0.04);
+                    float along = arc / 0.42 + (r * R) / 0.42 - t * 0.35;
+                    float sa = max((arcPx + R * px) / 0.42, 0.04);
                     float stripes = smoothstep(0.5 - sa, 0.5 + sa, abs(frac(along) * 2.0 - 1.0));
                     float lines = Band(r, 1.0, max(0.012 * m, 0.55 * px), px) * 0.95 + Band(r, 1.0 - bandW, max(0.007 * m, 0.5 * px), px) * 0.45;
                     float halo = Glow(r, 1.0, 0.12 * m) * 0.22;
@@ -203,6 +222,14 @@ Shader "ForgeVisual/Marker"
                     float halo = Glow(r, 1.0, 0.09 * m) * 0.3;
                     c = accent * (arcs * 0.95 + outer + cross + halo) + hot * (core + arcs * 0.35 + cross * 0.3);
                 }
+                if (_Style.w > 0.5 && _Style.z > 0.0)
+                {
+                    // Chevrons 2 m apart walking along the strip at 1.6 m/s, pointing the way the strike goes, clear of the rim band.
+                    float2 q = p * R;
+                    float chevron = frac((q.y - abs(q.x) * 0.8 - t * 1.6) / 2.0);
+                    float cw = max(fwidth(q.y - abs(q.x) * 0.8) / 2.0, 1e-4);
+                    c += accent * Band(chevron, 0.5, 0.06, cw) * (1.0 - smoothstep(0.55, 0.7, abs(p.x))) * 0.45;
+                }
                 float edge = 1.0 - smoothstep(1.18, 1.25, r);
                 return c * Sweep(u) * edge;
             }
@@ -210,15 +237,15 @@ Shader "ForgeVisual/Marker"
             float3 Ground(v2f i)
             {
                 float2 p = i.uv;
-                float r = length(p);
                 float R = max(_Shape.x, 0.05);
+                float r, u, arc;
+                Outline(p, R, r, u, arc);
                 float m = 1.0 / R;                       // one metre in r units
                 float px = max(fwidth(r), 1e-4);          // one pixel in r units
                 float pxa = px / max(r, 0.02) / TAU;      // one pixel in turns at this radius
-                // Turns clockwise from +Z (north).
-                float u = frac(atan2(p.x, p.y) / TAU + 1.0);
+                float arcPx = _Style.z > 0.0 ? fwidth(arc) : TAU * R * pxa; // one pixel along the rim, metres
                 float style = _Style.x;
-                float3 c = style < 0.5 ? Countdown(i, p, r, m, px, pxa, u) : Area(i, p, r, R, m, px, pxa, u, style);
+                float3 c = style < 0.5 ? Countdown(i, p, r, m, px, pxa, u) : Area(i, p, r, R, m, px, pxa, u, arc, arcPx, style);
                 return c * i.color.a * i.color.g * Drape(i, Band(r, 1.0, 0.025 * m, px)) * _State.w;
             }
 
@@ -226,12 +253,12 @@ Shader "ForgeVisual/Marker"
             float3 Hidden(v2f i)
             {
                 float2 p = i.uv;
-                float r = length(p);
                 float R = max(_Shape.x, 0.05);
+                float r, u, arc;
+                Outline(p, R, r, u, arc);
                 float m = 1.0 / R;
                 float px = max(fwidth(r), 1e-4);
                 float pxa = px / max(r, 0.02) / TAU;
-                float u = frac(atan2(p.x, p.y) / TAU + 1.0);
                 if (_Style.x < 0.5)
                 {
                     float dashes = max(12.0, floor(TAU * R / 0.2));
@@ -240,8 +267,11 @@ Shader "ForgeVisual/Marker"
                     float3 accent = lerp(_Color.rgb, _Hot.rgb, 0.35 * _State.z);
                     return accent * dash * lerp(0.15, 0.38, lit) * (1.0 + 0.9 * _Shape.w) * _Reveal * _State.w;
                 }
+                // Dashes about 0.45 m apart along the rim (a whole number round a disc).
                 float areaDashes = max(12.0, floor(TAU * R / 0.45));
-                float areaDash = Band(r, 1.0, max(0.012 * m, 0.8 * px), px) * Arc(frac(u * areaDashes), 0.0, 0.55, pxa * areaDashes);
+                float dashAt = _Style.z > 0.0 ? arc / 0.45 : u * areaDashes;
+                float dashPx = _Style.z > 0.0 ? max(fwidth(arc), 1e-4) / 0.45 : pxa * areaDashes;
+                float areaDash = Band(r, 1.0, max(0.012 * m, 0.8 * px), px) * Arc(frac(dashAt), 0.0, 0.55, dashPx);
                 return _Color.rgb * areaDash * 0.6 * Sweep(u) * _Reveal * _State.w;
             }
 

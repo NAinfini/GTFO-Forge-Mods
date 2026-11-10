@@ -176,8 +176,10 @@ public sealed class ZoneVolume : IDisposable
         _shaderTried = true;
         var bundle = ForgeCore.Assets.LoadBytes(Plugin.Id, "forgevisual-zone-shader", ZoneShaderBytes.Read())
             ?? throw new InvalidOperationException("ForgeVisual's zone shader bundle cannot be loaded.");
-        return _shader = ForgeCore.Assets.Get<Shader>(Plugin.Id, bundle, "Assets/TriggerZone.shader")
+        var shader = ForgeCore.Assets.Get<Shader>(Plugin.Id, bundle, "Assets/TriggerZone.shader")
             ?? throw new InvalidOperationException("ForgeVisual's zone shader asset is missing.");
+        if (!shader.isSupported) throw new InvalidOperationException("ForgeVisual's zone shader is not supported on this device.");
+        return _shader = shader;
     }
 
     private static bool Same(Vector3 a, Vector3 b) => a.x == b.x && a.y == b.y && a.z == b.z;

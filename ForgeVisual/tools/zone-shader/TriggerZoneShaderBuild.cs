@@ -4,8 +4,8 @@ using System.IO;
 using System.Security.Cryptography;
 using UnityEditor;
 
-// Copy this file into a temporary Unity 2019.4 project's Assets/Editor and TriggerZone.shader into Assets.
-// Invoke -executeMethod TriggerZoneShaderBuild.Build --zonefx-root <repository-root>. No game is launched.
+// Copy this file into a temporary Unity 2019.4 project's Assets/Editor; Build copies TriggerZone.shader into Assets itself.
+// Invoke -batchmode -executeMethod TriggerZoneShaderBuild.Build --zonefx-root <repository-root>. No game is launched.
 public static class TriggerZoneShaderBuild
 {
     public static void Build()
@@ -18,7 +18,10 @@ public static class TriggerZoneShaderBuild
         var source = Path.Combine(native, "TriggerZone.shader");
         if (!File.Exists(source)) throw new FileNotFoundException("The trigger-zone shader source is missing.", source);
         var output = Path.GetFullPath("../shader-out"); Directory.CreateDirectory(output);
-        AssetDatabase.ImportAsset("Assets/TriggerZone.shader", ImportAssetOptions.ForceSynchronousImport);
+        File.Copy(source, Path.GetFullPath("Assets/TriggerZone.shader"), true);
+        AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+        var shader = AssetDatabase.LoadAssetAtPath<UnityEngine.Shader>("Assets/TriggerZone.shader") ?? throw new InvalidOperationException("Unity did not import the trigger-zone shader.");
+        if (!shader.isSupported) throw new InvalidOperationException("The trigger-zone shader is not supported on this device.");
         var result = BuildPipeline.BuildAssetBundles(output, new[] { new AssetBundleBuild
         { assetBundleName = "trigger-zone.bundle", assetNames = new[] { "Assets/TriggerZone.shader" } } },
             BuildAssetBundleOptions.ForceRebuildAssetBundle | BuildAssetBundleOptions.DeterministicAssetBundle, BuildTarget.StandaloneWindows64);

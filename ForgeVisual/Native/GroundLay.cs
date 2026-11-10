@@ -5,7 +5,8 @@ using UnityEngine;
 namespace ForgeVisual;
 
 /// <summary>
-/// A polar disc laid on the floor for the marker shader (uv = local XZ / radius, +Z north; uv2 = height up a step's drape and
+/// A polar disc laid on the floor for the marker shader (uv = local XZ / radius, +Z north; a strip's uv is along its own right and forward
+/// over its half width, its spokes running to points round its rectangle; uv2 = height up a step's drape and
 /// that drape's height; colour green 1 = this side of every wall, alpha = brightness). Every ring sample is dropped onto the
 /// floor below it, so the mark follows floors, slopes and stairs and always reads as one whole ring:
 /// <list type="bullet">
@@ -45,8 +46,12 @@ internal sealed class GroundLay
     private const byte Flat = 0, Riser = 1, Wall = 2;
 
     private readonly int _spokes, _rings, _slots;
-    private float _radius, _spacing;
+    private float _radius;
+    // Each spoke's direction and ring spacing: a disc's spokes are evenly turned and equally long, a strip's run to points spread evenly round its outline.
     private readonly Vector3[] _direction;
+    private readonly float[] _spacing;
+    // The mark's own axes on the floor: uv is (along right, along forward) / radius.
+    private Vector3 _right = Vector3.right, _forward = Vector3.forward;
     // Ring samples, spoke s and ring k (0 = centre) at s * (rings + 1) + k.
     private readonly float[] _height, _light;
     private readonly bool[] _open;
@@ -78,13 +83,9 @@ internal sealed class GroundLay
         _spokes = spokes;
         _rings = rings;
         _slots = rings * 3;
-        _spacing = 1f / rings;
         _direction = new Vector3[spokes];
-        for (var s = 0; s < spokes; s++)
-        {
-            var angle = s * Mathf.PI * 2f / spokes;
-            _direction[s] = new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle));
-        }
+        _spacing = new float[spokes];
+        Disc(1f);
         _height = new float[spokes * (rings + 1)];
         _light = new float[spokes * (rings + 1)];
         _open = new bool[spokes * (rings + 1)];
@@ -115,7 +116,59 @@ internal sealed class GroundLay
     internal void Lay(Vector3 centre, float radius, float extent)
     {
         _radius = Math.Max(0.05f, radius);
-        _spacing = Math.Max(0.05f, extent) / _rings;
+        Disc(Math.Max(0.05f, extent));
+        Build(centre);
+    }
+
+    /// <summary>Lays a strip <paramref name="halfWidth"/> metres to each side of <paramref name="centre"/> and <paramref name="halfLength"/> along
+    /// <paramref name="forward"/> (level), reaching <paramref name="margin"/> metres past its outline. Its spokes run to points spread evenly round the
+    /// outline, its four corners among them, so the laid floor covers the whole rectangle however long it is.</summary>
+    internal void LayStrip(Vector3 centre, Vector3 forward, float halfWidth, float halfLength, float margin)
+    {
+        _radius = Math.Max(0.05f, halfWidth);
+        _forward = new Vector3(forward.x, 0f, forward.z).normalized;
+        if (_forward.sqrMagnitude < 0.5f) _forward = Vector3.forward;
+        _right = new Vector3(_forward.z, 0f, -_forward.x);
+        var a = _radius + margin;
+        var b = Math.Max(0.05f, halfLength) + margin;
+        // Spokes per side in proportion to its length, at least one each; the walk goes clockwise from the front right corner, as a disc's spokes do.
+        var ends = Math.Max(1, (int)Math.Round(_spokes * a / (2f * (a + b))));
+        var sides = Math.Max(1, _spokes / 2 - ends);
+        ends = _spokes / 2 - sides;
+        var s = 0;
+        Side(ref s, a, b, a, -b, sides);
+        Side(ref s, a, -b, -a, -b, ends);
+        Side(ref s, -a, -b, -a, b, sides);
+        Side(ref s, -a, b, a, b, _spokes - s);
+        Build(centre);
+    }
+
+    private void Side(ref int s, float x0, float y0, float x1, float y1, int count)
+    {
+        for (var j = 0; j < count; j++, s++)
+        {
+            var t = j / (float)count;
+            var flat = _right * (x0 + (x1 - x0) * t) + _forward * (y0 + (y1 - y0) * t);
+            var length = flat.magnitude;
+            _direction[s] = flat / length;
+            _spacing[s] = length / _rings;
+        }
+    }
+
+    private void Disc(float extent)
+    {
+        _right = Vector3.right;
+        _forward = Vector3.forward;
+        for (var s = 0; s < _spokes; s++)
+        {
+            var angle = s * Mathf.PI * 2f / _spokes;
+            _direction[s] = new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle));
+            _spacing[s] = extent / _rings;
+        }
+    }
+
+    private void Build(Vector3 centre)
+    {
         var mask = Scene.WorldMask;
         const QueryTriggerInteraction ignore = QueryTriggerInteraction.Ignore;
         var samples = _rings + 1;
@@ -124,11 +177,12 @@ internal sealed class GroundLay
         for (var s = 0; s < _spokes; s++)
         {
             var direction = _direction[s];
+            var spacing = _spacing[s];
             var o = s * samples;
             // One level ray along the spoke finds a wall on level floor; past a walkable slope it meets, each step casts its own.
             var trustTo = float.MaxValue;
             var wallAt = float.MaxValue;
-            if (Physics.Raycast(centre + Vector3.up * (baseY + WallCheck), direction, out var far, _spacing * _rings, mask, ignore))
+            if (Physics.Raycast(centre + Vector3.up * (baseY + WallCheck), direction, out var far, spacing * _rings, mask, ignore))
             {
                 trustTo = far.distance;
                 if (far.normal.y < Walkable) wallAt = far.distance;
@@ -142,8 +196,8 @@ internal sealed class GroundLay
             _open[o] = true;
             for (var k = 1; k <= _rings; k++)
             {
-                var r0 = _spacing * (k - 1);
-                var r1 = _spacing * k;
+                var r0 = spacing * (k - 1);
+                var r1 = spacing * k;
                 var step = s * _rings + k - 1;
                 _kind[step] = Flat;
                 if (open)
@@ -152,7 +206,7 @@ internal sealed class GroundLay
                     var onBase = Math.Abs(y - baseY) < 0.25f;
                     if (onBase && trustTo > r1) { }
                     else if (onBase && wallAt > r0 && wallAt <= r1) wall = wallAt;
-                    else if (Physics.Raycast(centre + direction * r0 + Vector3.up * (y + WallCheck), direction, out var near, _spacing, mask, ignore) && near.normal.y < Walkable)
+                    else if (Physics.Raycast(centre + direction * r0 + Vector3.up * (y + WallCheck), direction, out var near, spacing, mask, ignore) && near.normal.y < Walkable)
                         wall = r0 + near.distance;
                     if (wall >= 0f)
                     {
@@ -179,10 +233,10 @@ internal sealed class GroundLay
                         var edge = -1f;
                         if (rise > 0f)
                         {
-                            if (Physics.Raycast(centre + direction * r0 + Vector3.up * (y + 0.05f), direction, out var face, _spacing, mask, ignore) && face.normal.y < Walkable)
+                            if (Physics.Raycast(centre + direction * r0 + Vector3.up * (y + 0.05f), direction, out var face, spacing, mask, ignore) && face.normal.y < Walkable)
                                 edge = r0 + face.distance - Inset;
                         }
-                        else if (Physics.Raycast(centre + direction * r1 + Vector3.up * (next + 0.05f), -direction, out var face, _spacing, mask, ignore) && face.normal.y < Walkable)
+                        else if (Physics.Raycast(centre + direction * r1 + Vector3.up * (next + 0.05f), -direction, out var face, spacing, mask, ignore) && face.normal.y < Walkable)
                             edge = r1 - face.distance + Inset;
                         if (edge >= 0f)
                         {
@@ -229,14 +283,13 @@ internal sealed class GroundLay
             for (var s = 0; s < _spokes && first < 0; s++)
                 if (_open[s * samples + k]) first = s;
             if (first < 0) continue;
-            var arc = 2f * Mathf.PI * _spacing * k / _spokes;
             var j = 1;
             while (j < _spokes)
             {
                 if (_open[(first + j) % _spokes * samples + k]) { j++; continue; }
                 var count = 0;
                 while (j + count < _spokes && !_open[(first + j + count) % _spokes * samples + k]) count++;
-                if (count * arc <= ShadowRun)
+                if (Run(k, (first + j - 1) % _spokes, count) <= ShadowRun)
                 {
                     Fill(centre, samples, mask, k, (first + j - 1) % _spokes, count, 1);
                     Fill(centre, samples, mask, k, (first + j + count) % _spokes, count, -1);
@@ -246,9 +299,19 @@ internal sealed class GroundLay
         }
     }
 
+    /// <summary>Ring <paramref name="k"/>'s sample on spoke <paramref name="s"/>, level with the centre.</summary>
+    private Vector3 Spot(int s, int k) => _direction[s] * (_spacing[s] * k);
+
+    /// <summary>The length of ring <paramref name="k"/> over <paramref name="steps"/> spokes from spoke <paramref name="from"/> (m).</summary>
+    private float Run(int k, int from, int steps)
+    {
+        var length = 0f;
+        for (var i = 0; i < steps; i++) length += (Spot((from + i + 1) % _spokes, k) - Spot((from + i) % _spokes, k)).magnitude;
+        return length;
+    }
+
     private void Fill(Vector3 centre, int samples, int mask, int k, int from, int count, int way)
     {
-        var r = _spacing * k;
         for (var i = 1; i <= count; i++)
         {
             var s = ((from + way) % _spokes + _spokes) % _spokes;
@@ -257,7 +320,7 @@ internal sealed class GroundLay
             var h = _height[from * samples + k];
             if (Math.Abs(_height[at] - h) > WallCheck) return;
             var lift = Vector3.up * (h + WallCheck);
-            if (Physics.Linecast(centre + _direction[from] * r + lift, centre + _direction[s] * r + lift, mask, QueryTriggerInteraction.Ignore)) return;
+            if (Physics.Linecast(centre + Spot(from, k) + lift, centre + Spot(s, k) + lift, mask, QueryTriggerInteraction.Ignore)) return;
             _open[at] = true;
             _light[at] = _light[from * samples + k];
             from = s;
@@ -295,7 +358,7 @@ internal sealed class GroundLay
                         Put(s, j++, _edge[step], _height[a], _light[a], false, 0f, 0f);
                     }
                 }
-                Put(s, j++, _spacing * k, _height[b], _light[b], _open[b], 0f, 0f);
+                Put(s, j++, _spacing[s] * k, _height[b], _light[b], _open[b], 0f, 0f);
             }
             _used[s] = j;
             var spareAt = 1 + _spokes * _slots + s;
@@ -322,10 +385,10 @@ internal sealed class GroundLay
         var i = 1 + spoke * _slots + slot;
         var flat = _direction[spoke] * r;
         Vertices[i] = new Vector3(flat.x, y + Lift, flat.z);
-        Uvs[i] = new Vector2(flat.x / _radius, flat.z / _radius);
+        Uvs[i] = new Vector2(Vector3.Dot(flat, _right) / _radius, Vector3.Dot(flat, _forward) / _radius);
         Drapes[i] = new Vector2(up, drop);
         Colours[i] = new Color32(255, open ? (byte)255 : (byte)0, 255, (byte)Math.Round(light * 255f));
-        _distance[i] = r;
+        _distance[i] = r / _spacing[spoke]; // in rings: neighbouring spokes of a strip differ in length, they are stitched ring to ring
     }
 
     /// <summary>Triangles between neighbouring spokes. The floor between each pair of edges is stitched to the matching

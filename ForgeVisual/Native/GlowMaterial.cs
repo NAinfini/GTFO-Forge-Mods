@@ -23,6 +23,10 @@ public static partial class Glow
     public static Color Srgb(float[] value, float scale, float alpha = 1f)
         => new(SrgbToLinear(value[0]) * scale, SrgbToLinear(value[1]) * scale, SrgbToLinear(value[2]) * scale, alpha);
 
+    /// <summary>The inverse of <see cref="Srgb"/> for one channel: what a material's linear colour reads back as, in the author's sRGB.</summary>
+    public static float LinearToSrgb(float value)
+        => value <= 0.0031308f ? value * 12.92f : 1.055f * MathF.Pow(value, 1f / 2.4f) - 0.055f;
+
     private static float SrgbToLinear(float value)
     {
         var linear = value < 0.04045f ? value * 0.0773993808f : MathF.Pow(value * 0.9478672986f + 0.0521327014f, 2.4f);
@@ -33,22 +37,23 @@ public static partial class Glow
     /// <summary>Writes one uniform glow into <paramref name="material"/> itself, on both emission families the game's model shaders declare:
     /// Unity's <c>_EmissionColor</c>/<c>_EmissionMap</c>/<c>_EMISSION</c> and the game's <c>_EmissiveColor</c>/<c>_EmissiveMap</c>/
     /// <c>_EnableEmissive</c>. The flat surface shader takes <c>ENABLE_SELF_ILLUM</c> (scale the colour by <see cref="SurfaceEmissionPerBrightness"/>
-    /// per author brightness); the game's own materials keep <c>ENABLE_EMISSIVE</c>. The emission map becomes white, so the glow is even.
+    /// per author brightness); the game's own materials keep <c>ENABLE_EMISSIVE</c>. The emission map is <paramref name="map"/> (a model's own glow mask) or white,
+    /// so the glow is even. This is the one emission write of the libraries and packages.
     /// The caller owns <paramref name="material"/> (a copy); a material with neither family throws <c>model-glow-unsupported</c>.</summary>
-    public static void Write(Material material, Color emission)
+    public static void Write(Material material, Color emission, Texture? map = null)
     {
         var written = false;
         if (material.HasProperty(EmissionColor))
         {
             material.SetColor(EmissionColor, emission);
-            if (material.HasProperty(EmissionMap)) material.SetTexture(EmissionMap, Texture2D.whiteTexture);
+            if (material.HasProperty(EmissionMap)) material.SetTexture(EmissionMap, map ?? Texture2D.whiteTexture);
             material.EnableKeyword(EmissionKeyword);
             written = true;
         }
         if (material.HasProperty(EmissiveColor))
         {
             material.SetColor(EmissiveColor, emission);
-            if (material.HasProperty(EmissiveMap)) material.SetTexture(EmissiveMap, Texture2D.whiteTexture);
+            if (material.HasProperty(EmissiveMap)) material.SetTexture(EmissiveMap, map ?? Texture2D.whiteTexture);
             if (material.HasProperty(EnableEmissive)) material.SetFloat(EnableEmissive, 1f);
             material.EnableKeyword(IsSurface(material) ? SelfIllumKeyword : EmissiveKeyword);
             written = true;

@@ -33,6 +33,9 @@ public sealed class WorldBackdrop
 
     public GameObject Root => _object;
 
+    /// <summary>The colour the rectangle shows now; the alpha is its opacity.</summary>
+    public Color Color => _material.color;
+
     /// <summary>Recolours the rectangle in place; the alpha is its opacity.</summary>
     public void SetColor(Color color) => _material.color = color;
 

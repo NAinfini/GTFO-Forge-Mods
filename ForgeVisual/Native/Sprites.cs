@@ -28,9 +28,13 @@ public sealed class SpriteSheet
         Frames = frames;
         Blend = blend;
         Sheddable = sheddable;
+        Seen = ForgeCore.RecordingNames.Of(name);
     }
 
     public string Name { get; }
+
+    /// <summary>The name's number for reports to <see cref="ForgeCore.Recording"/>.</summary>
+    internal readonly int Seen;
     public int Columns { get; }
     public int Rows { get; }
 
@@ -54,12 +58,12 @@ public sealed class SpriteSheet
     public static SpriteSheet? Register(string modId, string name, Texture2D texture, int columns, int rows, FxBlend blend, bool sheddable = false, int frames = 0)
     {
         var log = ForgeCore.Log.For(string.IsNullOrEmpty(modId) ? Plugin.Id : modId);
-        if (texture == null) { log.ErrorOnce("ForgeVisual sprite sheet " + name + " not registered: no texture."); return null; }
-        if (columns < 1 || rows < 1 || frames < 0 || frames > columns * rows) { log.ErrorOnce("ForgeVisual sprite sheet " + name + " not registered: a " + columns + " x " + rows + " grid with " + frames + " frames does not fit."); return null; }
-        if (VisualNames.TrySplit(name, out var pack, out _, out _) && VisualNames.CheckPack(pack) is { } bad) { log.ErrorOnce("ForgeVisual sprite sheet " + name + " not registered: " + bad + "."); return null; }
+        if (texture == null) { log.ErrorOnce("visual-sprite-sheet-not-registered-no-texture", "ForgeVisual sprite sheet " + name + " not registered: no texture."); return null; }
+        if (columns < 1 || rows < 1 || frames < 0 || frames > columns * rows) { log.ErrorOnce("visual-sprite-sheet-not-registered-x-grid", "ForgeVisual sprite sheet " + name + " not registered: a " + columns + " x " + rows + " grid with " + frames + " frames does not fit."); return null; }
+        if (VisualNames.TrySplit(name, out var pack, out _, out _) && VisualNames.CheckPack(pack) is { } bad) { log.ErrorOnce("visual-sprite-sheet-not-registered", "ForgeVisual sprite sheet " + name + " not registered: " + bad + "."); return null; }
         ForgeCore.Assets.Keep(texture);
         var sheet = new SpriteSheet(name, texture, null, columns, rows, frames == 0 ? columns * rows : frames, blend, sheddable);
-        if (All.Add(name, sheet) is { } why) { log.ErrorOnce("ForgeVisual sprite sheet " + name + " not registered: " + why + "."); return null; }
+        if (All.Add(name, sheet) is { } why) { log.ErrorOnce("visual-sprite-sheet-not-registered", "ForgeVisual sprite sheet " + name + " not registered: " + why + "."); return null; }
         return sheet;
     }
 
@@ -69,7 +73,7 @@ public sealed class SpriteSheet
         if (name == VisualNames.Join(VisualNames.Forge, ForgeCatalog.SoftDot)) return SoftDot;
         if (name == VisualNames.Join(VisualNames.Forge, ForgeCatalog.SoftLine)) return SoftLine;
         if (All.TryGet(name, out var sheet)) return sheet;
-        Plugin.Logger.ErrorOnce("ForgeVisual has no sprite sheet " + name + ": " + Missing.Why(name, p => p == VisualNames.Forge || SheetPack(p), "sprite sheet") + ".");
+        if (Missing.First("sprite sheet", name)) Plugin.Logger.ErrorOnce("visual-has-no-sprite-sheet-sprite-sheet", "ForgeVisual has no sprite sheet " + name + ": " + Missing.Why(name, p => p == VisualNames.Forge || SheetPack(p), "sprite sheet") + ".");
         return null;
     }
 
@@ -163,8 +167,21 @@ public struct SpriteSpawn
 
     public static SpriteSpawn Of(SpriteSheet sheet, SpriteFace face, Vector3 position, float life, float size0, float size1, Color colour0, Color colour1) => new()
     {
-        Sheet = sheet, Face = face, Blend = sheet.Blend, Position = position, Normal = Vector3.up, Life = life, Size0 = size0, Size1 = size1,
-        Colour0 = colour0, Colour1 = colour1, Rotation = float.NaN, Cell = -1, Aspect = 1f, FadeIn = 0.06f, EndScale = 1f,
+        Sheet = sheet,
+        Face = face,
+        Blend = sheet.Blend,
+        Position = position,
+        Normal = Vector3.up,
+        Life = life,
+        Size0 = size0,
+        Size1 = size1,
+        Colour0 = colour0,
+        Colour1 = colour1,
+        Rotation = float.NaN,
+        Cell = -1,
+        Aspect = 1f,
+        FadeIn = 0.06f,
+        EndScale = 1f,
     };
 }
 
@@ -432,11 +449,23 @@ public static class SpritePool
             {
                 var p = All[i];
                 if (!p.Live) continue;
-                if (!Step(p, now)) Book.Free(i);
+                if (Step(p, now)) continue;
+                Book.Free(i);
+                Ended(p);
             }
         for (var r = 0; r < _ringCount; r++) _rings[r]!.Tick(now);
         // The next frame's smoke to give up: what is covered beyond the budget (one frame late, so the decision cannot flicker).
         _shed = Overdraw.Shed(_covTotal, _covShed, Overdraw.ScreenBudget);
+    }
+
+    /// <summary>Tells the owner of a sprite that <see cref="Step"/> ended, after its slot was given back (so what it emits in turn can take that slot).
+    /// A callback that throws is logged and costs nothing else.</summary>
+    internal static void Ended(SpriteParticle p)
+    {
+        var end = p.OnEnd;
+        if (end == null) return;
+        try { end(p.Pos, p.EndScale); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("visual-sprite-end-failed", "A ForgeVisual sprite's OnEnd callback failed: " + error); }
     }
 
     /// <summary>One frame of one sprite; false when it has ended.</summary>
@@ -448,7 +477,6 @@ public static class SpritePool
         else if (age >= p.Life)
         {
             Hide(p);
-            p.OnEnd?.Invoke(p.Pos, p.EndScale);
             return false;
         }
         if (!p.Shown) { p.Shown = true; p.Last = now; }
@@ -489,31 +517,31 @@ public static class SpritePool
         switch (p.Face)
         {
             case SpriteFace.Floor:
-            {
-                var up = Math.Abs(p.Normal.y) > 0.98f ? Vector3.forward : Vector3.up;
-                p.T.SetPositionAndRotation(p.Pos, Quaternion.LookRotation(p.Normal, up) * Quaternion.Euler(0f, 0f, (p.Rot + age * p.Spin) * 57.29578f));
-                p.T.localScale = new Vector3(size, size, 1f);
-                break;
-            }
+                {
+                    var up = Math.Abs(p.Normal.y) > 0.98f ? Vector3.forward : Vector3.up;
+                    p.T.SetPositionAndRotation(p.Pos, Quaternion.LookRotation(p.Normal, up) * Quaternion.Euler(0f, 0f, (p.Rot + age * p.Spin) * 57.29578f));
+                    p.T.localScale = new Vector3(size, size, 1f);
+                    break;
+                }
             case SpriteFace.Streak:
-            {
-                var speed = p.Vel.magnitude;
-                var tail = speed > 1e-3f ? p.Vel * (-1f / speed) : Vector3.up;
-                var length = Math.Max(size * p.Aspect + speed * p.Stretch, 0.01f);
-                var facing = p.Pos - eye;
-                var look = facing.sqrMagnitude > 1e-4f ? facing : Vector3.forward;
-                p.T.SetPositionAndRotation(p.Pos + tail * (length * 0.5f), Quaternion.LookRotation(look, tail));
-                p.T.localScale = new Vector3(size, length, 1f);
-                break;
-            }
+                {
+                    var speed = p.Vel.magnitude;
+                    var tail = speed > 1e-3f ? p.Vel * (-1f / speed) : Vector3.up;
+                    var length = Math.Max(size * p.Aspect + speed * p.Stretch, 0.01f);
+                    var facing = p.Pos - eye;
+                    var look = facing.sqrMagnitude > 1e-4f ? facing : Vector3.forward;
+                    p.T.SetPositionAndRotation(p.Pos + tail * (length * 0.5f), Quaternion.LookRotation(look, tail));
+                    p.T.localScale = new Vector3(size, length, 1f);
+                    break;
+                }
             default:
-            {
-                var facing = p.Pos - eye;
-                var look = facing.sqrMagnitude > 1e-4f ? Quaternion.LookRotation(facing) : Quaternion.identity;
-                p.T.SetPositionAndRotation(p.Pos, look * Quaternion.Euler(0f, 0f, (p.Rot + age * p.Spin) * 57.29578f));
-                p.T.localScale = new Vector3(size, size, 1f);
-                break;
-            }
+                {
+                    var facing = p.Pos - eye;
+                    var look = facing.sqrMagnitude > 1e-4f ? Quaternion.LookRotation(facing) : Quaternion.identity;
+                    p.T.SetPositionAndRotation(p.Pos, look * Quaternion.Euler(0f, 0f, (p.Rot + age * p.Spin) * 57.29578f));
+                    p.T.localScale = new Vector3(size, size, 1f);
+                    break;
+                }
         }
         _block!.SetColor(_colorId, colour);
         p.R.SetPropertyBlock(_block);
@@ -573,6 +601,8 @@ public sealed class DecalRing
     public Sprite Place(in SpriteSpawn s)
     {
         if (s.Sheet == null || !Alive) return Sprite.None;
+        if (ForgeCore.Recording.Watched)
+            ForgeCore.Recording.Effect(new ForgeCore.ShownEffect(ForgeCore.ShownKind.Decal, s.Sheet.Seen, 0, s.Position, s.Normal, s.Size0, s.Colour0, seconds: s.Life, fade: s.Life * (1f - s.Hold)));
         var slot = _slots.Take();
         var p = _marks[slot];
         SpritePool.Start(p, in s, Scene.Now);
@@ -596,7 +626,10 @@ public sealed class DecalRing
         return Place(in s);
     }
 
-    internal bool Alive => _marks.Length == 0 || (_marks[0].R != null && !_marks[0].R.WasCollected);
+    /// <summary>False once the pool's objects went with a scene and the pool was rebuilt: a mod keeping its own set across levels makes a
+    /// new one with <see cref="SpritePool.CreateDecals"/> then. A set made once stays usable from level to level otherwise (its marks are
+    /// cleared with the level).</summary>
+    public bool Alive => _marks.Length == 0 || (_marks[0].R != null && !_marks[0].R.WasCollected);
     internal bool IsCurrent(Sprite sprite) => _slots.Current(sprite.Slot, sprite.Generation);
     internal SpriteParticle At(int slot) => _marks[slot];
 
@@ -611,7 +644,11 @@ public sealed class DecalRing
     internal void Tick(float now)
     {
         for (var i = 0; i < _marks.Length; i++)
-            if (_marks[i].Live && !SpritePool.Step(_marks[i], now)) _slots.End(i);
+        {
+            if (!_marks[i].Live || SpritePool.Step(_marks[i], now)) continue;
+            _slots.End(i);
+            SpritePool.Ended(_marks[i]);
+        }
     }
 
     internal void Clear()

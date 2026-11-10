@@ -21,8 +21,13 @@ internal sealed class ZoneMesh : IDisposable
         _vertices = new Il2CppStructArray<Vector3>(unit.Length);
         var colors = new Color[unit.Length];
         Array.Fill(colors, new Color(1, 1, 1, 1));
-        Mesh = new Mesh { name = "ForgeVisual zone volume", vertices = _vertices,
-            colors = new Il2CppStructArray<Color>(colors), triangles = new Il2CppStructArray<int>(triangles) };
+        Mesh = new Mesh
+        {
+            name = "ForgeVisual zone volume",
+            vertices = _vertices,
+            colors = new Il2CppStructArray<Color>(colors),
+            triangles = new Il2CppStructArray<int>(triangles)
+        };
     }
 
     internal static ZoneMesh Create(ZoneShape shape, bool disc = false)
@@ -36,8 +41,8 @@ internal sealed class ZoneMesh : IDisposable
         {
             var rows = disc ? 1 : 2;
             for (var row = 0; row < rows; row++)
-            for (var i = 0; i < sides; i++)
-            { var angle = i * MathF.PI * 2 / sides; Add(MathF.Cos(angle) / 2, disc ? 0 : row - 0.5f, MathF.Sin(angle) / 2); }
+                for (var i = 0; i < sides; i++)
+                { var angle = i * MathF.PI * 2 / sides; Add(MathF.Cos(angle) / 2, disc ? 0 : row - 0.5f, MathF.Sin(angle) / 2); }
             var bottom = points.Count; Add(0, disc ? 0 : -0.5f, 0);
             var top = points.Count; if (!disc) Add(0, 0.5f, 0);
             for (var i = 0; i < sides; i++)

@@ -37,7 +37,7 @@ public sealed class EnemyOutlineStyle
     /// <summary>Hunting the players (aggressive).</summary>
     public OutlineColor Hunting { get; init; } = new(0.80f, 0.18f, 0.18f, 0.80f);
     /// <summary>True draws the line through walls too (round the whole silhouette): an opt-in for mods that mean to show what is behind a
-/// wall. False (the default) outlines only what the camera sees; Forge Frames' cockpit keeps it false.</summary>
+    /// wall. False (the default) outlines only what the camera sees; Forge Frames' cockpit keeps it false.</summary>
     public bool XRay { get; init; }
     /// <summary>Against outlines added to one enemy with <c>Outlines.Add</c>: an added outline of this priority or higher replaces the
     /// automatic one on that enemy; a lower one is not drawn while the automatic one is.</summary>
@@ -71,7 +71,7 @@ public sealed class EnemyOutlineStyle
 }
 
 /// <summary>Pure rules of the outline: line width on screen, what counts as in view, how many enemies are read per frame.</summary>
-public static class OutlineRules
+internal static class OutlineRules
 {
     /// <summary>The line width (pixels at 1080p) while no automatic enemy outline is on.</summary>
     public const float DefaultWidth = 1.6f;
@@ -118,7 +118,7 @@ public static class OutlineRules
 /// mesh's vertex colour, so pose, scale and where the enemy stands do not matter) into a unit space. A point is cut when, for any
 /// ellipsoid, it lies inside half the unit sphere (inverted: outside it).
 /// </summary>
-public static class OutlineCuts
+internal static class OutlineCuts
 {
     /// <summary>The most ellipsoids the game cuts one body with.</summary>
     public const int Max = 4;
@@ -143,7 +143,7 @@ public static class OutlineCuts
 
 /// <summary>Which of a target's renderers the outline draws: only those still drawn by the game (alive, enabled), at most a fixed
 /// number. A limb shot off takes its renderers out of this set the next time the set is read from the game.</summary>
-public static class OutlineDrawSet
+internal static class OutlineDrawSet
 {
     /// <summary>Fills <paramref name="into"/> (cleared first) with the candidates <paramref name="drawn"/> accepts, in order, at most
     /// <paramref name="max"/>; returns how many were skipped because they are no longer drawn.</summary>
@@ -165,7 +165,7 @@ public static class OutlineDrawSet
 /// end time. Several claims may name one target; exactly one is drawn: the highest priority, the latest added among equals. A slot's
 /// generation changes on every reuse, so an old handle never removes a newer claim. Nothing allocates once the arrays have grown.
 /// </summary>
-public sealed class OutlineClaims
+internal sealed class OutlineClaims
 {
     private long[] _key = new long[16], _stamp = new long[16];
     private int[] _priority = new int[16], _generation = new int[16];
@@ -396,7 +396,7 @@ public sealed class EnemyOutlineTracker
 /// The automatic enemy outlines every mod switched on. Outlines are drawn while any is on; the style is that of the one switched on
 /// most recently.
 /// </summary>
-public sealed class OutlineScopes<T> where T : class
+internal sealed class OutlineScopes<T> where T : class
 {
     private readonly List<(T Scope, long Stamp)> _on = new();
     private long _clock;

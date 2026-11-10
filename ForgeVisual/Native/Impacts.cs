@@ -11,6 +11,9 @@ public sealed class ImpactLook
     /// <summary>An effect by name (<c>Game:</c> or a pack's), played facing the surface normal.</summary>
     public FxHandle? Fx { get; set; }
 
+    /// <summary>The size (m) <see cref="Fx"/> plays at when the play's scale is 1, for an effect that takes a size (<see cref="FxOptions.DefaultSize"/>); NaN: its own size.</summary>
+    public float FxSize { get; set; } = float.NaN;
+
     /// <summary>A prefab effect (a particle system at its root) played from the library's own pool, facing the normal, at
     /// <see cref="ModelScale"/> times the play's scale. Fill the pool ahead with <see cref="Impacts.Prepare"/>.</summary>
     public ModelHandle? Model { get; set; }
@@ -51,7 +54,7 @@ public static class Impacts
         if (look == null) return;
         var facing = normal.sqrMagnitude > 1e-8f;
         var up = facing ? normal.normalized : Vector3.up;
-        if (look.Fx != null) ForgeVisual.Fx.Play(look.Fx, point, facing ? up : Vector3.zero);
+        if (look.Fx != null) ForgeVisual.Fx.Play(look.Fx, point, facing ? up : Vector3.zero, look.FxSize * scale, Color.white);
         if (look.Model != null)
         {
             var copy = Pool.Take(look.Model);

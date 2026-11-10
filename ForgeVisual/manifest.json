@@ -1,7 +1,7 @@
 {
   "name": "ForgeVisual",
-  "version_number": "0.1.0",
+  "version_number": "1.0.0",
   "website_url": "https://github.com/NAinfini/GTFO-Forge-Mods",
   "description": "Public GTFO world-visuals library: effects by name, particle pools, ground markers, glow materials and model loading.",
-  "dependencies": ["BepInEx-BepInExPack_GTFO-3.2.4", "NAinfini-ForgeCore-0.1.0"]
+  "dependencies": ["BepInEx-BepInExPack_GTFO-3.2.4", "NAinfini-ForgeCore-1.0.0"]
 }

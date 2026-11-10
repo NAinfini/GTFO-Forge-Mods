@@ -5,7 +5,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>ForgeVisual</AssemblyName>
-    <Version>0.1.0</Version>
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
@@ -49,9 +48,18 @@
   <ItemGroup>
     <ProjectReference Include="../ForgeCore/ForgeCore.csproj" Private="false" />
     <!-- Forge's effect bundle (CC0, Assets/Vfx/LICENSE.txt): the one copy every Forge mod draws its effects from; local media, not in Git. -->
+    <!-- The one gun-holding rule (Core/GunHold.cs); a website implementation reads the same file. -->
+    <EmbeddedResource Include="Data/gun-hold.json" LogicalName="ForgeVisual.Data.gun-hold.json" />
     <EmbeddedResource Include="$(ForgeModsRoot)ForgeVisual/Assets/Vfx/forge-vfx.bundle" LogicalName="ForgeVisual.Vfx.forge-vfx.bundle" />
+    <!-- The sights a package may put on its guns (Data/sights.json; self-made, Assets/Sights/LICENSE.txt): descriptors here; meshes and textures (<id>.t<index>.png, the descriptor's textures in order) local media, not in Git. -->
+    <EmbeddedResource Include="Data/sights.json" LogicalName="ForgeVisual.Data.sights.json" />
+    <EmbeddedResource Include="Assets/Sights/*.model.json" LogicalName="ForgeVisual.Sights.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="$(ForgeModsRoot)ForgeVisual/Assets/Sights/*.forgemesh" LogicalName="ForgeVisual.Sights.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="$(ForgeModsRoot)ForgeVisual/Assets/Sights/*.t*.png" LogicalName="ForgeVisual.Sights.%(Filename)%(Extension)" />
   </ItemGroup>
   <Target Name="RequireVfxBundle" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(ForgeModsRoot)ForgeVisual/Assets/Sights/red-dot-1x.forgemesh') or !Exists('$(ForgeModsRoot)ForgeVisual/Assets/Sights/holo-1x.forgemesh') or !Exists('$(ForgeModsRoot)ForgeVisual/Assets/Sights/scope-2x.forgemesh') or !Exists('$(ForgeModsRoot)ForgeVisual/Assets/Sights/red-dot-1x.t1.png') or !Exists('$(ForgeModsRoot)ForgeVisual/Assets/Sights/holo-1x.t1.png') or !Exists('$(ForgeModsRoot)ForgeVisual/Assets/Sights/scope-2x.t1.png')"
+           Text="ForgeVisual embeds its sight meshes from local media: $(ForgeModsRoot)ForgeVisual/Assets/Sights/*.forgemesh or *.t&lt;index&gt;.png is missing a sight file. Pass -p:ForgeModsRoot=&lt;the Mods folder that holds the local media, trailing slash&gt;." />
     <Error Condition="!Exists('$(ForgeModsRoot)ForgeVisual/Assets/Vfx/forge-vfx.bundle')"
            Text="ForgeVisual embeds its effect bundle from local media: $(ForgeModsRoot)ForgeVisual/Assets/Vfx/forge-vfx.bundle is missing. Pass -p:ForgeModsRoot=&lt;the Mods folder that holds the local media, trailing slash&gt;." />
   </Target>

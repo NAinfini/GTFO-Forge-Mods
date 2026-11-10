@@ -1,0 +1,11 @@
+ForgeVisual - notices and credits
+Copyright (c) 2026 NAinfini. Licensed under the MIT License (see LICENSE); the effect bundle is CC0 1.0, as listed below.
+
+This is an unofficial fan-made mod for GTFO. It is not made, endorsed or supported by 10 Chambers Collective.
+GTFO and its game data belong to their owners; no file taken from the game is included in this package.
+Effect bundle (forge-vfx.bundle, embedded in ForgeVisual.dll), CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/):
+- The effect prefabs, particle shaders, textures, materials and meshes were all made for this project by NAinfini with Unity 2019.4.21f1
+  (Tools/Vfx/ForgeVfx); the bundle contains no third-party file. Credit is not required; it is given for completeness.
+
+Everything else in the zip is written for this project.
+The package is compiled against BepInEx, HarmonyX, Il2CppInterop and the game's interop assemblies, which are installed separately and not included here.

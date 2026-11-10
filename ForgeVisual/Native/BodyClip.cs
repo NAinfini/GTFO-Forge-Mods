@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Player;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace ForgeVisual;
 
@@ -37,7 +36,7 @@ public sealed class BodyClipRig
         var hips = Models.Find(animated.transform, rootBone);
         if (hips == null)
         {
-            Plugin.Logger.ErrorOnce("ForgeVisual body clip rig " + label + " has no bone " + rootBone + "; it plays nothing.");
+            Plugin.Logger.ErrorOnce("visual-body-clip-rig-has-no-bone", "ForgeVisual body clip rig " + label + " has no bone " + rootBone + "; it plays nothing.");
             return null;
         }
         var bones = new List<Transform> { hips };
@@ -79,28 +78,20 @@ public sealed class BodyClip
     private readonly BodyClipRig _rig;
     private readonly bool _local;
     private readonly Transform?[] _game;
-    private readonly Behaviour[] _solvers;
-    private readonly bool[] _solversWere;
-    private readonly Renderer[] _drawn;
-    private readonly ShadowCastingMode[] _drawnMode;
-    private readonly int[] _drawnLayer;
-    private readonly Renderer[] _arms;
-    private readonly bool[] _armsWere;
+    private readonly IkPause _ik;
+    private static readonly float[] Whole = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Repeat(1f, ClipRig.Count));
+    private readonly OwnBodyOptions _view;
+    private OwnBodyView? _own;
     private bool _posing, _firstPerson;
 
-    private BodyClip(PlayerAgent agent, BodyClipRig rig, bool local, Transform?[] game, Behaviour[] solvers, Renderer[] drawn, Renderer[] arms)
+    private BodyClip(PlayerAgent agent, BodyClipRig rig, bool local, Transform?[] game, IkPause ik, OwnBodyOptions view)
     {
         _agent = agent;
         _rig = rig;
         _local = local;
         _game = game;
-        _solvers = solvers;
-        _solversWere = new bool[solvers.Length];
-        _drawn = drawn;
-        _drawnMode = new ShadowCastingMode[drawn.Length];
-        _drawnLayer = new int[drawn.Length];
-        _arms = arms;
-        _armsWere = new bool[arms.Length];
+        _ik = ik;
+        _view = view;
         Matched = 0;
         foreach (var bone in game) if (bone != null) Matched++;
     }
@@ -118,7 +109,7 @@ public sealed class BodyClip
         var hips = animator != null ? animator.GetBoneTransform(HumanBodyBones.Hips) : null;
         if (hips == null)
         {
-            Plugin.Logger.ErrorOnce("ForgeVisual body clip " + label + ": the player's body has no hips; no clip plays on it.");
+            Plugin.Logger.ErrorOnce("visual-body-clip-players-body", "ForgeVisual body clip " + label + ": the player's body has no hips; no clip plays on it.");
             return null;
         }
         var byName = new Dictionary<string, Transform>(StringComparer.Ordinal);
@@ -127,40 +118,8 @@ public sealed class BodyClip
         var game = new Transform?[bones.Count];
         for (var i = 0; i < bones.Count; i++) if (byName.TryGetValue(bones[i].name, out var bone)) game[i] = bone;
         game[0] = hips;
-        var solvers = new List<Behaviour>();
-        if (options.PauseIk)
-            foreach (var behaviour in agent.GetComponentsInChildren<MonoBehaviour>(true))
-            {
-                var type = behaviour.GetIl2CppType();
-                var ns = type.Namespace ?? "";
-                if (ns.StartsWith("RootMotion.FinalIK", StringComparison.Ordinal) || type.Name == nameof(PlayerSyncIK)) solvers.Add(behaviour);
-            }
         var local = BodyConvert.IsLocal(agent);
-        var drawn = new List<Renderer>();
-        var arms = new List<Renderer>();
-        if (local)
-        {
-            var model = agent.PlayerSyncModel;
-            if (model != null)
-            {
-                var head = new HashSet<IntPtr>();
-                if (!options.FirstPersonHead && model.m_gfxHead != null)
-                    foreach (var part in model.m_gfxHead)
-                        if (part != null) foreach (var r in part.GetComponentsInChildren<Renderer>(true)) head.Add(r.Pointer);
-                foreach (var r in model.GetComponentsInChildren<Renderer>(true))
-                    if (!head.Contains(r.Pointer) && !Skipped(r.name, options.FirstPersonSkip)) drawn.Add(r);
-            }
-            var holder = agent.FPItemHolder;
-            if (holder != null) arms.AddRange(holder.GetComponentsInChildren<Renderer>(true));
-        }
-        return new BodyClip(agent, rig, local, game, solvers.ToArray(), drawn.ToArray(), arms.ToArray());
-    }
-
-    private static bool Skipped(string name, IReadOnlyList<string>? skip)
-    {
-        if (skip == null) return false;
-        for (var i = 0; i < skip.Count; i++) if (name.IndexOf(skip[i], StringComparison.OrdinalIgnoreCase) >= 0) return true;
-        return false;
+        return new BodyClip(agent, rig, local, game, options.PauseIk ? IkPause.Of(agent, null) : IkPause.None, new OwnBodyOptions { HeadAndArms = false, KeepHead = !options.FirstPersonHead, Skip = options.FirstPersonSkip });
     }
 
     /// <summary>Poses the body <paramref name="time"/> seconds into <paramref name="clip"/> (a legacy clip of the rig) with the rig's
@@ -190,19 +149,13 @@ public sealed class BodyClip
         FirstPerson(false);
         if (!_posing) return;
         _posing = false;
-        for (var i = 0; i < _solvers.Length; i++)
-            if (_solvers[i] != null && !_solvers[i].WasCollected && _solversWere[i]) _solvers[i].enabled = true;
+        _ik.Release();
     }
 
     private void Pause()
     {
         _posing = true;
-        for (var i = 0; i < _solvers.Length; i++)
-        {
-            var solver = _solvers[i];
-            _solversWere[i] = solver != null && !solver.WasCollected && solver.enabled;
-            if (_solversWere[i]) solver!.enabled = false;
-        }
+        _ik.Hold(Whole);
     }
 
     /// <summary>This peer's own player: the first-person view shows this body (seen by <paramref name="camera"/>; renderers on a layer
@@ -212,30 +165,8 @@ public sealed class BodyClip
     {
         if (!_local || on == _firstPerson) return;
         _firstPerson = on;
-        var mask = camera != null && !camera.WasCollected ? camera.cullingMask : ~0;
-        for (var i = 0; i < _drawn.Length; i++)
-        {
-            var r = _drawn[i];
-            if (r == null || r.WasCollected) continue;
-            if (on)
-            {
-                _drawnMode[i] = r.shadowCastingMode;
-                _drawnLayer[i] = r.gameObject.layer;
-                r.shadowCastingMode = ShadowCastingMode.On;
-                if ((mask & (1 << r.gameObject.layer)) == 0) r.gameObject.layer = 0;
-            }
-            else
-            {
-                r.shadowCastingMode = _drawnMode[i];
-                r.gameObject.layer = _drawnLayer[i];
-            }
-        }
-        for (var i = 0; i < _arms.Length; i++)
-        {
-            var r = _arms[i];
-            if (r == null || r.WasCollected) continue;
-            if (on) { _armsWere[i] = r.forceRenderingOff; r.forceRenderingOff = true; }
-            else r.forceRenderingOff = _armsWere[i];
-        }
+        if (!on) { _own?.Dispose(); _own = null; return; }
+        _view.Camera = camera;
+        _own = new OwnBodyView(_agent, _view);
     }
 }

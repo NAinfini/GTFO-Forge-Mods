@@ -48,6 +48,8 @@ public sealed class Beam
     private readonly MeshRenderer _flare;
     private Vector3 _from, _to;
     private float _born;
+    // This use's own number in reports to ForgeCore.Recording: a pooled beam used again is another beam.
+    private int _key;
     internal bool Live;
 
     internal Beam(GameObject o, LineRenderer core, LineRenderer glow, MeshRenderer flare)
@@ -90,11 +92,14 @@ public sealed class Beam
         _glow.SetPosition(0, from);
         _glow.SetPosition(1, to);
         if (!Visible) { Visible = true; _object.SetActive(true); }
+        // Reported every frame it is shown, with its style as the look and the opacity as the seconds field; the observer keeps only changes.
+        if (ForgeCore.Recording.Watched) ForgeCore.Recording.Effect(new ForgeCore.ShownEffect(ForgeCore.ShownKind.Beam, 0, _key, from, to, Width, Colour, seconds: Opacity, look: Style));
         Draw(Scene.Now);
     }
 
     public void Hide()
     {
+        if (Visible && ForgeCore.Recording.Watched) ForgeCore.Recording.Effect(new ForgeCore.ShownEffect(ForgeCore.ShownKind.Release, 0, _key, default, default, float.NaN, Colour));
         Visible = false;
         if (_object != null && !_object.WasCollected) _object.SetActive(false);
     }
@@ -109,6 +114,7 @@ public sealed class Beam
         Hot = Color.Lerp(colour, Color.white, 0.65f);
         Opacity = Width = FlareScale = CoreLevel = GlowLevel = FlareLevel = GlowWidthScale = CoreScale = 1f;
         _born = Scene.Now;
+        _key = Fx.NewKey();
         Visible = false;
         Live = true;
         _object.SetActive(false);

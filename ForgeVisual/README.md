@@ -4,9 +4,26 @@ A shared visuals library for GTFO mods: new models, glow, effects, particles, de
 
 ForgeVisual does nothing on its own. You normally install it because another mod needs it.
 
-![An enemy outlined, with arcs beside the crosshair](https://raw.githubusercontent.com/NAinfini/GTFO-Forge-Mods/main/ForgeVisual/docs/images/enemy-outline-crosshair-arcs.jpg)
+![An enemy outlined in red](https://raw.githubusercontent.com/NAinfini/GTFO-Forge-Mods/main/ForgeVisual/docs/images/enemy-outline.jpg)
 
 Report bugs on [GitHub](https://github.com/NAinfini/GTFO-Forge-Mods/issues), or find me on the GTFO Modding Discord as **nainfini**.
+
+## What mods can draw
+
+- Outlines round enemies and objects, also through walls (above).
+- Beams and trails, lit where they hit:
+
+  ![A beam gun firing at a wall](https://raw.githubusercontent.com/NAinfini/GTFO-Forge-Mods/main/ForgeVisual/docs/images/beam.jpg)
+
+- Markers on the ground, such as where a call-in lands:
+
+  ![A call-in's ground ring and light column](https://raw.githubusercontent.com/NAinfini/GTFO-Forge-Mods/main/ForgeVisual/docs/images/ground-marker.jpg)
+
+- New gun models on the game's guns, held by the game's own hands, with red-dot, holographic and 2x sights you aim through:
+
+  ![Aiming through a sight on a mod gun](https://raw.githubusercontent.com/NAinfini/GTFO-Forge-Mods/main/ForgeVisual/docs/images/sight.jpg)
+
+- Explosions and other effects with light that falls on the room, marks left on walls and floors, glow, and camera shake.
 
 ## Settings
 

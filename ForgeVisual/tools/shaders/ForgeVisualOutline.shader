@@ -4,15 +4,19 @@
 // depth: the front faces of the target mesh, depth tested against the scene (pulled a hair towards the camera so the target's own
 // depth never hides them), so the mask holds exactly the target's visible area and walls cut it.
 // Pass 2 (FillXRay) is the same fill without the depth test: the whole silhouette goes into the mask, so its line shows through walls.
+// Pass 3 (Silhouette) runs before each Fill: the whole silhouette, marked "inside" with no line strength. A pixel of the body that the
+// depth test loses (the game's flesh shader moves its surface, so its own depth beats the plain mesh here and there) stays inside, so a hole in
+// the visible area cannot draw a line round itself, and a line never runs along the edge of what covers the target: it follows the
+// outer edge of the body and stops where the body goes behind something.
 // What the game clips away from the body itself (a shot-off head or limb: up to four ellipsoids in the renderer's property block) is
 // dropped too, so the line follows the body that is really drawn. The game tests each pixel's rest-pose mesh position, which every enemy
 // mesh stores in its vertex colour (Cell/Enemy/EnemyFlesh_CD and Hidden/DepthOutput read COLOR.xyz, not the skinned or world position),
 // so the fill reads the same colour. Each pixel keeps the colour and, in alpha, 1 plus the line's strength (1 marks "inside").
-// Pass 1 (Composite) lays the line over the finished frame after the camera's post-processing: a pixel outside every target takes the
-// strongest target within the line's width (a ring of samples at the full and half width) and draws its colour; a pixel inside draws
-// nothing. The game's exposure and tonemapping brighten its dark scenes many times over; drawn into the scene, every colour came out
-// white. Laid over the finished frame, the colours are shown exactly as given. Colour and parameters are globals set by the command
-// buffers.
+// Pass 1 (Composite) lays the line over the frame after the camera's post-processing and before the game adds its HUD (UI_Apply): a pixel
+// outside every target takes the strongest target within the line's width (a ring of samples at the full and half width) and draws its
+// colour; a pixel inside draws nothing. The game's exposure and tonemapping brighten its dark scenes many times over; drawn into the
+// scene, every colour came out white. Laid over the post-processed frame, the colours are shown exactly as given, and the HUD stays on top.
+// Colour and parameters are globals.
 Shader "Hidden/ForgeVisual/Outline"
 {
     Properties
@@ -60,7 +64,7 @@ Shader "Hidden/ForgeVisual/Outline"
         return o;
     }
 
-    float4 frag_fill(v2f i) : SV_Target
+    void clip_cuts(v2f i)
     {
         [unroll]
         for (int k = 0; k < 4; k++)
@@ -71,7 +75,18 @@ Shader "Hidden/ForgeVisual/Outline"
                 clip(0.5 - (_EllipsoidInverts[k] != 0.0 ? d : 1.0 - d));
             }
         }
+    }
+
+    float4 frag_fill(v2f i) : SV_Target
+    {
+        clip_cuts(i);
         return float4(_ForgeOutlineColor.rgb, 1.0 + _ForgeOutlineColor.a * i.fade);
+    }
+
+    float4 frag_silhouette(v2f i) : SV_Target
+    {
+        clip_cuts(i);
+        return float4(0.0, 0.0, 0.0, 1.0);
     }
     ENDCG
     SubShader
@@ -141,6 +156,23 @@ Shader "Hidden/ForgeVisual/Outline"
             CGPROGRAM
             #pragma vertex vert_fill
             #pragma fragment frag_fill
+            #pragma target 3.0
+            #pragma enable_d3d11_debug_symbols
+            ENDCG
+        }
+        Pass
+        {
+            Name "Silhouette"
+            Cull Off
+            ZWrite Off
+            ZTest Always
+            // Never lowers what an earlier target wrote: where a target stands in front of another, the front one's line stays.
+            BlendOp Max
+            Blend One One
+
+            CGPROGRAM
+            #pragma vertex vert_fill
+            #pragma fragment frag_silhouette
             #pragma target 3.0
             #pragma enable_d3d11_debug_symbols
             ENDCG

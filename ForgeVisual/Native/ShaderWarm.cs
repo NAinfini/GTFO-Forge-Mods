@@ -9,7 +9,8 @@ namespace ForgeVisual;
 /// shows a sprite, a ground mark or a beam does not create the shader's GPU programs. Loading a shader does not create them;
 /// only a draw does, on the render thread, and the main thread then waits for it at the next present: on 10-28 the frame right after the
 /// first beacon marker was drawn waited 119 ms there. A temporary camera renders the library's unit quad with every material into a
-/// 16 x 16 texture and is destroyed; nothing is shown.
+/// 16 x 16 texture and is destroyed; nothing is shown. The marks and the draw are steps of ForgeCore <c>LandingWork</c>, one per frame
+/// after the elevator stops, so they do not share a frame with the other libraries' warm-ups.
 /// </summary>
 internal static class ShaderWarm
 {
@@ -23,7 +24,12 @@ internal static class ShaderWarm
         if (state != eGameStateName.StopElevatorRide && state != eGameStateName.InLevel) return;
         _done = true;
         // The shared surface marks are built here too, so the first hit does not make their quads in its own frame.
-        Decals.Prepare();
+        ForgeCore.LandingWork.Add(Plugin.Id, "decal-marks", Decals.Prepare);
+        ForgeCore.LandingWork.Add(Plugin.Id, "shaders", Draw);
+    }
+
+    private static void Draw()
+    {
         GameObject? holder = null;
         RenderTexture? target = null;
         Material? additive = null, alpha = null;
@@ -56,7 +62,7 @@ internal static class ShaderWarm
             camera.Render();
             camera.targetTexture = null;
         }
-        catch (Exception error) { Plugin.Logger.Error("ForgeVisual shaders could not be drawn ahead of use (their first real draw pays for it): " + error); }
+        catch (Exception error) { Plugin.Logger.Error("visual-shaders-could-not-be-drawn-ahead", "ForgeVisual shaders could not be drawn ahead of use (their first real draw pays for it): " + error); }
         finally
         {
             if (target != null) RenderTexture.ReleaseTemporary(target);

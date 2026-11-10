@@ -1,9 +1,9 @@
 {
   "kind": "forge-library-manifest",
-  "schemaVersion": 1,
+  "schemaVersion": "1.0.0",
   "library": "ForgeVisual",
   "packageName": "NAinfini-ForgeVisual",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "groups": [
     {
       "id": "gameEffects",
@@ -308,7 +308,7 @@
         },
         {
           "id": "Play(FxHandle, Vector3, Vector3, float, Color)",
-          "summary": "Plays fx with a size (m) and a tint. A Game: effect keeps the game's own size and colour; a pack's effect without a DefaultSize ignores the size. The tint goes to the prefab's renderers as _Color (ForgeVisual's particle shader multiplies by it).",
+          "summary": "Plays fx with a size (m) and a tint. A Game: effect keeps the game's own size and colour; a pack's effect without a DefaultSize ignores the size. The tint goes to the prefab's renderers as _Color (a library layer converted with @tint takes its hue from it at its own brightness, Tools/Vfx; other layers keep their colour).",
           "name": "Fx.Play",
           "parameters": [
             {
@@ -345,7 +345,7 @@
         },
         {
           "id": "Line(FxHandle, Vector3, Vector3)",
-          "summary": "Plays a line effect from from to to (the game's tracer reads its far end from FX_Manager.EffectTargetPosition, which is written first, the way a weapon does). A line effect registered with HoldSeconds is held like Hold: calling this again every frame moves and stretches the one live copy.",
+          "summary": "Plays a line effect once from from to to (the game's tracer reads its far end from FX_Manager.EffectTargetPosition, which is written first, the way a weapon does). A line effect registered with HoldSeconds is held and takes the key form (Line(FxHandle, int, Vector3, Vector3, bool, Color)).",
           "name": "Fx.Line",
           "parameters": [
             {
@@ -363,6 +363,117 @@
             {
               "name": "to",
               "type": "Vector3",
+              "summary": "",
+              "required": true
+            }
+          ]
+        },
+        {
+          "id": "Line(FxHandle, Vector3, Vector3, bool)",
+          "summary": "The same line; head false leaves a laser line's LaserHead out (the line ends in the air, it hit nothing).",
+          "name": "Fx.Line",
+          "parameters": [
+            {
+              "name": "fx",
+              "type": "FxHandle",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "from",
+              "type": "Vector3",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "to",
+              "type": "Vector3",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "head",
+              "type": "bool",
+              "summary": "",
+              "required": true
+            }
+          ]
+        },
+        {
+          "id": "Line(FxHandle, Vector3, Vector3, bool, Color)",
+          "summary": "The same line in a tint (a pack's effect only: it goes to the renderers as _Color, see Play(FxHandle, Vector3, Vector3, float, Color); a Game: line keeps its own colour).",
+          "name": "Fx.Line",
+          "parameters": [
+            {
+              "name": "fx",
+              "type": "FxHandle",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "from",
+              "type": "Vector3",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "to",
+              "type": "Vector3",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "head",
+              "type": "bool",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "colour",
+              "type": "Color",
+              "summary": "",
+              "required": true
+            }
+          ]
+        },
+        {
+          "id": "Line(FxHandle, int, Vector3, Vector3, bool, Color)",
+          "summary": "A line effect registered with HoldSeconds is held like Hold: calling this again every frame with the same key moves and stretches that one live copy, and another key has a copy of its own, however close the lines are (the key comes from NewKey, one per thing that carries the line; any other key is refused). A line that is not held ignores the key.",
+          "name": "Fx.Line",
+          "parameters": [
+            {
+              "name": "fx",
+              "type": "FxHandle",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "key",
+              "type": "int",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "from",
+              "type": "Vector3",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "to",
+              "type": "Vector3",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "head",
+              "type": "bool",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "colour",
+              "type": "Color",
               "summary": "",
               "required": true
             }
@@ -388,13 +499,19 @@
           ]
         },
         {
-          "id": "Hold(FxHandle, Vector3, Vector3, float, Color)",
-          "summary": "Holds a sustained effect at a point: a hold near a live copy within HoldReach moves it and keeps it emitting; a copy not held again within HoldSeconds stops emitting, lets its particles finish and is free again.",
+          "id": "Hold(FxHandle, int, Vector3, Vector3, float, Color)",
+          "summary": "Holds a sustained effect at a point: a hold with the key of a live copy moves it and keeps it emitting; a copy not held again within HoldSeconds stops emitting, lets its particles finish and is free again. The key comes from NewKey (any other is refused): each key has its own copy, so two things standing next to each other stay two, and a thing that is moving stays one.",
           "name": "Fx.Hold",
           "parameters": [
             {
               "name": "fx",
               "type": "FxHandle",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "key",
+              "type": "int",
               "summary": "",
               "required": true
             },
@@ -453,28 +570,106 @@
               "summary": "The size the prefab is authored at (m); a request's size scales it by size / this. NaN: the effect takes no size."
             },
             {
+              "name": "BaseScale",
+              "type": "float",
+              "summary": "An extra factor on whatever size the effect plays at (1: none), for a prefab authored larger or smaller than its use.",
+              "default": 1
+            },
+            {
               "name": "Line",
               "type": "bool",
-              "summary": "The prefab's one-metre +Z length is stretched from the point to the end (Line).",
+              "summary": "The prefab's +Z length is stretched from the point to the end (Line(FxHandle, Vector3, Vector3)): one metre long, or DefaultSize metres when that is set (a line effect then takes no size from the caller).",
               "default": false
             },
             {
               "name": "HoldSeconds",
               "type": "float",
-              "summary": "Above 0: a sustained effect (the prefab loops at its root). A hold keeps emitting this long after the last call.",
+              "summary": "Above 0: a sustained effect (the prefab loops at its root). A hold keeps emitting this long after the last call. Each caller's key has its own copy.",
               "default": 0
-            },
-            {
-              "name": "HoldReach",
-              "type": "float",
-              "summary": "A hold within this many metres of a live copy moves that copy instead of starting another.",
-              "default": 1.5
             },
             {
               "name": "Copies",
               "type": "int",
               "summary": "Copies kept; a play past that restarts the oldest.",
               "default": 16
+            },
+            {
+              "name": "Seconds",
+              "type": "float",
+              "summary": "Seconds a one-shot keeps emitting before it stops and lets its particles finish, however its prefab loops. 0: one round of its longest layer, start delay included, at most 8 s (the game's build has stripped MainModule.loop, so a play cannot ask whether the prefab loops: a looping prefab that should play shorter sets this).",
+              "default": 0
+            },
+            {
+              "name": "AxisUp",
+              "type": "bool",
+              "summary": "The prefab's axis is +Y (a ground effect, a column) rather than +Z (a muzzle, a jet): a request's direction turns +Y onto it.",
+              "default": false
+            },
+            {
+              "name": "Centre",
+              "type": "Vector3",
+              "summary": "Where a prefab draws its middle, from its root (m, at scale 1, unrotated), when that is not the root (an explosion authored standing on its root): a request's point is where that middle stands, at any size and direction, so what is drawn and what the caller means by the point are one place. Zero: the root."
+            },
+            {
+              "name": "Spacing",
+              "type": "float",
+              "summary": "Above 0: Field covers an area with held copies this many metres apart instead of one copy scaled to it.",
+              "default": 0
+            },
+            {
+              "name": "LaserHead",
+              "type": "string?",
+              "summary": "A laser line (Line) keeps its uniform BaseScale instead of being stretched as a whole: this child of the prefab (a path below the root) goes to the line's end."
+            },
+            {
+              "name": "LaserBodies",
+              "type": "string[]?",
+              "summary": "The children of a laser line that reach from the point to the end, DefaultSize metres long as authored. A stretched billboard takes the length through its renderer's length scale, which changes its live particles at once (start sizes only reach particles not yet emitted); any other layer, a flat line along its own +X, through its transform's X."
+            },
+            {
+              "name": "LaserTile",
+              "type": "float",
+              "summary": "Above 0: a laser line's bodies repeat their texture every this many metres, so a jagged stroke stays jagged at any length instead of stretching out.",
+              "default": 0
+            },
+            {
+              "name": "EndFade",
+              "type": "float",
+              "summary": "Above 0: a line that ends in the air (Line(FxHandle, int, Vector3, Vector3, bool, Color) with head false: it hit nothing) fades out over this many metres before its end instead of stopping square; a line that hit something keeps its end. The Forge particle shaders read it (_LineEnd, _LineFade), others ignore it.",
+              "default": 0
+            },
+            {
+              "name": "Linger",
+              "type": "float",
+              "summary": "Seconds a copy may stay after it stopped emitting. A sustained effect with long-lived particles (a standing vortex, a ring) sets it short, so it ends with its hold instead of standing on where nothing is left.",
+              "default": 8
+            },
+            {
+              "name": "Light",
+              "type": "PointLightSpec?",
+              "summary": "A point light that goes with every play (FxLights): a one-shot flashes it (peak at once, fading over its life, LightDelay late), a held effect holds it while held. Its colour is multiplied by the caller's hue (FxLights); its range grows with the size the effect plays at. Null: no light."
+            },
+            {
+              "name": "LightDelay",
+              "type": "float",
+              "summary": "Seconds after the play the light flashes.",
+              "default": 0
+            },
+            {
+              "name": "Body",
+              "type": "Bounds?",
+              "summary": "The box the drawn particles fill (m from the prefab's root, at scale 1, unrotated), as the converter measured it; null: not known. Seat stands a copy by it so it clears floor and ceiling."
+            },
+            {
+              "name": "AlwaysDraw",
+              "type": "bool?",
+              "summary": "True: never culled (drawn at any distance and from any direction); false: always culled; null (the default): culled unless it plays large (its reach is LargeReach metres or more: a blast, an air strike, which people see from far away). Lines are never culled."
+            },
+            {
+              "name": "CullDistance",
+              "type": "float",
+              "summary": "Metres beyond which a copy is paused and hidden; 0 (the default): the player's Culling / Distance setting. Measured to the surface of its reach.",
+              "default": 0
             }
           ]
         }

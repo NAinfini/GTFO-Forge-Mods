@@ -95,7 +95,7 @@ public static class CameraShake
     private static FPSCamera? Camera(out Vector3 eye)
     {
         eye = default;
-        var agent = PlayerManager.GetLocalPlayerAgent();
+        var agent = ForgeCore.Players.Local;
         if (agent == null || agent.WasCollected) return null;
         var camera = agent.FPSCamera;
         if (camera == null || camera.WasCollected) return null;
