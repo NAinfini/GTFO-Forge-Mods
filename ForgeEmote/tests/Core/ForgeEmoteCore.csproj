@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>ForgeEmote.Tests</RootNamespace>
+    <AssemblyName>ForgeEmote.Core.Tests</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The Core sources are compiled straight into the test: it references no game or Unity assembly. -->
+    <Compile Include="../../Core/*.cs" Link="Core/%(Filename)%(Extension)" />
+    <Compile Include="../../../ForgeCore/Core/PlayerMotion.cs" Link="Core/PlayerMotion.cs" />
+    <ProjectReference Include="../../../ForgeCore/Once/ForgeCore.Once.csproj" />
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+</Project>

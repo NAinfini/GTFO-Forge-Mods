@@ -1,0 +1,49 @@
+Action clips in ForgeEmote: where each came from. Sources checked 2026-11-04.
+
+middle-finger
+  Author: supplied by the mod's owner, who confirmed CC0 (Middle_Finger_One_Hand_character.fbx)
+  Licence: CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/
+  Changes: resampled to the game's skeleton; the walking distance reduced; thumb tucked.
+
+wave ("Waving"), cheer ("Cheering")
+  Author: Kay Lousberg, www.kaylousberg.com
+  Source: KayKit Character Animations 1.1, https://kaylousberg.itch.io/kaykit-character-animations
+  Licence: CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/
+  Changes: resampled to the game's skeleton; fingers posed.
+
+dance ("Dance_Loop")
+  Author: Quaternius
+  Source: Universal Animation Library, https://quaternius.itch.io/universal-animation-library
+  Licence: CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/
+  Changes: resampled to the game's skeleton.
+
+come-here (13_27), stop (14_24), go-there (14_26)
+  Source: CMU Graphics Lab Motion Capture Database, http://mocap.cs.cmu.edu/
+  The data used in this project was obtained from mocap.cs.cmu.edu.
+  The collection of the data in this database was supported by NSF Grant #0196217.
+  Terms: "You may include this data in commercially-sold products" (the site's home page);
+  it may not be resold directly, even in converted form. It ships here only as part of this mod.
+  Changes: cut to the gesture, resampled to the game's skeleton, go-there mirrored to the left
+  arm; fingers posed.
+
+dancing-twerk, hip-hop-dancing, zombie-stumbling, backflip, praying, laying-shrugging, laying-seizure
+  Source: Mixamo (Adobe), https://www.mixamo.com/, FBX files supplied by the mod's owner on 2026-11-07 (kept at F:\Unity\动作\Mixamo-1107\).
+  Terms: Adobe's Mixamo FAQ allows the animations in personal, commercial and non-profit projects but not redistributing the animation files on their own.
+  The owner ruled on 2026-11-08 that the converted clips ship inside the free mod; the original FBX files are not distributed. Registered as owner-ruling in catalog/resources/asset-licences.json.
+  Changes: resampled to the game's skeleton; the walking distance of the in-place ones set to 0.
+
+thumbs-up, quiet, wait, follow-me, cover-me, countdown, and every first-person clip (*-fp)
+  Author: keyed by hand for this mod in Assets/Clips/sources.json.
+  Licence: CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/
+
+handshake ("Shaking Hands")
+  Source: Mixamo (Adobe), https://www.mixamo.com/, FBX file supplied by the mod's owner (kept at F:\Unity\动作\Mixamo-1107\).
+  Terms: Adobe's Mixamo FAQ allows the animations in personal, commercial and non-profit projects but not redistributing the animation files on their own.
+  The owner ruled on 2026-11-08 that the converted clip ships inside the free mod; the original FBX is not distributed.
+  Changes: resampled to the game's skeleton; the walking distance set to 0; faced forward at the start.
+
+fist-bump ("fist_bump_v2_60fps.fbx")
+  Source: FBX file supplied by the mod's owner (kept at F:\Unity\动作\FistBump-1109\); the owner gave no source or licence beyond that, and none is claimed here.
+  Clue only, not a confirmed origin: the file was exported from Blender and records the project file Animmade_packed.blend, and its name follows the AnimMade store's file names.
+  The owner directed on 2026-11-09 that the converted clip ships inside the free mod; the original FBX is not distributed. Registered as owner-ruling in catalog/resources/asset-licences.json.
+  Changes: resampled to the game's skeleton; the walking distance set to 0; faced forward at the start.

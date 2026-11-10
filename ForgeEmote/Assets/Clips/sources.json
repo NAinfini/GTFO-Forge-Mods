@@ -1,0 +1,536 @@
+{
+  "character": "bishop",
+  "fps": 30,
+  "preview": {"glb": "Web/public/assets/models/bishop/original.glb", "base": "Rifle_Idle"},
+  "handShapes": {
+    "fist": {"Index": [85, 100, 60], "Middle": [88, 100, 60], "Ring": [90, 100, 60], "Pinky": [92, 100, 60], "thumb": [[0.42, -0.2, 0.92], [0.3, -0.85, 0.55]]},
+    "middle-finger": {"Index": [82, 105, 60], "Middle": [0, 0, 0], "Ring": [80, 105, 60], "Pinky": [78, 105, 60], "thumb": [[0.2, 0.4, 0.89], [0.6, -0.6, 0.52]]},
+    "thumbs-up": {"Index": [85, 100, 60], "Middle": [88, 100, 60], "Ring": [90, 100, 60], "Pinky": [92, 100, 60], "thumb": [[0.15, 0.95, 0.25], [0.1, 1, 0.1]]},
+    "point": {"Index": [2, 3, 2], "Middle": [85, 100, 60], "Ring": [90, 100, 60], "Pinky": [92, 100, 60], "thumb": [[0.6, 0.05, 0.8], [0.55, -0.6, 0.55]]},
+    "flat": {"Index": [2, 3, 2], "Middle": [2, 3, 2], "Ring": [2, 3, 2], "Pinky": [2, 3, 2], "spread": 2, "thumb": [[0.8, 0.5, 0.3], [0.92, 0.32, 0.2]]},
+    "open": {"Index": [6, 8, 5], "Middle": [8, 10, 6], "Ring": [10, 10, 6], "Pinky": [12, 12, 8], "spread": 7, "thumb": [[0.55, 0.8, 0.2], [0.7, 0.7, 0.1]]},
+    "open-trailing": {"Index": [16, 16, 10], "Middle": [18, 18, 10], "Ring": [20, 18, 10], "Pinky": [24, 20, 12], "spread": 5, "thumb": [[0.55, 0.8, 0.2], [0.7, 0.7, 0.1]]},
+    "beckon": {"Index": [65, 85, 55], "Middle": [58, 75, 50], "Ring": [50, 65, 45], "Pinky": [42, 55, 40], "spread": 1, "thumb": [[0.75, 0.5, 0.45], [0.9, 0.3, 0.3]]},
+    "relaxed": {"Index": [14, 22, 12], "Middle": [18, 24, 14], "Ring": [22, 26, 14], "Pinky": [26, 28, 16], "spread": 4, "thumb": [[0.7, 0.55, 0.3], [0.85, 0.35, 0.25]]},
+    "one": {"Index": [2, 3, 2], "Middle": [85, 100, 60], "Ring": [90, 100, 60], "Pinky": [92, 100, 60], "thumb": [[0.6, 0.05, 0.8], [0.55, -0.6, 0.55]]},
+    "two": {"Index": [2, 3, 2], "Middle": [2, 3, 2], "Ring": [88, 100, 60], "Pinky": [92, 100, 60], "spread": 9, "thumb": [[0.42, -0.2, 0.92], [0.28, -0.88, 0.5]]},
+    "three": {"Index": [2, 3, 2], "Middle": [2, 3, 2], "Ring": [4, 4, 3], "Pinky": [92, 100, 60], "spread": 7, "thumb": [[0.42, -0.2, 0.92], [0.22, -0.92, 0.45]]}
+  },
+  "clips": [
+    {
+      "id": "middle-finger", "loop": false, "body": "full", "hipTravel": 0.8,
+      "handShape": {"right": "middle-finger"},
+      "skeleton": "rigify", "file": "F:/Unity/动作/竖中指/Middle_Finger_One_Hand_character.fbx", "action": "Middle Finger", "faceAt": 0,
+      "source": "Middle_Finger_One_Hand_character.fbx", "author": "owner supplied", "licence": "CC0"
+    },
+    {
+      "id": "wave", "loop": false, "body": "upper",
+      "handShape": {"right": "open"},
+      "skeleton": "kaykit", "file": "F:/Unity/动作/KayKit/extracted/KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_Simulation.glb", "action": "Waving",
+      "still": ["leftShoulder", "leftUpperArm", "leftLowerArm", "leftHand"],
+      "source": "KayKit Character Animations 1.1, Rig_Medium_Simulation", "author": "Kay Lousberg", "licence": "CC0"
+    },
+    {
+      "id": "come-here", "loop": false, "body": "left-arm",
+      "handShape": {"left": "open"},
+      "skeleton": "cmu-amc", "asf": "F:/Unity/动作/CMU/13/13.asf", "file": "F:/Unity/动作/CMU/13/13_27.amc", "range": [9.0, 11.0], "faceAt": 0,
+      "source": "CMU Graphics Lab Motion Capture Database, 13_27", "author": "CMU", "licence": "CMU: may be included in commercial products, not resold on its own"
+    },
+    {
+      "id": "stop", "loop": false, "body": "left-arm",
+      "handShape": {"left": "flat"},
+      "skeleton": "cmu-amc", "asf": "F:/Unity/动作/CMU/14/14.asf", "file": "F:/Unity/动作/CMU/14/14_24.amc", "range": [7.33, 9.0], "faceAt": 0,
+      "source": "CMU Graphics Lab Motion Capture Database, 14_24", "author": "CMU", "licence": "CMU: may be included in commercial products, not resold on its own"
+    },
+    {
+      "id": "go-there", "loop": false, "body": "left-arm",
+      "handShape": {"left": "point"},
+      "skeleton": "cmu-amc", "asf": "F:/Unity/动作/CMU/14/14.asf", "file": "F:/Unity/动作/CMU/14/14_26.amc", "range": [13.67, 15.5], "faceAt": 0, "mirror": true,
+      "source": "CMU Graphics Lab Motion Capture Database, 14_26", "author": "CMU", "licence": "CMU: may be included in commercial products, not resold on its own"
+    },
+    {
+      "id": "cheer", "loop": false, "body": "upper",
+      "handShape": {"left": "open", "right": "open"},
+      "skeleton": "kaykit", "file": "F:/Unity/动作/KayKit/extracted/KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_Simulation.glb", "action": "Cheering",
+      "source": "KayKit Character Animations 1.1, Rig_Medium_Simulation", "author": "Kay Lousberg", "licence": "CC0"
+    },
+    {
+      "id": "dance", "loop": true, "body": "full",
+      "skeleton": "quaternius", "file": "F:/Unity/动作/Quaternius-UAL1/extracted/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb", "action": "Dance_Loop",
+      "source": "Quaternius Universal Animation Library, Dance_Loop", "author": "Quaternius", "licence": "CC0"
+    },
+    {
+      "id": "dancing-twerk", "loop": true, "body": "full",
+      "skeleton": "mixamo", "file": "F:/Unity/动作/Mixamo-1107/Dancing Twerk.fbx", "faceAt": 0,
+      "source": "Dancing Twerk.fbx (Mixamo), supplied by the owner", "author": "Mixamo / Adobe", "licence": "mixamo-converted-owner-ruling"
+    },
+    {
+      "id": "hip-hop-dancing", "loop": true, "body": "full",
+      "skeleton": "mixamo", "file": "F:/Unity/动作/Mixamo-1107/Hip Hop Dancing.fbx", "faceAt": 0,
+      "source": "Hip Hop Dancing.fbx (Mixamo), supplied by the owner", "author": "Mixamo / Adobe", "licence": "mixamo-converted-owner-ruling"
+    },
+    {
+      "id": "zombie-stumbling", "loop": false, "body": "full", "hipTravel": 0,
+      "skeleton": "mixamo", "file": "F:/Unity/动作/Mixamo-1107/Zombie Stumbling.fbx", "faceAt": 0,
+      "source": "Zombie Stumbling.fbx (Mixamo), supplied by the owner", "author": "Mixamo / Adobe", "licence": "mixamo-converted-owner-ruling"
+    },
+    {
+      "id": "backflip", "loop": false, "body": "full", "hipTravel": 0,
+      "skeleton": "mixamo", "file": "F:/Unity/动作/Mixamo-1107/Backflip.fbx", "faceAt": 0,
+      "source": "Backflip.fbx (Mixamo), supplied by the owner", "author": "Mixamo / Adobe", "licence": "mixamo-converted-owner-ruling"
+    },
+    {
+      "id": "praying", "loop": false, "body": "full", "hipTravel": 0,
+      "skeleton": "mixamo", "file": "F:/Unity/动作/Mixamo-1107/Praying.fbx", "faceAt": 0,
+      "source": "Praying.fbx (Mixamo), supplied by the owner", "author": "Mixamo / Adobe", "licence": "mixamo-converted-owner-ruling"
+    },
+    {
+      "id": "laying-shrugging", "loop": false, "body": "full", "hipTravel": 0,
+      "skeleton": "mixamo", "file": "F:/Unity/动作/Mixamo-1107/Laying Shrugging.fbx", "faceAt": 0,
+      "source": "Laying Shrugging.fbx (Mixamo), supplied by the owner", "author": "Mixamo / Adobe", "licence": "mixamo-converted-owner-ruling"
+    },
+    {
+      "id": "laying-seizure", "loop": false, "body": "full", "hipTravel": 0,
+      "skeleton": "mixamo", "file": "F:/Unity/动作/Mixamo-1107/Laying Seizure.fbx", "faceAt": 0,
+      "source": "Laying Seizure.fbx (Mixamo), supplied by the owner", "author": "Mixamo / Adobe", "licence": "mixamo-converted-owner-ruling"
+    },
+    {
+      "id": "handshake", "loop": false, "body": "full", "hipTravel": 0,
+      "skeleton": "mixamo", "file": "F:/Unity/动作/Mixamo-1107/Shaking Hands.fbx", "faceAt": 0,
+      "source": "Shaking Hands.fbx (Mixamo), supplied by the owner", "author": "Mixamo / Adobe", "licence": "mixamo-converted-owner-ruling"
+    },
+    {
+      "id": "fist-bump", "loop": false, "body": "full", "hipTravel": 0,
+      "skeleton": "animmade", "file": "F:/Unity/动作/FistBump-1109/fist_bump_v2_60fps.fbx", "faceAt": 0,
+      "source": "fist_bump_v2_60fps.fbx, supplied by the owner", "author": "owner supplied", "licence": "owner-supplied-converted-owner-ruling"
+    },
+    {
+      "id": "thumbs-up", "loop": false, "body": "upper", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file",
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "rest"},
+          {"t": 0.24, "pose": "gather"},
+          {"t": 0.48, "pose": "up", "ease": "out"},
+          {"t": 0.62, "pose": "settled"},
+          {"t": 1.6, "pose": "settled"},
+          {"t": 2.0, "pose": "rest", "ease": "in"}
+        ],
+        "poses": {
+          "gather": {
+            "aim": {"rightUpperArm": [-0.25, -0.85, 0.42], "rightLowerArm": [-0.05, 0.05, 1.0]},
+            "hands": {"rightHand": {"aim": [0.1, -0.2, 1.0], "knuckles": [0, 1, 0], "shape": "fist"}}
+          },
+          "up": {
+            "aim": {"rightUpperArm": [-0.3, -0.62, 0.72], "rightLowerArm": [-0.12, 0.34, 0.93]},
+            "hands": {"rightHand": {"aim": [-0.05, 0.1, 1.0], "knuckles": [0, 1, 0], "shape": "thumbs-up"}}
+          },
+          "settled": {
+            "from": "up",
+            "aim": {"rightUpperArm": [-0.3, -0.72, 0.62], "rightLowerArm": [-0.12, 0.28, 0.95]}
+          }
+        }
+      }
+    },
+    {
+      "id": "middle-finger-fp", "loop": false, "body": "arms", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file", "firstPerson": true,
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "down"},
+          {"t": 0.28, "pose": "fist-up"},
+          {"t": 0.4, "pose": "cock"},
+          {"t": 0.54, "pose": "pop", "ease": "out"},
+          {"t": 0.7, "pose": "up"},
+          {"t": 1.36, "pose": "drift"},
+          {"t": 1.48, "pose": "pump", "ease": "out"},
+          {"t": 1.64, "pose": "up"},
+          {"t": 2.18, "pose": "drift"},
+          {"t": 2.28, "pose": "lift"},
+          {"t": 2.52, "pose": "fall", "ease": "in"},
+          {"t": 2.62, "pose": "down"}
+        ],
+        "poses": {
+          "fist-up": {"reach": {"right": {"wrist": [-0.097, -0.122, 0.367], "elbow": [0.098, -0.19, 0.252]}}, "hands": {"rightHand": {"aim": [0.05, 0.82, 0.57], "knuckles": [-0.963, 0.192, -0.192], "shape": "fist"}}},
+          "cock": {"reach": {"right": {"wrist": [-0.106, -0.157, 0.411], "elbow": [0.09, -0.19, 0.255]}}, "hands": {"rightHand": {"aim": [0.05, 0.701, 0.711], "knuckles": [-0.96, 0.23, -0.16], "shape": "fist"}}},
+          "pop": {"reach": {"right": {"wrist": [-0.102, -0.059, 0.366], "elbow": [0.079, -0.146, 0.285]}}, "hands": {"rightHand": {"aim": [0.1, 0.887, 0.452], "knuckles": [-0.947, 0.223, -0.229], "shape": "middle-finger"}}},
+          "up": {"reach": {"right": {"wrist": [-0.096, -0.064, 0.345], "elbow": [0.085, -0.158, 0.277]}}, "hands": {"rightHand": {"aim": [0.1, 0.909, 0.405], "knuckles": [-0.952, 0.206, -0.228], "shape": "middle-finger"}}},
+          "drift": {"reach": {"right": {"wrist": [-0.098, -0.066, 0.345], "elbow": [0.082, -0.159, 0.277]}}, "hands": {"rightHand": {"aim": [0.104, 0.909, 0.405], "knuckles": [-0.95, 0.211, -0.229], "shape": "middle-finger"}}},
+          "pump": {"reach": {"right": {"wrist": [-0.102, -0.061, 0.365], "elbow": [0.079, -0.148, 0.284]}}, "hands": {"rightHand": {"aim": [0.1, 0.887, 0.452], "knuckles": [-0.948, 0.223, -0.228], "shape": "middle-finger"}}},
+          "lift": {"reach": {"right": {"wrist": [-0.097, -0.06, 0.347], "elbow": [0.084, -0.154, 0.28]}}, "hands": {"rightHand": {"aim": [0.1, 0.909, 0.405], "knuckles": [-0.951, 0.207, -0.23], "shape": "middle-finger"}}},
+          "down": {"hands": {"rightHand": {"aim": [-0.1, -0.2, 1], "knuckles": [-0.9, 0.2, -0.1], "shape": "fist"}}},
+          "fall": {"from": "up", "reach": {"right": {"wrist": [-0.096, -0.45, 0.32], "elbow": [0.085, -0.158, 0.277]}}}
+        }
+      }
+    },
+    {
+      "id": "thumbs-up-fp", "loop": false, "body": "arms", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file", "firstPerson": true,
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "rest"},
+          {"t": 0.24, "pose": "gather"},
+          {"t": 0.46, "pose": "pop", "ease": "out"},
+          {"t": 0.62, "pose": "up"},
+          {"t": 1.56, "pose": "drift"},
+          {"t": 1.66, "pose": "lift"},
+          {"t": 1.88, "pose": "fall", "ease": "in"},
+          {"t": 2.0, "pose": "rest"}
+        ],
+        "poses": {
+          "gather": {"reach": {"right": {"wrist": [-0.114, -0.151, 0.456], "elbow": [0.009, -0.155, 0.291]}}, "hands": {"rightHand": {"aim": [0.3, 0.601, 0.741], "knuckles": [0.0, 1.0, 0.0], "shape": "fist"}}},
+          "pop": {"reach": {"right": {"wrist": [-0.122, -0.076, 0.459], "elbow": [-0.01, -0.097, 0.315]}}, "hands": {"rightHand": {"aim": [0.34, 0.66, 0.67], "knuckles": [0.0, 1.0, 0.0], "shape": "thumbs-up"}}},
+          "up": {"reach": {"right": {"wrist": [-0.121, -0.087, 0.456], "elbow": [-0.009, -0.108, 0.312]}}, "hands": {"rightHand": {"aim": [0.34, 0.66, 0.67], "knuckles": [0.0, 1.0, 0.0], "shape": "thumbs-up"}}},
+          "drift": {"reach": {"right": {"wrist": [-0.122, -0.089, 0.455], "elbow": [-0.011, -0.11, 0.311]}}, "hands": {"rightHand": {"aim": [0.34, 0.66, 0.67], "knuckles": [0.0, 1.0, 0.0], "shape": "thumbs-up"}}},
+          "lift": {"reach": {"right": {"wrist": [-0.118, -0.077, 0.444], "elbow": [-0.006, -0.11, 0.311]}}, "hands": {"rightHand": {"aim": [0.34, 0.699, 0.629], "knuckles": [0.0, 1.0, 0.0], "shape": "thumbs-up"}}},
+          "fall": {"from": "up", "reach": {"right": {"wrist": [-0.121, -0.45, 0.32], "elbow": [-0.009, -0.108, 0.312]}}}
+        }
+      }
+    },
+    {
+      "id": "wave-fp", "loop": false, "body": "arms", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file", "firstPerson": true,
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "rest"},
+          {"t": 0.12, "pose": "enter"},
+          {"t": 0.34, "pose": "l", "ease": "out"},
+          {"t": 0.62, "pose": "r"},
+          {"t": 0.9, "pose": "l"},
+          {"t": 1.18, "pose": "r"},
+          {"t": 1.46, "pose": "l"},
+          {"t": 1.7, "pose": "lift"},
+          {"t": 1.98, "pose": "fall", "ease": "in"},
+          {"t": 2.12, "pose": "rest"}
+        ],
+        "poses": {
+          "l": {"reach": {"right": {"wrist": [-0.094, -0.096, 0.401], "elbow": [0.029, -0.152, 0.291]}}, "hands": {"rightHand": {"aim": [0.3, 0.78, 0.55], "knuckles": [0.899, -0.423, 0.11], "shape": "open"}}},
+          "r": {"reach": {"right": {"wrist": [-0.143, -0.09, 0.375], "elbow": [0.13, -0.152, 0.262]}}, "hands": {"rightHand": {"aim": [-0.22, 0.799, 0.559], "knuckles": [0.933, 0.006, 0.359], "shape": "open-trailing"}}},
+          "lift": {"reach": {"right": {"wrist": [-0.12, -0.099, 0.387], "elbow": [0.084, -0.167, 0.272]}}, "hands": {"rightHand": {"aim": [0.02, 0.821, 0.571], "knuckles": [0.95, -0.193, 0.244], "shape": "open-trailing"}}},
+          "fall": {"from": "lift", "reach": {"right": {"wrist": [-0.12, -0.45, 0.32], "elbow": [0.084, -0.167, 0.272]}}},
+          "enter": {"from": "l", "reach": {"right": {"wrist": [-0.094, -0.45, 0.32], "elbow": [0.029, -0.152, 0.291]}}}
+        }
+      }
+    },
+    {
+      "id": "come-here-fp", "loop": false, "body": "left-arm", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file", "firstPerson": true,
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "rest"},
+          {"t": 0.12, "pose": "enter"},
+          {"t": 0.3, "pose": "open", "ease": "out"},
+          {"t": 0.5, "pose": "in"},
+          {"t": 0.76, "pose": "open", "ease": "out"},
+          {"t": 0.96, "pose": "in"},
+          {"t": 1.22, "pose": "open", "ease": "out"},
+          {"t": 1.42, "pose": "in"},
+          {"t": 1.6, "pose": "open"},
+          {"t": 1.86, "pose": "fall", "ease": "in"},
+          {"t": 2.0, "pose": "rest"}
+        ],
+        "poses": {
+          "open": {"reach": {"left": {"wrist": [0.149, -0.109, 0.481], "elbow": [-0.018, -0.119, 0.307]}}, "hands": {"leftHand": {"aim": [-0.15, 0.62, 0.77], "knuckles": [0.995, 0.0, 0.1], "shape": "open"}}},
+          "in": {"reach": {"left": {"wrist": [0.131, -0.087, 0.422], "elbow": [-0.05, -0.143, 0.293]}}, "hands": {"leftHand": {"aim": [-0.1, 0.779, 0.619], "knuckles": [0.995, 0.0, 0.1], "shape": "beckon"}}},
+          "fall": {"from": "open", "reach": {"left": {"wrist": [0.149, -0.45, 0.32], "elbow": [-0.018, -0.119, 0.307]}}},
+          "enter": {"from": "open", "reach": {"left": {"wrist": [0.149, -0.45, 0.32], "elbow": [-0.018, -0.119, 0.307]}}}
+        }
+      }
+    },
+    {
+      "id": "stop-fp", "loop": false, "body": "left-arm", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file", "firstPerson": true,
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "rest"},
+          {"t": 0.2, "pose": "gather"},
+          {"t": 0.36, "pose": "push", "ease": "out"},
+          {"t": 0.5, "pose": "up"},
+          {"t": 1.26, "pose": "drift"},
+          {"t": 1.54, "pose": "fall", "ease": "in"},
+          {"t": 1.66, "pose": "rest"}
+        ],
+        "poses": {
+          "gather": {"reach": {"left": {"wrist": [0.098, -0.146, 0.415], "elbow": [-0.098, -0.18, 0.259]}}, "hands": {"leftHand": {"aim": [-0.05, 0.701, 0.711], "knuckles": [-0.964, -0.22, 0.149], "shape": "flat"}}},
+          "push": {"reach": {"left": {"wrist": [0.111, -0.076, 0.42], "elbow": [-0.084, -0.133, 0.29]}}, "hands": {"leftHand": {"aim": [-0.06, 0.952, 0.301], "knuckles": [-0.964, -0.134, 0.231], "shape": "flat"}}},
+          "up": {"reach": {"left": {"wrist": [0.108, -0.084, 0.406], "elbow": [-0.088, -0.146, 0.283]}}, "hands": {"leftHand": {"aim": [-0.06, 0.961, 0.27], "knuckles": [-0.965, -0.125, 0.23], "shape": "flat"}}},
+          "drift": {"reach": {"left": {"wrist": [0.109, -0.086, 0.406], "elbow": [-0.085, -0.147, 0.283]}}, "hands": {"leftHand": {"aim": [-0.06, 0.961, 0.27], "knuckles": [-0.964, -0.126, 0.233], "shape": "flat"}}},
+          "fall": {"from": "up", "reach": {"left": {"wrist": [0.108, -0.45, 0.32], "elbow": [-0.088, -0.146, 0.283]}}}
+        }
+      }
+    },
+    {
+      "id": "go-there-fp", "loop": false, "body": "left-arm", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file", "firstPerson": true,
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "rest"},
+          {"t": 0.22, "pose": "gather"},
+          {"t": 0.4, "pose": "thrust", "ease": "out"},
+          {"t": 0.54, "pose": "point"},
+          {"t": 1.42, "pose": "drift"},
+          {"t": 1.7, "pose": "fall", "ease": "in"},
+          {"t": 1.82, "pose": "rest"}
+        ],
+        "poses": {
+          "gather": {"reach": {"left": {"wrist": [0.108, -0.132, 0.457], "elbow": [-0.015, -0.143, 0.297]}}, "hands": {"leftHand": {"aim": [-0.301, 0.622, 0.723], "knuckles": [-0.82, 0.512, -0.256], "shape": "fist"}}},
+          "thrust": {"reach": {"left": {"wrist": [0.137, -0.069, 0.491], "elbow": [0.032, -0.059, 0.323]}}, "hands": {"leftHand": {"aim": [-0.421, 0.34, 0.841], "knuckles": [-0.82, 0.512, -0.256], "shape": "point"}}},
+          "point": {"reach": {"left": {"wrist": [0.135, -0.076, 0.482], "elbow": [0.029, -0.074, 0.32]}}, "hands": {"leftHand": {"aim": [-0.421, 0.361, 0.832], "knuckles": [-0.82, 0.512, -0.256], "shape": "point"}}},
+          "drift": {"reach": {"left": {"wrist": [0.136, -0.078, 0.481], "elbow": [0.031, -0.076, 0.32]}}, "hands": {"leftHand": {"aim": [-0.421, 0.361, 0.832], "knuckles": [-0.82, 0.512, -0.256], "shape": "point"}}},
+          "fall": {"from": "point", "reach": {"left": {"wrist": [0.135, -0.45, 0.32], "elbow": [0.029, -0.074, 0.32]}}}
+        }
+      }
+    },
+    {
+      "id": "cheer-fp", "loop": false, "body": "arms", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file", "firstPerson": true,
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "rest"},
+          {"t": 0.1, "pose": "enter"},
+          {"t": 0.26, "pose": "high", "ease": "out"},
+          {"t": 0.46, "pose": "low"},
+          {"t": 0.62, "pose": "high", "ease": "out"},
+          {"t": 0.82, "pose": "low"},
+          {"t": 0.98, "pose": "high", "ease": "out"},
+          {"t": 1.24, "pose": "held"},
+          {"t": 1.52, "pose": "fall", "ease": "in"},
+          {"t": 1.66, "pose": "rest"}
+        ],
+        "poses": {
+          "high": {"reach": {"left": {"wrist": [0.139, -0.067, 0.402], "elbow": [-0.042, -0.139, 0.296]}, "right": {"wrist": [-0.139, -0.067, 0.402], "elbow": [0.042, -0.139, 0.296]}}, "hands": {"leftHand": {"aim": [-0.1, 0.837, 0.538], "knuckles": [0.92, 0.284, -0.271], "shape": "fist"}, "rightHand": {"aim": [0.1, 0.837, 0.538], "knuckles": [-0.92, 0.284, -0.271], "shape": "fist"}}},
+          "low": {"reach": {"left": {"wrist": [0.15, -0.129, 0.432], "elbow": [-0.031, -0.167, 0.283]}, "right": {"wrist": [-0.15, -0.129, 0.432], "elbow": [0.031, -0.167, 0.283]}}, "hands": {"leftHand": {"aim": [-0.1, 0.718, 0.688], "knuckles": [0.917, 0.336, -0.217], "shape": "fist"}, "rightHand": {"aim": [0.1, 0.718, 0.688], "knuckles": [-0.917, 0.336, -0.217], "shape": "fist"}}},
+          "held": {"reach": {"left": {"wrist": [0.141, -0.078, 0.409], "elbow": [-0.04, -0.145, 0.294]}, "right": {"wrist": [-0.141, -0.078, 0.409], "elbow": [0.04, -0.145, 0.294]}}, "hands": {"leftHand": {"aim": [-0.1, 0.817, 0.568], "knuckles": [0.919, 0.294, -0.262], "shape": "fist"}, "rightHand": {"aim": [0.1, 0.817, 0.568], "knuckles": [-0.919, 0.294, -0.262], "shape": "fist"}}},
+          "fall": {"from": "held", "reach": {"left": {"wrist": [0.141, -0.45, 0.32], "elbow": [-0.04, -0.145, 0.294]}, "right": {"wrist": [-0.141, -0.45, 0.32], "elbow": [0.04, -0.145, 0.294]}}},
+          "enter": {"from": "high", "reach": {"left": {"wrist": [0.139, -0.45, 0.32], "elbow": [-0.042, -0.139, 0.296]}, "right": {"wrist": [-0.139, -0.45, 0.32], "elbow": [0.042, -0.139, 0.296]}}}
+        }
+      }
+    },
+    {
+      "id": "dance-fp", "loop": true, "body": "arms", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file", "firstPerson": true,
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "left-high"},
+          {"t": 0.5, "pose": "middle-low"},
+          {"t": 1.0, "pose": "right-high"},
+          {"t": 1.5, "pose": "middle-low"},
+          {"t": 2.0, "pose": "left-high"}
+        ],
+        "poses": {
+          "left-high": {"reach": {"left": {"wrist": [0.178, -0.066, 0.417], "elbow": [-0.018, -0.133, 0.301]}, "right": {"wrist": [-0.1, -0.123, 0.426], "elbow": [0.057, -0.162, 0.282]}}, "hands": {"leftHand": {"aim": [-0.05, 0.82, 0.57], "knuckles": [-0.896, -0.289, 0.337], "shape": "relaxed"}, "rightHand": {"aim": [0.18, 0.72, 0.67], "knuckles": [0.931, -0.344, 0.12], "shape": "relaxed"}}},
+          "middle-low": {"reach": {"left": {"wrist": [0.143, -0.125, 0.43], "elbow": [-0.015, -0.164, 0.286]}, "right": {"wrist": [-0.143, -0.125, 0.43], "elbow": [0.015, -0.164, 0.286]}}, "hands": {"leftHand": {"aim": [-0.18, 0.72, 0.67], "knuckles": [-0.9, -0.396, 0.183], "shape": "relaxed"}, "rightHand": {"aim": [0.18, 0.72, 0.67], "knuckles": [0.9, -0.396, 0.183], "shape": "relaxed"}}},
+          "right-high": {"reach": {"left": {"wrist": [0.1, -0.123, 0.426], "elbow": [-0.057, -0.162, 0.282]}, "right": {"wrist": [-0.178, -0.066, 0.417], "elbow": [0.018, -0.133, 0.301]}}, "hands": {"leftHand": {"aim": [-0.18, 0.72, 0.67], "knuckles": [-0.931, -0.344, 0.12], "shape": "relaxed"}, "rightHand": {"aim": [0.05, 0.82, 0.57], "knuckles": [0.896, -0.289, 0.337], "shape": "relaxed"}}}
+        }
+      }
+    },
+    {
+      "id": "quiet", "loop": false, "body": "left-arm", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file",
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "low"},
+          {"t": 0.32, "pose": "lips", "ease": "out"},
+          {"t": 0.5, "pose": "press"},
+          {"t": 0.68, "pose": "lips"},
+          {"t": 1.36, "pose": "hold"},
+          {"t": 1.7, "pose": "low", "ease": "in"}
+        ],
+        "poses": {
+          "low": {"aim": {"leftUpperArm": [0.32, -0.94, 0.08], "leftLowerArm": [0.2, -0.9, 0.38]}},
+          "lips": {"aim": {"leftUpperArm": [-0.15, -0.75, 0.65], "leftLowerArm": [-0.45, 0.85, -0.15]}, "hands": {"leftHand": {"aim": [-0.05, 1, 0.05], "knuckles": [0, 0, -1], "shape": "one"}}},
+          "press": {"from": "lips", "aim": {"leftUpperArm": [-0.16, -0.76, 0.63], "leftLowerArm": [-0.47, 0.84, -0.2]}},
+          "hold": {"from": "lips", "aim": {"leftUpperArm": [-0.14, -0.76, 0.64], "leftLowerArm": [-0.45, 0.86, -0.13]}}
+        }
+      }
+    },
+    {
+      "id": "wait", "loop": false, "body": "left-arm", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file",
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "low"},
+          {"t": 0.3, "pose": "up", "ease": "out"},
+          {"t": 0.5, "pose": "push", "ease": "out"},
+          {"t": 0.72, "pose": "up"},
+          {"t": 1.46, "pose": "held"},
+          {"t": 1.8, "pose": "low", "ease": "in"}
+        ],
+        "poses": {
+          "low": {"aim": {"leftUpperArm": [0.32, -0.94, 0.08], "leftLowerArm": [0.2, -0.9, 0.38]}},
+          "up": {"aim": {"leftUpperArm": [0.25, -0.45, 0.86], "leftLowerArm": [0.05, 0.78, 0.62]}, "hands": {"leftHand": {"aim": [0, 1, 0.15], "knuckles": [-1, 0, 0], "shape": "one"}}},
+          "push": {"from": "up", "aim": {"leftUpperArm": [0.24, -0.38, 0.9], "leftLowerArm": [0.05, 0.7, 0.71]}},
+          "held": {"from": "up", "aim": {"leftUpperArm": [0.25, -0.46, 0.85], "leftLowerArm": [0.05, 0.8, 0.6]}}
+        }
+      }
+    },
+    {
+      "id": "follow-me", "loop": false, "body": "left-arm", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file",
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "low"},
+          {"t": 0.32, "pose": "raise", "ease": "out"},
+          {"t": 0.58, "pose": "forward", "ease": "out"},
+          {"t": 0.86, "pose": "raise"},
+          {"t": 1.12, "pose": "forward", "ease": "out"},
+          {"t": 1.5, "pose": "forward"},
+          {"t": 1.84, "pose": "low", "ease": "in"}
+        ],
+        "poses": {
+          "low": {"aim": {"leftUpperArm": [0.32, -0.94, 0.08], "leftLowerArm": [0.2, -0.9, 0.38]}},
+          "raise": {"aim": {"leftUpperArm": [0.35, 0.7, -0.1], "leftLowerArm": [0.15, 0.97, 0.15]}, "hands": {"leftHand": {"aim": [0, 1, 0.1], "knuckles": [-1, 0, 0], "shape": "flat"}}},
+          "forward": {"aim": {"leftUpperArm": [0.18, 0.08, 0.98], "leftLowerArm": [0.08, 0.02, 1]}, "hands": {"leftHand": {"aim": [0, -0.05, 1], "knuckles": [-1, 0, 0], "shape": "flat"}}}
+        }
+      }
+    },
+    {
+      "id": "cover-me", "loop": false, "body": "left-arm", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file",
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "low"},
+          {"t": 0.36, "pose": "on", "ease": "out"},
+          {"t": 0.52, "pose": "lift"},
+          {"t": 0.66, "pose": "on", "ease": "in"},
+          {"t": 0.82, "pose": "lift"},
+          {"t": 0.96, "pose": "on", "ease": "in"},
+          {"t": 1.6, "pose": "on"},
+          {"t": 1.94, "pose": "low", "ease": "in"}
+        ],
+        "poses": {
+          "low": {"aim": {"leftUpperArm": [0.32, -0.94, 0.08], "leftLowerArm": [0.2, -0.9, 0.38]}},
+          "on": {"aim": {"leftUpperArm": [0.75, 0.55, 0.2], "leftLowerArm": [-0.78, 0.6, 0.02]}, "hands": {"leftHand": {"aim": [-1, 0.05, 0.05], "knuckles": [0, 0, -1], "shape": "flat"}}},
+          "lift": {"from": "on", "aim": {"leftUpperArm": [0.74, 0.58, 0.2], "leftLowerArm": [-0.7, 0.71, 0.02]}}
+        }
+      }
+    },
+    {
+      "id": "countdown", "loop": false, "body": "left-arm", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file",
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "low"},
+          {"t": 0.3, "pose": "three", "ease": "out"},
+          {"t": 0.95, "pose": "three"},
+          {"t": 1.1, "pose": "two", "ease": "out"},
+          {"t": 1.65, "pose": "two"},
+          {"t": 1.8, "pose": "one", "ease": "out"},
+          {"t": 2.35, "pose": "one"},
+          {"t": 2.55, "pose": "go", "ease": "out"},
+          {"t": 3.0, "pose": "go"},
+          {"t": 3.36, "pose": "low", "ease": "in"}
+        ],
+        "poses": {
+          "low": {"aim": {"leftUpperArm": [0.32, -0.94, 0.08], "leftLowerArm": [0.2, -0.9, 0.38]}},
+          "three": {"aim": {"leftUpperArm": [0.45, -0.25, 0.86], "leftLowerArm": [0.1, 0.95, 0.25]}, "hands": {"leftHand": {"aim": [0, 1, 0.1], "knuckles": [-1, 0, 0], "shape": "three"}}},
+          "two": {"from": "three", "hands": {"leftHand": {"aim": [0, 1, 0.1], "knuckles": [-1, 0, 0], "shape": "two"}}},
+          "one": {"from": "three", "hands": {"leftHand": {"aim": [0, 1, 0.1], "knuckles": [-1, 0, 0], "shape": "one"}}},
+          "go": {"aim": {"leftUpperArm": [0.12, 0.05, 1], "leftLowerArm": [0.05, 0, 1]}, "hands": {"leftHand": {"aim": [0, -0.05, 1], "knuckles": [-1, 0, 0], "shape": "point"}}}
+        }
+      }
+    },
+    {
+      "id": "quiet-fp", "loop": false, "body": "left-arm", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file", "firstPerson": true,
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "rest"},
+          {"t": 0.12, "pose": "enter"},
+          {"t": 0.32, "pose": "lips", "ease": "out"},
+          {"t": 0.5, "pose": "press"},
+          {"t": 0.68, "pose": "lips"},
+          {"t": 1.36, "pose": "hold"},
+          {"t": 1.58, "pose": "fall", "ease": "in"},
+          {"t": 1.7, "pose": "rest"}
+        ],
+        "poses": {
+          "lips": {"reach": {"left": {"wrist": [0.05, -0.15, 0.4], "elbow": [0.05, -0.18, 0.28]}}, "hands": {"leftHand": {"aim": [-0.1, 0.97, 0.2], "knuckles": [0.1, 0, -1], "shape": "one"}}},
+          "press": {"from": "lips", "reach": {"left": {"wrist": [0.046, -0.155, 0.385], "elbow": [0.05, -0.18, 0.28]}}},
+          "hold": {"from": "lips", "reach": {"left": {"wrist": [0.051, -0.148, 0.402], "elbow": [0.05, -0.18, 0.28]}}},
+          "enter": {"from": "lips", "reach": {"left": {"wrist": [0.05, -0.45, 0.32], "elbow": [0.05, -0.18, 0.28]}}},
+          "fall": {"from": "hold", "reach": {"left": {"wrist": [0.051, -0.45, 0.32], "elbow": [0.05, -0.18, 0.28]}}}
+        }
+      }
+    },
+    {
+      "id": "wait-fp", "loop": false, "body": "left-arm", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file", "firstPerson": true,
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "rest"},
+          {"t": 0.12, "pose": "enter"},
+          {"t": 0.3, "pose": "up", "ease": "out"},
+          {"t": 0.5, "pose": "push", "ease": "out"},
+          {"t": 0.72, "pose": "up"},
+          {"t": 1.46, "pose": "held"},
+          {"t": 1.68, "pose": "fall", "ease": "in"},
+          {"t": 1.8, "pose": "rest"}
+        ],
+        "poses": {
+          "up": {"reach": {"left": {"wrist": [0.105, -0.085, 0.41], "elbow": [-0.088, -0.146, 0.283]}}, "hands": {"leftHand": {"aim": [-0.06, 0.961, 0.27], "knuckles": [-0.965, -0.125, 0.23], "shape": "one"}}},
+          "push": {"from": "up", "reach": {"left": {"wrist": [0.108, -0.078, 0.44], "elbow": [-0.088, -0.146, 0.283]}}},
+          "held": {"from": "up", "reach": {"left": {"wrist": [0.106, -0.087, 0.408], "elbow": [-0.088, -0.146, 0.283]}}},
+          "enter": {"from": "up", "reach": {"left": {"wrist": [0.105, -0.45, 0.32], "elbow": [-0.088, -0.146, 0.283]}}},
+          "fall": {"from": "held", "reach": {"left": {"wrist": [0.106, -0.45, 0.32], "elbow": [-0.088, -0.146, 0.283]}}}
+        }
+      }
+    },
+    {
+      "id": "follow-me-fp", "loop": false, "body": "left-arm", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file", "firstPerson": true,
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "rest"},
+          {"t": 0.12, "pose": "enter"},
+          {"t": 0.32, "pose": "raise", "ease": "out"},
+          {"t": 0.58, "pose": "forward", "ease": "out"},
+          {"t": 0.86, "pose": "raise"},
+          {"t": 1.12, "pose": "forward", "ease": "out"},
+          {"t": 1.5, "pose": "forward"},
+          {"t": 1.72, "pose": "fall", "ease": "in"},
+          {"t": 1.84, "pose": "rest"}
+        ],
+        "poses": {
+          "raise": {"reach": {"left": {"wrist": [0.16, -0.02, 0.36], "elbow": [0.05, -0.15, 0.28]}}, "hands": {"leftHand": {"aim": [-0.1, 0.95, 0.3], "knuckles": [-0.96, -0.1, 0.2], "shape": "flat"}}},
+          "forward": {"reach": {"left": {"wrist": [0.12, -0.1, 0.5], "elbow": [0.02, -0.1, 0.32]}}, "hands": {"leftHand": {"aim": [-0.2, 0.15, 0.97], "knuckles": [-0.97, 0, -0.2], "shape": "flat"}}},
+          "enter": {"from": "raise", "reach": {"left": {"wrist": [0.16, -0.45, 0.32], "elbow": [0.05, -0.15, 0.28]}}},
+          "fall": {"from": "forward", "reach": {"left": {"wrist": [0.12, -0.45, 0.32], "elbow": [0.02, -0.1, 0.32]}}}
+        }
+      }
+    },
+    {
+      "id": "cover-me-fp", "loop": false, "body": "left-arm", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file", "firstPerson": true,
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "rest"},
+          {"t": 0.14, "pose": "enter"},
+          {"t": 0.36, "pose": "on", "ease": "out"},
+          {"t": 0.52, "pose": "lift"},
+          {"t": 0.66, "pose": "on", "ease": "in"},
+          {"t": 0.82, "pose": "lift"},
+          {"t": 0.96, "pose": "on", "ease": "in"},
+          {"t": 1.6, "pose": "on"},
+          {"t": 1.82, "pose": "fall", "ease": "in"},
+          {"t": 1.94, "pose": "rest"}
+        ],
+        "poses": {
+          "on": {"reach": {"left": {"wrist": [0.13, 0.07, 0.34], "elbow": [0.3, -0.2, 0.15]}}, "hands": {"leftHand": {"aim": [-0.6, 0.15, 0.78], "knuckles": [-0.8, 0, -0.6], "shape": "flat"}}},
+          "lift": {"from": "on", "reach": {"left": {"wrist": [0.13, 0.1, 0.34], "elbow": [0.3, -0.2, 0.15]}}},
+          "enter": {"from": "on", "reach": {"left": {"wrist": [0.13, -0.45, 0.32], "elbow": [0.3, -0.2, 0.15]}}},
+          "fall": {"from": "on", "reach": {"left": {"wrist": [0.13, -0.45, 0.32], "elbow": [0.3, -0.2, 0.15]}}}
+        }
+      }
+    },
+    {
+      "id": "countdown-fp", "loop": false, "body": "left-arm", "author": "Forge, keyed", "licence": "CC0", "source": "keyed in this file", "firstPerson": true,
+      "keyed": {
+        "keys": [
+          {"t": 0, "pose": "rest"},
+          {"t": 0.12, "pose": "enter"},
+          {"t": 0.3, "pose": "three", "ease": "out"},
+          {"t": 0.95, "pose": "three"},
+          {"t": 1.1, "pose": "two", "ease": "out"},
+          {"t": 1.65, "pose": "two"},
+          {"t": 1.8, "pose": "one", "ease": "out"},
+          {"t": 2.35, "pose": "one"},
+          {"t": 2.55, "pose": "go", "ease": "out"},
+          {"t": 3.0, "pose": "go"},
+          {"t": 3.24, "pose": "fall", "ease": "in"},
+          {"t": 3.36, "pose": "rest"}
+        ],
+        "poses": {
+          "three": {"reach": {"left": {"wrist": [0.12, -0.075, 0.42], "elbow": [-0.088, -0.146, 0.283]}}, "hands": {"leftHand": {"aim": [-0.06, 0.961, 0.27], "knuckles": [-0.965, -0.125, 0.23], "shape": "three"}}},
+          "two": {"from": "three", "hands": {"leftHand": {"aim": [-0.06, 0.961, 0.27], "knuckles": [-0.965, -0.125, 0.23], "shape": "two"}}},
+          "one": {"from": "three", "hands": {"leftHand": {"aim": [-0.06, 0.961, 0.27], "knuckles": [-0.965, -0.125, 0.23], "shape": "one"}}},
+          "go": {"reach": {"left": {"wrist": [0.137, -0.072, 0.49], "elbow": [0.032, -0.059, 0.323]}}, "hands": {"leftHand": {"aim": [-0.3, 0.25, 0.92], "knuckles": [-0.82, 0.512, -0.256], "shape": "point"}}},
+          "enter": {"from": "three", "reach": {"left": {"wrist": [0.12, -0.45, 0.32], "elbow": [-0.088, -0.146, 0.283]}}},
+          "fall": {"from": "go", "reach": {"left": {"wrist": [0.137, -0.45, 0.32], "elbow": [0.032, -0.059, 0.323]}}}
+        }
+      }
+    }
+  ]
+}

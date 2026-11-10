@@ -1,0 +1,82 @@
+{
+  "buses": {
+    "music": {
+      "category": "music",
+      "seats": 1
+    },
+    "voice": {
+      "category": "voice",
+      "seats": 1
+    }
+  },
+  "cues": {
+    "dance": {
+      "bus": "music",
+      "gain": 0.55,
+      "loop": true,
+      "priority": 60,
+      "maxVoices": 4,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "place": {
+        "self": "2d",
+        "other": "auto"
+      },
+      "space": {
+        "near": 4,
+        "far": 30
+      }
+    },
+    "cheer": {
+      "bus": "voice",
+      "gain": 0.8,
+      "loop": false,
+      "priority": 90,
+      "maxVoices": 4,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "place": {
+        "self": "2d",
+        "other": "auto"
+      },
+      "space": {
+        "near": 3,
+        "far": 40
+      }
+    },
+    "dancing-twerk": {
+      "bus": "music",
+      "gain": 0.55,
+      "loop": true,
+      "priority": 60,
+      "maxVoices": 4,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "place": {
+        "self": "2d",
+        "other": "auto"
+      },
+      "space": {
+        "near": 4,
+        "far": 30
+      }
+    },
+    "hip-hop-dancing": {
+      "bus": "music",
+      "gain": 0.55,
+      "loop": true,
+      "priority": 60,
+      "maxVoices": 4,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "place": {
+        "self": "2d",
+        "other": "auto"
+      },
+      "space": {
+        "near": 4,
+        "far": 30
+      }
+    }
+  }
+}

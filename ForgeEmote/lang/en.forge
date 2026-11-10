@@ -1,0 +1,9 @@
+{
+  "keys.group": "Actions",
+  "keys.wheel": "Action wheel",
+  "page.tactical": "Tactical",
+  "page.favorites": "Favourites",
+  "page.gesture": "Gestures",
+  "page.dance": "Dance",
+  "pair.answer": "Answer: {0}"
+}

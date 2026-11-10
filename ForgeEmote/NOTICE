@@ -1,0 +1,24 @@
+ForgeEmote - notices and credits
+Copyright (c) 2026 NAinfini. Licensed under the MIT License (see LICENSE), except for the third-party material listed below,
+which keeps its own licence.
+
+This is an unofficial fan-made mod for GTFO. It is not made, endorsed or supported by 10 Chambers Collective.
+GTFO and its game data belong to their owners; no file taken from the game is included in this package.
+
+Action clips (full record in ForgeEmote/Clips/LICENSE.forge). All were changed: resampled to the game's skeleton, and cut or posed as listed there.
+- wave, cheer: KayKit Character Animations 1.1 by Kay Lousberg, www.kaylousberg.com, https://kaylousberg.itch.io/kaykit-character-animations, CC0 1.0
+- dance: Universal Animation Library by Quaternius, https://quaternius.itch.io/universal-animation-library, CC0 1.0
+- come-here, stop, go-there: CMU Graphics Lab Motion Capture Database, http://mocap.cs.cmu.edu/.
+  The data used in this project was obtained from mocap.cs.cmu.edu. The collection of the data in this database was supported by NSF Grant #0196217.
+  It may not be resold directly, even in converted form; it ships here only as part of this mod.
+- middle-finger: supplied by the mod's owner, who confirmed CC0 1.0.
+- quiet, wait, follow-me, cover-me, countdown, thumbs-up and every first-person clip: keyed for this mod, CC0 1.0.
+- dancing-twerk, hip-hop-dancing, zombie-stumbling, backflip, praying, laying-shrugging, laying-seizure: Mixamo animations (Adobe), supplied by the mod's owner;
+  resampled to the game's skeleton. Mixamo's terms for shipping these inside a released mod are not settled: see ForgeEmote/Clips/LICENSE.forge.
+
+Sounds (full record in ForgeEmote/audio/LICENSE.forge).
+- dance, dancing-twerk, hip-hop-dancing: music made for this mod, CC0 1.0.
+- cheer: Sonniss GameAudioGDC bundle, SoundBits "Vox Hominis - Human Effort Voices", royalty-free licence
+  (https://sonniss.com/gameaudiogdc); cut and converted, shipped only inside this mod.
+- fist-bump: animation file supplied by the mod's owner (source not recorded beyond that); resampled to the game's skeleton. Shipped as a converted clip only, never the original FBX: see ForgeEmote/Clips/LICENSE.forge.
+- handshake: Mixamo animation (Adobe), supplied by the mod's owner; resampled to the game's skeleton. Shipped as a converted clip only, never the original FBX (owner's ruling, 2026-11-08): see ForgeEmote/Clips/LICENSE.forge.

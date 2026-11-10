@@ -1,0 +1,16 @@
+Sounds in ForgeEmote: where each came from. Recorded 2026-11-07.
+
+dance (dance.ogg, the dance's music)
+  Author: made for this mod (synthesised, 120 BPM, 8 s loop); the original synthesis script is lost, the audio file itself is the record.
+  Licence: CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/
+
+dancing-twerk (dancing-twerk.ogg), hip-hop-dancing (hip-hop-dancing.ogg), the music of those two dances
+  Author: made for this mod (synthesised, 104 BPM and 92 BPM, 9 s and 10 s loops); synthesised by a home-made script kept on the author's machine in Source/audio/forge-emote (make_audio2.py), not shipped with the package.
+  Licence: CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/
+
+cheer (cheer.ogg)
+  Source: Sonniss GameAudioGDC 2026 bundle, SoundBits "Vox Hominis - Human Effort Voices",
+  WHSTHmn_Whistle Male 06 09_SNDBTS_VH.wav
+  Licence: Sonniss GameAudioGDC royalty-free licence, https://sonniss.com/gameaudiogdc
+  Changes: cut to the long whistle (0.78 s to 2.36 s), faded, delayed 0.12 s, converted to Ogg Vorbis.
+  Ships only inside this mod; the original recording is not redistributed.

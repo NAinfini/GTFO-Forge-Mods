@@ -1,0 +1,4 @@
+Wheel icons in ForgeEmote.
+
+Rendered for this mod from these clips' poses on the game's first-person arms and player body
+  shapes: white silhouettes only, no texture. CC0 1.0 for the drawing.

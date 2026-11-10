@@ -1,0 +1,13 @@
+{
+  "name": "ForgeEmote",
+  "version_number": "1.0.0",
+  "website_url": "https://github.com/NAinfini/GTFO-Forge-Mods",
+  "description": "An action wheel: hold H for tactical signals, gestures and a dance with music your teammates see and hear, in first person, with a view of yourself from behind for the dance.",
+  "dependencies": [
+    "BepInEx-BepInExPack_GTFO-3.2.4",
+    "NAinfini-ForgeCore-1.0.0",
+    "NAinfini-ForgeUI-1.0.0",
+    "NAinfini-ForgeAudio-1.0.0",
+    "NAinfini-ForgeVisual-1.0.0"
+  ]
+}
