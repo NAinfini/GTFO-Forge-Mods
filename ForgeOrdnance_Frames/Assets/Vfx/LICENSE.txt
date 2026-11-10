@@ -1,0 +1,7 @@
+Forge effect library effects
+=================================================
+
+forge-<package>-fx.bundle (when installed) holds effects rebuilt from Unity Asset Store packs under the Standard Unity Asset Store EULA, which
+allows shipping them inside a built product. They are shipped only inside that built bundle; the packs' source files are not redistributed
+and are not in this repository. fx-licences.forge next to the bundle lists, per bundle, every pack used, its recorded licence and the effects taken from it.
+The shaders that draw them (Tools/Vfx/ForgeVfx/Assets/ForgeVfx/Shaders) are the project's own, MIT.

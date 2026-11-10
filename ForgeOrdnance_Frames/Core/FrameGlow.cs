@@ -7,7 +7,7 @@ namespace ForgeOrdnanceFrames;
 /// is every light of the suit. A steady look is written once when it begins; only the looks that move (an empty suit breathing, an
 /// overheated suit pulsing) and the short transitions (power-on, armour falling to red, the wreck going dark) write a colour every
 /// frame while they last. No light or post effect is added.</summary>
-public enum GlowLook : byte
+internal enum GlowLook : byte
 {
     /// <summary>Wrecked: dark.</summary>
     Off,
@@ -25,7 +25,7 @@ public enum GlowLook : byte
     Opening,
 }
 
-public static class FrameGlow
+internal static class FrameGlow
 {
     /// <summary>The armour share at or below which the lights turn red: the same line as the HUD's red armour bar and the alarm.</summary>
     public const float DamagedShare = 0.25f;

@@ -10,7 +10,7 @@ source UVs (albedo; R metal, G and A smoothness; tangent normal; emission colour
 
 <out>/<model>_cut.blend then holds the whole shell, shut and not yet thickened, as one object in the collection FIXED. The
 timeline runs frames 1..30. Nothing is split or chosen: the owner may draw guide lines on it with Blender's Annotate tool; the
-hinge add-on (tools/hinge_tool) cuts the parts and sets their hinges, and its bake.py writes the file build_frame.py builds
+hinge add-on (Tools/Blender/hinge_tool) cuts the parts and sets their hinges, and its bake.py writes the file build_frame.py builds
 from (build_assets.ps1 bakes each model's <model>_cut.draft.blend). An existing cut file is the owner's work and is never overwritten without --replace."""
 import argparse
 import json

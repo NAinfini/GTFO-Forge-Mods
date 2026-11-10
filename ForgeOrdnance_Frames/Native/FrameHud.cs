@@ -67,7 +67,7 @@ internal sealed class FrameHud
     private CrosshairAttachment? _aim;
     private HudLoadout? _loadout;
     private HudLabel? _readings;
-   private HudSkillSlot? _special, _rockets, _carry;
+    private HudSkillSlot? _special, _rockets, _carry;
     private HudKeyHint? _lamp, _exit;
     private bool? _carryState;
     private string _carryKey = "";
@@ -93,7 +93,7 @@ internal sealed class FrameHud
         if (_names.TryGetValue(r.DefinitionKey, out var known) && known.Language == language) return known.Text;
         if (FrameWorld.DefinitionName(r.DefinitionKey) is not { } name)
         {
-            Plugin.Error("Exosuit " + r.Spec.Model + " has no name: no loaded definition has key " + r.DefinitionKey + ".");
+            Plugin.Logger.ErrorOnce("Exosuit " + r.Spec.Model + " has no name: no loaded definition has key " + r.DefinitionKey + ".");
             _names[r.DefinitionKey] = (language, UIText.Empty);
             return UIText.Empty;
         }
@@ -143,9 +143,15 @@ internal sealed class FrameHud
             _chat.Accent = Primary;
             _chat.Look = new ChatLook
             {
-                TextPx = ChatTextPx, InputPx = ChatInputPx, Text = UIKitColors.Faded(Primary, 0.88f), Alert = Warning,
-                Input = UIKitColors.Bright, Caret = Primary,
-                IdleLines = 3, IdleSeconds = 10f, IdleOpacity = 0.85f,
+                TextPx = ChatTextPx,
+                InputPx = ChatInputPx,
+                Text = UIKitColors.Faded(Primary, 0.88f),
+                Alert = Warning,
+                Input = UIKitColors.Bright,
+                Caret = Primary,
+                IdleLines = 3,
+                IdleSeconds = 10f,
+                IdleOpacity = 0.85f,
             };
         }
         if (_hide != null) _hide.Released += why => KitReleased("game HUD hide", why);
@@ -224,7 +230,7 @@ internal sealed class FrameHud
         if (_carry != null) { _carry.Icon = FrameHudArt.Carry; _carry.Count = () => _carryState == null ? 0 : 1; }
         _lamp = _ui.AddKeyHint("Lamp", InputAction.Flashlight, UIText.Key("hud.lamp"), new HudSlot(HudRegion.BottomLeft, 45, 160f, 30f, row: 2));
         if (_lamp != null) { _lamp.Icon = FrameHudArt.Lamp; _lamp.FadeWhenFamiliar(); }
-        _exit = _ui.AddKeyHint("Exit", FrameKeys.Exit,UIText.Key("hud.exit"), new HudSlot(HudRegion.BottomLeft, 44, 160f, 30f, row: 2));
+        _exit = _ui.AddKeyHint("Exit", FrameKeys.Exit, UIText.Key("hud.exit"), new HudSlot(HudRegion.BottomLeft, 44, 160f, 30f, row: 2));
         if (_exit != null) { _exit.Icon = FrameHudArt.Exit; _exit.HoldSeconds = LocalPilot.ExitHoldSeconds; _exit.FadeWhenFamiliar(); }
         // The squad: chamfered rows on a dark plate, segmented health, a pilot's armour as a thin ice line; 16 units clear of LAMP / EXIT.
         _mates = _ui.AddTeammates("Mates", new HudSlot(HudRegion.BottomLeft, 30, 290f, 142f, space: 16f));
@@ -266,6 +272,8 @@ internal sealed class FrameHud
             _interaction.KeyBox = true;
             _interaction.ProgressStyle = InteractionProgress.Underline;
             _interaction.AtGamePrompt = true;
+            // The message line (reactor steps and codes, scans) keeps the game's own place, not the prompt's stack in mid-screen.
+            _interaction.AtGameMessage = true;
         }
         _subtitles = _ui.AddSubtitles("Subtitles");
         _threats = _ui.AddBearingArc("Threats", 24);
@@ -303,7 +311,7 @@ internal sealed class FrameHud
         _parts = new HudWidget?[] { _bars, _readings, _objectives, _special, _rockets, _lamp, _exit, _carry, _silhouette, _mates, _loadout, _threats, _clip, _heat };
         Hide();
         if (_hide == null || _chat == null || _bars == null || _link == null)
-            Plugin.Error("Part of the exosuit cockpit could not be registered with ForgeUI (see its log above); the game's HUD stays as it is while piloting.");
+            Plugin.Logger.ErrorOnce("Part of the exosuit cockpit could not be registered with ForgeUI (see its log above); the game's HUD stays as it is while piloting.");
     }
 
     private FrameWords MakeWords()
@@ -327,7 +335,7 @@ internal sealed class FrameHud
             var shown = _scope.Set(phase);
             if (_outline != null) _outline.Active = _scope.Phase == CockpitPhase.Worn;
             if (_enemyBars != null) _enemyBars.Active = _scope.Phase == CockpitPhase.Worn;
-        if (_hits != null) _hits.Active = _scope.Phase == CockpitPhase.Worn;
+            if (_hits != null) _hits.Active = _scope.Phase == CockpitPhase.Worn;
             if (!_scope.Cockpit) Parts(false);
             if (!_scope.Visor) _visor?.Hide();
             if (phase is CockpitPhase.Off or CockpitPhase.Boarding) { _onScreen = false; _missingSince = -1f; }
@@ -349,7 +357,7 @@ internal sealed class FrameHud
     private void NotTaken(string what, float now)
     {
         _takeAgainAt = now + RetrySeconds;
-        Plugin.Error("Exosuit cockpit: ForgeUI did not take the " + what + " while " + _scope.Phase + " (its reason is in ForgeUI's log line above); the game's HUD shows with the cockpit and it is asked again every " + ForgeCore.Log.Num(RetrySeconds) + " s.");
+        Plugin.Logger.ErrorOnce("Exosuit cockpit: ForgeUI did not take the " + what + " while " + _scope.Phase + " (its reason is in ForgeUI's log line above); the game's HUD shows with the cockpit and it is asked again every " + ForgeCore.Log.Num(RetrySeconds) + " s.");
     }
 
     /// <summary>ForgeUI gave the game's HUD back by itself. The next <see cref="Sync"/> decides: a pilot who is not alive or out of the
@@ -376,7 +384,7 @@ internal sealed class FrameHud
         _alerts.Reset();
         _link?.Prepare(FrameBootMessage.Words(_words, Percent(r)));
         if (_silhouette != null) { _silhouette.Center = FrameHudArt.Mark(r.Spec.Model); _silhouette.CenterLabel = NameOf(r); }
-       var spec = r.Spec;
+        var spec = r.Spec;
         if (_special != null)
         {
             var kind = spec.Boost != null ? FrameSpecialKind.Charge : spec.Siege != null ? FrameSpecialKind.Siege : spec.Scan != null ? FrameSpecialKind.Scan : FrameSpecialKind.None;
@@ -470,7 +478,7 @@ internal sealed class FrameHud
             if (_parts[i] is not { Visible: true } w || w.HudElement.State is LayoutState.Placed or LayoutState.Free) continue;
             b.Append(b.Length == 0 ? "" : ", ").Append(w.Id).Append(' ').Append(w.HudElement.State).Append(w.HudElement.Root == null ? " (not built)" : "");
         }
-        Plugin.Error("Exosuit cockpit: " + missing + " of its parts are shown by the suit but not on screen " + ForgeCore.Log.Num(boot)
+        Plugin.Logger.ErrorOnce("Exosuit cockpit: " + missing + " of its parts are shown by the suit but not on screen " + ForgeCore.Log.Num(boot)
             + " s into the power-on: " + b + " (ForgeUI's HUD line above says why: a game screen open, no HUD camera, the screen not measured, a failed element).");
     }
 
@@ -684,7 +692,7 @@ internal sealed class FrameHud
         Notice(reason);
     }
 
-    /// <summary>The heavy object of a suit that carries it on the back (<see cref="PilotCarry.InHands"/>): null greys the skill; true (in the hands)
+    /// <summary>The heavy object of a suit that carries it on the back (<see cref="ForgeCore.CarrySlot.InHands"/>): null greys the skill; true (in the hands)
     /// names the ability key as the one that puts it on the back, false (on the back) as the one that takes it off.</summary>
     internal void CarryHint(bool? inHands)
     {
@@ -714,13 +722,13 @@ internal sealed class FrameHud
     private void Fault(Exception error)
     {
         _faultUntil = Time.time + RetrySeconds;
-        Plugin.Error("The exosuit cockpit failed (" + _scope.Phase + "); its parts are off and drawn again in " + ForgeCore.Log.Num(RetrySeconds) + " s: " + error);
+        Plugin.Logger.ErrorOnce("The exosuit cockpit failed (" + _scope.Phase + "); its parts are off and drawn again in " + ForgeCore.Log.Num(RetrySeconds) + " s: " + error);
         try
         {
             Parts(false);
             _link?.Stop();
         }
-        catch (Exception again) { Plugin.Error("The exosuit cockpit could not put its parts away after a failure: " + again); }
+        catch (Exception again) { Plugin.Logger.ErrorOnce("The exosuit cockpit could not put its parts away after a failure: " + again); }
     }
 
     // ---- prewarm ----------------------------------------------------------------------------------------------
@@ -749,9 +757,14 @@ internal sealed class FrameHud
             // bars in those colours); above an ordinary exclusive layer, so nothing else covers the picture while the suit seals and powers on.
             _power = _ui.AddPowerOn("PowerOn", new PowerOnSpec
             {
-                Panels = panels, Seams = seams, Timeline = BootPlan.Default.Timeline, Priority = 50,
+                Panels = panels,
+                Seams = seams,
+                Timeline = BootPlan.Default.Timeline,
+                Priority = 50,
                 Tint = new Color(0.80f, 0.94f, 1f, 1f),
-                ChannelLeft = new Color(1f, 0.18f, 0.32f, 1f), ChannelMiddle = new Color(0.30f, 1f, 0.55f, 1f), ChannelRight = new Color(0.20f, 0.50f, 1f, 1f),
+                ChannelLeft = new Color(1f, 0.18f, 0.32f, 1f),
+                ChannelMiddle = new Color(0.30f, 1f, 0.55f, 1f),
+                ChannelRight = new Color(0.20f, 0.50f, 1f, 1f),
             });
         }
     }

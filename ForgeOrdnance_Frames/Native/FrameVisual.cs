@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ForgeAudio;
 using ForgeOrdnance;
 using Player;
@@ -37,7 +38,6 @@ internal sealed partial class FrameVisual : IBodySoundHandler
     // Boarding: when the boot sound (the power-on starting at the black, FrameSequence.Black) and, for the other players, the ready voice (the
     // power-on's NEURAL LINK OK) play, or -1; the pilot plays the voice with the power-on on their own clock (LocalPilot).
     private float _bootAt = -1f, _voiceAt = -1f;
-    private const float HitboxScale = 1.3f;
     private const float ShakeRange = 40f;
     /// <summary>Metres the renderers' bounds grow on every side: the built bounds cover the opening clips only, a worn suit's limbs
     /// reach wherever its pilot's do.</summary>
@@ -47,7 +47,7 @@ internal sealed partial class FrameVisual : IBodySoundHandler
     private readonly GameObject _root;
     private readonly Animation? _animation;
     private readonly SkinnedMeshRenderer[] _renderers;
-    private readonly Transform? _muzzle, _chest, _head, _model;
+    private readonly Transform? _muzzle, _chest, _head;
     // The opening: the model's "open" and "close" clips (every part's rigid path; the open clip's first frame and the close
     // clip's last are shut), their sounds (read off the clips), the back's parts (an ejection's steam) and the parts beside the
     // back's middle seam (the opening's steam).
@@ -75,9 +75,8 @@ internal sealed partial class FrameVisual : IBodySoundHandler
     private int _eventStep;
     private bool _ownHidden;
     private readonly List<Renderer> _forcedOff = new();
-    private readonly ForgeVisual.AttachedFx? _flash;
     private int _tracerFrame, _tracersThisFrame;
-    private readonly List<(Collider Collider, Vector3 Size, float Radius, float Height)> _hitboxes = new();
+    private readonly PilotHull _hull = new();
 
     private FrameState _shown = (FrameState)255;
     private ulong _shownPilot;
@@ -109,6 +108,8 @@ internal sealed partial class FrameVisual : IBodySoundHandler
     private static readonly Color LampColour = new(1f, 0.85f, 0.6f, 0.85f);
     private const float LampSize = 0.09f;
 
+    private static readonly Dictionary<string, (PlateEvent[] Open, PlateEvent[] Close, float CloseEnd)> PlateTables = new(StringComparer.Ordinal);
+
     private FrameVisual(FrameUnit unit, GameObject root)
     {
         _unit = unit;
@@ -117,10 +118,10 @@ internal sealed partial class FrameVisual : IBodySoundHandler
         _root = root;
         _renderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
         _animation = root.GetComponentInChildren<Animation>(true);
-        if (_animation == null) Plugin.Error("Exosuit model " + unit.Record.Spec.Model + " has no Animation; it does not visibly open.");
-        _muzzle = Find(root.transform, "hand.R");
-        _chest = Find(root.transform, "chest");
-        _head = Find(root.transform, "head");
+        if (_animation == null) Plugin.Logger.ErrorOnce("Exosuit model " + unit.Record.Spec.Model + " has no Animation; it does not visibly open.");
+        _muzzle = ForgeVisual.Models.Find(root.transform, "hand.R");
+        _chest = ForgeVisual.Models.Find(root.transform, "chest");
+        _head = ForgeVisual.Models.Find(root.transform, "head");
         var opening = unit.Record.Spec.Opening;
         var back = new List<Transform>();
         var nodes = new List<Transform>();
@@ -128,10 +129,10 @@ internal sealed partial class FrameVisual : IBodySoundHandler
         if (opening != null)
             foreach (var part in opening.Parts)
             {
-                var node = Find(root.transform, part.Node);
+                var node = ForgeVisual.Models.Find(root.transform, part.Node);
                 if (node == null)
                 {
-                    Plugin.Error("Exosuit model " + unit.Record.Spec.Model + " has no node '" + part.Node + "' (Opening); that part does not open.");
+                    Plugin.Logger.ErrorOnce("Exosuit model " + unit.Record.Spec.Model + " has no node '" + part.Node + "' (Opening); that part does not open.");
                     continue;
                 }
                 nodes.Add(node);
@@ -146,25 +147,35 @@ internal sealed partial class FrameVisual : IBodySoundHandler
         _open = _animation != null ? _animation.GetClip("open") : null;
         _close = _animation != null ? _animation.GetClip("close") : null;
         if (opening != null && _animation != null && (_open == null || _close == null))
-            Plugin.Error("Exosuit model " + unit.Record.Spec.Model + " lacks its "
+            Plugin.Logger.ErrorOnce("Exosuit model " + unit.Record.Spec.Model + " lacks its "
                 + (_open == null ? "'open'" : "") + (_open == null && _close == null ? " and " : "") + (_close == null ? "'close'" : "") + " clip; it does not visibly open.");
         else if (_open != null && _close != null && _animation != null)
         {
-            _openEvents = PlateTimeline.Opening(Offsets(_open, nodes, out var openDegrees, out var step), openDegrees, seams.ToArray(), step);
-            _closeEvents = PlateTimeline.Closing(Offsets(_close, nodes, out var closeDegrees, out step), closeDegrees, step);
+            // The tables depend only on the model's clips and rest pose, so each model is sampled once; a later suit of it only
+            // leaves the pose the sampling would have left (the close clip's last frame, then the shut suit).
+            var key = unit.Record.Spec.Model + "|" + string.Join(",", nodes.Select((n, i) => n.name + (seams[i] ? "!" : "")));
+            if (!PlateTables.TryGetValue(key, out var tables))
+            {
+                _openEvents = PlateTimeline.Opening(Offsets(_open, nodes, out var openDegrees, out var step), openDegrees, seams.ToArray(), step);
+                _closeEvents = PlateTimeline.Closing(Offsets(_close, nodes, out var closeDegrees, out step), closeDegrees, step);
+                PlateTables[key] = (_openEvents, _closeEvents, Math.Min(_close.length, (closeDegrees.Length - 1) * step));
+            }
+            else
+            {
+                (_openEvents, _closeEvents, var closeEnd) = tables;
+                _close.SampleAnimation(_animation.gameObject, closeEnd);
+            }
             _open.SampleAnimation(_animation.gameObject, 0f);
         }
-        if (_head == null) Plugin.Error("Exosuit model " + unit.Record.Spec.Model + " has no 'head' node; its name sits at a fixed height.");
+        if (_head == null) Plugin.Logger.ErrorOnce("Exosuit model " + unit.Record.Spec.Model + " has no 'head' node; its name sits at a fixed height.");
         foreach (var renderer in _renderers)
         {
             var bounds = renderer.localBounds;
             bounds.Expand(LimbReach * 2f);
             renderer.localBounds = bounds;
         }
-        _model = _animation != null ? _animation.transform : root.transform.childCount > 0 ? root.transform.GetChild(0) : null;
         _pose = _renderers.Length > 0 ? ForgeVisual.Models.ReadPoseTarget(root.transform, _renderers[0], FrameBodyRig.PoseLinks, unit.Record.Spec.Model) : null;
-        if (found == 0) Plugin.Error("Exosuit model " + unit.Record.Spec.Model + " has no opening parts; it does not visibly open.");
-        if (_muzzle != null) _flash = FrameFx.MuzzleFlash(_muzzle);
+        if (found == 0) Plugin.Logger.ErrorOnce("Exosuit model " + unit.Record.Spec.Model + " has no opening parts; it does not visibly open.");
         if (unit.Record.Spec.Rockets is { } rockets)
         {
             var now = Time.time;
@@ -285,12 +296,12 @@ internal sealed partial class FrameVisual : IBodySoundHandler
                 else if (!_helmetMeasured && now - _stateStart > 1f) MeasureHelmet(r);
                 break;
             case FrameState.Destroyed:
-            {
-                var age = now - _stateStart;
-                _root.transform.position = new Vector3(r.X, r.Y, r.Z) + Vector3.down * FrameEffectsPlan.WreckSink(age, FrameRules.WreckSeconds) * 2.5f;
-                WreckFx(now, age);
-                break;
-            }
+                {
+                    var age = now - _stateStart;
+                    _root.transform.position = new Vector3(r.X, r.Y, r.Z) + Vector3.down * FrameEffectsPlan.WreckSink(age, FrameRules.WreckSeconds) * 2.5f;
+                    WreckFx(now, age);
+                    break;
+                }
         }
         TickFxLight(r, now);
         TickGlow(r, now);
@@ -335,7 +346,7 @@ internal sealed partial class FrameVisual : IBodySoundHandler
         }
         catch (Exception e)
         {
-            Plugin.Error("Name plate of " + r.Spec.Model + ": the meshes could not be read for the helmet top (" + e + "); it sits " + HelmetEstimate.ToString("F2") + " m over the head bone.");
+            Plugin.Logger.ErrorOnce("Name plate of " + r.Spec.Model + ": the meshes could not be read for the helmet top (" + e + "); it sits " + HelmetEstimate.ToString("F2") + " m over the head bone.");
             return;
         }
         finally { Object.Destroy(baked); }
@@ -343,7 +354,7 @@ internal sealed partial class FrameVisual : IBodySoundHandler
         var above = top - head.y;
         if (float.IsNegativeInfinity(top) || above < 0.05f || above > 1f)
         {
-            Plugin.Error("Name plate of " + r.Spec.Model + ": the helmet top reads " + above.ToString("F2") + " m over the head bone; it sits " + HelmetEstimate.ToString("F2") + " m over it.");
+            Plugin.Logger.ErrorOnce("Name plate of " + r.Spec.Model + ": the helmet top reads " + above.ToString("F2") + " m over the head bone; it sits " + HelmetEstimate.ToString("F2") + " m over it.");
             return;
         }
         _helmetAboveHead = above;
@@ -367,38 +378,38 @@ internal sealed partial class FrameVisual : IBodySoundHandler
         switch (r.State)
         {
             case FrameState.Entering:
-            {
-                var elapsed = now - _stateStart;
-                Stand(r);
-                var plates = FrameSequence.EnterPlates(elapsed, OpenLength, CloseLength);
-                Open(plates);
-                PlateSounds(plates);
-                // The pilot stands where they boarded from until the black, then is inside: no motion plays.
-                Conceal(!FrameSequence.PilotShownEntering(elapsed));
-                _body?.Stop();
-                Own(_pilotLocal && LocalPilot.Inside);
-                TickLight(false);
-                _carry.Release();
-                Unpose();
-                return;
-            }
+                {
+                    var elapsed = now - _stateStart;
+                    Stand(r);
+                    var plates = FrameSequence.EnterPlates(elapsed, OpenLength, CloseLength);
+                    Open(plates);
+                    PlateSounds(plates);
+                    // The pilot stands where they boarded from until the black, then is inside: no motion plays.
+                    Conceal(!FrameSequence.PilotShownEntering(elapsed));
+                    _body?.Stop();
+                    Own(_pilotLocal && LocalPilot.Inside);
+                    TickLight(false);
+                    _carry.Release();
+                    Unpose();
+                    return;
+                }
             case FrameState.Exiting:
-            {
-                var elapsed = now - _stateStart;
-                Stand(r);
-                var plates = FrameSequence.ExitPlates(elapsed, OpenLength);
-                Open(plates);
-                PlateSounds(plates);
-                Conceal(!FrameSequence.PilotShownExiting(elapsed));
-                var clip = elapsed - FrameSequence.ExitClipStart;
-                if (clip >= 0f && clip < PilotMotion.ExitSeconds) PoseBody(r, clip);
-                else _body?.Stop();
-                Own(_pilotLocal && elapsed < FrameSequence.ExitClipStart);
-                TickLight(false);
-                _carry.Release();
-                Unpose();
-                return;
-            }
+                {
+                    var elapsed = now - _stateStart;
+                    Stand(r);
+                    var plates = FrameSequence.ExitPlates(elapsed, OpenLength);
+                    Open(plates);
+                    PlateSounds(plates);
+                    Conceal(!FrameSequence.PilotShownExiting(elapsed));
+                    var clip = elapsed - FrameSequence.ExitClipStart;
+                    if (clip >= 0f && clip < PilotMotion.ExitSeconds) PoseBody(r, clip);
+                    else _body?.Stop();
+                    Own(_pilotLocal && elapsed < FrameSequence.ExitClipStart);
+                    TickLight(false);
+                    _carry.Release();
+                    Unpose();
+                    return;
+                }
         }
         IdlePlates(now);
         _body?.Stop();
@@ -428,10 +439,7 @@ internal sealed partial class FrameVisual : IBodySoundHandler
         {
             _airborne = airborne;
             if (airborne) { if (state == PlayerLocomotion.PLOC_State.Jump) Sound(FrameSound.Jump); }
-            else
-            {
-                SoundAt(FrameSound.Land, feet);
-            }
+            else SoundAt(FrameSound.Land, feet);
         }
         _wornFrame = Time.frameCount;
         FollowPilot(now);
@@ -503,19 +511,28 @@ internal sealed partial class FrameVisual : IBodySoundHandler
         _eventStep = PlateTimeline.Passed(pose.Closing ? _closeEvents : _openEvents, pose.Time);
     }
 
-    /// <summary>A short puff of steam from the back's middle seam as it first parts: between the parts beside it, out and up
-    /// behind the suit.</summary>
+    /// <summary><paramref name="at"/> moved back onto the shell's back surface (<see cref="_backPlane"/>, measured from the posed meshes): a plate's
+    /// node is its hinge inside the suit, so steam played there came out of the body. Unchanged before the shell was measured.</summary>
+    private Vector3 OnBack(Vector3 at)
+    {
+        if (float.IsNaN(_backPlane)) return at;
+        var t = _root.transform;
+        var local = t.InverseTransformPoint(at);
+        local.z = _backPlane;
+        return t.TransformPoint(local);
+    }
+
+    /// <summary>A faint small mist from every seam part (the model's Seam parts, left and right of the back's middle seam) as the seam first parts: each on the
+    /// shell's back, drifting out to its own side, back and a little down.</summary>
     private void VentSeam()
     {
-        var sum = Vector3.zero;
-        var count = 0;
-        foreach (var plate in _seamParts)
-            if (plate != null && !plate.WasCollected) { sum += plate.position; count++; }
-        if (count == 0) return;
         var t = _root.transform;
-        var at = sum / count;
-        at += t.right * Vector3.Dot(t.position - at, t.right);
-        FrameFx.Vent(at - t.forward * 0.08f, -t.forward + Vector3.up * 0.45f, 2, 1.4f);
+        foreach (var plate in _seamParts)
+        {
+            if (plate == null || plate.WasCollected) continue;
+            var side = Mathf.Sign(t.InverseTransformPoint(plate.position).x);
+            FrameFx.Vent(OnBack(plate.position), t.right * side * 0.5f - t.forward * 0.8f - Vector3.up * 0.25f);
+        }
     }
 
     /// <summary>The local pilot's own suit once the pilot is inside it: drawn as its shadow only, so the camera never shows its walls
@@ -524,9 +541,8 @@ internal sealed partial class FrameVisual : IBodySoundHandler
     {
         if (hidden == _ownHidden) return;
         _ownHidden = hidden;
-        var mode = hidden ? UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly : UnityEngine.Rendering.ShadowCastingMode.On;
         foreach (var renderer in _renderers)
-            if (renderer != null && !renderer.WasCollected) renderer.shadowCastingMode = mode;
+            if (renderer != null && !renderer.WasCollected) ForgeVisual.SurfaceLook.SetShadowOnly(renderer, hidden);
         _rocketPod?.ShadowOnly(hidden);
         _heldCopy?.ShadowOnly(hidden);
     }
@@ -619,8 +635,10 @@ internal sealed partial class FrameVisual : IBodySoundHandler
     private OrdnanceDropStyle FallStyle(Vector3 ground)
         => new()
         {
-            FallHeight = FallHeight, Impact = _fallImpact ??= LandImpactOf(Noise.LandingRadius()),
-            OnFall = fall => ArrivalFx(fall, ground), OnLanded = () => Touchdown(ground),
+            FallHeight = FallHeight,
+            Impact = _fallImpact ??= LandImpactOf(Noise.LandingRadius()),
+            OnFall = fall => ArrivalFx(fall, ground),
+            OnLanded = () => Touchdown(ground),
         };
 
     /// <summary>The suit stands on the ground and the drop has played its impact: the suit's own landing sound and effects.</summary>
@@ -646,12 +664,7 @@ internal sealed partial class FrameVisual : IBodySoundHandler
         if (count <= 0) return;
         // The pilot's own shot left from the gun the suit holds here.
         if (HeldMuzzle(out var held)) origin = held;
-        if (_flash?.Transform is { } flash)
-        {
-            var aim = target - origin;
-            flash.SetPositionAndRotation(origin, Quaternion.LookRotation(aim.sqrMagnitude > 0.01f ? aim : _root.transform.forward));
-            _flash.Play();
-        }
+        if (FramesFxSlots.GunMuzzle is { } flash) ForgeVisual.Fx.Play(flash, origin, target - origin);
         var frame = Time.frameCount;
         if (frame != _tracerFrame) { _tracerFrame = frame; _tracersThisFrame = 0; }
         for (var s = 0; s < Math.Min(count, 2) && _tracersThisFrame < 2; s++, _tracersThisFrame++) FrameFx.Tracer(origin, target);
@@ -725,7 +738,7 @@ internal sealed partial class FrameVisual : IBodySoundHandler
         if (agent == null) return;
         _pilot = agent;
         _pilotLocal = agent.IsLocallyOwned && agent.Owner != null && agent.Owner.Lookup == SNet.LocalPlayer.Lookup;
-        ScaleHitboxes(agent);
+        _hull.Wear(agent, _unit.Record.Spec.EyeHeight);
         _body = PilotBody.Bind(agent, _pilotLocal);
         BindPose(agent);
         MoveMarker();
@@ -786,15 +799,17 @@ internal sealed partial class FrameVisual : IBodySoundHandler
         _carry.Release();
         Unpose();
         UnbindPose();
-        if (_pilot == null) return;
         _body?.Stop();
         _body = null;
         ReleaseMarker();
-        if (!_pilot.WasCollected)
+        // A pilot the game already destroyed (dropped out) leaves nothing to show again, but the suit's own state must still be cleared.
+        if (_pilot != null && !_pilot.WasCollected) Conceal(false);
+        else
         {
-            Conceal(false);
-            RestoreHitboxes();
+            ForgeVisual.Models.ShowRenderers(_forcedOff);
+            _hidden = false;
         }
+        _hull.Remove();
         RestoreLight();
         Glow(false);
         Own(false);
@@ -820,16 +835,12 @@ internal sealed partial class FrameVisual : IBodySoundHandler
                 if (model != null) model.SetAllVisible(!hide);
             }
             if (hide) HideRenderers(agent);
-            else
-            {
-                foreach (var renderer in _forcedOff)
-                    if (renderer != null && !renderer.WasCollected) renderer.forceRenderingOff = false;
-                _forcedOff.Clear();
-            }
+            else ForgeVisual.Models.ShowRenderers(_forcedOff);
+
             _hidden = hide;
             _nextHideCheck = Time.time + 0.5f;
         }
-        catch (Exception error) { Plugin.Error("Hiding the exosuit pilot failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Hiding the exosuit pilot failed: " + error); }
     }
 
     private void HideRenderers(PlayerAgent agent)
@@ -839,15 +850,8 @@ internal sealed partial class FrameVisual : IBodySoundHandler
         if (model != null) ForceOff(model.gameObject);
     }
 
-    private void ForceOff(GameObject root)
-    {
-        foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
-        {
-            if (renderer == null || renderer.forceRenderingOff || _carry.Shows(renderer)) continue;
-            renderer.forceRenderingOff = true;
-            _forcedOff.Add(renderer);
-        }
-    }
+    private void ForceOff(GameObject root) => ForgeVisual.Models.HideRenderers(root.transform, _carry.Shows, _forcedOff);
+
 
     /// <summary>Every 0.5 s while the pilot is inside: renderers the game created since (a newly drawn weapon of a remote pilot) are
     /// turned off too. Nothing the game switched is switched back here; the renderers already off stay off by themselves.</summary>
@@ -858,39 +862,8 @@ internal sealed partial class FrameVisual : IBodySoundHandler
         HideRenderers(_pilot);
     }
 
-    private void ScaleHitboxes(PlayerAgent agent)
-    {
-        _hitboxes.Clear();
-        foreach (var limb in agent.GetComponentsInChildren<Dam_PlayerDamageLimb>(true))
-        {
-            var collider = limb.GetComponent<Collider>();
-            if (collider == null) continue;
-            var capsule = collider.TryCast<CapsuleCollider>();
-            var sphere = collider.TryCast<SphereCollider>();
-            var box = collider.TryCast<BoxCollider>();
-            if (capsule != null) { _hitboxes.Add((collider, Vector3.zero, capsule.radius, capsule.height)); capsule.radius *= HitboxScale; capsule.height *= HitboxScale; }
-            else if (sphere != null) { _hitboxes.Add((collider, Vector3.zero, sphere.radius, 0f)); sphere.radius *= HitboxScale; }
-            else if (box != null) { _hitboxes.Add((collider, box.size, 0f, 0f)); box.size *= HitboxScale; }
-        }
-    }
-
-    private void RestoreHitboxes()
-    {
-        foreach (var (collider, size, radius, height) in _hitboxes)
-        {
-            if (collider == null || collider.WasCollected) continue;
-            var capsule = collider.TryCast<CapsuleCollider>();
-            var sphere = collider.TryCast<SphereCollider>();
-            var box = collider.TryCast<BoxCollider>();
-            if (capsule != null) { capsule.radius = radius; capsule.height = height; }
-            else if (sphere != null) sphere.radius = radius;
-            else if (box != null) box.size = size;
-        }
-        _hitboxes.Clear();
-    }
-
-    /// <summary>A suit's barrier (the tank's, or the firepower's while planted) has no picture of its own: its raise, drop and hit sounds
-    /// (a hit is the barrier's strength dropping since the last frame), the push pulse and the pilot's barrier line.</summary>
+    /// <summary>A suit's barrier (the tank's, or the firepower's while planted) has no standing picture: its raise, drop and hit sounds
+    /// (a hit is the barrier's strength dropping since the last frame), a short flash on a hit and when it breaks, the push pulse and the pilot's barrier line.</summary>
     private void TickBarrier(FrameRecord r, float now)
     {
         var lost = r.Shield < _seenShield;
@@ -901,11 +874,13 @@ internal sealed partial class FrameVisual : IBodySoundHandler
         {
             _seenShieldUp = up;
             if (r.State == FrameState.Piloted) Sound(up ? FrameSound.ShieldUp : FrameSound.ShieldDown);
+            if (!up && !r.ShieldUp) BarrierFx(false); // emptied, not stood down
         }
         else if (lost && up && now >= _nextShieldHitSound)
         {
             _nextShieldHitSound = now + 0.25f;
             Sound(FrameSound.ShieldHit);
+            BarrierFx(true);
         }
     }
 
@@ -983,6 +958,7 @@ internal sealed partial class FrameVisual : IBodySoundHandler
 
     private void StopBoost()
     {
+        FrameFx.TrailEnd(ref _chargeTrail);
         if (_boostLoop != null && _boostLoop.State != PlaybackState.Ended) _boostLoop.Stop(0.2f);
         _boostLoop = null;
         _boostDimension = -1;
@@ -995,14 +971,4 @@ internal sealed partial class FrameVisual : IBodySoundHandler
         _servoDimension = -1;
     }
 
-    private static Transform? Find(Transform parent, string name)
-    {
-        if (parent.name == name) return parent;
-        for (var i = 0; i < parent.childCount; i++)
-        {
-            var found = Find(parent.GetChild(i), name);
-            if (found != null) return found;
-        }
-        return null;
-    }
 }

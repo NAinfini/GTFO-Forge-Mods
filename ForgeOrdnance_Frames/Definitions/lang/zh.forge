@@ -1,0 +1,10 @@
+{
+  "nainfini.frames.assault.Name": "天狼",
+  "nainfini.frames.assault.Description": "均衡型动力装甲。穿上后双联机枪占用你的副武器槽（弹药有限，不能补充）。特长：短距冲撞，撞开薄门、撞退敌人。",
+  "nainfini.frames.tank.Name": "泰山",
+  "nainfini.frames.tank.Description": "护甲最厚，副武器槽是重机枪。特长：战甲周围的能量盾挡下敌人对罩内所有人的攻击，打空即碎，停一会儿后回复。背着重物也不减速。",
+  "nainfini.frames.firepower.Name": "雷鸟",
+  "nainfini.frames.firepower.Description": "火力平台，重机枪伤害最高。特长：架设后站定不能走，射速更快、受伤更少。火箭键向准星所指处发射四枚肩扛火箭。",
+  "nainfini.frames.scout.Name": "夜鸮",
+  "nainfini.frames.scout.Description": "轻快型装甲，副武器槽是反器材步枪。特长：每 5 秒像生物追踪器一样标出 30 米内醒着的敌人。"
+}

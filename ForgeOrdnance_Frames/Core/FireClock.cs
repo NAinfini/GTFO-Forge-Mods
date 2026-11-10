@@ -10,7 +10,7 @@ namespace ForgeOrdnanceFrames;
 /// time to hand back to the game as its next-shot timer. Over any stretch of held fire the average interval is the target at any frame
 /// rate, and no frame fires more than <see cref="MaxPerFrame"/> shots.
 /// </summary>
-public sealed class FireClock
+internal sealed class FireClock
 {
     /// <summary>Shots in one frame at most (the game's own one included).</summary>
     public const int MaxPerFrame = 4;

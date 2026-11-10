@@ -1,9 +1,0 @@
-schema_version = "1.0.0"
-id = "frames_hinge"
-version = "1.0.0"
-name = "战甲开合"
-tagline = "Cut hinged plates and set their hinges by clicking"
-maintainer = "NAinfini"
-type = "add-on"
-blender_version_min = "5.2.0"
-license = ["SPDX:GPL-3.0-or-later"]

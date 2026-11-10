@@ -3,12 +3,12 @@ using System;
 namespace ForgeOrdnanceFrames;
 
 /// <summary>The rounds of the gun in the special slot as the pilot's cockpit shows them: a magazine, a reserve, the magazine size and the most the reserve holds (0: not known here).</summary>
-public readonly record struct SlotRounds(int Clip, int Reserve, int ClipSize, int ReserveMax);
+internal readonly record struct SlotRounds(int Clip, int Reserve, int ClipSize, int ReserveMax);
 
 /// <summary>How the suit's stock sits in the special slot, and what the slot is worth while a swap is on its way. The game assembles
 /// the new gun a moment after it is asked for and shows it empty until its rounds are written into it; the loan already knows what
 /// they will be, so the cockpit shows that stock from the first frame of the swap and never a zero in between.</summary>
-public static class SuitGunStock
+internal static class SuitGunStock
 {
     /// <summary>The split of the suit gun's stock: <paramref name="clip"/> rounds in the magazine (at most <paramref name="maxClip"/>) and the rest
     /// in the game's pack (at most <paramref name="packCap"/>); what does not fit waits as overflow and tops the pack up as it drains.</summary>
@@ -28,11 +28,11 @@ public static class SuitGunStock
         switch (loan.Pending)
         {
             case LoanGun.Suit:
-            {
-                var clip = clipSize > 0 ? Math.Min(loan.SuitClip, clipSize) : loan.SuitClip;
-                var reserve = loan.SuitClip - clip + loan.SuitReserve;
-                return new SlotRounds(clip, reserve, clipSize, Math.Max(suitStock - Math.Max(clipSize, clip), reserve));
-            }
+                {
+                    var clip = clipSize > 0 ? Math.Min(loan.SuitClip, clipSize) : loan.SuitClip;
+                    var reserve = loan.SuitClip - clip + loan.SuitReserve;
+                    return new SlotRounds(clip, reserve, clipSize, Math.Max(suitStock - Math.Max(clipSize, clip), reserve));
+                }
             case LoanGun.Own when loan.Own is { } own:
                 return new SlotRounds(own.Clip, costOfBullet > 0f ? (int)MathF.Round(own.Pool / costOfBullet) : 0, 0, 0);
             default:

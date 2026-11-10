@@ -20,7 +20,10 @@ trim) are never painted.
 
 The visor, the suit's brightest light and its focus: where the source head has lamps of its own (a lit visor, eyes) they glow, up to
 LAMP_LEVEL; else the largest dark patch of the helmet's face at eye height (the glass) glows at VISOR_LEVEL with a full eye band
-through its middle; else a slit is cut across the helmet's face at eye height at full brightness."""
+through its middle; else a slit is cut across the helmet's face at eye height at full brightness. VISORS overrides that per suit where the source head has no
+readable face: eyes or lenses drawn at measured places, or the lit lamps kept and a band added. VISOR_PANES lists the suits whose visor is an
+open hole in the source; build_frame.add_visor_pane closes it with a slab of glass mapped to PANE_TILE, and its eye band is drawn on the glass.
+LIT_TILE and PANE_TILE are the reserved strip's texels for the interior's light bars and that glass."""
 import math
 import os
 
@@ -55,6 +58,33 @@ SLIT_WIDE = 0.065      # m: half its width
 INSERT = 0.006         # m: half the width of the dark glass insert under the strip
 STEP = 0.001           # m: sample spacing along a line
 TILE_V = 0.965         # the atlas's reserved strip starts here (build_frame.py TILE_V)
+LIT_TILE = (0.140, 0.170, 0.965, 0.995)   # u0, u1, v0, v1: the reserved strip's lit tile (interior.LIT_U), the light bars in the opened suit
+LIT_LEVEL = 0.7        # its brightness in the emission map
+GLASS = (0.018, 0.022, 0.028)   # visor glass: nearly black, smooth, not metal; it glows faintly (GLASS_GLOW), so wear leaves it alone
+GLASS_GLOW = 0.07
+# The visors, each drawn on its helmet's real shape, in metres on the front view (x across, z up; only faces turned to the front):
+# glass: outline of the glass; band: (z at x=0, rise per metre of |x|, half height, half width) a line of light; eyes: (x, z, rx, rz, level) soft spots.
+VISORS = {
+    "M15": dict(glass=[(-0.09, 2.06), (0.09, 2.06), (0.06, 1.97), (0.034, 1.97), (0.034, 2.03), (-0.034, 2.03), (-0.034, 1.97), (-0.06, 1.97)]),
+    "M16": dict(eyes=[(-0.075, 2.315, 0.030, 0.019, 1.0), (0.075, 2.315, 0.030, 0.019, 1.0)]),
+    "M17": dict(lamps_glass=True, band=(2.030, 0.33, 0.0065, 0.13)),
+    "M18": dict(eyes=[(-0.054, 2.050, 0.0105, 0.0105, 1.0), (0.054, 2.050, 0.0105, 0.0105, 1.0), (-0.030, 1.991, 0.0085, 0.0085, 0.6), (0.030, 1.991, 0.0085, 0.0085, 0.6)]),
+}
+# A helmet whose source has an open hole for its glass (only the frame came with it): build_frame.add_visor_pane closes it with a real pane: a convex outline
+# (x, z in metres, on the front view, a little wider than the hole so the frame hides its edge), with its band of light as (z, half height).
+VISOR_PANES = {"M15": dict(outline=[(-0.100, 2.115), (0.100, 2.115), (0.085, 2.05), (0.04, 1.975), (-0.04, 1.975), (-0.085, 2.05)], band=(2.084, 0.0055))}
+PANE_TILE = (0.180, 0.240, 0.965, 0.995)   # u0, u1, v0, v1: the reserved strip's glass tile, the pane mapped flat on it
+
+
+def inside_polygon(x, z, polygon):
+    """Whether points (arrays x, z) lie inside the outline."""
+    inside = np.zeros(x.shape, bool)
+    for (x0, z0), (x1, z1) in zip(polygon, polygon[1:] + polygon[:1]):
+        crosses = (z0 > z) != (z1 > z)
+        inside ^= crosses & (x < x0 + (z - z0) * (x1 - x0) / (z1 - z0 + 1e-12))
+    return inside
+
+
 LIMBS = {"arm": ("upperarm", "forearm"), "leg": ("thigh", "shin")}
 AXES = {"upperarm": ("upperarm", "forearm"), "forearm": ("forearm", "hand"), "thigh": ("thigh", "shin"), "shin": ("shin", "foot")}
 # Slots: (group, facing, rails). Every slot is filled on each side on its own.
@@ -124,7 +154,7 @@ def samples(a, b):
     return [a.lerp(b, i / n) for i in range(n + 1)]
 
 
-def paint(bm, groups, joints, sources, textures, log):
+def paint(bm, groups, joints, sources, textures, log, model=None):
     """bm: the shut, triangulated shell (material 0 the armour, UV layer UVMap, deform weights); groups: vertex group index ->
     bone name; joints: joint name -> Vector (the rig's); sources and textures: {kind: png path} of the albedo, metallic and
     emission maps, read from sources and written to textures (never the same file: painting twice would paint over the strips).
@@ -469,7 +499,34 @@ def paint(bm, groups, joints, sources, textures, log):
     eye = joints["neck"].z + EYE * (joints["headtip"].z - joints["neck"].z)
     own = (lamps > 0.02) & keep
     how = ""
-    if own.sum() >= VISOR_LAMPS:
+    spec = VISORS.get(model)
+    glass = np.zeros((H, W), bool)
+    if spec:
+        lit_texels = 0
+        for f, xs, ys, world in rows:
+            if f.normal.y > -0.12:
+                continue
+            x, z = world[:, 0], world[:, 2]
+            level = np.zeros(xs.shape, np.float32)
+            if "glass" in spec or "lamps_glass" in spec:
+                pane = inside_polygon(x, z, spec["glass"]) if "glass" in spec else own[ys, xs]
+                glass[ys[pane], xs[pane]] = True
+                level[pane] = GLASS_GLOW
+            if "band" in spec:
+                z0, rise, half, wide = spec["band"]
+                line = np.clip(1.5 - np.abs(z - z0 - rise * np.abs(x)) / half, 0.0, 1.0) * np.clip((wide - np.abs(x)) / 0.012, 0.0, 1.0)
+                level = np.maximum(level, line * (pane if ("glass" in spec or "lamps_glass" in spec) else 1.0))
+            for ex, ez, rx, rz, peak in spec.get("eyes", ()):
+                r = np.sqrt(((x - ex) / rx) ** 2 + ((z - ez) / rz) ** 2)
+                level = np.maximum(level, peak * np.clip(1.6 - 1.2 * r, 0.0, 1.0))
+            visor[ys, xs] = np.maximum(visor[ys, xs], level)
+            lit_texels += int((level > 0).sum())
+        how = "drawn for %s (%d texels)" % (model, lit_texels)
+        albedo[glass, :3] = GLASS
+        metal[glass, 0] = 0.0
+        metal[glass, 1] = 0.9
+        metal[glass, 3] = 0.9
+    elif own.sum() >= VISOR_LAMPS:
         top = float(lamps[own].max())
         visor[own] = np.clip(lamps[own] / top, 0.0, 1.0) * LAMP_LEVEL
         how = "the head's own lamps (%d texels)" % int(own.sum())
@@ -522,6 +579,21 @@ def paint(bm, groups, joints, sources, textures, log):
     log("visor: %s; %d texels lit" % (how, int((visor > 0).sum())))
     light = visor.copy()
     light = np.maximum(light, strength * STRIP_LEVEL)
+    u0, u1, v0, v1 = LIT_TILE
+    light[int(v0 * H):int(v1 * H) + 1, int(u0 * W):int(u1 * W) + 1] = LIT_LEVEL
+    pane = VISOR_PANES.get(model)
+    if pane:
+        u0, u1, v0, v1 = PANE_TILE
+        r0, r1, c0, c1 = int(v0 * H), int(v1 * H) + 1, int(u0 * W), int(u1 * W) + 1
+        zs = [p[1] for p in pane["outline"]]
+        z = min(zs) + (np.arange(r0, r1) + 0.5 - v0 * H) / ((v1 - v0) * H) * (max(zs) - min(zs))
+        x = np.linspace(-1.0, 1.0, c1 - c0)
+        line = np.clip(1.5 - np.abs(z - pane["band"][0]) / pane["band"][1], 0.0, 1.0)[:, None] * np.clip((1.0 - np.abs(x)) / 0.1, 0.0, 1.0)[None, :]
+        light[r0:r1, c0:c1] = np.maximum(GLASS_GLOW, line)
+        albedo[r0:r1, c0:c1, :3] = GLASS
+        metal[r0:r1, c0:c1, 0] = 0.0
+        metal[r0:r1, c0:c1, 1] = 0.9
+        metal[r0:r1, c0:c1, 3] = 0.9
     emission[:, :, 0] = emission[:, :, 1] = emission[:, :, 2] = light
     emission[:, :, 3] = 1.0
     albedo[insert, :3] = albedo[insert, :3] * 0.15 + 0.02

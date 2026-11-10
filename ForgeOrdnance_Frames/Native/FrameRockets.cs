@@ -23,7 +23,8 @@ internal static class FrameRockets
     {
         internal float Start, Duration, Arc, Damage, Radius, Speed;
         internal int Index;
-        internal ForgeVisual.Trail? Tail;
+        /// <summary>The ribbon this rocket leaves along its flight; null before it first moves.</summary>
+        internal ForgeVisual.Trail? Trail;
         internal bool Fired;
         internal Vector3 From, To;
         internal FrameUnit Unit;
@@ -40,10 +41,10 @@ internal static class FrameRockets
     internal static void Launch(FrameUnit unit, FrameRocketMessage m, float now)
     {
         var spec = unit.Record.Spec.Rockets;
-        if (spec == null) { Plugin.Error("Exosuit rockets: suit " + unit.Record.ThrowId + " has no rockets; launch ignored."); return; }
+        if (spec == null) { Plugin.Logger.ErrorOnce("Exosuit rockets: suit " + unit.Record.ThrowId + " has no rockets; launch ignored."); return; }
         if (!float.IsFinite(m.TargetX) || !float.IsFinite(m.TargetY) || !float.IsFinite(m.TargetZ))
         {
-            Plugin.Error("Exosuit rockets: suit " + unit.Record.ThrowId + " received a non-finite target; launch ignored.");
+            Plugin.Logger.ErrorOnce("Exosuit rockets: suit " + unit.Record.ThrowId + " received a non-finite target; launch ignored.");
             return;
         }
         var target = new Vector3(m.TargetX, m.TargetY, m.TargetZ);
@@ -57,8 +58,14 @@ internal static class FrameRockets
             FrameRules.RocketShot(m.Seed, i, spec.Spread, out var dx, out var dz, out var delay);
             var rocket = new Rocket
             {
-                Start = now + delay, Damage = spec.Damage, Radius = spec.Radius, Speed = spec.Speed, Index = i, Unit = unit,
-                Round = spec.Launcher.Round, To = target + new Vector3(dx, 0f, dz),
+                Start = now + delay,
+                Damage = spec.Damage,
+                Radius = spec.Radius,
+                Speed = spec.Speed,
+                Index = i,
+                Unit = unit,
+                Round = spec.Launcher.Round,
+                To = target + new Vector3(dx, 0f, dz),
             };
             Aim(ref rocket, Origin(unit, i));
             Flying.Add(rocket);
@@ -95,8 +102,7 @@ internal static class FrameRockets
             if (r.Body == null) continue;
             var position = Point(in r, t);
             var ahead = Point(in r, Math.Min(1f, t + 0.02f)) - position;
-            r.Tail ??= FrameFx.RocketTail(position);
-            r.Tail?.Move(position, t);
+            FrameFx.RocketTrail(ref r.Trail, position);
             r.Body.transform.SetPositionAndRotation(position, ahead.sqrMagnitude > 1e-6f ? Quaternion.LookRotation(ahead) : r.Body.transform.rotation);
         }
     }
@@ -119,16 +125,16 @@ internal static class FrameRockets
 
     private static void Land(int slot, ref Rocket r)
     {
-        var ownsDamage = Flying.Settle(slot, SNet.IsMaster);
+        var ownsDamage = Flying.Settle(slot, ForgeCore.Session.IsHost);
         try
         {
-            r.Tail?.End();
-            r.Tail = null;
+            FrameFx.RocketTrail(ref r.Trail, r.To);
+            FrameFx.TrailEnd(ref r.Trail);
             if (r.Body != null && !r.Body.WasCollected) Give(r.Round, r.Body);
             r.Body = null;
             PlayExplosion(r.To);
         }
-        catch (Exception error) { Plugin.Error("Exosuit rocket landing presentation failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Exosuit rocket landing presentation failed: " + error); }
         finally
         {
             if (ownsDamage) Explode(r.To, r.Radius, r.Damage);
@@ -138,7 +144,7 @@ internal static class FrameRockets
     private static void Explode(Vector3 point, float radius, float damage)
     {
         try { ForgeCore.Combat.Explode(point, radius, damage, 0f); }
-        catch (Exception error) { Plugin.Error("Exosuit rocket explosion failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Exosuit rocket explosion failed: " + error); }
     }
 
     private static void PlayExplosion(Vector3 point)
@@ -160,9 +166,9 @@ internal static class FrameRockets
                 body.transform.position = at;
                 return body;
             }
-            Plugin.Error("Exosuit rockets: all " + pool.Capacity + " bodies of round '" + round + "' are in the air; this rocket is not drawn.");
+            Plugin.Logger.ErrorOnce("Exosuit rockets: all " + pool.Capacity + " bodies of round '" + round + "' are in the air; this rocket is not drawn.");
         }
-        catch (Exception error) { Plugin.Error("Exosuit rockets: a body of round '" + round + "' could not be made: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Exosuit rockets: a body of round '" + round + "' could not be made: " + error); }
         return null;
     }
 
@@ -187,8 +193,7 @@ internal static class FrameRockets
         {
             if (!Flying.IsLive(i)) continue;
             ref var rocket = ref Flying.At(i);
-            rocket.Tail?.End();
-            rocket.Tail = null;
+            FrameFx.TrailEnd(ref rocket.Trail);
             if (rocket.Body != null && !rocket.Body.WasCollected) Object.Destroy(rocket.Body);
         }
         foreach (var pool in Spare.Values) pool.Drain(spare => { if (spare != null && !spare.WasCollected) Object.Destroy(spare); });

@@ -11,7 +11,7 @@ namespace ForgeOrdnanceFrames;
 /// to the plain picture in <see cref="ShiftSeconds"/>; each block runs on its own clock. When each block comes on is the
 /// <see cref="BootPlan"/>; the pilot moves once the last block starts to come on, and the picture is whole once the last seam is gone. Leaving runs the blocks in reverse (outer pair first) under the red power-down word: glitch up, black, then the black
 /// clears once the pilot's head is out of the shell. The native overlay only draws what these functions return; nothing here allocates.</summary>
-public static class FrameBootScreen
+internal static class FrameBootScreen
 {
     public const int PanelCount = 10, SeamCount = 16, Groups = 5;
     /// <summary>How long a block's colour glitch takes to settle to the normal picture.</summary>
@@ -20,10 +20,11 @@ public static class FrameBootScreen
     public const float SeamHold = 0.12f, SeamFade = 0.16f;
     /// <summary>Leaving: block by block (outer pair first, one every <see cref="DownStep"/>) the picture glitches for
     /// <see cref="DownShiftSeconds"/> and goes black; every block is black at <see cref="DownDark"/>, when the pilot starts pulling out; the
-    /// black stays while the head is still in the shell (<see cref="PilotMotion.HeadOut"/>) and then clears over <see cref="DownClear"/>.</summary>
+    /// black stays while the pilot lands outside the suit and the camera eases to the player's own eye, then clears over
+    /// <see cref="DownClear"/>: never while the camera still stands inside the shell.</summary>
     public const float DownStep = 0.12f, DownShiftSeconds = 0.30f, DownClear = 0.15f;
     public const float DownDark = (Groups - 1) * DownStep + DownShiftSeconds;
-    public const float DownClearStart = DownDark + PilotMotion.HeadOut;
+    public const float DownClearStart = DownDark + PilotMotion.Land + FrameSequence.HandBackSeconds;
     public const float DownSeconds = DownClearStart + DownClear;
 
     // Panels, clockwise from the top left, in the unit square (x to the right, y up). Window (0 upper, 1 lower), 2 top, 3 bottom,
@@ -75,8 +76,14 @@ public static class FrameBootScreen
     /// <paramref name="starts"/> and this suit's rhythm. The power-down runs the blocks in reverse (the outer pair first).</summary>
     public static PowerOnTimeline Timeline(float[] starts) => new(Group, new PowerOnRhythm
     {
-        Starts = starts, ShiftSeconds = ShiftSeconds, SeamHold = SeamHold, SeamFade = SeamFade,
-        DownStep = DownStep, DownShiftSeconds = DownShiftSeconds, DownClearStart = DownClearStart, DownClear = DownClear,
+        Starts = starts,
+        ShiftSeconds = ShiftSeconds,
+        SeamHold = SeamHold,
+        SeamFade = SeamFade,
+        DownStep = DownStep,
+        DownShiftSeconds = DownShiftSeconds,
+        DownClearStart = DownClearStart,
+        DownClear = DownClear,
     });
 }
 
@@ -89,7 +96,7 @@ public static class FrameBootScreen
 /// reveal) and the message over the crosshair (<see cref="FrameBootMessage"/>, from <see cref="MessageStart"/>) runs on past the boarding:
 /// it locks at <see cref="LinkLock"/> with the ready voice and the crosshair arcs, and the whole power-on is over at <see cref="Settled"/>.
 /// </summary>
-public sealed class BootPlan
+internal sealed class BootPlan
 {
     /// <summary>The block starts: window, top and bottom, middle pair, upper pair, lower pair; not evenly spaced.</summary>
     public static readonly float[] DefaultStarts = { 0.20f, 0.36f, 0.56f, 0.74f, 0.95f };
@@ -145,17 +152,36 @@ public sealed class BootPlan
 /// <see cref="BootPlan.MessageStart"/>; the power-down word on the leaving clock, gone as the window block turns black), its colours
 /// (cyan-white, orange only on the SYNC stall, a red-blue split while NEURAL LINK OK decodes, red for SHUTDOWN) and its words (the NEURAL
 /// LINK header, five self-test lines under the bar, NEURAL LINK OK, SHUTDOWN).</summary>
-public static class FrameBootMessage
+internal static class FrameBootMessage
 {
     public static readonly BootMessageBeats Beats = new()
     {
-        IgniteEnd = 0.12f, BracketsStart = 0.04f, BracketsEnd = 0.20f, HeaderStart = 0.08f, HeaderEnd = 0.32f,
-        FillTimes = new[] { 0.15f, 0.50f, 0.75f, 1.15f, 1.30f }, FillValues = new[] { 0f, 0.35f, 0.48f, 0.92f, 1f },
-        StallStart = 0.50f, StallEnd = 0.78f, BarFlash = 0.08f,
-        CheckStarts = new[] { 0.42f, 0.58f, 0.74f, 0.90f, 1.06f }, CheckType = 0.10f, CheckOk = 0.12f, CheckStamp = 0.08f, ChecksFade = 1.60f, ChecksGone = 1.80f,
-        MessageStart = 1.32f, MessageLock = BootPlan.LinkLock - BootPlan.MessageStart, LockFlash = 0.07f, LockBurst = 0.25f, LockShake = 0.12f, FoldStart = 1.90f,
+        IgniteEnd = 0.12f,
+        BracketsStart = 0.04f,
+        BracketsEnd = 0.20f,
+        HeaderStart = 0.08f,
+        HeaderEnd = 0.32f,
+        FillTimes = new[] { 0.15f, 0.50f, 0.75f, 1.15f, 1.30f },
+        FillValues = new[] { 0f, 0.35f, 0.48f, 0.92f, 1f },
+        StallStart = 0.50f,
+        StallEnd = 0.78f,
+        BarFlash = 0.08f,
+        CheckStarts = new[] { 0.42f, 0.58f, 0.74f, 0.90f, 1.06f },
+        CheckType = 0.10f,
+        CheckOk = 0.12f,
+        CheckStamp = 0.08f,
+        ChecksFade = 1.60f,
+        ChecksGone = 1.80f,
+        MessageStart = 1.32f,
+        MessageLock = BootPlan.LinkLock - BootPlan.MessageStart,
+        LockFlash = 0.07f,
+        LockBurst = 0.25f,
+        LockShake = 0.12f,
+        FoldStart = 1.90f,
         Duration = BootPlan.Duration - BootPlan.MessageStart,
-        DownStart = 0.06f, DownDecoded = 0.28f, DownEnd = FrameBootScreen.DownDark,
+        DownStart = 0.06f,
+        DownDecoded = 0.28f,
+        DownEnd = FrameBootScreen.DownDark,
     };
 
     /// <summary>The crosshair and the two arcs either side of it (the magazine's, the heat's with its OVERHEAT label), the box the
@@ -175,26 +201,50 @@ public static class FrameBootMessage
     public static readonly HudColour StatusGreen = new(0.30f, 0.95f, 0.48f, 1f);
     public static readonly BootMessageLook Look = new()
     {
-        Accent = new(0.80f, 0.94f, 1f, 1f), Bright = new(0.957f, 0.965f, 0.957f, 1f), White = new(1f, 1f, 1f, 1f),
-        SplitLeft = new(1f, 0.29f, 0.23f, 1f), SplitRight = new(0.25f, 0.85f, 1f, 1f), Stall = new(1f, 0.56f, 0.17f, 1f),
-        Backing = new(0.016f, 0.03f, 0.047f, 0.62f), Down = new(1f, 0.25f, 0.2f, 1f),
-        MessagePx = 50f, HeaderPx = 16f, CheckPx = 16f, CheckRow = 20f, BarWidth = 420f, Cells = 24, CellHeight = 6f, CellGap = 3f,
-        HeaderY = 18f, CheckBase = 44f, LineY = 80f, MessageLift = 86f, Status = StatusGreen, Keepout = Keepout, DownPx = 64f, Width = 500f, Height = 320f,
+        Accent = new(0.80f, 0.94f, 1f, 1f),
+        Bright = new(0.957f, 0.965f, 0.957f, 1f),
+        White = new(1f, 1f, 1f, 1f),
+        SplitLeft = new(1f, 0.29f, 0.23f, 1f),
+        SplitRight = new(0.25f, 0.85f, 1f, 1f),
+        Stall = new(1f, 0.56f, 0.17f, 1f),
+        Backing = new(0.016f, 0.03f, 0.047f, 0.62f),
+        Down = new(1f, 0.25f, 0.2f, 1f),
+        MessagePx = 50f,
+        HeaderPx = 16f,
+        CheckPx = 16f,
+        CheckRow = 20f,
+        BarWidth = 420f,
+        Cells = 24,
+        CellHeight = 6f,
+        CellGap = 3f,
+        HeaderY = 18f,
+        CheckBase = 44f,
+        LineY = 80f,
+        MessageLift = 86f,
+        Status = StatusGreen,
+        Keepout = Keepout,
+        DownPx = 64f,
+        Width = 500f,
+        Height = 320f,
     };
 
     /// <summary>The words for a boarding of a suit with <paramref name="armorPercent"/> armour.</summary>
     public static BootMessageWords Words(FrameWords words, int armorPercent) => new()
     {
-        Header = words.LinkHeader, Stall = words.BootSync, Ok = words.BootOk, Message = words.Link, Down = words.Shutdown,
+        Header = words.LinkHeader,
+        Stall = words.BootSync,
+        Ok = words.BootOk,
+        Message = words.Link,
+        Down = words.Shutdown,
         Checks = new[] { words.BootSeal, FrameWords.Format(words.BootArmor, armorPercent), words.BootServos, words.BootWeapon, words.BootSensors },
     };
 }
 /// <summary>The cockpit's parts as the power-on and power-down see them: each ForgeUI element (or group of elements) of the cockpit
 /// belongs to one. They report in one after another (<see cref="CockpitParts.Order"/>: the top bars first, the crosshair arcs last) and power down with
 /// the panel block that covers them, the outer blocks first (<see cref="CockpitParts.DownGroup"/>), so each goes dark just before its block turns black.</summary>
-public enum CockpitPart : byte { Bars, Objectives, Skills, Teammates, Weapon, Radar, Arcs }
+internal enum CockpitPart : byte { Bars, Objectives, Skills, Teammates, Weapon, Radar, Arcs }
 
-public static class CockpitParts
+internal static class CockpitParts
 {
     public const int Count = 7;
 

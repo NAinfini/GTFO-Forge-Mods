@@ -5,7 +5,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>ForgeOrdnanceFrames</AssemblyName>
-    <Version>1.0.0</Version>
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
@@ -47,6 +46,5 @@
     <Reference Include="UnityEngine.PhysicsModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.PhysicsModule.dll" Private="false" />
     <Reference Include="UnityEngine.InputLegacyModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.InputLegacyModule.dll" Private="false" />
     <Reference Include="UnityEngine.AssetBundleModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.AssetBundleModule.dll" Private="false" />
-    <Reference Include="FPSRenderer" HintPath="$(GTFOBepInExPath)/interop/FPSRenderer.dll" Private="false" />
   </ItemGroup>
 </Project>

@@ -4,7 +4,7 @@ namespace ForgeOrdnanceFrames;
 /// by the game's own rules (a walk, run, jump or landing inside the enemy's own detection distance, a crouch inside 1.9 m); the suit
 /// makes every one of them <see cref="PilotMultiplier"/> times as far (ForgeCore's <c>PlayerNoise.Scale</c>). The suit's own landing,
 /// which has no pilot, is heard as far as that player's run: the multiplier times the game's default detection distance.</summary>
-public static class FrameNoise
+internal static class FrameNoise
 {
     /// <summary>How many times as far as an ordinary player's noise a piloted suit is heard, in every movement state.</summary>
     public const float PilotMultiplier = 2f;

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Player;
 using UnityEngine;
 
@@ -137,17 +136,5 @@ internal sealed class FrameCarry
         _displaced = true;
     }
 
-    private bool Extent(out Bounds bounds)
-    {
-        bounds = default;
-        var any = false;
-        for (var i = 0; i < _renderers.Length; i++)
-        {
-            var renderer = _renderers[i];
-            if (renderer == null || renderer.WasCollected) continue;
-            if (!any) { bounds = renderer.bounds; any = true; }
-            else bounds.Encapsulate(renderer.bounds);
-        }
-        return any && bounds.size.sqrMagnitude > 1e-6f;
-    }
+    private bool Extent(out Bounds bounds) => ForgeVisual.Models.WorldBounds(_renderers, out bounds) && bounds.size.sqrMagnitude > 1e-6f;
 }

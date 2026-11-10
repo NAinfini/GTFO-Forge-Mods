@@ -1,8 +1,8 @@
 #Requires -Version 7
 # Builds forge-frames.bundle: the four exosuits, each from the owner's finished cut file <Cut>/<model>_cut.draft.blend (cut and
-# hinged with tools/hinge_tool). The cut files are only read: the add-on's bake.py writes <Build>/cut/<model>_baked.blend from
-# each, build_frame.py builds that into <model>_rigged.blend/.fbx, <model>_rig.json, the four textures and the three lining
-# textures in -Assets/models/<model>, everything else goes under -Build. The pilot's leaving motion comes from
+# hinged with Tools/Blender/hinge_tool). The cut files are only read: the add-on's bake.py writes <Build>/cut/<model>_baked.blend from
+# each, build_frame.py builds that into <model>_rigged.blend/.fbx, <model>_rig.json, the four textures and the six lining
+# textures (fabric and bare metal) in -Assets/models/<model>, everything else goes under -Build. The pilot's leaving motion comes from
 # -Pilot (PilotMotion.fbx and motion.json, made by the pilot-motion scripts; only its PilotExit take is used). The parts shown with a suit (tools/props.json:
 # the rocket launcher and the rocket) come from their finished low-poly GLBs in -Props, staged by build_prop.py. Run from the
 # repository root:
@@ -31,7 +31,9 @@ $Props = [IO.Path]::GetFullPath($Props)
 # Model -> prefab name the definitions use ("Model" in the payload).
 $prefabs = @{ M15 = 'frame-m15'; M16 = 'frame-m16'; M17 = 'frame-m17'; M18 = 'frame-m18' }
 function CutFile([string]$m) { Join-Path $Cut "${m}_cut.draft.blend" }
-$textures = @('albedo', 'metallic', 'normal', 'emission', 'lining_albedo', 'lining_metallic', 'lining_normal')
+$textures = @('albedo', 'metallic', 'normal', 'emission', 'lining_albedo')
+# The lining's other maps are one set for every suit (interior.py writes the same files beside each model).
+$sharedTextures = @('lining_normal', 'lining_metallic', 'lining_metal_albedo', 'lining_metal_metallic', 'lining_metal_normal', 'lining_rubber_albedo', 'lining_rubber_metallic', 'lining_rubber_normal')
 $receipt = Join-Path $Build 'out/forge-frames.receipt.json'
 # Invalidate the previous success before any input/tool validation can fail.
 if (Test-Path -LiteralPath $receipt) { Remove-Item -LiteralPath $receipt -Force }
@@ -41,21 +43,23 @@ if (($Models | Sort-Object -Unique).Count -ne 4 -or $Models.Count -ne 4 -or @($M
 foreach ($path in @($Unity, $Blender, "$Pilot/PilotMotion.fbx", "$Pilot/motion.json")) {
     if (!(Test-Path -LiteralPath $path)) { throw "Missing required input: $path" }
 }
-$definitions = Get-Content -LiteralPath "$repo/Mods/ForgeOrdnance_Frames/Definitions/frames.json" -Raw | ConvertFrom-Json
+$definitions = Get-Content -LiteralPath "$repo/Mods/ForgeOrdnance_Frames/Definitions/frames.forge" -Raw | ConvertFrom-Json
 $stage = Join-Path $Build 'stage'
 $out = Join-Path $Build 'out'
 if (Test-Path -LiteralPath $stage) { Remove-SafeTree -Target $stage -Root $Build }
 New-Item -ItemType Directory -Force (Join-Path $stage 'frames'), $out | Out-Null
 
+$rigSkipped = $false
 foreach ($m in $Models) {
     $dir = Join-Path $Assets "models/$m"
+    if ($SkipRig -and (Test-Path -LiteralPath "$dir/${m}_rigged.fbx")) { $rigSkipped = $true }
     if (!$SkipRig -or !(Test-Path -LiteralPath "$dir/${m}_rigged.fbx")) {
         $file = CutFile $m
         if (!(Test-Path -LiteralPath $file)) { throw "Missing the cut file of ${m}: $file" }
         New-Item -ItemType Directory -Force $dir, (Join-Path $Build 'cut') | Out-Null
         # The hinges baked into each part's move, then the parts and their lining; thicken the shell, check it, rig and key the clips.
         $baked = Join-Path $Build "cut/${m}_baked.blend"
-        & $Blender --background --factory-startup --disable-autoexec --python-exit-code 1 $file --python "$tools/hinge_tool/bake.py" -- $baked (Join-Path $Build "cut/${m}_checks.json")
+        & $Blender --background --factory-startup --disable-autoexec --python-exit-code 1 $file --python (Join-Path $repo 'Tools/Blender/hinge_tool/bake.py') -- $baked (Join-Path $Build "cut/${m}_checks.json")
         if ($LASTEXITCODE -ne 0) { throw "Baking $m failed." }
         & $Blender --background --factory-startup --disable-autoexec --python-exit-code 1 $baked --python "$tools/build_frame.py" -- --model $m --out $dir
         if ($LASTEXITCODE -ne 0) { throw "Building $m failed." }
@@ -69,17 +73,20 @@ foreach ($m in $Models) {
     $definition = @($definitions | Where-Object { $_.Payload.Model -eq ("Frames:" + $prefabs[$m]) })
     if ($definition.Count -ne 1) { throw "Expected one definition using $($prefabs[$m])." }
     $parts = @($definition[0].Payload.Opening.Parts | ForEach-Object { $_.Node })
-    # The definition must open exactly the parts this build cut (frames.json lists <model>_rig.json's parts).
+    # The definition must open exactly the parts this build cut (frames.forge lists <model>_rig.json's parts).
     $built = @($rig.plates | ForEach-Object { $_.node } | Sort-Object)
     $listed = @($parts | Sort-Object)
-    if (($built -join ',') -ne ($listed -join ',')) { throw "frames.json opens $($listed -join ', ') for $m but the build cut $($built -join ', ')." }
+    if (($built -join ',') -ne ($listed -join ',')) { throw "frames.forge opens $($listed -join ', ') for $m but the build cut $($built -join ', ')." }
     # The pilot-slot rays the build checked (Blender origin and direction, six numbers each), for the Unity step's check.
     $entry = Get-Content -LiteralPath "$dir/${m}_entry.json" -Raw | ConvertFrom-Json
     $rays = @($entry.slotRays | ForEach-Object { $_ })
     # The parts the owner allowed into the body in the add-on (fh_allow "body"); the Unity step logs them instead of failing.
     $intoBody = @($rig.plates | Where-Object { $_.intoBody } | ForEach-Object { $_.node })
-    @{ prefab = $prefabs[$m]; height = $rig.height; opening = $parts; intoBody = $intoBody; slotRays = $rays; liningTriangles = $rig.liningTriangles } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath "$target/frame.json" -Encoding utf8NoBOM
+    @{ prefab = $prefabs[$m]; height = $rig.height; opening = $parts; intoBody = $intoBody; slotRays = $rays; liningTriangles = @($rig.liningTriangles) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath "$target/frame.json" -Encoding utf8NoBOM
 }
+$sharedStage = Join-Path $stage 'lining'
+New-Item -ItemType Directory -Force $sharedStage | Out-Null
+foreach ($kind in $sharedTextures) { Copy-Item -LiteralPath (Join-Path $Assets "models/$($Models[0])/$kind.png") -Destination "$sharedStage/$kind.png" }
 # The pilot's motion: the skeleton with its takes, and the leaving clip's root path and the eye at rest (pilot.json, read by FramesBundleBuild).
 $pilotStage = Join-Path $stage 'pilot'
 New-Item -ItemType Directory -Force $pilotStage | Out-Null
@@ -126,16 +133,31 @@ $hash = (Get-FileHash -LiteralPath $bundle -Algorithm SHA256).Hash.ToLowerInvari
 if (!(Select-String -LiteralPath $log -Pattern "FRAMES_BUNDLE_VERIFIED forge-frames.bundle $length bytes $hash" -SimpleMatch -Quiet)) { throw "This run did not verify the bundle; see $log" }
 Select-String -LiteralPath $log -Pattern '^FRAME ' | ForEach-Object { Write-Host $_.Line }
 Write-Host "Built and verified $bundle ($length bytes, $hash)."
-# The receipt pins only inputs that outlive the build: this repository's tools, definitions and props.json (keys relative to the
+if ($rigSkipped) {
+    # The models came from an earlier rig build, not from the tools hashed below: no receipt, so a package cannot pass this off as built from them.
+    if ($Install) {
+        New-Item -ItemType Directory -Force $Install | Out-Null
+        Copy-Item -LiteralPath $bundle -Destination (Join-Path $Install 'forge-frames.bundle') -Force
+        Write-Host "Installed the bundle into $Install."
+    }
+    Write-Warning '-SkipRig reused earlier rigged models: no receipt written, the package is not updated. Run without -SkipRig before packaging.'
+    return
+}
+# The receipt pins only inputs that outlive the build: this repository's tools (and Tools/Blender/hinge_tool), definitions and props.json (keys relative to the
 # repository), and the model sources under -Cut, -Pilot and -Props (keys "cut/", "pilot/", "props/" under the recorded roots).
-# The stage folder and the per-model outputs are rebuilt by every run, so they are never pinned.
+# The stage folder and the per-model outputs are rebuilt by every run, so they are never pinned. A packaging step (tools/package_*.py) is not an input
+# either: it only reads the finished bundle and its receipt, so changing how the zip is made must not make the models stale.
 $inputs = @{}
-$trackedInputs = @(Get-ChildItem -LiteralPath $tools -File -Recurse | Where-Object { $_.Extension -in '.cs', '.ps1', '.py' })
-$trackedInputs += Get-Item -LiteralPath "$repo/Mods/ForgeOrdnance_Frames/Definitions/frames.json"
+$trackedInputs = @(Get-ChildItem -LiteralPath $tools -File -Recurse | Where-Object { ($_.Extension -in '.cs', '.ps1', '.py') -and $_.Name -notlike 'package_*' })
+$trackedInputs += Get-Item -LiteralPath "$repo/Mods/ForgeOrdnance_Frames/Definitions/frames.forge"
 $trackedInputs += Get-Item -LiteralPath "$tools/props.json"
+# bake.py and the add-on modules it imports (Tools/Blender/hinge_tool) shape the models too.
+$trackedInputs += Get-ChildItem -LiteralPath "$repo/Tools/Blender/hinge_tool" -File | Where-Object { $_.Extension -in '.py', '.ps1' }
 foreach ($inputFile in $trackedInputs) {
     $relative = [IO.Path]::GetRelativePath($repo, $inputFile.FullName).Replace('\', '/')
-    $inputs[$relative] = (Get-FileHash -LiteralPath $inputFile.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    # Hashed as Git stores the file (CRLF read as LF, package_release.py text_sha256): a Windows checkout and the repository give one hash.
+    $text = [Text.Encoding]::Latin1.GetBytes([Text.Encoding]::Latin1.GetString([IO.File]::ReadAllBytes($inputFile.FullName)).Replace("`r`n", "`n"))
+    $inputs[$relative] = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($text)).ToLowerInvariant()
 }
 $sources = @{}
 $sourceFiles = @()
@@ -152,7 +174,7 @@ foreach ($source in $sourceFiles) {
     $key = $source[0] + '/' + [IO.Path]::GetRelativePath($source[1], $source[2]).Replace('\', '/')
     $sources[$key] = (Get-FileHash -LiteralPath $source[2] -Algorithm SHA256).Hash.ToLowerInvariant()
 }
-@{ format = 2; bundleBytes = $length; bundleSha256 = $hash; models = @($Models | ForEach-Object { $prefabs[$_] } | Sort-Object); props = @($propList | Sort-Object)
+@{ format = 3; bundleBytes = $length; bundleSha256 = $hash; models = @($Models | ForEach-Object { $prefabs[$_] } | Sort-Object); props = @($propList | Sort-Object)
    roots = @{ cut = $Cut; pilot = $Pilot; props = $Props }; inputs = $inputs; sources = $sources } |
     ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $receipt -Encoding utf8NoBOM
 # The package keeps the verified bundle and its receipt in its own Assets/Models, where package_release.py reads them (the build folder is disposable).

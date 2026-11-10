@@ -1,12 +1,10 @@
-using System;
-
 namespace ForgeOrdnanceFrames;
 
 /// <summary>What the suit does to guns, as two separate things. Handling (the suit steadies whatever gun the pilot holds while piloting:
 /// the suit gun and the pilot's own primary and special alike): recoil is <see cref="Recoil"/> of the gun's own and the reload takes
 /// <see cref="Reload"/> of its own time; leaving the suit gives every gun its own values back at once. Numbers (only the suit's own gun):
 /// <see cref="Damage"/> and <see cref="FireRate"/>; the pilot's own guns keep the game's damage, fire rate and magazine.</summary>
-public static class GunHandling
+internal static class GunHandling
 {
     /// <summary>Recoil share of any gun held while piloting: the model's <see cref="WeaponSpec.RecoilMultiplier"/>, times the siege's
     /// <see cref="SiegeSpec.RecoilMultiplier"/> while planted.</summary>

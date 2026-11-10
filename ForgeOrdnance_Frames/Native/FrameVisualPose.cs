@@ -36,7 +36,7 @@ internal sealed partial class FrameVisual
         _heldCopy = Models.MirrorHeld(agent, _root.layer, PoseLabel);
         _heldCopy.ShadowOnly(_ownHidden);
         _syncIK = agent.SyncIK != null ? agent.SyncIK.Pointer : IntPtr.Zero;
-        PoseAfterIK.Hooks.Ensure();
+        PoseAfterIK.Ensure();
     }
 
     /// <summary>The pilot's body just had its hands put on its grips, after this suit already followed it this frame: follow again.</summary>
@@ -52,9 +52,41 @@ internal sealed partial class FrameVisual
         if (_copy == null || _pose == null) return;
         if (!_copy.Apply()) { Unpose(); return; }
         _posed = true;
+        ChargeLean(now);
         if (_heldCopy == null) return;
         if (now >= _nextHeldCheck) { _nextHeldCheck = now + HeldCheck; _heldCopy.Refresh(); }
         _heldCopy.Place(_copy.Turn, _copy.Source(FrameBodyRig.RightHandLink), _pose.Bone(FrameBodyRig.RightHandLink), _copy.Scale);
+    }
+
+    // The assault charge, for everyone watching this suit (the pilot's own camera is the game's, never this): the upper body leans into the run
+    // while it lasts, and a hit on a door or an enemy drives the right shoulder forward once.
+    private const float LeanIn = 0.25f, LeanOut = 0.35f, LeanSpine = 9f, LeanChest = 14f, BumpSeconds = 0.4f, BumpPitch = 8f, BumpTurn = 32f;
+    private float _lean, _bumpAt = -99f;
+
+    /// <summary>After the pilot's pose was copied: the charge's lean and shoulder bash on the spine and chest.</summary>
+    private void ChargeLean(float now)
+    {
+        var record = _unit.Record;
+        var charging = record.State == FrameState.Piloted && record.Boosting(now);
+        _lean = Mathf.MoveTowards(_lean, charging ? 1f : 0f, Time.deltaTime / (charging ? LeanIn : LeanOut));
+        var age = now - _bumpAt;
+        var bash = age >= 0f && age < BumpSeconds ? Mathf.Sin(age / BumpSeconds * Mathf.PI) : 0f;
+        if (_lean <= 0f && bash <= 0f) return;
+        var spine = _pose!.Bone(SpineLink);
+        var chest = _pose.Bone(ChestLink);
+        if (spine == null || chest == null) return;
+        var right = _root.transform.right;
+        spine.rotation = Quaternion.AngleAxis(LeanSpine * _lean, right) * spine.rotation;
+        chest.rotation = Quaternion.AngleAxis(LeanChest * _lean + BumpPitch * bash, right) * Quaternion.AngleAxis(-BumpTurn * bash, _root.transform.up) * chest.rotation;
+    }
+
+    private const int SpineLink = 1, ChestLink = 2;
+
+    /// <summary>The charge's shoulder hit something: the bash and its impact at <paramref name="point"/>.</summary>
+    internal void Bash(Vector3 point, Vector3 forward)
+    {
+        _bumpAt = Time.time;
+        FrameFx.Bash(point, forward, SuitGlow);
     }
 
     /// <summary>The suit stops following its pilot (no pilot, boarding, leaving): its held item goes and its bones go back to rest.</summary>

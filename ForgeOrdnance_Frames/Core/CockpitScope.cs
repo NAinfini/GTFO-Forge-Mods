@@ -1,7 +1,7 @@
 namespace ForgeOrdnanceFrames;
 
 /// <summary>Where the local player is with a suit, as far as the screen is concerned.</summary>
-public enum CockpitPhase : byte
+internal enum CockpitPhase : byte
 {
     /// <summary>No suit: the game's HUD is whole and nothing of the cockpit shows.</summary>
     Off,
@@ -28,7 +28,7 @@ public enum CockpitPhase : byte
 /// changes happen under a black screen. The native side mirrors <see cref="HideGameHud"/>, <see cref="MoveChat"/> and
 /// <see cref="Cockpit"/> onto ForgeUI and takes the game's HUD again whenever it is wanted and not held.
 /// </summary>
-public sealed class CockpitScope
+internal sealed class CockpitScope
 {
     public CockpitPhase Phase { get; private set; } = CockpitPhase.Off;
 

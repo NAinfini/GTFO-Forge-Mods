@@ -8,9 +8,9 @@ using UnityEngine;
 
 /// <summary>Builds forge-frames.bundle (Unity 2019.4.21f1, the game's version) from the stage build_assets.ps1 wrote:
 /// stage/frames/&lt;prefab&gt;/ holds model.fbx (skinned, takes open/close; sub-mesh 0 the armour on the texture atlas,
-/// sub-mesh 1 the parts' lining, UVs tiling), albedo.png, metallic.png, normal.png, emission.png (the lights in grey, the light strips white),
-/// lining_albedo.png, lining_metallic.png, lining_normal.png (tiling) and frame.json (height, the definition's opening parts,
-/// the lining's triangle count). Each frame becomes a prefab
+/// sub-meshes 1 to 3 the inside: fabric, metal, rubber), albedo.png, metallic.png, normal.png, emission.png (the lights in grey, the light strips white),
+/// lining_albedo.png (the fabric's colours) and frame.json (height, the definition's opening parts,
+/// the inside's triangle counts). stage/lining/ holds the inside's other maps, one set for every suit. Each frame becomes a prefab
 /// "&lt;prefab&gt;": an empty root with the imported model as child "model" (facing +Z by the export convention), a legacy
 /// Animation component on "model" holding the two opening clips ("open" and "close", cut down to the opening parts' bones, which
 /// FrameVisual samples; a worn suit's limbs follow its pilot's own game body), the bones at their bind pose, and renderers without materials (the plugin builds them with the
@@ -22,7 +22,7 @@ using UnityEngine;
 /// Environment: FORGE_FRAMES_STAGE (input) and FORGE_FRAMES_OUT (output folder).</summary>
 public static class FramesBundleBuild
 {
-    [Serializable] public sealed class FrameStage { public string prefab; public float height; public string[] opening, intoBody; public float[] slotRays; public int liningTriangles; }
+    [Serializable] public sealed class FrameStage { public string prefab; public float height; public string[] opening, intoBody; public float[] slotRays; public int[] liningTriangles; }
     [Serializable] public sealed class ProfileRenderer { public string name; public string[] surfaces; }
     [Serializable] public sealed class ProfilePrefab { public string name; public ProfileRenderer[] renderers; public string[] anchors; }
     [Serializable] public sealed class ProfileSurface { public string key, albedo, metallic, normal, emission; public float[] emissionColor; }
@@ -46,8 +46,13 @@ public static class FramesBundleBuild
     const float SlotDepth = 1f;
     /// <summary>Metres: every opening part's centre moves at least this far in the open clip, and ends at most this much nearer the body's nearest axis (a plate tucked under its neighbour).</summary>
     const float MovesAtLeast = 0.002f, TuckAtMost = 0.03f;
-    /// <summary>The lining textures' size (they tile).</summary>
-    const int LiningSize = 512;
+    /// <summary>The inside's textures: the fabric atlas (sub-mesh 1) and the tiling metal (2) and rubber (3); file stem in stage/lining and size.</summary>
+    const int FabricSize = 1024, LiningSize = 512;
+    static readonly (string name, string file, int size)[] LiningKinds = { ("lining", "lining", FabricSize), ("lining-metal", "lining_metal", LiningSize), ("lining-rubber", "lining_rubber", LiningSize) };
+    /// <summary>The asset name of a map every suit shares.</summary>
+    static string SharedMap(string file, string map) => "frames-" + file.Replace('_', '-') + "-" + map;
+    /// <summary>The armour atlas (albedo) and the metal-smoothness map; the normal and emission maps stay at 2048.</summary>
+    const int AtlasSize = 4096, MetalSize = 2048, DetailSize = 2048;
     /// <summary>The body's axes, by bone kind: each runs from that bone to this one (build_frame.py's rig: a limb from its joint to the next, the trunk from the pelvis up to the neck).</summary>
     static readonly Dictionary<string, string> AxisEnd = new Dictionary<string, string>
     {
@@ -80,6 +85,14 @@ public static class FramesBundleBuild
         var assets = new List<(string path, string name)>();
         var prefabs = new List<ProfilePrefab>();
         var surfaces = new List<ProfileSurface>();
+        // The inside's maps every suit shares: only the fabric's colour map is a suit's own.
+        foreach (var kind in LiningKinds)
+        {
+            var maps = Stage + "/lining/" + kind.file + "_";
+            if (kind.file != "lining") assets.Add((Texture(maps + "albedo.png", TextureImporterType.Default, true, kind.size), SharedMap(kind.file, "albedo")));
+            assets.Add((Texture(maps + "metallic.png", TextureImporterType.Default, false, kind.size), SharedMap(kind.file, "metallic")));
+            assets.Add((Texture(maps + "normal.png", TextureImporterType.NormalMap, false, kind.size), SharedMap(kind.file, "normal")));
+        }
         foreach (var dir in Directory.GetDirectories(Path.Combine(project, Stage, "frames")).OrderBy(d => d, StringComparer.Ordinal))
         {
             var stage = JsonUtility.FromJson<FrameStage>(File.ReadAllText(Path.Combine(dir, "frame.json")));
@@ -90,21 +103,26 @@ public static class FramesBundleBuild
             var metallic = stage.prefab + "-body-metallic";
             var normal = stage.prefab + "-body-normal";
             var emission = stage.prefab + "-body-emission";
-            assets.Add((Texture(folder + "/albedo.png", TextureImporterType.Default, true, 2048), albedo));
-            assets.Add((Texture(folder + "/metallic.png", TextureImporterType.Default, false, 1024), metallic));
-            assets.Add((Texture(folder + "/normal.png", TextureImporterType.NormalMap, false, 2048), normal));
-            assets.Add((Texture(folder + "/emission.png", TextureImporterType.Default, true, 2048), emission));
+            assets.Add((Texture(folder + "/albedo.png", TextureImporterType.Default, true, AtlasSize), albedo));
+            assets.Add((Texture(folder + "/metallic.png", TextureImporterType.Default, false, MetalSize), metallic));
+            assets.Add((Texture(folder + "/normal.png", TextureImporterType.NormalMap, false, DetailSize), normal));
+            assets.Add((Texture(folder + "/emission.png", TextureImporterType.Default, true, DetailSize), emission));
             // The lights in grey (sRGB); ForgeOrdnance scales them by this gain (_EmissiveMap x _EmissiveColor on the gear shader), each suit then by its state's colour.
             surfaces.Add(new ProfileSurface { key = key, albedo = albedo, metallic = metallic, normal = normal, emission = emission, emissionColor = LightColour });
-            // The parts' lining, "<prefab>/lining": tiling textures, no lights.
-            var liningKey = stage.prefab + "/lining";
-            var liningAlbedo = stage.prefab + "-lining-albedo";
-            var liningMetallic = stage.prefab + "-lining-metallic";
-            var liningNormal = stage.prefab + "-lining-normal";
-            assets.Add((Texture(folder + "/lining_albedo.png", TextureImporterType.Default, true, LiningSize), liningAlbedo));
-            assets.Add((Texture(folder + "/lining_metallic.png", TextureImporterType.Default, false, LiningSize), liningMetallic));
-            assets.Add((Texture(folder + "/lining_normal.png", TextureImporterType.NormalMap, false, LiningSize), liningNormal));
-            surfaces.Add(new ProfileSurface { key = liningKey, albedo = liningAlbedo, metallic = liningMetallic, normal = liningNormal, emission = "", emissionColor = new float[0] });
+            // The inside: sub-mesh 1 "<prefab>/lining" (fabric, the suit's own colours), 2 "<prefab>/lining-metal" and 3 "<prefab>/lining-rubber"; no lights.
+            var liningKeys = new string[LiningKinds.Length];
+            for (var kind = 0; kind < LiningKinds.Length; kind++)
+            {
+                var file = LiningKinds[kind].file;
+                var liningKey = liningKeys[kind] = stage.prefab + "/" + LiningKinds[kind].name;
+                var liningAlbedo = SharedMap(file, "albedo");
+                if (kind == 0)
+                {
+                    liningAlbedo = stage.prefab + "-lining-albedo";
+                    assets.Add((Texture(folder + "/lining_albedo.png", TextureImporterType.Default, true, FabricSize), liningAlbedo));
+                }
+                surfaces.Add(new ProfileSurface { key = liningKey, albedo = liningAlbedo, metallic = SharedMap(file, "metallic"), normal = SharedMap(file, "normal"), emission = "", emissionColor = new float[0] });
+            }
 
             var modelPath = folder + "/model.fbx";
             var importer = (ModelImporter)AssetImporter.GetAtPath(modelPath) ?? throw new InvalidDataException("No model importer for " + modelPath);
@@ -127,9 +145,12 @@ public static class FramesBundleBuild
                 var fps = take.sampleRate > 0 ? take.sampleRate : 30f;
                 clips.Add(new ModelImporterClipAnimation
                 {
-                    name = clip, takeName = take.name,
-                    firstFrame = take.startTime * fps, lastFrame = take.stopTime * fps,
-                    loopTime = false, wrapMode = WrapMode.ClampForever,
+                    name = clip,
+                    takeName = take.name,
+                    firstFrame = take.startTime * fps,
+                    lastFrame = take.stopTime * fps,
+                    loopTime = false,
+                    wrapMode = WrapMode.ClampForever,
                 });
             }
             importer.clipAnimations = clips.ToArray();
@@ -171,7 +192,7 @@ public static class FramesBundleBuild
             PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
             UnityEngine.Object.DestroyImmediate(root);
             assets.Add((prefabPath, stage.prefab));
-            prefabs.Add(new ProfilePrefab { name = stage.prefab, renderers = new[] { new ProfileRenderer { name = rendererPath, surfaces = new[] { key, liningKey } } }, anchors = new string[0] });
+            prefabs.Add(new ProfilePrefab { name = stage.prefab, renderers = new[] { new ProfileRenderer { name = rendererPath, surfaces = new[] { key, liningKeys[0], liningKeys[1], liningKeys[2] } } }, anchors = new string[0] });
         }
 
         assets.Add((Pilot(project), PilotPrefab));
@@ -546,6 +567,9 @@ public static class FramesBundleBuild
     /// set (x = its vertex index), so the check sees Blender's topology rather than Unity's
     /// split vertices: every shell edge must be used by exactly two triangles running opposite ways, and every connected shell
     /// piece must enclose positive volume.</summary>
+    /// <summary>Per model, the imported sub-mesh holding the armour, the fabric lining and the bare-metal lining (CheckSurface); ShippedMesh puts them in that order.</summary>
+    static int[] SubmeshOrder;
+
     static void CheckSurface(FrameStage stage, Mesh mesh)
     {
         var prefab = stage.prefab;
@@ -554,10 +578,21 @@ public static class FramesBundleBuild
         var tris = mesh.triangles;
         var positions = mesh.vertices;
         if (ids == null || ids.Length != uv.Length) throw new InvalidDataException(prefab + " has no vertex-id UV set; rebuild it with build_frame.py.");
-        if (mesh.subMeshCount != 2) throw new InvalidDataException(prefab + " has " + mesh.subMeshCount + " sub-meshes; expected the armour and the lining.");
-        var lining = mesh.GetTriangles(1).Length / 3;
-        if (stage.liningTriangles <= 0 || lining != stage.liningTriangles) throw new InvalidDataException(prefab + " lining sub-mesh has " + lining + " triangles; the build made " + stage.liningTriangles + ".");
-        foreach (var i in mesh.GetTriangles(0))
+        if (mesh.subMeshCount != 4) throw new InvalidDataException(prefab + " has " + mesh.subMeshCount + " sub-meshes; expected the armour and the fabric, bare-metal and rubber linings.");
+        if (stage.liningTriangles == null || stage.liningTriangles.Length != 3) throw new InvalidDataException(prefab + " frame.json lists no fabric, bare-metal and rubber lining triangle counts.");
+        // The importer orders the sub-meshes by first use, not by the build's material order: find each kind by its triangle count.
+        var lining = 0;
+        SubmeshOrder = new[] { -1, -1, -1, -1 };
+        for (var kind = 0; kind < 3; kind++)
+        {
+            var want = stage.liningTriangles[kind];
+            for (var sub = 0; sub < 4; sub++)
+                if (mesh.GetTriangles(sub).Length / 3 == want && Array.IndexOf(SubmeshOrder, sub) < 0 && SubmeshOrder[kind + 1] < 0) SubmeshOrder[kind + 1] = sub;
+            if (want <= 0 || SubmeshOrder[kind + 1] < 0) throw new InvalidDataException(prefab + " has no sub-mesh with the " + want + " " + LiningKinds[kind].name + " triangles the build made.");
+            lining += want;
+        }
+        SubmeshOrder[0] = Enumerable.Range(0, 4).First(i => Array.IndexOf(SubmeshOrder, i) < 0);
+        foreach (var i in mesh.GetTriangles(SubmeshOrder[0]))
             if (!(uv[i].x >= 0f && uv[i].x <= 1f && uv[i].y >= 0f && uv[i].y <= 1f))
                 throw new InvalidDataException(prefab + " has an armour UV outside the atlas: " + uv[i].ToString("F4"));
         var edges = new Dictionary<long, int>();
@@ -604,6 +639,8 @@ public static class FramesBundleBuild
         var mesh = UnityEngine.Object.Instantiate(imported);
         mesh.name = imported.name;
         mesh.uv2 = new Vector2[0];
+        var parts = SubmeshOrder.Select(i => imported.GetTriangles(i)).ToArray();
+        for (var i = 0; i < parts.Length; i++) mesh.SetTriangles(parts[i], i);
         if (mesh.uv2.Length != 0) throw new InvalidOperationException("Could not drop the id UV set from " + imported.name + ".");
         if (!mesh.isReadable) throw new InvalidOperationException(imported.name + " copy is not readable; the first-person shell cuts it at run time.");
         AssetDatabase.CreateAsset(mesh, path);
@@ -759,11 +796,12 @@ public static class FramesBundleBuild
                     VerifyTexture(bundle, s.metallic, propSize);
                     continue;
                 }
-                var lining = s.key.EndsWith("/lining", StringComparison.Ordinal);
-                VerifyTexture(bundle, s.albedo, lining ? LiningSize : 2048);
-                VerifyTexture(bundle, s.normal, lining ? LiningSize : 2048);
-                VerifyTexture(bundle, s.metallic, lining ? LiningSize : 1024);
-                if (!lining) VerifyTexture(bundle, s.emission, 2048);
+                var kind = Array.FindIndex(LiningKinds, k => s.key.EndsWith("/" + k.name, StringComparison.Ordinal));
+                var lining = kind >= 0;
+                VerifyTexture(bundle, s.albedo, lining ? LiningKinds[kind].size : AtlasSize);
+                VerifyTexture(bundle, s.normal, lining ? LiningKinds[kind].size : DetailSize);
+                VerifyTexture(bundle, s.metallic, lining ? LiningKinds[kind].size : MetalSize);
+                if (!lining) VerifyTexture(bundle, s.emission, DetailSize);
             }
         }
         finally { bundle.Unload(true); }

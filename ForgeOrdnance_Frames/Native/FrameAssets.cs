@@ -18,9 +18,6 @@ internal static class FrameAssets
     internal const string BundleFile = "forge-frames.bundle";
     private static BundleHandle? _registered;
 
-    private static string BundlePath => Path.Combine(Path.GetDirectoryName(typeof(FrameAssets).Assembly.Location)
-        ?? throw new InvalidOperationException("The plugin folder is unknown."), BundleFile);
-
     /// <summary>This plugin's own pack once a level has been built (before that nothing can be spawned or worn), else null.</summary>
     internal static BundleHandle? Bundle { get; private set; }
     internal static string? Failure { get; private set; }
@@ -30,13 +27,13 @@ internal static class FrameAssets
     {
         try
         {
-            _registered = Bundles.Register(Plugin.Id, Pack, BundlePath)
+            _registered = Bundles.Register(Plugin.Id, Pack, BundleFile)
                 ?? throw new InvalidDataException("ForgeVisual did not register " + BundleFile + " (its error is in the log)");
         }
         catch (Exception error)
         {
             Failure = error.Message;
-            Plugin.Error("Exosuit art could not be loaded; suits cannot be shown or boarded: " + error);
+            Plugin.Logger.ErrorOnce("Exosuit art could not be loaded; suits cannot be shown or boarded: " + error);
         }
     }
 
@@ -62,7 +59,7 @@ internal static class FrameAssets
         {
             GameObject Prefab(string name)
             {
-                if (!FrameModelName.TrySplit(name, out var pack, out var item)) throw new InvalidDataException("'" + name + "' is not Pack:item.");
+                if (!ForgeCore.PackItem.TrySplit(name, out var pack, out var item)) throw new InvalidDataException("'" + name + "' is not Pack:item.");
                 if (!Bundles.TryGet(pack, out var bundle))
                     throw new InvalidDataException("no ForgeVisual pack '" + pack + "' is registered" + (pack == Pack && Failure != null ? " (" + Failure + ")" : "; its mod must register it with Bundles.Register in its plugin Load"));
                 return bundle.TryModel(item, out var model) ? model.Prefab : throw new InvalidDataException("pack '" + pack + "' has no prefab '" + item + "'.");
@@ -70,7 +67,7 @@ internal static class FrameAssets
             var suit = Prefab(spec.Model);
             if (suit.GetComponentsInChildren<SkinnedMeshRenderer>(true).Length == 0)
                 throw new InvalidDataException("Model '" + spec.Model + "' has no skinned renderer.");
-            var missing = FrameBodyRig.MissingNodes(spec, name => Child(suit.transform, name) != null).ToList();
+            var missing = FrameBodyRig.MissingNodes(spec, name => Models.Find(suit.transform, name) != null).ToList();
             if (missing.Count > 0)
             {
                 field = missing[0].Field;
@@ -84,22 +81,13 @@ internal static class FrameAssets
                 field = "Rockets.Launcher.Pod";
                 var pod = Prefab(launcher.Pod);
                 if (pod.GetComponentsInChildren<MeshRenderer>(true).Length != 1) throw new InvalidDataException("Launcher '" + launcher.Pod + "' must have one mesh renderer.");
-                if (Child(pod.transform, FrameRocketRack.FirstMuzzle) == null) throw new InvalidDataException("Launcher '" + launcher.Pod + "' has no tube " + FrameRocketRack.FirstMuzzle + ".");
+                if (Models.Find(pod.transform, FrameRocketRack.FirstMuzzle) == null) throw new InvalidDataException("Launcher '" + launcher.Pod + "' has no tube " + FrameRocketRack.FirstMuzzle + ".");
                 field = "Rockets.Launcher.Round";
                 if (Prefab(launcher.Round).GetComponentsInChildren<MeshRenderer>(true).Length != 1) throw new InvalidDataException("Rocket '" + launcher.Round + "' must have one mesh renderer.");
             }
         }
         catch (Exception error) { throw new ForgeCore.StrictJsonException(field, error.Message); }
         FrameHudArt.Expect(spec.Model);
-    }
-
-    /// <summary>The descendant of <paramref name="root"/> named <paramref name="name"/>, or null.</summary>
-    internal static Transform? Child(Transform root, string name)
-    {
-        if (root.name == name) return root;
-        for (var i = 0; i < root.childCount; i++)
-            if (Child(root.GetChild(i), name) is { } found) return found;
-        return null;
     }
 
     /// <summary>A new instance of the suit model <paramref name="model"/> (<c>Pack:item</c>) with its game-shaded materials (ForgeVisual's
@@ -110,7 +98,7 @@ internal static class FrameAssets
         var instance = handle.Spawn(position, rotation);
         if (instance == null) return null;
         var renderers = instance.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-        if (renderers.Length == 0) { Object.Destroy(instance); Plugin.Error("Exosuit model '" + model + "' has no skinned renderer."); return null; }
+        if (renderers.Length == 0) { Object.Destroy(instance); Plugin.Logger.ErrorOnce("Exosuit model '" + model + "' has no skinned renderer."); return null; }
         return instance;
     }
 

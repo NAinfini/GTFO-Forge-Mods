@@ -1,0 +1,201 @@
+{
+ "Slots": {
+  "frame.backblast": {
+   "Item": "Compose_frame_backblast_ad2ec2f4",
+   "Scale": 1.3,
+   "Seconds": 0.12,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.6471,
+     0.3216
+    ],
+    "Range": 1.5,
+    "Peak": 3,
+    "Life": 0.06
+   }
+  },
+  "frame.charge": {
+   "None": true
+  },
+  "frame.charge.dust": {
+   "Item": "Recipe_frame_charge_dust_c0cb01",
+   "Scale": 1,
+   "Seconds": 0.1,
+   "AxisUp": true
+  },
+  "frame.eject": {
+   "Item": "Compose_frame_eject_1c321a35",
+   "Scale": 1.4,
+   "AxisUp": true
+  },
+  "frame.explode": {
+   "Item": "Triple_A_Sci_fi_effects_cc4eca32_a9bfe7",
+   "Size": 14.6,
+   "Seconds": 0.33,
+   "AxisUp": true,
+   "AlwaysDraw": true,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.5216,
+     0.2
+    ],
+    "Range": 25,
+    "Peak": 5,
+    "Life": 0.45
+   }
+  },
+  "frame.gun.muzzle": {
+   "Item": "War_FX_c888f0c9_50dafc",
+   "Scale": 0.8564,
+   "Seconds": 0.12,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.6902,
+     0.3765
+    ],
+    "Range": 3,
+    "Peak": 3,
+    "Life": 0.05,
+    "Flicker": 0.2
+   }
+  },
+  "frame.heat": {
+   "Item": "Recipe_frame_heat_c4b078",
+   "Scale": 1,
+   "AxisUp": true
+  },
+  "frame.kick": {
+   "Item": "Recipe_frame_kick_a25d9b_16662b",
+   "Scale": 1,
+   "AxisUp": true
+  },
+  "frame.landing": {
+   "Item": "Compose_frame_landing_2bb592ce",
+   "Scale": 1,
+   "AxisUp": true,
+   "AlwaysDraw": true,
+   "Light": {
+    "Colour": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "Range": 4.5,
+    "Peak": 1.5,
+    "Life": 0.25
+   }
+  },
+  "frame.pulse": {
+   "Item": "Recipe_frame_pulse_c6c462_fd8aa3",
+   "Size": 7.95,
+   "AxisUp": true,
+   "AlwaysDraw": true
+  },
+  "frame.rocket.muzzle": {
+   "Item": "War_FX_c888f0c9_50dafc",
+   "Scale": 0.6851,
+   "Seconds": 0.12,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.6471,
+     0.3216
+    ],
+    "Range": 3,
+    "Peak": 3.5,
+    "Life": 0.08,
+    "Flicker": 0.15
+   }
+  },
+  "frame.rocket.tail": {
+   "None": true
+  },
+  "frame.shield.break": {
+   "Item": "Compose_frame_shield_break_6a6fcc3a",
+   "Scale": 0.3,
+   "Seconds": 0.33,
+   "Light": {
+    "Colour": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "Range": 5,
+    "Peak": 5,
+    "Life": 0.35
+   }
+  },
+  "frame.shield.field": {
+   "None": true
+  },
+  "frame.shield.hit": {
+   "Item": "Compose_frame_shield_hit_6e60105d",
+   "Scale": 0.17,
+   "Light": {
+    "Colour": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "Range": 3,
+    "Peak": 3,
+    "Life": 0.18
+   }
+  },
+  "frame.siege": {
+   "Item": "Recipe_frame_siege_e9ee33_58ad62",
+   "Scale": 1,
+   "AxisUp": true,
+   "AlwaysDraw": true,
+   "Light": {
+    "Colour": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "Range": 4,
+    "Peak": 2.5,
+    "Life": 0.3
+   }
+  },
+  "frame.vent": {
+   "Item": "Recipe_frame_vent_519e88",
+   "Scale": 0.4,
+   "AxisUp": true
+  },
+  "frame.wreck": {
+   "Item": "Particle_Pack_Starter_As_bb98861c_2247e9",
+   "Hold": 0.15,
+   "Scale": 0.6112,
+   "AxisUp": true,
+   "AlwaysDraw": true
+  },
+  "frame.wreck.smoke": {
+   "Item": "Recipe_frame_wreck_smoke_b4695f",
+   "Scale": 1,
+   "Seconds": 0.12,
+   "AxisUp": true,
+   "Copies": 32
+  },
+  "sirius.dash": {
+   "None": true
+  },
+  "sirius.ram": {
+   "Item": "Compose_sirius_ram_4460dac9",
+   "Scale": 0.22,
+   "Light": {
+    "Colour": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "Range": 4,
+    "Peak": 4,
+    "Life": 0.2
+   }
+  }
+ }
+}

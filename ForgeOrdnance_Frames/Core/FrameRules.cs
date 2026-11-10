@@ -3,7 +3,7 @@ using System;
 namespace ForgeOrdnanceFrames;
 
 /// <summary>Life of one suit. The host owns the record; every other peer mirrors it from <see cref="FrameStateMessage"/>.</summary>
-public enum FrameState : byte
+internal enum FrameState : byte
 {
     /// <summary>Falling from above the ceiling (no collision); nobody can board yet.</summary>
     Arriving = 0,
@@ -19,9 +19,9 @@ public enum FrameState : byte
     Destroyed = 5,
 }
 
-public enum FrameRequestKind : byte { Enter = 1, Exit = 2, Ammo = 3, Boost = 4, Siege = 5, Rockets = 6 }
+internal enum FrameRequestKind : byte { Enter = 1, Exit = 2, Ammo = 3, Boost = 4, Siege = 5, Rockets = 6 }
 
-public enum FrameRejection : byte
+internal enum FrameRejection : byte
 {
     None = 0,
     NotIdle = 1,
@@ -41,10 +41,10 @@ public enum FrameRejection : byte
 
 /// <summary>Why the host ended a piloted state without a request. <see cref="PilotTaken"/>: the game seized the pilot of a suit being
 /// boarded or left, or put the pilot away from it (a warp, a dimension change); the suit stays empty where it stands.</summary>
-public enum FrameEjection : byte { None = 0, Destroyed = 1, PilotDown = 2, PilotLeft = 3, PilotTaken = 4 }
+internal enum FrameEjection : byte { None = 0, Destroyed = 1, PilotDown = 2, PilotLeft = 3, PilotTaken = 4 }
 
 /// <summary>The host's truth about one suit; also the mirror every client keeps.</summary>
-public sealed class FrameRecord
+internal sealed class FrameRecord
 {
     public FrameRecord(ulong thrower, uint throwId, FrameSpec spec)
     {
@@ -81,17 +81,19 @@ public sealed class FrameRecord
     /// <summary>Host identity that issued Sequence; sequences are ordered only within one authority.</summary>
     public ulong Authority;
     public uint Sequence;
+    /// <summary>Counts the times a pilot boarded: a request made in an earlier boarding is stale.</summary>
+    public uint Drive;
 
     public bool Boosting(float now) => now < BoostEndsAt;
     public bool HasPilot => State is FrameState.Entering or FrameState.Piloted or FrameState.Exiting;
 }
 
 /// <summary>The host's decisions, free of the game so they are tested offline.</summary>
-public static class FrameRules
+internal static class FrameRules
 {
     /// <summary>A suit is boarded from close behind it: within <see cref="BoardDistance"/> of its feet; the walk-round arrow points at
-    /// <see cref="BoardSpot"/> straight behind it.</summary>
-    public const float BoardDistance = 0.9f, BoardSpot = 0.85f;
+    /// <see cref="BoardSpot"/> straight behind it. The host allows <see cref="BoardLag"/> more: the pilot's place it reads is a moment old.</summary>
+    public const float BoardDistance = 1.2f, BoardSpot = 0.85f, BoardLag = 0.6f;
     /// <summary>How long a wreck stays (burning, then sinking) before it is removed.</summary>
     public const float WreckSeconds = 12f;
 
@@ -111,6 +113,7 @@ public static class FrameRules
         frame.StateEndsAt = now + FrameSequence.EnterSeconds;
         frame.Sieged = false;
         frame.SiegeDeployEndsAt = 0f;
+        frame.Drive++;
         frame.Sequence++;
     }
 
@@ -217,6 +220,12 @@ public static class FrameRules
 
     public const float RocketInterval = 0.12f;
 
+    /// <summary>Whether a salvo aimed <paramref name="distance"/> metres away leaves the suit out of every blast (the point's spread plus the blast's radius and half a metre).</summary>
+    public static bool RocketsClear(RocketsSpec rockets, float distance) => distance >= rockets.Spread + rockets.Radius + 0.5f;
+
+    /// <summary>The suit is planted or planting: it stands still, on the ground.</summary>
+    public static bool Planted(FrameRecord frame) => frame.Sieged || frame.SiegeDeployEndsAt > 0f;
+
     /// <summary>Where rocket <paramref name="index"/> of a salvo lands relative to the aimed point, and when it leaves (seconds
     /// after launch). Every peer computes the same values from the host's <paramref name="seed"/>.</summary>
     public static void RocketShot(ushort seed, int index, float spread, out float dx, out float dz, out float delay)
@@ -294,6 +303,14 @@ public static class FrameRules
         return true;
     }
 
+    /// <summary>Plants or stands the suit down as asked; false (nothing changed) when it already is as asked.</summary>
+    public static bool SetSiege(FrameRecord frame, float now, bool on)
+    {
+        if (Planted(frame) == on) return false;
+        ToggleSiege(frame, now);
+        return true;
+    }
+
     public static void ToggleSiege(FrameRecord frame, float now)
     {
         if (frame.Sieged || frame.SiegeDeployEndsAt > 0f)
@@ -345,13 +362,14 @@ public static class FrameRules
         return true;
     }
 
-    /// <summary>Host: the pilot's report of its gun. Only lowers the stock (a client cannot mint ammunition).</summary>
+    /// <summary>Host: the pilot's report of its gun. Only lowers the whole stock (a client cannot mint ammunition); how it is split is the gun's own (a gear's clip can be smaller than the definition's <see cref="WeaponSpec.Magazine"/>, the rest then stands in the reserve).</summary>
     public static bool ReportAmmo(FrameRecord frame, ulong sender, int magazine, int reserve)
     {
         if (!frame.HasPilot || frame.Pilot != sender) return false;
-        magazine = Math.Clamp(magazine, 0, frame.Spec.Weapon.Magazine);
-        reserve = Math.Clamp(reserve, 0, frame.Spec.Weapon.Reserve);
-        if (magazine + reserve > frame.Magazine + frame.Reserve) return false;
+        // Not capped by the definition: a placement's Reserve override may stand above it.
+        magazine = Math.Max(magazine, 0);
+        reserve = Math.Max(reserve, 0);
+        if ((long)magazine + reserve > frame.Magazine + frame.Reserve) return false;
         if (magazine == frame.Magazine && reserve == frame.Reserve) return false;
         frame.Magazine = magazine; frame.Reserve = reserve;
         frame.Sequence++;
@@ -364,12 +382,12 @@ public static class FrameRules
 
     /// <summary>Movement multiplier the pilot's locomotion uses this frame.</summary>
     public static float SpeedMultiplier(FrameRecord frame, float now)
-        => frame.Sieged || frame.SiegeDeployEndsAt > 0f ? 0f : frame.Spec.Movement.Walk * (frame.Boosting(now) && frame.Spec.Boost != null ? frame.Spec.Boost.SpeedMultiplier : 1f);
+        => Planted(frame) ? 0f : frame.Spec.Movement.Walk * (frame.Boosting(now) && frame.Spec.Boost != null ? frame.Spec.Boost.SpeedMultiplier : 1f);
 }
 
 /// <summary>The worn suit's sprint heat, 0 (cold) to 1: it rises while the pilot sprints and moves, cools otherwise; once full
 /// the sprint gives no extra speed until the heat is back below <see cref="Rearm"/>.</summary>
-public sealed class SprintHeat
+internal sealed class SprintHeat
 {
     public const float Rearm = 0.35f;
 

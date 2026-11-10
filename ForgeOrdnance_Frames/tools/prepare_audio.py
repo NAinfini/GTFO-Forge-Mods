@@ -1,6 +1,6 @@
-"""Build the local ForgeAudio audio folder (one <asset>.ogg per recorded source, and cues.json) from sources.json.
+"""Build the local ForgeAudio audio folder (one <asset>.ogg per recorded source, and cues.forge) from sources.forge.
 
-sources.json records each cue's ``maxSeconds`` and layers under ``cues`` and each recorded section under ``sources``: ``layer`` is the
+sources.forge records each cue's ``maxSeconds`` and layers under ``cues`` and each recorded section under ``sources``: ``layer`` is the
 1-based layer whose variant pool it belongs to, ``start`` and ``duration`` are the section, ``gainDb`` aligns a variant to its reference."""
 from __future__ import annotations
 
@@ -16,9 +16,9 @@ import tempfile
 
 PACKAGE = Path(__file__).resolve().parent.parent
 REPO = PACKAGE.parents[1]
-SOURCES = PACKAGE / "Assets" / "audio" / "sources.json"
-RECORDED_LIBRARY = "<sound library>/"
-OUTPUT = PACKAGE / "Assets" / "audio"
+SOURCES = PACKAGE / "Assets" / "Audio" / "sources.forge"
+RECORDED_LIBRARY = "F:/音效库/"
+OUTPUT = PACKAGE / "Assets" / "Audio"
 AUDIOKIT_TOOLS = REPO / "Mods" / "ForgeAudio" / "tools"
 CONVERTER = AUDIOKIT_TOOLS / "convert_audio.py"
 sys.path.insert(0, str(AUDIOKIT_TOOLS))
@@ -187,13 +187,13 @@ def cue_table(document: dict) -> dict[str, dict]:
 def write_cues(output: Path, document: dict) -> int:
     cues = cue_table(document)
     text = json.dumps({"buses": BUSES, "cues": cues}, ensure_ascii=False, indent=2) + "\n"
-    temporary = output / "cues.json.tmp"
+    temporary = output / "cues.forge.tmp"
     temporary.write_text(text, encoding="utf-8", newline="\n")
-    os.replace(temporary, output / "cues.json")
+    os.replace(temporary, output / "cues.forge")
     return len(cues)
 
 def build(library: Path | None) -> None:
-    """``library`` is a copy of the sound library (same relative layout) read instead of the recorded <sound library> paths."""
+    """``library`` is a copy of the sound library (same relative layout) read instead of the recorded F:/音效库 paths."""
     document = json.loads(SOURCES.read_text(encoding="utf-8"))
     sources = document["sources"]
     if library is not None:
@@ -228,7 +228,7 @@ def build(library: Path | None) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--library", type=Path, help="a copy of the sound library to read instead of <sound library>")
+    parser.add_argument("--library", type=Path, help="a copy of the sound library to read instead of F:/音效库")
     args = parser.parse_args()
     try:
         build(args.library)

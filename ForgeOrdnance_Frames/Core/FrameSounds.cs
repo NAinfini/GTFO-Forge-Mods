@@ -1,9 +1,9 @@
 namespace ForgeOrdnanceFrames;
 
 /// <summary>Every sound this package plays through ForgeAudio. The order is the index into <see cref="FrameSounds.Table"/>.
-/// Each cue's settings, including its minimum gap between plays, are in <c>audio/cues.json</c>. The suit's arrival (fall, touchdown,
+/// Each cue's settings, including its minimum gap between plays, are in <c>audio/cues.forge</c>. The suit's arrival (fall, touchdown,
 /// rubble) uses ForgeOrdnance's own drop sounds, and <see cref="Landing"/> lays the heavy machine's weight over the touchdown once.</summary>
-public enum FrameSound
+internal enum FrameSound
 {
     Footstep, Boot, VoiceReady, Servo, Alarm, Destroyed, Boost, ShieldUp, ShieldHit, ShieldDown, Rocket,
     PlateSlide, HatchClose, HudSection, Unseal, PowerDown, Jump, ReloadStart, ReloadDone, DryFire,
@@ -11,9 +11,9 @@ public enum FrameSound
 }
 
 /// <summary>The cue name of each <see cref="FrameSound"/>.</summary>
-public static class FrameSounds
+internal static class FrameSounds
 {
-    public readonly record struct Entry(FrameSound Sound, string Cue);
+    internal readonly record struct Entry(FrameSound Sound, string Cue);
 
     public static readonly Entry[] Table =
     {

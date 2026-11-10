@@ -3,7 +3,7 @@ namespace ForgeOrdnanceFrames;
 /// <summary>Where a heavy object a suit carries hangs on the suit's back, in the suit's own frame (x right, y up, z forward). The
 /// object's near face sits <see cref="Gap"/> behind the rearmost point of the shell, so it never sinks into the plates, and its centre
 /// is at chest height, centred between the shoulders. The suit's own size and the object's own size decide the rest.</summary>
-public static class CarrySocket
+internal static class CarrySocket
 {
     /// <summary>Clearance between the shell's rearmost point and the object (metres).</summary>
     public const float Gap = 0.05f;

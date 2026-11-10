@@ -7,14 +7,13 @@ namespace ForgeOrdnanceFrames;
 
 /// <summary>A suit's rocket launcher (<see cref="RocketLauncherSpec"/>), on every peer: the launcher model riding its bone, a rocket
 /// seated in every loaded tube (<see cref="FrameRocketRack"/>, from the salvo's launch time, so a late joiner sees the same tubes),
-/// and a muzzle flash (the sentry gun's, <see cref="FrameFx.MuzzleFlash"/>) at a tube's mouth the moment its rocket leaves. Drawn
+/// and the slot's muzzle flash at a tube's mouth the moment its rocket leaves. Drawn
 /// like the rest of the suit (the local pilot's own launcher casts its shadow only) and destroyed with its model, whose bone it rides.</summary>
 internal sealed class FrameRocketPod
 {
     private readonly RocketsSpec _spec;
     private readonly Transform[] _muzzles;
     private readonly GameObject?[] _seated;
-    private readonly ForgeVisual.AttachedFx? _flash;
     private readonly List<Renderer> _renderers = new();
     private float _salvoAt;
     private bool _shadowOnly;
@@ -39,7 +38,6 @@ internal sealed class FrameRocketPod
             _renderers.AddRange(round.GetComponentsInChildren<Renderer>(true));
             _seated[t] = round;
         }
-        _flash = FrameFx.MuzzleFlash(muzzles[0]);
     }
 
     /// <summary>The launcher of a suit whose model is <paramref name="root"/>, riding its bone (a plate that lifts when the suit
@@ -53,7 +51,7 @@ internal sealed class FrameRocketPod
         var bindposes = skin != null && skin.sharedMesh != null ? skin.sharedMesh.bindposes : null;
         if (skin == null || bones == null || bindposes == null || bindposes.Length != bones.Length)
         {
-            Plugin.Error("Exosuit rocket launcher: the model has no bind poses for its bones; the suit shows no launcher.");
+            Plugin.Logger.ErrorOnce("Exosuit rocket launcher: the model has no bind poses for its bones; the suit shows no launcher.");
             return null;
         }
         var index = -1;
@@ -61,7 +59,7 @@ internal sealed class FrameRocketPod
             if (bones[b] != null && bones[b].name == launcher.Bone) { index = b; break; }
         if (index < 0)
         {
-            Plugin.Error("Exosuit rocket launcher: no bone '" + launcher.Bone + "' skins the model; the suit shows no launcher.");
+            Plugin.Logger.ErrorOnce("Exosuit rocket launcher: no bone '" + launcher.Bone + "' skins the model; the suit shows no launcher.");
             return null;
         }
         // The launcher's place is in the model root's space at the rest pose; on its bone it follows every pose from there.
@@ -74,10 +72,10 @@ internal sealed class FrameRocketPod
         pod.transform.localRotation = onBone.rotation;
         pod.transform.localScale = onBone.lossyScale;
         var muzzles = new List<Transform>();
-        for (var t = 1; FrameAssets.Child(pod.transform, FrameRocketRack.MuzzlePrefix + t) is { } muzzle; t++) muzzles.Add(muzzle);
+        for (var t = 1; ForgeVisual.Models.Find(pod.transform, FrameRocketRack.MuzzlePrefix + t) is { } muzzle; t++) muzzles.Add(muzzle);
         if (muzzles.Count < 1)
         {
-            Plugin.Error("Exosuit rocket launcher " + launcher.Pod + " has no tube " + FrameRocketRack.FirstMuzzle + "; the suit shows no launcher.");
+            Plugin.Logger.ErrorOnce("Exosuit rocket launcher " + launcher.Pod + " has no tube " + FrameRocketRack.FirstMuzzle + "; the suit shows no launcher.");
             Object.Destroy(pod);
             return null;
         }
@@ -113,9 +111,8 @@ internal sealed class FrameRocketPod
     /// <summary>Rocket <paramref name="index"/> leaves its tube now: the muzzle flash.</summary>
     internal void Fire(int index)
     {
-        if (_flash?.Transform is not { } flash) return;
-        flash.SetParent(Muzzle(index), false);
-        _flash.Play();
+        var mouth = Muzzle(index);
+        if (FramesFxSlots.RocketMuzzle is { } flash) ForgeVisual.Fx.Play(flash, mouth.position, mouth.forward);
     }
 
     /// <summary>Every frame: a rocket in every loaded tube.</summary>
@@ -135,8 +132,7 @@ internal sealed class FrameRocketPod
     {
         if (shadowOnly == _shadowOnly) return;
         _shadowOnly = shadowOnly;
-        var mode = shadowOnly ? UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly : UnityEngine.Rendering.ShadowCastingMode.On;
         foreach (var renderer in _renderers)
-            if (renderer != null && !renderer.WasCollected) renderer.shadowCastingMode = mode;
+            if (renderer != null && !renderer.WasCollected) ForgeVisual.SurfaceLook.SetShadowOnly(renderer, shadowOnly);
     }
 }

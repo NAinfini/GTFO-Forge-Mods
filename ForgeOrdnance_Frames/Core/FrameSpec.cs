@@ -12,25 +12,25 @@ namespace ForgeOrdnanceFrames;
 /// every gun the pilot holds while piloting (the suit gun and the pilot's own guns alike): recoil (view kick up and sideways, crosshair
 /// bloom, weapon kick) is <see cref="RecoilMultiplier"/> of the gun's own and the reload takes <see cref="ReloadMultiplier"/> of its
 /// own time (<see cref="GunHandling"/>).</summary>
-public sealed record WeaponSpec(uint Gear, float DamageMultiplier, int Magazine, int Reserve, float RecoilMultiplier, float ReloadMultiplier);
+internal sealed record WeaponSpec(uint Gear, float DamageMultiplier, int Magazine, int Reserve, float RecoilMultiplier, float ReloadMultiplier);
 
 /// <summary>How the worn suit moves, through the game's own locomotion. A suit is an enhancement: every multiplier is at least 1.
 /// <see cref="Walk"/> scales every speed the game asks for (it responds as fast as the player on foot: no added inertia), the
 /// game's sprint is a further <see cref="Sprint"/> times faster for at most <see cref="SprintSeconds"/> before its heat must cool
 /// (<see cref="SprintRecovery"/> seconds from full), and the game's jump reaches <see cref="Jump"/> times its height.</summary>
-public sealed record MovementSpec(float Walk, float Sprint, float Jump, float SprintSeconds, float SprintRecovery);
+internal sealed record MovementSpec(float Walk, float Sprint, float Jump, float SprintSeconds, float SprintRecovery);
 
 /// <summary>One moving part of the suit's opening: the bone <see cref="Node"/>, a rigid piece of armour. How it moves is the model's
 /// own "open" and "close" clips (every part's rigid path, posed by the owner in the cut file and baked by
 /// <c>tools/build_frame.py</c>); the runtime plays them. <see cref="Seam"/> marks a part beside the back's middle seam: steam
 /// vents from the seam when the first of them unlatches (<see cref="PlateTimeline"/>).</summary>
-public sealed record OpeningPart(string Node, bool Seam);
+internal sealed record OpeningPart(string Node, bool Seam);
 /// <summary>How the suit opens to be boarded and left: the <see cref="Parts"/> its "open" clip moves (the sequence timing is
 /// <see cref="FrameSequence"/>; the pilot's own motion is <see cref="PilotMotion"/>).</summary>
-public sealed record OpeningSpec(OpeningPart[] Parts);
+internal sealed record OpeningSpec(OpeningPart[] Parts);
 
 /// <summary>The game's first-person body bones a suit part can be worn on (Unity's humanoid bone names).</summary>
-public enum FrameBodyBone
+internal enum FrameBodyBone
 {
     Hips, Spine, Chest, UpperChest, Neck, Head,
     LeftShoulder, LeftUpperArm, LeftLowerArm, LeftHand, RightShoulder, RightUpperArm, RightLowerArm, RightHand,
@@ -39,39 +39,39 @@ public enum FrameBodyBone
 
 /// <summary>One part of the pilot's first-person shell: the suit model's bone <see cref="Bone"/> (with the mesh it skins) is worn
 /// on the game's first-person body bone <see cref="Body"/> and moves only with the game's own animation of that bone.</summary>
-public sealed record ShellBone(string Bone, FrameBodyBone Body);
+internal sealed record ShellBone(string Bone, FrameBodyBone Body);
 
 /// <summary>The suit's lamp: the pilot's own flashlight (its key, its sync), reshaped while worn: range, cone angle and intensity
 /// times the multipliers, tinted <see cref="R"/>/<see cref="G"/>/<see cref="B"/>. The shell's light strips (and its lamps) glow in
 /// <see cref="GlowR"/>/<see cref="GlowG"/>/<see cref="GlowB"/> while all is well; <see cref="FrameGlow"/> gives the other states.</summary>
-public sealed record LightSpec(float RangeMultiplier, float AngleMultiplier, float IntensityMultiplier, float R, float G, float B,
+internal sealed record LightSpec(float RangeMultiplier, float AngleMultiplier, float IntensityMultiplier, float R, float G, float B,
     float GlowR, float GlowG, float GlowB);
 
 /// <summary>Assault special: a short sprint that breaks weak doors in the way and shoves enemies aside.</summary>
-public sealed record BoostSpec(float Seconds, float SpeedMultiplier, float Cooldown, bool BreachDoors, float Shove);
+internal sealed record BoostSpec(float Seconds, float SpeedMultiplier, float Cooldown, bool BreachDoors, float Shove);
 
 /// <summary>Firepower special: plant the suit; while planted it cannot move, its own gun hits <see cref="DamageMultiplier"/> times
 /// harder and fires <see cref="FireRateMultiplier"/> times as fast (that gun's own shot timer), any gun the pilot holds reloads in
 /// <see cref="ReloadMultiplier"/> of its time and kicks <see cref="RecoilMultiplier"/> as much again (on top of the model's
 /// <see cref="WeaponSpec.ReloadMultiplier"/> and <see cref="WeaponSpec.RecoilMultiplier"/>), and its armour stops a further <see cref="DamageReduction"/> of every hit. A
 /// suit with a <see cref="ShieldSpec.WhileSieged"/> barrier raises it only while planted.</summary>
-public sealed record SiegeSpec(float DeploySeconds, float DamageMultiplier, float DamageReduction, float FireRateMultiplier, float ReloadMultiplier, float RecoilMultiplier);
+internal sealed record SiegeSpec(float DeploySeconds, float DamageMultiplier, float DamageReduction, float FireRateMultiplier, float ReloadMultiplier, float RecoilMultiplier);
 
 /// <summary>Tank special: an energy barrier around the suit (a dome of <see cref="Radius"/> metres that moves with it). Friendly
 /// bullets and players pass; enemy attacks and enemies do not. Enemy attacks wear down <see cref="Capacity"/>; emptied it
 /// breaks, and after <see cref="RegenDelay"/> seconds without a hit it refills at <see cref="RegenRate"/> per second, standing
 /// again once it holds <see cref="RaiseFraction"/> of its capacity. With <see cref="WhileSieged"/> (a suit with a siege mode) the barrier
 /// stands only while the suit is planted; it keeps its charge and refills either way.</summary>
-public sealed record ShieldSpec(float Capacity, float RegenDelay, float RegenRate, float Radius, float RaiseFraction, bool WhileSieged);
+internal sealed record ShieldSpec(float Capacity, float RegenDelay, float RegenRate, float Radius, float RaiseFraction, bool WhileSieged);
 
 /// <summary>Scout special: tags every enemy around the suit the way the bio tracker does, every <see cref="Interval"/> seconds.</summary>
-public sealed record ScanSpec(float Radius, float Interval);
+internal sealed record ScanSpec(float Radius, float Interval);
 
 /// <summary>Firepower extra: a salvo of <see cref="Salvo"/> shoulder rockets at the aimed point (the rocket key), each a game
 /// explosion of <see cref="Damage"/> within <see cref="Radius"/> metres, scattered within <see cref="Spread"/> metres of the
 /// point, then <see cref="Cooldown"/> seconds before the next salvo. Rockets fly at <see cref="Speed"/> m/s up to
 /// <see cref="Range"/> metres, out of the tubes of the suit's <see cref="Launcher"/>.</summary>
-public sealed record RocketsSpec(int Salvo, float Damage, float Radius, float Spread, float Cooldown, float Range, float Speed, RocketLauncherSpec Launcher);
+internal sealed record RocketsSpec(int Salvo, float Damage, float Radius, float Spread, float Cooldown, float Range, float Speed, RocketLauncherSpec Launcher);
 
 /// <summary>The rockets' look: one launcher, the prefab <see cref="Pod"/> (<c>Pack:item</c>; its tubes are its children
 /// <c>muzzle_1</c>..<c>muzzle_N</c>, each at a tube's mouth facing +Z), and the rocket prefab <see cref="Round"/> (nose +Z): one
@@ -79,7 +79,7 @@ public sealed record RocketsSpec(int Salvo, float Damage, float Radius, float Sp
 /// <see cref="Bone"/> (a plate that lifts when the suit opens carries it along), placed at (<see cref="X"/>, <see cref="Y"/>,
 /// <see cref="Z"/>) metres in the suit's own space at its rest (bind) pose (x right, y up, z forward, from its feet) and turned by
 /// <see cref="Pitch"/>, <see cref="Yaw"/> and <see cref="Roll"/> degrees; never scaled or mirrored.</summary>
-public sealed record RocketLauncherSpec(string Pod, string Round, string Bone, float X, float Y, float Z, float Pitch, float Yaw, float Roll);
+internal sealed record RocketLauncherSpec(string Pod, string Round, string Bone, float X, float Y, float Z, float Pitch, float Yaw, float Roll);
 
 /// <summary>One exosuit model, read from a definition's <c>Payload</c>. <see cref="Armor"/> is the suit's only health: every hit
 /// on the pilot lands on it, it never regenerates and no healing item restores it; at zero the suit is wrecked. Specials are
@@ -88,13 +88,13 @@ public sealed record RocketLauncherSpec(string Pod, string Round, string Bone, f
 /// does not visibly open); <see cref="Shell"/> the suit bones worn on the pilot's own first-person body (none: nothing is worn). The
 /// pilot's arms and hands are never replaced: the game's own arms stay (tinted to the suit's look), so the two upper arms in the list only
 /// line the suit's skeleton up with the game's, and the other listed bones (hips, legs) are the parts the pilot sees looking down.</summary>
-public sealed record FrameSpec(string Model, float Armor, float DamageReduction, float EyeHeight,
+internal sealed record FrameSpec(string Model, float Armor, float DamageReduction, float EyeHeight,
     MovementSpec Movement, WeaponSpec Weapon, LightSpec Light, BoostSpec? Boost, SiegeSpec? Siege,
     ScanSpec? Scan, ShieldSpec? Shield, bool CarryHeavy, RocketsSpec? Rockets, OpeningSpec? Opening, ShellBone[] Shell);
 
 /// <summary>Strict reader for the <c>Exosuit</c> payload. Unknown fields, wrong types and values out of range are errors that
 /// name the field; nothing is silently clamped.</summary>
-public static class FrameSpecParser
+internal static class FrameSpecParser
 {
     public const string TypeName = "frames.Exosuit";
 
@@ -122,6 +122,8 @@ public static class FrameSpecParser
         var model = Asset(payload, "", "Model");
         if (payload.TryGetProperty("Boost", out _) && payload.TryGetProperty("Siege", out _))
             throw new StrictJsonException("Siege", "cannot be combined with Boost: both use the special key.");
+        if (StrictJson.Bool(payload, "", "CarryHeavy", false) && (payload.TryGetProperty("Boost", out _) || payload.TryGetProperty("Siege", out _)))
+            throw new StrictJsonException("CarryHeavy", "cannot be combined with Boost or Siege: all three use the special key.");
         if (payload.TryGetProperty("Shield", out var sw) && sw.ValueKind == JsonValueKind.Object && StrictJson.Bool(sw, "Shield.", "WhileSieged", false) && !payload.TryGetProperty("Siege", out _))
             throw new StrictJsonException("Shield.WhileSieged", "needs a Siege: the barrier stands while the suit is planted.");
         return new FrameSpec(model,
@@ -225,7 +227,7 @@ public static class FrameSpecParser
     private static string Asset(JsonElement o, string prefix, string field)
     {
         var text = Name(o, prefix, field);
-        if (!FrameModelName.TrySplit(text, out _, out _)) throw new StrictJsonException(prefix + field, "'" + text + "' must be Pack:item, a prefab of a ForgeVisual pack.");
+        if (!PackItem.TrySplit(text, out _, out _)) throw new StrictJsonException(prefix + field, "'" + text + "' must be Pack:item, a prefab of a ForgeVisual pack.");
         return text;
     }
 
@@ -322,28 +324,15 @@ public static class FrameSpecParser
 
 /// <summary>A prefab name <c>Pack:item</c>, the way ForgeVisual names models. The suit's cockpit mark is the icon <c>mark-item</c> in
 /// the ForgeUI icon pack of the same name as the model's pack.</summary>
-public static class FrameModelName
+internal static class FrameModelName
 {
-    /// <summary>False unless <paramref name="name"/> is exactly one pack and one item, both non-empty (ForgeVisual checks the characters
-    /// and that the pack and prefab exist).</summary>
-    public static bool TrySplit(string? name, out string pack, out string item)
-    {
-        pack = item = "";
-        if (string.IsNullOrEmpty(name)) return false;
-        var colon = name.IndexOf(':');
-        if (colon <= 0 || colon == name.Length - 1 || name.IndexOf(':', colon + 1) >= 0) return false;
-        pack = name.Substring(0, colon);
-        item = name.Substring(colon + 1);
-        return true;
-    }
-
     /// <summary>The icon name of the suit's cockpit mark: <c>Pack:mark-item</c>.</summary>
-    public static string MarkIcon(string model) => TrySplit(model, out var pack, out var item) ? pack + ":mark-" + item : throw new ArgumentException("'" + model + "' is not Pack:item.", nameof(model));
+    public static string MarkIcon(string model) => PackItem.TrySplit(model, out var pack, out var item) ? pack + ":mark-" + item : throw new ArgumentException("'" + model + "' is not Pack:item.", nameof(model));
 }
 
 /// <summary>A content key of a parsed model: every peer that loaded the same definition computes the same key, so the host can
 /// name a suit's model in its state and a late joiner (who never saw the call arrive) finds the spec it parsed itself.</summary>
-public static class FrameSpecKey
+internal static class FrameSpecKey
 {
     public static ulong Of(FrameSpec s)
     {

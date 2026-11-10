@@ -14,7 +14,6 @@ namespace ForgeOrdnanceFrames;
 internal sealed class PilotBody
 {
     internal const string Prefab = "pilot-motion";
-    private static bool _tried;
     private static BodyClipRig? _rig;
     private static AnimationClip? _exit;
     private static Transform? _head;
@@ -25,16 +24,16 @@ internal sealed class PilotBody
     /// <summary>The motion loaded and checked against <see cref="PilotMotion"/>.</summary>
     internal static bool Ready => _exit != null && _rig != null;
 
-    /// <summary>Once, after the first level is built (the bundle is read then): the rig, its clip, and where the eye sits on the head.</summary>
+    /// <summary>After a level is built (the bundle is read then), until one load succeeds: the rig, its clip, and where the eye sits on the head.</summary>
     internal static void Load()
     {
-        if (_tried) return;
-        _tried = true;
+        if (Ready) return;
+        GameObject? proxy = null;
         try
         {
             var bundle = FrameAssets.Bundle ?? throw new InvalidOperationException("forge-frames.bundle is not loaded");
             if (!bundle.TryModel(Prefab, out var model)) throw new InvalidOperationException("forge-frames.bundle has no " + Prefab);
-            var proxy = model.Spawn(new Vector3(0f, -1000f, 0f), Quaternion.identity) ?? throw new InvalidOperationException("the pilot proxy could not be spawned (ForgeVisual has logged why)");
+            proxy = model.Spawn(new Vector3(0f, -1000f, 0f), Quaternion.identity) ?? throw new InvalidOperationException("the pilot proxy could not be spawned (ForgeVisual has logged why)");
             proxy.name = "ForgeOrdnanceFrames.PilotMotion";
             Object.DontDestroyOnLoad(proxy);
             var modelNode = proxy.transform.Find("model") ?? throw new InvalidOperationException(Prefab + " has no 'model'");
@@ -54,8 +53,8 @@ internal sealed class PilotBody
             var facing = toes != null && foot != null ? toes.position.z - foot.position.z : float.NaN;
             proxy.transform.position = new Vector3(0f, -1000f, 0f);
             var problems = "";
-            if (Math.Abs(exit.length - PilotMotion.ExitSeconds) > 0.02f) problems += " PilotExit is " + Plugin.Num(exit.length) + " s (expected " + Plugin.Num(PilotMotion.ExitSeconds) + ");";
-            if (!(facing > 0f)) problems += " the skeleton does not face forward (left toe " + Plugin.Num(facing) + " m ahead of the foot);";
+            if (Math.Abs(exit.length - PilotMotion.ExitSeconds) > 0.02f) problems += " PilotExit is " + ForgeCore.Log.Num(exit.length) + " s (expected " + ForgeCore.Log.Num(PilotMotion.ExitSeconds) + ");";
+            if (!(facing > 0f)) problems += " the skeleton does not face forward (left toe " + ForgeCore.Log.Num(facing) + " m ahead of the foot);";
             if (problems.Length > 0) throw new InvalidOperationException("the pilot motion does not match this plugin:" + problems);
             _rig = rig;
             _exit = exit;
@@ -63,7 +62,9 @@ internal sealed class PilotBody
         }
         catch (Exception error)
         {
-            Plugin.Error("Exosuit pilot motion could not be loaded; pilots leave without moving their body or camera: " + error);
+            // The next level tries again with a fresh copy.
+            if (proxy != null) Object.Destroy(proxy);
+            Plugin.Logger.ErrorOnce("Exosuit pilot motion could not be loaded; pilots leave without moving their body or camera: " + error);
         }
     }
 

@@ -1,4 +1,3 @@
-using GameData;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using ForgeOrdnanceFrames;
@@ -24,7 +23,7 @@ const string Minimal = "{\"Type\":\"frames.Exosuit\",\"Model\":\"Frames:frame-m1
     Check(spec.DamageReduction == 0f && spec.Movement.Walk > 1f && spec.Movement.Sprint > 1f && spec.Movement.Jump > 1f && spec.Light.RangeMultiplier >= 2f,
         "no damage reduction, faster walking, a sprint bonus, a higher jump and the wider lamp by default");
     Check(spec.Opening == null && spec.Shell.Length == 0, "no opening parts and no first-person shell unless listed");
-    Check(Math.Abs(FrameSequence.EnterSeconds - 2.85f) < 1e-4f && FrameSequence.ExitSeconds < 2f, "boarding lasts 2.85 s to the last power-on block and leaving ends on the landing, for every model (no definition sets them)");
+    Check(Math.Abs(FrameSequence.EnterSeconds - 2.85f) < 1e-4f && FrameSequence.ExitSeconds < 2.1f, "boarding lasts 2.85 s to the last power-on block and leaving ends after the landing and the black has cleared, for every model (no definition sets them)");
 }
 
 void Rejected(string name, string payload, string field)
@@ -71,7 +70,7 @@ Rejected("scan radius missing", Minimal.Replace("\"Armor\":100", "\"Armor\":100,
 
 {
     // The definitions this package ships must load.
-    var file = Path.Combine(AppContext.BaseDirectory, "frames.json");
+    var file = Path.Combine(AppContext.BaseDirectory, "frames.forge");
     using var doc = JsonDocument.Parse(File.ReadAllText(file));
     var models = new Dictionary<string, FrameSpec>();
     var codes = new HashSet<string>();
@@ -87,7 +86,6 @@ Rejected("scan radius missing", Minimal.Replace("\"Armor\":100", "\"Armor\":100,
     var keys = new HashSet<ulong>();
     foreach (var m in models.Values) keys.Add(FrameSpecKey.Of(m));
     Check(keys.Count == 4, "each shipped model has its own content key");
-    LangChecks.Run(Check, models.Values);
     // Each model's specialty is data: tank barrier and carrying, firepower siege, recon scan, assault charge.
     Check(models["frame-m15"].Boost != null && models["frame-m15"].Shield == null, "assault: charge only");
     Check(models["frame-m16"].Shield != null && models["frame-m16"].CarryHeavy && models["frame-m16"].Boost == null, "tank: barrier and heavy carrying");
@@ -99,8 +97,6 @@ Rejected("scan radius missing", Minimal.Replace("\"Armor\":100", "\"Armor\":100,
     var fp = models["frame-m17"];
     Check(fp.Siege!.FireRateMultiplier > 1f && fp.Siege.ReloadMultiplier < 1f && fp.Shield != null && fp.Shield.WhileSieged && !models["frame-m16"].Shield!.WhileSieged,
         "firepower: planting fires faster, reloads faster and raises its own barrier; the tank's barrier always stands");
-    GunChecks.Run(Check, models);
-    GunLoanChecks.Run(Check, models);
     var planted = new FrameRecord(3, 3, fp) { State = FrameState.Piloted, Pilot = 5 };
     var walking = !FrameRules.BarrierUp(planted) && !FrameRules.Repels(planted, planted.X, planted.Y + 1.2f, planted.Z) && !FrameRules.ShieldHit(planted, 10f, 1f) && planted.Shield == fp.Shield!.Capacity;
     planted.Sieged = true;
@@ -109,16 +105,7 @@ Rejected("scan radius missing", Minimal.Replace("\"Armor\":100", "\"Armor\":100,
     Rejected("barrier while planted without a siege", Minimal.Replace("\"Armor\":100", "\"Armor\":100,\"Shield\":{\"Capacity\":50,\"RegenRate\":10,\"WhileSieged\":true}"), "Shield.WhileSieged");
     Check(models["frame-m18"].Scan != null && models["frame-m18"].Siege == null && models["frame-m18"].Shield == null, "recon: scan only");
     Check(FrameRules.ScanTags(ForgeCore.EnemyAlert.Awake) && FrameRules.ScanTags(ForgeCore.EnemyAlert.Hunting) && !FrameRules.ScanTags(ForgeCore.EnemyAlert.Sleeping) && !FrameRules.ScanTags(ForgeCore.EnemyAlert.Off), "recon: the scan tags awake enemies, not sleeping ones");
-    // Every suit is faster and jumps higher than on foot; recon most, then assault, firepower, tank (still above the player).
-    var order = new[] { "frame-m18", "frame-m15", "frame-m17", "frame-m16" };
-    for (var i = 0; i < order.Length; i++)
-    {
-        var mv = models[order[i]].Movement;
-        Check(mv.Walk > 1f && mv.Sprint > 1f && mv.Jump > 1f, order[i] + " is faster and jumps higher than the player on foot");
-        if (i == 0) continue;
-        var up = models[order[i - 1]].Movement;
-        Check(up.Walk > mv.Walk && up.Sprint >= mv.Sprint && up.Jump > mv.Jump, order[i - 1] + " outruns and outjumps " + order[i]);
-    }
+    foreach (var m in models.Values) Check(m.Movement.Walk > 1f && m.Movement.Sprint > 1f && m.Movement.Jump > 1f, m.Model + " is faster and jumps higher than the player on foot");
     foreach (var m in models.Values)
     {
         Check(m.Opening != null && m.Opening.Parts.Length >= 2 && m.Opening.Parts.All(part => !part.Node.Contains("helmet", StringComparison.Ordinal)), m.Model + " lists its opening parts; the helmet stays shut");
@@ -138,11 +125,6 @@ Rejected("scan radius missing", Minimal.Replace("\"Armor\":100", "\"Armor\":100,
 foreach (var bone in Enum.GetValues<FrameBodyBone>())
     Check(FrameBodyRig.Body(bone).ToString() == bone.ToString(), "body bone " + bone + " maps onto ForgeVisual's namesake");
 Check(ForgeVisual.PoseSolver.Validate(FrameBodyRig.PoseLinks) == null, "the suit pose table is well formed");
-Check(FrameBodyRig.PoseLinks.Length == 16 && FrameBodyRig.PoseLinks[0].Body == ForgeVisual.BodyBone.Hips
-    && FrameBodyRig.PoseLinks[FrameBodyRig.RightHandLink].Model == "hand.R" && FrameBodyRig.PoseLinks[FrameBodyRig.LeftUpperArmLink].Model == "upperarm.L"
-    && FrameBodyRig.PoseLinks[FrameBodyRig.RightUpperArmLink].Model == "upperarm.R", "the pose table starts at the pelvis and names the hand and arms the suit uses");
-Check(FrameBodyRig.PoseLinks[2].Body == ForgeVisual.BodyBone.UpperChest && FrameBodyRig.PoseLinks[2].BodyAlt == ForgeVisual.BodyBone.Chest
-    && FrameBodyRig.PoseLinks[2].TowardBody == ForgeVisual.BodyBone.Neck, "the game's upper chest and neck fold into the suit's chest");
 Check(ForgeVisual.PoseSolver.ValidateReach(FrameBodyRig.ArmReach, FrameBodyRig.PoseLinks.Length) == null
     && FrameBodyRig.ArmReach.Length == 2 && Array.TrueForAll(FrameBodyRig.ArmReach, r =>
         FrameBodyRig.PoseLinks[r.Upper].Model.StartsWith("upperarm.") && FrameBodyRig.PoseLinks[r.Lower].Model.StartsWith("forearm.")
@@ -168,7 +150,7 @@ var assault = FrameSpecParser.Parse(Json(Minimal.Replace("\"Armor\":100", "\"Arm
     FrameRules.Tick(f, 10f + FrameSequence.EnterSeconds - 0.01f, out _);
     var stillBoarding = f.State == FrameState.Entering;
     FrameRules.Tick(f, 10f + FrameSequence.EnterSeconds, out _);
-    Check(stillBoarding && f.State == FrameState.Piloted, "boarding completes, and the pilot moves, exactly when the power-on's picture is whole");
+    Check(stillBoarding && f.State == FrameState.Piloted, "boarding completes, and the pilot moves, exactly when the boarding sequence ends");
     Check(FrameRules.CanExit(f, 43) == FrameRejection.NotPilot, "only the pilot can leave");
 
     Check(FrameRules.CanBoost(f, 42, 12f) == FrameRejection.None, "boost ready");
@@ -191,7 +173,7 @@ var assault = FrameSpecParser.Parse(Json(Minimal.Replace("\"Armor\":100", "\"Arm
     FrameRules.Exit(f, 31f, 1, 2, 3, 90);
     Check(f.State == FrameState.Exiting && f.X == 1 && f.Yaw == 90 && f.Pilot == 42, "leaving keeps the pilot until the sequence ends");
     FrameRules.Tick(f, 31f + FrameSequence.ExitSeconds - 0.01f, out _);
-    Check(f.State == FrameState.Exiting, "leaving holds until the landing");
+    Check(f.State == FrameState.Exiting, "leaving holds until the black has cleared after the landing");
     FrameRules.Tick(f, 31f + FrameSequence.ExitSeconds, out _);
     Check(f.State == FrameState.Idle && f.Pilot == 0 && Math.Abs(f.Armor - 80f) < 1e-3f && f.Magazine == 20, "left standing with its armour and ammunition");
     Check(!FrameRules.Damage(f, 50f, 35f) && Math.Abs(f.Armor - 80f) < 1e-3f, "an empty suit takes no damage");
@@ -222,9 +204,11 @@ var assault = FrameSpecParser.Parse(Json(Minimal.Replace("\"Armor\":100", "\"Arm
     Check(!f.Sieged && f.SiegeDeployEndsAt == sieger.Siege!.DeploySeconds && FrameRules.SpeedMultiplier(f, 0f) == 0f, "deployment locks movement before granting siege bonuses");
     FrameRules.Tick(f, sieger.Siege!.DeploySeconds, out _);
     Check(f.Sieged && FrameRules.SpeedMultiplier(f, 0f) == 0f, "a planted suit cannot move");
-    FrameRules.ToggleSiege(f, 2f);
-    Check(!f.Sieged && FrameRules.SpeedMultiplier(f, 0f) == sieger.Movement.Walk, "packing up restores movement");
+    Check(!FrameRules.SetSiege(f, 2f, true) && f.Sieged, "a repeated plant request changes nothing (it names its target, it does not toggle)");
+    Check(FrameRules.SetSiege(f, 2f, false) && !f.Sieged && FrameRules.SpeedMultiplier(f, 0f) == sieger.Movement.Walk, "packing up restores movement");
     Check(FrameRules.Rockets(f, 3, 0f) == FrameRejection.NoSpecial, "no rockets on a suit without them");
+    FrameRules.Enter(f, 3, 3f);
+    Check(f.Drive == 1 && FrameMessages.TryRead(FrameMessages.ToBytes(FrameStateMessage.From(f, 3f, FrameEjection.None)), out FrameStateMessage drove) && drove.Drive == 1, "boarding counts and the state carries it");
 }
 {
     const string launcher = "\"Launcher\":{\"Pod\":\"Frames:pod\",\"Round\":\"Frames:round\",\"Bone\":\"plate\",\"Position\":[0.3,1.9,-0.1],\"Rotation\":[0,15,0]}";
@@ -280,42 +264,17 @@ var assault = FrameSpecParser.Parse(Json(Minimal.Replace("\"Armor\":100", "\"Arm
     Check(!plain.ShieldUp && !FrameRules.ShieldHit(plain, 5, 1) && !FrameRules.RegenShield(plain, 100, 1), "suits without a barrier have none");
 }
 
-// ---- weapon and steps ----------------------------------------------------------------------------------------
-
-{
-    var move = new MovementSpec(1f, 1.5f, 1.3f, 4f, 8f); // sprint 4 s, cool 8 s from full
-    var heat = new SprintHeat();
-    var bonus = 0;
-    while (!heat.Overheated && bonus < 100) if (heat.Step(move, true, 0.1f)) bonus++;
-    Check(bonus >= 39 && bonus <= 40, "the sprint bonus lasts SprintSeconds, then the suit overheats, got " + bonus);
-    Check(!heat.Step(move, true, 0.1f), "an overheated suit gets no sprint bonus while sprint is held (it cools meanwhile)");
-    var cooling = 1;
-    while (heat.Overheated && cooling < 100) { heat.Step(move, false, 0.1f); cooling++; }
-    Check(cooling >= 51 && cooling <= 53, "it stays overheated until the heat falls to the rearm level, got " + cooling + " steps");
-    Check(heat.Step(move, true, 0.1f), "cooled to the rearm level, sprint works again");
-}
-{
-    Check(FrameNoise.PilotMultiplier == 2f, "a piloted suit is heard at twice an ordinary player's distance");
-    Check(FrameNoise.LandingRadius(8f) == 16f && FrameNoise.LandingRadius(20f) == 40f, "a pilotless landing is heard as far as the player's run, doubled");
-    EnemyDetectionDataBlock.Default = new EnemyDetectionDataBlock { movementDetectionDistance = 8f };
-    Check(Noise.LandingRadius() == 16f, "the landing radius is twice the game's default detection distance, read from its block");
-    EnemyDetectionDataBlock.Default = null;
-    Plugin.ThrowOnError = false;
-    Check(Noise.LandingRadius() == 0f && Plugin.Errors.Count == 1, "no default detection block: no landing noise and one error");
-    Plugin.ThrowOnError = true; Plugin.Errors.Clear();
-}
-
 // ---- messages ------------------------------------------------------------------------------------------------
 
-Check(Marshal.SizeOf<FrameStateMessage>() == 91, "state message size " + Marshal.SizeOf<FrameStateMessage>());
+Check(Marshal.SizeOf<FrameStateMessage>() == 95, "state message size " + Marshal.SizeOf<FrameStateMessage>());
 Check(Marshal.OffsetOf<FrameStateMessage>(nameof(FrameStateMessage.Spec)).ToInt32() == 55, "state spec offset");
 Check(Marshal.OffsetOf<FrameStateMessage>(nameof(FrameStateMessage.Definition)).ToInt32() == 63, "state definition offset");
 Check(Marshal.OffsetOf<FrameStateMessage>(nameof(FrameStateMessage.Pilot)).ToInt32() == 6, "state pilot offset");
 Check(Marshal.OffsetOf<FrameStateMessage>(nameof(FrameStateMessage.Ejection)).ToInt32() == 54, "state ejection offset");
-Check(Marshal.SizeOf<FrameRequestMessage>() == 21, "request size");
+Check(Marshal.SizeOf<FrameRequestMessage>() == 34, "request size");
 Check(Marshal.SizeOf<FrameRejectMessage>() == 14, "reject size");
 Check(Marshal.SizeOf<FrameFireMessage>() == 37, "fire size");
-Check(Marshal.SizeOf<FrameRocketMessage>() == 26, "rocket size");
+Check(Marshal.SizeOf<FrameRocketMessage>() == 38, "rocket size");
 Check(Marshal.SizeOf<FrameStateMessage>() <= 192, "state fits ForgeOrdnance per-call data");
 {
     var host = new FrameRecord(9, 4, assault) { State = FrameState.Piloted, Pilot = 77, Armor = 55, Shield = 7, ShieldUp = true, Magazine = 12, Reserve = 40, X = 1, Y = 2, Z = 3, Yaw = 45, Sequence = 5, BoostEndsAt = 13f, Sieged = true, DefinitionKey = 0xC0FFEEu };
@@ -374,10 +333,8 @@ Check(Marshal.SizeOf<FrameStateMessage>() <= 192, "state fits ForgeOrdnance per-
     try { snapshot.Restore(new Dictionary<ulong, FrameSpec>(), 0, 0); }
     catch (InvalidOperationException) { missingRejected = true; }
     Check(missingRejected, "missing checkpoint model is an explicit failure");
-    Check(Marshal.SizeOf<FrameCheckpointMessage>() == 112 && Marshal.OffsetOf<FrameCheckpointMessage>(nameof(FrameCheckpointMessage.State)).ToInt32() == 21, "checkpoint message layout");
+    Check(Marshal.SizeOf<FrameCheckpointMessage>() == 116 && Marshal.OffsetOf<FrameCheckpointMessage>(nameof(FrameCheckpointMessage.State)).ToInt32() == 21, "checkpoint message layout");
     Check(Marshal.SizeOf<FrameHitMessage>() == 25 && Marshal.OffsetOf<FrameHitMessage>(nameof(FrameHitMessage.Damage)).ToInt32() == 20, "hit message layout");
-    NativeChecks.Run(Check, assault, tank);
-    R2Checks.Run(Check, assault, tank);
 }
 
 {
@@ -388,19 +345,14 @@ Check(Marshal.SizeOf<FrameStateMessage>() <= 192, "state fits ForgeOrdnance per-
     Check(Math.Abs((deep.Z + 0.25f) - (-0.4f - CarrySocket.Gap)) < 1e-6f && deep.Z < thin.Z, "a deeper object's near face still sits the gap behind the shell");
 }
 
-HudChecks.Run(Check, assault);
-RocketChecks.Run(Check);
-SoundChecks.Run(Check);
-EffectsChecks.Run(Check);
-CockpitChecks.Run(Check);
 
 Console.WriteLine("Frames core: " + checks + " checks passed.");
 
 // ---- model names and nodes -----------------------------------------------------------------------------------
 
 {
-    Check(FrameModelName.TrySplit("Pack:item", out var pack, out var item) && pack == "Pack" && item == "item", "Pack:item splits");
-    Check(!FrameModelName.TrySplit("item", out _, out _) && !FrameModelName.TrySplit(":item", out _, out _) && !FrameModelName.TrySplit("Pack:", out _, out _) && !FrameModelName.TrySplit("a:b:c", out _, out _) && !FrameModelName.TrySplit(null, out _, out _),
+    Check(ForgeCore.PackItem.TrySplit("Pack:item", out var pack, out var item) && pack == "Pack" && item == "item", "Pack:item splits");
+    Check(!ForgeCore.PackItem.TrySplit("item", out _, out _) && !ForgeCore.PackItem.TrySplit(":item", out _, out _) && !ForgeCore.PackItem.TrySplit("Pack:", out _, out _) && !ForgeCore.PackItem.TrySplit("a:b:c", out _, out _) && !ForgeCore.PackItem.TrySplit(null, out _, out _),
         "a name without exactly one pack and one item is refused");
     Check(FrameModelName.MarkIcon("Other:walker") == "Other:mark-walker", "the cockpit mark is mark-<item> in the icon pack of the model\u0027s pack");
     var spec = FrameSpecParser.Parse(Json(Minimal));

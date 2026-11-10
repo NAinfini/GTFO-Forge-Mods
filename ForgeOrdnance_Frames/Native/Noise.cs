@@ -25,7 +25,7 @@ internal static class Noise
         var block = EnemyDetectionDataBlock.GetBlock(DefaultDetection);
         if (block == null)
         {
-            Plugin.Error("Exosuit landing noise: the game has no " + DefaultDetection + " enemy detection block, so the landing makes no noise.");
+            Plugin.Logger.ErrorOnce("Exosuit landing noise: the game has no " + DefaultDetection + " enemy detection block, so the landing makes no noise.");
             return 0f;
         }
         var radius = FrameNoise.LandingRadius(block.movementDetectionDistance);

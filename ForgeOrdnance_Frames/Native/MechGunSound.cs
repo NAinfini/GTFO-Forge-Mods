@@ -26,7 +26,7 @@ internal sealed class MechGunSound : IWeaponActionHandler
     }
 
     /// <summary>The planted gun's bolt under every planted shot: its own cue (the dry-fire clicks without the beep; raised and quieter, set in
-    /// <c>audio/cues.json</c>; the cue's minimum gap thins it out at high rates).</summary>
+    /// <c>audio/cues.forge</c>; the cue's minimum gap thins it out at high rates).</summary>
     internal static void SiegeShot() => FrameAudio.Local(FrameSound.SiegeBolt);
 
     public void Play(WeaponAction action)

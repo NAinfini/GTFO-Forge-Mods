@@ -1,0 +1,1206 @@
+{
+    "bundle": "forge-frames-fx.bundle",
+    "sha256": "ad4eea0d253a8e34a8332c02129564a369772e90fa4b8ca267ac3d2ffed6700e",
+    "unity": "2019.4.21f1",
+    "target": "StandaloneWindows64",
+    "bytes": 10197906,
+    "effects": [
+        {
+            "slug": "Compose_frame_backblast_ad2ec2f4",
+            "id": "compose:frame.backblast",
+            "name": "frame.backblast",
+            "pack": "War FX",
+            "license": "Standard Unity Asset Store EULA (may ship inside built mod bundles; raw assets must not be redistributed or committed)",
+            "libraryPackage": "",
+            "prefab": "Assets/ForgeVfx/Converted/Compose_frame_backblast_ad2ec2f4.prefab",
+            "seconds": 0.0,
+            "loop": false,
+            "shaders": [
+                "ForgeVfx/Particles Alpha Blended",
+                "ForgeVfx/Particles Uber"
+            ],
+            "items": [
+                {
+                    "path": "Assets/ForgeVfx/Converted/Compose_frame_backblast_ad2ec2f4.prefab",
+                    "sha256": "7ea7818fbdaa0c0f029cf8642e853297ad2231f25d33bc1f14228fc10e8a0bfb"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/WFXMR_BImpact Dirt_colour0_WFXMR_BImpact Dirt_ff7a1a.mat",
+                    "sha256": "364c826a72d3669f23ecc9be71014ab460d98ad4de55f6d0098c2d2e3b457e58"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/WFXMR_BImpact Dirt_colour1_Directional Smoke_ff7a1a.mat",
+                    "sha256": "5a0bba7de2e770a3e9d7a396885425d0f6b108164d675c7305673db3f5971c73"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/WFXMR_BImpact Dirt_colour2_Dirt_ff7a1a.mat",
+                    "sha256": "d3c9943eb8b8339c8a2fba2d6192e55fc10dd8eefed6e2ea12efeb3f423ba636"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/War_FX_bc8d2212_33bb3d_1.mat",
+                    "sha256": "c57e2e222e9cc986dd79e208c5d2881408a70fdfeaafd316bfa54a4e98e5c02b"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/War_FX_c888f0c9_50dafc_0.mat",
+                    "sha256": "b89c56234bbfb19f9940a89dc639ff53b24ab75b8e24ec0626e5ba6f3e8ff54a"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/War_FX_c888f0c9_50dafc_1.mat",
+                    "sha256": "26a9edb3816aacbfe5b3ec45a5889d56515098c5bb3cd30aa68ccc93c03e58bb"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/War_FX_c888f0c9_50dafc_2.mat",
+                    "sha256": "1b526c53fec6fb7a4f8ce6b075f45f65b338cd6efd0ba7d3cb2f4f3693590e8e"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/War_FX_c888f0c9_50dafc_3.mat",
+                    "sha256": "06794ceab9100cab540a5d2b5d950d6ab1c5a571ba846400a35a0bd133f8c29f"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/SoftDot.png",
+                    "sha256": "f62202277ebded93d6ea85d4b3837d56d64db249ad582cb3e766b240d4dbf0e8"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Desktop/Textures/Misc/WFX_T_GlowCircle A8.png",
+                    "sha256": "a4d78687c7dd608b6ecb99ec01fee29e8240a7707f296654d5249d6fdc65e36a"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Desktop/Textures/MuzzleFlashes/WFX_T_MF Side RIFLE1 A8.png",
+                    "sha256": "a7d45e556f46ab53398c845aed0d3efa649853b1f1b348ecf3d05abc713afa48"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Desktop/Textures/MuzzleFlashes/WFX_T_MF Sparks RIFLE1 A8.tga",
+                    "sha256": "30b932d762ea2a6f665f357819f161f6063019d0cffe19eea2c20611aad17fff"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Mesh/Plane1x1.FBX",
+                    "sha256": "2cf3065375c5b7e9f45823c8f17d8d1cb94a20e607ffaa31616c5229637da961"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Mobile/Textures/Misc/WFXM_T_Debris Generic.tga",
+                    "sha256": "7dcfdbf3065bb41f317f9178a69cc17a8132aebf3dd6ea0c744114300d47749f"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Mobile/Textures/Smoke/WFXM_T_SmokeLoopAlpha.tga",
+                    "sha256": "fd66fca42d073a54c7a4841700154eb4ee97f78f82eb6ce08d5a8f2b8dc398a2"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAlphaBlended.shader",
+                    "sha256": "6ed26d258f93a839d59052b5b32020bed437a5b59d38d80ad2a6511ef5e9edbd"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesUber.shader",
+                    "sha256": "319d1cde2177467f580fc25da88dcd458d46a273426acf338d1409abdb231abf"
+                }
+            ]
+        },
+        {
+            "slug": "Compose_frame_eject_1c321a35",
+            "id": "compose:frame.eject",
+            "name": "frame.eject",
+            "pack": "Forge own effects; PRO Effects Sci-fi Shooter FX  Unity6 v1.2; War FX",
+            "license": "Forge's own effect, generated by ForgeVfxOwnEffects.cs; Standard Unity Asset Store EULA (may ship inside built mod bundles; raw assets must not be redistributed or committed); Unity Asset Store EULA（只能随构建发布，不能分发原素材）",
+            "libraryPackage": "",
+            "prefab": "Assets/ForgeVfx/Converted/Compose_frame_eject_1c321a35.prefab",
+            "seconds": 0.0,
+            "loop": false,
+            "shaders": [
+                "ForgeVfx/Particles Additive",
+                "ForgeVfx/Particles Alpha Blended"
+            ],
+            "items": [
+                {
+                    "path": "Assets/ForgeVfx/Converted/Compose_frame_eject_1c321a35.prefab",
+                    "sha256": "af820682d1172d78330d15f6a3dfd11624c375577b5b596935b8f11979efc7f9"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/PRO_Effects_Sci_fi_Shoot_55a9c0b2_17668a_0.mat",
+                    "sha256": "51b72d91e47093d28c0cf653e8c3e3d13f0eb1c8d5523daa5c41ee2628916b2e"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_vent_519e88_0.mat",
+                    "sha256": "86b4e2617ec1c59e1cae1a06e51785ab14e475985e21ab38c4ba1add66b607a5"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_vent_519e88_2.mat",
+                    "sha256": "fce19fb7cd534e3bcb48918f27c0c200684e3853d9b13dcec0507478a5ae472e"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/SoftDot.png",
+                    "sha256": "f62202277ebded93d6ea85d4b3837d56d64db249ad582cb3e766b240d4dbf0e8"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Desktop/Textures/Smoke/WFX_T_SmokeLoopAlpha.tga",
+                    "sha256": "fd66fca42d073a54c7a4841700154eb4ee97f78f82eb6ce08d5a8f2b8dc398a2"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Own/Materials/glow_additive.mat",
+                    "sha256": "f1ddc5c3499e1fb4b476c6912ed7152612a940b8742a61dc6e3aa84877fe4477"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Own/Textures/glow.png",
+                    "sha256": "d7f5dede7b600cfa51915d9b4bff7f6e03cc347c847d23fe69c631cb263a55c3"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAdditive.shader",
+                    "sha256": "4bd5534a6d86a69d850169eecd071d410febb1e0696474af556ea1526d6bab26"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAlphaBlended.shader",
+                    "sha256": "6ed26d258f93a839d59052b5b32020bed437a5b59d38d80ad2a6511ef5e9edbd"
+                }
+            ]
+        },
+        {
+            "slug": "Compose_frame_landing_2bb592ce",
+            "id": "compose:frame.landing",
+            "name": "frame.landing",
+            "pack": "Forge own effects; Free Quick Effects Vol 1; War FX",
+            "license": "Forge's own effect, generated by ForgeVfxOwnEffects.cs; Standard Unity Asset Store EULA (may ship inside built mod bundles; raw assets must not be redistributed or committed)",
+            "libraryPackage": "",
+            "prefab": "Assets/ForgeVfx/Converted/Compose_frame_landing_2bb592ce.prefab",
+            "seconds": 0.0,
+            "loop": false,
+            "shaders": [
+                "ForgeVfx/Particles Alpha Blended",
+                "ForgeVfx/Particles Uber"
+            ],
+            "items": [
+                {
+                    "path": "Assets/ForgeVfx/Converted/Compose_frame_landing_2bb592ce.prefab",
+                    "sha256": "9284ceb82bb85a6e091f153021f7f799d2be7555d50bd4374456120cb84cf2f7"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_landing_68cbae_703a11_0.mat",
+                    "sha256": "44879e21caa49ae11313ce2458f738173e1343065170c2522fbc6729bf8938ab"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_landing_68cbae_703a11_1.mat",
+                    "sha256": "85624284948c2b1e082df96779d5af9457a98326b6c0865d6aa06fd925cd2d4b"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_landing_68cbae_703a11_3.mat",
+                    "sha256": "88c20061133723f2e575012b350ad56b12d8624382e40b1b8b0ac104b5d81899"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_landing_68cbae_703a11_4.mat",
+                    "sha256": "d537f95c9dd6a9d2ac2e2c7aaff23ef38c1acef08eb8063e2d26c0718718c28e"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/War_FX_bc8d2212_0.mat",
+                    "sha256": "6e9242bcefbb0721d4af7eb34860695bdeb5fcab0cd4c5e41ef15ed167d8677a"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/War_FX_bc8d2212_1.mat",
+                    "sha256": "8680108f332424d54c79a3a7fdc0d4e7c2141dd531888851dc864dd7978d7440"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/War_FX_bc8d2212_2.mat",
+                    "sha256": "708815df612d51db49075ab32552fe79bbd19d17223eb6e40064f062e35b95d6"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/SoftDot.png",
+                    "sha256": "f62202277ebded93d6ea85d4b3837d56d64db249ad582cb3e766b240d4dbf0e8"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/GabrielAguiarProductions/FreeQuickEffectsVol1/Textures/Circle01_v1.png",
+                    "sha256": "91e70159a51e00920a35c895e23142ca1d1d323644969aa44d411f126b684d9b"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/GabrielAguiarProductions/FreeQuickEffectsVol1/Textures/Swirl01.png",
+                    "sha256": "09ccfcbd222890ea13911aaa3e92a5480df80058fd9d4c2269bdabddf01b7758"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Desktop/Textures/Misc/WFX_T_Debris Generic.tga",
+                    "sha256": "7dcfdbf3065bb41f317f9178a69cc17a8132aebf3dd6ea0c744114300d47749f"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Desktop/Textures/Smoke/WFX_T_SmokeLoopAlpha.tga",
+                    "sha256": "fd66fca42d073a54c7a4841700154eb4ee97f78f82eb6ce08d5a8f2b8dc398a2"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Mobile/Textures/Misc/WFXM_T_Debris Generic.tga",
+                    "sha256": "7dcfdbf3065bb41f317f9178a69cc17a8132aebf3dd6ea0c744114300d47749f"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Mobile/Textures/Smoke/WFXM_T_SmokeLoopAlpha.tga",
+                    "sha256": "fd66fca42d073a54c7a4841700154eb4ee97f78f82eb6ce08d5a8f2b8dc398a2"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAlphaBlended.shader",
+                    "sha256": "6ed26d258f93a839d59052b5b32020bed437a5b59d38d80ad2a6511ef5e9edbd"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesUber.shader",
+                    "sha256": "319d1cde2177467f580fc25da88dcd458d46a273426acf338d1409abdb231abf"
+                }
+            ]
+        },
+        {
+            "slug": "Compose_frame_shield_break_6a6fcc3a",
+            "id": "compose:frame.shield.break",
+            "name": "frame.shield.break",
+            "pack": "Master MagicFX Bundle 1.0; Super Magic FX - 1700 Unique VFX 1.8",
+            "license": "Unity Asset Store EULA（只能随构建发布，不能分发原素材）",
+            "libraryPackage": "",
+            "prefab": "Assets/ForgeVfx/Converted/Compose_frame_shield_break_6a6fcc3a.prefab",
+            "seconds": 0.0,
+            "loop": false,
+            "shaders": [
+                "ForgeVfx/Particles Uber"
+            ],
+            "items": [
+                {
+                    "path": "Assets/ForgeVfx/Converted/Compose_frame_shield_break_6a6fcc3a.prefab",
+                    "sha256": "9dcd72864b6c30ee0fddfb29f32b3fa4aeed576abde327a4ad45e549b16239d4"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_a20c0328_fd8aa3_0.mat",
+                    "sha256": "04503b7d4f2d3c4bf53998fd254a1f1c7b03ec83090164b382117b635f18a62f"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_a20c0328_fd8aa3_1.mat",
+                    "sha256": "a744fc5f8f97be1dc282c48dc50981ca18ab8c62faa7dd01d0dd59afea641051"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_a20c0328_fd8aa3_10.mat",
+                    "sha256": "3660e58a785d27fb5d8823a1822bcb335065e1bf8576e9ec3b3a1e33c09a2e3f"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_a20c0328_fd8aa3_2.mat",
+                    "sha256": "c61cecad8d0006b2005148c7bc6499dee67c426ea8e3470b034f39f055dd037e"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_a20c0328_fd8aa3_3.mat",
+                    "sha256": "1c04bdc57eb8eef8c769f2eb11a1593b2b6274c72621fecd5ae7b97d11f6ca9d"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_a20c0328_fd8aa3_4.mat",
+                    "sha256": "b7dfea83f77f20dd33211d34a42ed81326718067bfd7c736a9c8733412ee63aa"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_a20c0328_fd8aa3_5.mat",
+                    "sha256": "560ab18871d04f45cdfb911608bc904a331f30e3c4b715d7e0d7342fcc47d207"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_a20c0328_fd8aa3_6.mat",
+                    "sha256": "c2b2bf014a6bd52715e98e0926b6ad1e5ed27d80ea2b825bf3b8015e28098e18"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_a20c0328_fd8aa3_7.mat",
+                    "sha256": "76bde624fa762cd70de659851a77d287e4dde9b4abcd87a9c3061bc8b18f6f8f"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_a20c0328_fd8aa3_8.mat",
+                    "sha256": "ac95ebff77f56b6aad1f6d8bd64cb30764d1af16070f1ce09d1062f41f3499b0"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_a20c0328_fd8aa3_9.mat",
+                    "sha256": "53ea990b89d5c9603dfbdf2c3be568b91663fd27219348b9119c7a191c43046c"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_e2ca32e2_3ec9f4_0.mat",
+                    "sha256": "912bfe2ad87b6cbed01231a99fa4e0e505e5289ab3ed4f55b0bfa542c1a8b0fc"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_e2ca32e2_3ec9f4_1.mat",
+                    "sha256": "b997e145005efccd2517a2bdcbb683a9e47ae22d39e2a3ae53b1c0d02652f61a"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_e2ca32e2_3ec9f4_2.mat",
+                    "sha256": "dc64d1ba98359c26f487396b6745b3c944c4fbec55625a5702deb96529f04c53"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_e2ca32e2_3ec9f4_3.mat",
+                    "sha256": "8d838d9512ca6ec7546e06125182e0b90a6fab3837ad37ed70e4dd5b0ba23861"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_e2ca32e2_3ec9f4_4.mat",
+                    "sha256": "a9ecf256323a5325579e508db0ee35a8f46bb9c9aaeaea383c14c76b08aa6ad4"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Super_Magic_FX_1700_Uniq_55baf385_8c1e4f_0.mat",
+                    "sha256": "f644d49ecbd2bd1cf5d8d0c241119ba09fa9e54ed567b19f2c429645df5aa4f2"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Super_Magic_FX_1700_Uniq_55baf385_8c1e4f_1.mat",
+                    "sha256": "b024546ce700639fdea926b850d4f7d39b5b8dd50285420812abe800e4618263"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Super_Magic_FX_1700_Uniq_55baf385_8c1e4f_2.mat",
+                    "sha256": "a130d4a083e06ae8c83b55680971b1738e89e79e26e92bf43431ca12a8f81ef5"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Super_Magic_FX_1700_Uniq_55baf385_8c1e4f_3.mat",
+                    "sha256": "c09ac51130688051650b8fef2735b26e92ac1a59605ebe8bcd0f8f4999ad3940"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Models/Shard.fbx",
+                    "sha256": "eb6db1b7bc51585f79d4151e516dbb1504d2ecf12334479ea3e8e047a245fdf3"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Models/Shell.fbx",
+                    "sha256": "fb8acb61ced1e2ac72016b89a253bedfc10fb3bfc4c4090216e0e54c6489130c"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Shard.png",
+                    "sha256": "bb6d16a92c50a5ab209d9532beb69c3065a100377c54bf9f18debfd8aac62cd0"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Spike.png",
+                    "sha256": "c7fe8db87296b0b6ddaee87f84d16abec094157614720b092210ac6c4e293530"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_3PointSparkles.png",
+                    "sha256": "ae16b3220c6554e030f9153a59fce4951af9a32ff059f3a44a2927757d843820"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_Circle4.png",
+                    "sha256": "372a351625a9693aaef26601a23e4fe83b7d012b0f36af237ef3b0ffc0820150"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_CircleStatic.png",
+                    "sha256": "57a3f10792efeaca778a68f4c30176cc67bbdf4473a3e4ad4b0f959293c2c74d"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_DefaultDot.png",
+                    "sha256": "cd9debbab7c043af8e986e0ecf327bb8942a3c5a34683bdaf3607b5d2a36e400"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_Flare.png",
+                    "sha256": "ea188497ace327020227f662191c67b0c0356a08471edec59346fc2e8550cc02"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_Gradient 1.png",
+                    "sha256": "bc234dc95767d4d349780504625e621dee94aad1158af3dfb6f5bc3345a3c649"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_Gradient 13.png",
+                    "sha256": "3d36da3d1cc89a3ef721ce395317d4a89e684cf522f830109fb8c52ea5d9f97a"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_Gradient 34.png",
+                    "sha256": "e18a6a998d834052ea97c6efb4bc0d50055b9c866ca678ca023dbb231b0b43a3"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_HorizontalFlare.png",
+                    "sha256": "68a7aa13787cea4525a0d2fb6b700c37ac684bf9767ed79229435e9cbd2d44f6"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_SmokeSheet2.png",
+                    "sha256": "203e60dd19f19a523b1ce4ad598a2dd8dbbaab68fbeebcd1d72fcbdba50a1cfd"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_Sparkle 1.png",
+                    "sha256": "783273f4192e1d38e9bab17584ed4ed05dea7eacbdb82a03a96d5408189257d8"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_Sparkle2.png",
+                    "sha256": "b277aa33815a388ede0b903253a8f4dacf8d2c1766f6ec9dd5e57615e47fb748"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/ParticlesVer2/Shoots/OrangeSparkleShoot/Textures/Tex_FireSparkle.png",
+                    "sha256": "3323f4df7e38367b58092c85cfcf3ead1c29fe9bcdbdec08bb48f68bf9e37221"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/ParticlesVer3/Lightnings/LightningExp/Textures/Tex_Smoke2.png",
+                    "sha256": "8256bab5b215bd81a3bddcce865077bd5d409f03b38209ed8537a25e46bec3be"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/ParticlesVer3/Shoots/WaterShoots/Textures/Tex_HitSparkle.png",
+                    "sha256": "833ac60572576ab4053e09beee13d3a20fdbd1a77ebf7a80c1482266df8a767e"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Piloto Studio/Textures/Glowdots_Speckles.png",
+                    "sha256": "c539e0c6874dfba6449b86848f06f677b77ea7cf5cd21aabe89d05bbd7568e57"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Piloto Studio/Textures/LightningQuad.png",
+                    "sha256": "f48a5af0acb3ec321e3d706db57baa8314ad0f48436cabfaf95347916a6ba698"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Piloto Studio/Textures/Noise_SuperContrasted.tga",
+                    "sha256": "00846b79b859a04e6caf53446c5bafbd98119a3c0bf430508202f72fe6793e2d"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Piloto Studio/Textures/Tech_ImpactClusters.png",
+                    "sha256": "3c73a56c03a268774bd741a240effcf19c8600800a68f9d7b2a0bf733345966d"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Piloto Studio/Textures/Tech_TexturesPacked.png",
+                    "sha256": "2fb32ecff3c3d40e60ef98f3693ffeedf9ecfd0ee68d5ae98d54168e71dbbe64"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesUber.shader",
+                    "sha256": "319d1cde2177467f580fc25da88dcd458d46a273426acf338d1409abdb231abf"
+                }
+            ]
+        },
+        {
+            "slug": "Compose_frame_shield_hit_6e60105d",
+            "id": "compose:frame.shield.hit",
+            "name": "frame.shield.hit",
+            "pack": "Master MagicFX Bundle 1.0; Super Magic FX - 1700 Unique VFX 1.8",
+            "license": "Unity Asset Store EULA（只能随构建发布，不能分发原素材）",
+            "libraryPackage": "",
+            "prefab": "Assets/ForgeVfx/Converted/Compose_frame_shield_hit_6e60105d.prefab",
+            "seconds": 0.0,
+            "loop": false,
+            "shaders": [
+                "ForgeVfx/Particles Uber"
+            ],
+            "items": [
+                {
+                    "path": "Assets/ForgeVfx/Converted/Compose_frame_shield_hit_6e60105d.prefab",
+                    "sha256": "e0d9389fd7e4487c9ade73a85c81bf0367fe36b13e11b17ac74544a6d3d7777b"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_e2ca32e2_3ec9f4_0.mat",
+                    "sha256": "912bfe2ad87b6cbed01231a99fa4e0e505e5289ab3ed4f55b0bfa542c1a8b0fc"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_e2ca32e2_3ec9f4_1.mat",
+                    "sha256": "b997e145005efccd2517a2bdcbb683a9e47ae22d39e2a3ae53b1c0d02652f61a"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_e2ca32e2_3ec9f4_2.mat",
+                    "sha256": "dc64d1ba98359c26f487396b6745b3c944c4fbec55625a5702deb96529f04c53"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_e2ca32e2_3ec9f4_3.mat",
+                    "sha256": "8d838d9512ca6ec7546e06125182e0b90a6fab3837ad37ed70e4dd5b0ba23861"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_e2ca32e2_3ec9f4_4.mat",
+                    "sha256": "a9ecf256323a5325579e508db0ee35a8f46bb9c9aaeaea383c14c76b08aa6ad4"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Super_Magic_FX_1700_Uniq_55baf385_8c1e4f_0.mat",
+                    "sha256": "f644d49ecbd2bd1cf5d8d0c241119ba09fa9e54ed567b19f2c429645df5aa4f2"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Super_Magic_FX_1700_Uniq_55baf385_8c1e4f_1.mat",
+                    "sha256": "b024546ce700639fdea926b850d4f7d39b5b8dd50285420812abe800e4618263"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Super_Magic_FX_1700_Uniq_55baf385_8c1e4f_2.mat",
+                    "sha256": "a130d4a083e06ae8c83b55680971b1738e89e79e26e92bf43431ca12a8f81ef5"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Super_Magic_FX_1700_Uniq_55baf385_8c1e4f_3.mat",
+                    "sha256": "c09ac51130688051650b8fef2735b26e92ac1a59605ebe8bcd0f8f4999ad3940"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Models/Shell.fbx",
+                    "sha256": "fb8acb61ced1e2ac72016b89a253bedfc10fb3bfc4c4090216e0e54c6489130c"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_3PointSparkles.png",
+                    "sha256": "ae16b3220c6554e030f9153a59fce4951af9a32ff059f3a44a2927757d843820"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_Circle4.png",
+                    "sha256": "372a351625a9693aaef26601a23e4fe83b7d012b0f36af237ef3b0ffc0820150"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_Flare.png",
+                    "sha256": "ea188497ace327020227f662191c67b0c0356a08471edec59346fc2e8550cc02"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_Gradient 1.png",
+                    "sha256": "bc234dc95767d4d349780504625e621dee94aad1158af3dfb6f5bc3345a3c649"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_HorizontalFlare.png",
+                    "sha256": "68a7aa13787cea4525a0d2fb6b700c37ac684bf9767ed79229435e9cbd2d44f6"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/ParticlesVer3/Shoots/WaterShoots/Textures/Tex_HitSparkle.png",
+                    "sha256": "833ac60572576ab4053e09beee13d3a20fdbd1a77ebf7a80c1482266df8a767e"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Piloto Studio/Textures/Glowdots_Speckles.png",
+                    "sha256": "c539e0c6874dfba6449b86848f06f677b77ea7cf5cd21aabe89d05bbd7568e57"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Piloto Studio/Textures/LightningQuad.png",
+                    "sha256": "f48a5af0acb3ec321e3d706db57baa8314ad0f48436cabfaf95347916a6ba698"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Piloto Studio/Textures/Noise_SuperContrasted.tga",
+                    "sha256": "00846b79b859a04e6caf53446c5bafbd98119a3c0bf430508202f72fe6793e2d"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Piloto Studio/Textures/Tech_ImpactClusters.png",
+                    "sha256": "3c73a56c03a268774bd741a240effcf19c8600800a68f9d7b2a0bf733345966d"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Piloto Studio/Textures/Tech_TexturesPacked.png",
+                    "sha256": "2fb32ecff3c3d40e60ef98f3693ffeedf9ecfd0ee68d5ae98d54168e71dbbe64"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesUber.shader",
+                    "sha256": "319d1cde2177467f580fc25da88dcd458d46a273426acf338d1409abdb231abf"
+                }
+            ]
+        },
+        {
+            "slug": "Compose_sirius_ram_4460dac9",
+            "id": "compose:sirius.ram",
+            "name": "sirius.ram",
+            "pack": "Master MagicFX Bundle 1.0; PRO Effects Sci-fi Shooter FX  Unity6 v1.2; Super Magic FX - 1700 Unique VFX 1.8",
+            "license": "Unity Asset Store EULA（只能随构建发布，不能分发原素材）",
+            "libraryPackage": "",
+            "prefab": "Assets/ForgeVfx/Converted/Compose_sirius_ram_4460dac9.prefab",
+            "seconds": 0.0,
+            "loop": false,
+            "shaders": [
+                "ForgeVfx/Particles Alpha Blended",
+                "ForgeVfx/Particles Uber"
+            ],
+            "items": [
+                {
+                    "path": "Assets/ForgeVfx/Converted/Compose_sirius_ram_4460dac9.prefab",
+                    "sha256": "12db9942a7df1b658da15b8733b4c787cd22d42cbc5182057b97ebf3a155967e"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_e2ca32e2_93a711_0.mat",
+                    "sha256": "2badd45d989226ec093ca4cd630636df701624b03a7532f27e690f375561647e"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_e2ca32e2_93a711_1.mat",
+                    "sha256": "29cf172862510d8da8cbabcc5048d2ae878d613afe75abeddd189d21355aa458"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_e2ca32e2_93a711_2.mat",
+                    "sha256": "6959b702d0c3889b0eeec8642d13dcd7c2afd0890c240849605d6ec904f9ea59"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Master_MagicFX_Bundle_1_e2ca32e2_93a711_3.mat",
+                    "sha256": "7993a44a119ca88c97b3e52cb26e74397efe13bfb0a7b68a8d6c7e47efe84d74"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/PRO_Effects_Sci_fi_Shoot_55a9c0b2_0.mat",
+                    "sha256": "536293e6b5ad854c450bf0d809910cabf82a7991232d2f7880b985d97e1d6a39"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Super_Magic_FX_1700_Uniq_55baf385_8c1e4f_0.mat",
+                    "sha256": "f644d49ecbd2bd1cf5d8d0c241119ba09fa9e54ed567b19f2c429645df5aa4f2"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Super_Magic_FX_1700_Uniq_55baf385_8c1e4f_1.mat",
+                    "sha256": "b024546ce700639fdea926b850d4f7d39b5b8dd50285420812abe800e4618263"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Super_Magic_FX_1700_Uniq_55baf385_8c1e4f_2.mat",
+                    "sha256": "a130d4a083e06ae8c83b55680971b1738e89e79e26e92bf43431ca12a8f81ef5"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Super_Magic_FX_1700_Uniq_55baf385_8c1e4f_3.mat",
+                    "sha256": "c09ac51130688051650b8fef2735b26e92ac1a59605ebe8bcd0f8f4999ad3940"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/SoftDot.png",
+                    "sha256": "f62202277ebded93d6ea85d4b3837d56d64db249ad582cb3e766b240d4dbf0e8"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Models/Shell.fbx",
+                    "sha256": "fb8acb61ced1e2ac72016b89a253bedfc10fb3bfc4c4090216e0e54c6489130c"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_3PointSparkles.png",
+                    "sha256": "ae16b3220c6554e030f9153a59fce4951af9a32ff059f3a44a2927757d843820"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_Circle4.png",
+                    "sha256": "372a351625a9693aaef26601a23e4fe83b7d012b0f36af237ef3b0ffc0820150"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_Gradient 1.png",
+                    "sha256": "bc234dc95767d4d349780504625e621dee94aad1158af3dfb6f5bc3345a3c649"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/Commons/Textures/Tex_HorizontalFlare.png",
+                    "sha256": "68a7aa13787cea4525a0d2fb6b700c37ac684bf9767ed79229435e9cbd2d44f6"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/MasterMagicFX/ParticlesVer3/Shoots/WaterShoots/Textures/Tex_HitSparkle.png",
+                    "sha256": "833ac60572576ab4053e09beee13d3a20fdbd1a77ebf7a80c1482266df8a767e"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Piloto Studio/Textures/Glowdots_Speckles.png",
+                    "sha256": "c539e0c6874dfba6449b86848f06f677b77ea7cf5cd21aabe89d05bbd7568e57"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Piloto Studio/Textures/LightningQuad.png",
+                    "sha256": "f48a5af0acb3ec321e3d706db57baa8314ad0f48436cabfaf95347916a6ba698"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Piloto Studio/Textures/Noise_SuperContrasted.tga",
+                    "sha256": "00846b79b859a04e6caf53446c5bafbd98119a3c0bf430508202f72fe6793e2d"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Piloto Studio/Textures/Tech_ImpactClusters.png",
+                    "sha256": "3c73a56c03a268774bd741a240effcf19c8600800a68f9d7b2a0bf733345966d"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Piloto Studio/Textures/Tech_TexturesPacked.png",
+                    "sha256": "2fb32ecff3c3d40e60ef98f3693ffeedf9ecfd0ee68d5ae98d54168e71dbbe64"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAlphaBlended.shader",
+                    "sha256": "6ed26d258f93a839d59052b5b32020bed437a5b59d38d80ad2a6511ef5e9edbd"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesUber.shader",
+                    "sha256": "319d1cde2177467f580fc25da88dcd458d46a273426acf338d1409abdb231abf"
+                }
+            ]
+        },
+        {
+            "slug": "Particle_Pack_Starter_As_bb98861c_2247e9",
+            "id": "Particle-Pack-Starter-Assets:bb98861c48ad2024ca93498c7dd93a6c|@nodelay",
+            "name": "橙黄地面火焰",
+            "pack": "Particle Pack Starter Assets",
+            "license": "Standard Unity Asset Store EULA (may ship inside built mod bundles; raw assets must not be redistributed or committed)",
+            "libraryPackage": "F:\\Unity\\特效\\asset-store\\Particle Pack Starter Assets\\Particle Pack Starter Assets.unitypackage",
+            "prefab": "Assets/ForgeVfx/Converted/Particle_Pack_Starter_As_bb98861c_2247e9.prefab",
+            "seconds": 3.0,
+            "loop": true,
+            "shaders": [
+                "ForgeVfx/Particles Additive",
+                "ForgeVfx/Particles Uber"
+            ],
+            "items": [
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Particle_Pack_Starter_As_bb98861c_2247e9_0.mat",
+                    "sha256": "6eda29052493a8350cf00c172ccf483cec5d6edd52f48b66ad47047e9c050593"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Particle_Pack_Starter_As_bb98861c_2247e9_1.mat",
+                    "sha256": "52f33ef59f72fc5eccd8d6f632b3cf46224f72120df8c6b1311e78dcf03b8c18"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Particle_Pack_Starter_As_bb98861c_2247e9.prefab",
+                    "sha256": "c08872f3cf986fbf5a51511fcbebc2d689ec346ea5d5a06208624c63a73c0a7f"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/SoftDot.png",
+                    "sha256": "f62202277ebded93d6ea85d4b3837d56d64db249ad582cb3e766b240d4dbf0e8"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/UnityTechnologies/ParticlePack/EffectExamples/Fire & Explosion Effects/Textures/LargeFlame01.tif",
+                    "sha256": "0c54578941c275d2878d8f8f85a7a7b9a457e6833c31a9fba5c6e27c55e1f125"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAdditive.shader",
+                    "sha256": "4bd5534a6d86a69d850169eecd071d410febb1e0696474af556ea1526d6bab26"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesUber.shader",
+                    "sha256": "319d1cde2177467f580fc25da88dcd458d46a273426acf338d1409abdb231abf"
+                }
+            ]
+        },
+        {
+            "slug": "Recipe_frame_charge_dust_c0cb01",
+            "id": "forge-own:frame_charge_dust",
+            "name": "frame_charge_dust",
+            "pack": "Forge own effects",
+            "license": "Forge's own effect, generated by ForgeVfxOwnEffects.cs",
+            "libraryPackage": "",
+            "prefab": "Assets/ForgeVfx/Converted/Recipe_frame_charge_dust_c0cb01.prefab",
+            "seconds": 0.0,
+            "loop": true,
+            "shaders": [
+                "ForgeVfx/Particles Alpha Blended"
+            ],
+            "items": [
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_charge_dust_c0cb01_0.mat",
+                    "sha256": "a4cb3e1222054ccd5fb190fc20633b8a4eee4799218dbfd22f5aabc358d5d1a3"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_charge_dust_c0cb01_1.mat",
+                    "sha256": "1b4801ef9d47147c10c4781342732411b9bae7aaabc1b860c3529edbd0beafcf"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Recipe_frame_charge_dust_c0cb01.prefab",
+                    "sha256": "af98438b15d5b4f4530df1f80fe82237d5efec1e0271e8eac0ff117098d4a6fb"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Desktop/Textures/Misc/WFX_T_Debris Generic.tga",
+                    "sha256": "7dcfdbf3065bb41f317f9178a69cc17a8132aebf3dd6ea0c744114300d47749f"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Desktop/Textures/Smoke/WFX_T_SmokeLoopAlpha.tga",
+                    "sha256": "fd66fca42d073a54c7a4841700154eb4ee97f78f82eb6ce08d5a8f2b8dc398a2"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAlphaBlended.shader",
+                    "sha256": "6ed26d258f93a839d59052b5b32020bed437a5b59d38d80ad2a6511ef5e9edbd"
+                }
+            ]
+        },
+        {
+            "slug": "Recipe_frame_heat_c4b078",
+            "id": "forge-own:frame_heat",
+            "name": "frame_heat",
+            "pack": "Forge own effects",
+            "license": "Forge's own effect, generated by ForgeVfxOwnEffects.cs",
+            "libraryPackage": "",
+            "prefab": "Assets/ForgeVfx/Converted/Recipe_frame_heat_c4b078.prefab",
+            "seconds": 0.0,
+            "loop": true,
+            "shaders": [
+                "ForgeVfx/Particles Additive",
+                "ForgeVfx/Particles Alpha Blended"
+            ],
+            "items": [
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_heat_c4b078_0.mat",
+                    "sha256": "f1eca039cf04bd0b6b3bf528312313f9b4721c4c5e69338ca30c7a7ecdff17f1"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_heat_c4b078_3.mat",
+                    "sha256": "8a50b2ed74465886b86478c59ec69bf43a0b1a9f78c044938e2699a7959bbbd5"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Recipe_frame_heat_c4b078.prefab",
+                    "sha256": "b20b7497436a819039fc36de0e0bddeac3f2ed8ca5e03bf1c427db0240395129"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Desktop/Textures/Smoke/WFX_T_SmokeLoopAlpha.tga",
+                    "sha256": "fd66fca42d073a54c7a4841700154eb4ee97f78f82eb6ce08d5a8f2b8dc398a2"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Own/Materials/glow_additive.mat",
+                    "sha256": "f1ddc5c3499e1fb4b476c6912ed7152612a940b8742a61dc6e3aa84877fe4477"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Own/Textures/glow.png",
+                    "sha256": "d7f5dede7b600cfa51915d9b4bff7f6e03cc347c847d23fe69c631cb263a55c3"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAdditive.shader",
+                    "sha256": "4bd5534a6d86a69d850169eecd071d410febb1e0696474af556ea1526d6bab26"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAlphaBlended.shader",
+                    "sha256": "6ed26d258f93a839d59052b5b32020bed437a5b59d38d80ad2a6511ef5e9edbd"
+                }
+            ]
+        },
+        {
+            "slug": "Recipe_frame_kick_a25d9b_16662b",
+            "id": "forge-own:frame_kick|@tint:swirl",
+            "name": "frame_kick",
+            "pack": "Forge own effects",
+            "license": "Forge's own effect, generated by ForgeVfxOwnEffects.cs",
+            "libraryPackage": "",
+            "prefab": "Assets/ForgeVfx/Converted/Recipe_frame_kick_a25d9b_16662b.prefab",
+            "seconds": 0.0,
+            "loop": true,
+            "shaders": [
+                "ForgeVfx/Particles Alpha Blended",
+                "ForgeVfx/Particles Uber"
+            ],
+            "items": [
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_kick_a25d9b_16662b_0.mat",
+                    "sha256": "2fad6bbab1f4a2ae461fab2055ae96880a940ca71c45ea918b7636dac972ade7"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_kick_a25d9b_16662b_1.mat",
+                    "sha256": "788f1df38dd9d74262dd208423878ad8a47a94e08c7cdbe03a3ca604be35e73b"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Recipe_frame_kick_a25d9b_16662b.prefab",
+                    "sha256": "5bcf9a5c45416cb58c19596dbcf55c15b38a21b39d031f5990d285065ee25e12"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/GabrielAguiarProductions/FreeQuickEffectsVol1/Textures/Swirl01.png",
+                    "sha256": "09ccfcbd222890ea13911aaa3e92a5480df80058fd9d4c2269bdabddf01b7758"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Desktop/Textures/Smoke/WFX_T_SmokeLoopAlpha.tga",
+                    "sha256": "fd66fca42d073a54c7a4841700154eb4ee97f78f82eb6ce08d5a8f2b8dc398a2"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAlphaBlended.shader",
+                    "sha256": "6ed26d258f93a839d59052b5b32020bed437a5b59d38d80ad2a6511ef5e9edbd"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesUber.shader",
+                    "sha256": "319d1cde2177467f580fc25da88dcd458d46a273426acf338d1409abdb231abf"
+                }
+            ]
+        },
+        {
+            "slug": "Recipe_frame_pulse_c6c462_fd8aa3",
+            "id": "forge-own:frame_pulse|@tint:*",
+            "name": "frame_pulse",
+            "pack": "Forge own effects",
+            "license": "Forge's own effect, generated by ForgeVfxOwnEffects.cs",
+            "libraryPackage": "",
+            "prefab": "Assets/ForgeVfx/Converted/Recipe_frame_pulse_c6c462_fd8aa3.prefab",
+            "seconds": 0.0,
+            "loop": true,
+            "shaders": [
+                "ForgeVfx/Particles Uber"
+            ],
+            "items": [
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_pulse_c6c462_fd8aa3_0.mat",
+                    "sha256": "ecb35780a12dd7ad34973fc9103abbaabdd74e36328823a200b9562bcb796736"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_pulse_c6c462_fd8aa3_1.mat",
+                    "sha256": "714a266f09e14fff34712a8176175f050d17770870fc903b4572bc9a10307315"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Recipe_frame_pulse_c6c462_fd8aa3.prefab",
+                    "sha256": "8d7833293d7ce20162cc40c864957bc81378959be8a26dfe6584203b692bc340"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/GabrielAguiarProductions/FreeQuickEffectsVol1/Textures/Flare00.PNG",
+                    "sha256": "cd95c8842d220d86bc4e0791c13df210def6eefd96a36628165c8cc779ddfaf4"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/GabrielAguiarProductions/FreeQuickEffectsVol1/Textures/Swirl01.png",
+                    "sha256": "09ccfcbd222890ea13911aaa3e92a5480df80058fd9d4c2269bdabddf01b7758"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesUber.shader",
+                    "sha256": "319d1cde2177467f580fc25da88dcd458d46a273426acf338d1409abdb231abf"
+                }
+            ]
+        },
+        {
+            "slug": "Recipe_frame_siege_e9ee33_58ad62",
+            "id": "forge-own:frame_siege|@tint:ring,ring2",
+            "name": "frame_siege",
+            "pack": "Forge own effects",
+            "license": "Forge's own effect, generated by ForgeVfxOwnEffects.cs",
+            "libraryPackage": "",
+            "prefab": "Assets/ForgeVfx/Converted/Recipe_frame_siege_e9ee33_58ad62.prefab",
+            "seconds": 0.0,
+            "loop": true,
+            "shaders": [
+                "ForgeVfx/Particles Additive",
+                "ForgeVfx/Particles Alpha Blended",
+                "ForgeVfx/Particles Uber"
+            ],
+            "items": [
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_siege_e9ee33_58ad62_0.mat",
+                    "sha256": "fb2238317748b4b102238c6d46a89cfb0244a29e530b1d5a4d903aa526f88d67"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_siege_e9ee33_58ad62_1.mat",
+                    "sha256": "d13b1974dc2219127a40d99513ffba3a04bb73c28665014ea33948f0b23da3a5"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_siege_e9ee33_58ad62_3.mat",
+                    "sha256": "5b92357547440cfb4bc2053adddf564d8a3b7def8894346bc31d3bac6a1cd2d4"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_siege_e9ee33_58ad62_4.mat",
+                    "sha256": "cc26ba2fa37d1cacb1013c49e4f348f1a90fb621846be2d171147072a9a1b891"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Recipe_frame_siege_e9ee33_58ad62.prefab",
+                    "sha256": "df6b6449836cbf95c042cd40bf0c7c156d784fa78025367c2eeb4a0ecd6d24ce"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/GabrielAguiarProductions/FreeQuickEffectsVol1/Textures/Circle01_v1.png",
+                    "sha256": "91e70159a51e00920a35c895e23142ca1d1d323644969aa44d411f126b684d9b"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Desktop/Textures/Misc/WFX_T_Debris Generic.tga",
+                    "sha256": "7dcfdbf3065bb41f317f9178a69cc17a8132aebf3dd6ea0c744114300d47749f"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Desktop/Textures/Smoke/WFX_T_SmokeLoopAlpha.tga",
+                    "sha256": "fd66fca42d073a54c7a4841700154eb4ee97f78f82eb6ce08d5a8f2b8dc398a2"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Own/Materials/glow_additive.mat",
+                    "sha256": "f1ddc5c3499e1fb4b476c6912ed7152612a940b8742a61dc6e3aa84877fe4477"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Own/Textures/glow.png",
+                    "sha256": "d7f5dede7b600cfa51915d9b4bff7f6e03cc347c847d23fe69c631cb263a55c3"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAdditive.shader",
+                    "sha256": "4bd5534a6d86a69d850169eecd071d410febb1e0696474af556ea1526d6bab26"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAlphaBlended.shader",
+                    "sha256": "6ed26d258f93a839d59052b5b32020bed437a5b59d38d80ad2a6511ef5e9edbd"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesUber.shader",
+                    "sha256": "319d1cde2177467f580fc25da88dcd458d46a273426acf338d1409abdb231abf"
+                }
+            ]
+        },
+        {
+            "slug": "Recipe_frame_vent_519e88",
+            "id": "forge-own:frame_vent",
+            "name": "frame_vent",
+            "pack": "Forge own effects",
+            "license": "Forge's own effect, generated by ForgeVfxOwnEffects.cs",
+            "libraryPackage": "",
+            "prefab": "Assets/ForgeVfx/Converted/Recipe_frame_vent_519e88.prefab",
+            "seconds": 0.0,
+            "loop": true,
+            "shaders": [
+                "ForgeVfx/Particles Additive",
+                "ForgeVfx/Particles Alpha Blended"
+            ],
+            "items": [
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_vent_519e88_0.mat",
+                    "sha256": "86b4e2617ec1c59e1cae1a06e51785ab14e475985e21ab38c4ba1add66b607a5"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_vent_519e88_2.mat",
+                    "sha256": "fce19fb7cd534e3bcb48918f27c0c200684e3853d9b13dcec0507478a5ae472e"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Recipe_frame_vent_519e88.prefab",
+                    "sha256": "7def45c265d4b7d0a7fe0d6635a301627a98e354747b47e2b55ac47467889535"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Desktop/Textures/Smoke/WFX_T_SmokeLoopAlpha.tga",
+                    "sha256": "fd66fca42d073a54c7a4841700154eb4ee97f78f82eb6ce08d5a8f2b8dc398a2"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Own/Materials/glow_additive.mat",
+                    "sha256": "f1ddc5c3499e1fb4b476c6912ed7152612a940b8742a61dc6e3aa84877fe4477"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Own/Textures/glow.png",
+                    "sha256": "d7f5dede7b600cfa51915d9b4bff7f6e03cc347c847d23fe69c631cb263a55c3"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAdditive.shader",
+                    "sha256": "4bd5534a6d86a69d850169eecd071d410febb1e0696474af556ea1526d6bab26"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAlphaBlended.shader",
+                    "sha256": "6ed26d258f93a839d59052b5b32020bed437a5b59d38d80ad2a6511ef5e9edbd"
+                }
+            ]
+        },
+        {
+            "slug": "Recipe_frame_wreck_smoke_b4695f",
+            "id": "forge-own:frame_wreck_smoke",
+            "name": "frame_wreck_smoke",
+            "pack": "Forge own effects",
+            "license": "Forge's own effect, generated by ForgeVfxOwnEffects.cs",
+            "libraryPackage": "",
+            "prefab": "Assets/ForgeVfx/Converted/Recipe_frame_wreck_smoke_b4695f.prefab",
+            "seconds": 0.0,
+            "loop": true,
+            "shaders": [
+                "ForgeVfx/Particles Additive",
+                "ForgeVfx/Particles Alpha Blended"
+            ],
+            "items": [
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_wreck_smoke_b4695f_0.mat",
+                    "sha256": "6d696b91efd7f140bc22c10345bc6b430f31cb9f7d0766685f1ab757c5224582"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Recipe_frame_wreck_smoke_b4695f_1.mat",
+                    "sha256": "311268ba2189339eae765e69a42efc098a958201f6ad1a0f664f3b6400f95a72"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Recipe_frame_wreck_smoke_b4695f.prefab",
+                    "sha256": "a582059a8cbcfb479b8575c9fe4addbe00ec834f1d1e050eef0215a564e5af7b"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Desktop/Textures/Smoke/WFX_T_SmokeLoopAlpha.tga",
+                    "sha256": "fd66fca42d073a54c7a4841700154eb4ee97f78f82eb6ce08d5a8f2b8dc398a2"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Own/Materials/glow_additive.mat",
+                    "sha256": "f1ddc5c3499e1fb4b476c6912ed7152612a940b8742a61dc6e3aa84877fe4477"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Own/Textures/glow.png",
+                    "sha256": "d7f5dede7b600cfa51915d9b4bff7f6e03cc347c847d23fe69c631cb263a55c3"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAdditive.shader",
+                    "sha256": "4bd5534a6d86a69d850169eecd071d410febb1e0696474af556ea1526d6bab26"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAlphaBlended.shader",
+                    "sha256": "6ed26d258f93a839d59052b5b32020bed437a5b59d38d80ad2a6511ef5e9edbd"
+                }
+            ]
+        },
+        {
+            "slug": "Triple_A_Sci_fi_effects_cc4eca32_a9bfe7",
+            "id": "Triple-A-Sci-fi-effects-2-1:cc4eca32d70f35a41a78af1b4a64f756|Crack;Crack2;Distortion;GroundDistortion",
+            "name": "橙色火焰爆炸",
+            "pack": "Triple-A Sci-fi effects 2.1",
+            "license": "Unity Asset Store EULA（只能随构建发布，不能分发原素材）",
+            "libraryPackage": "F:\\Unity\\特效\\Triple-A Sci-fi effects 2.1.unitypackage",
+            "prefab": "Assets/ForgeVfx/Converted/Triple_A_Sci_fi_effects_cc4eca32_a9bfe7.prefab",
+            "seconds": 3.0,
+            "loop": true,
+            "shaders": [
+                "ForgeVfx/Particles Alpha Blended",
+                "ForgeVfx/Particles Uber"
+            ],
+            "items": [
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Triple_A_Sci_fi_effects_cc4eca32_a9bfe7_0.mat",
+                    "sha256": "4012c179e591c26af0897d180d6bf7eb3f3c48c9b96fc35b4e7d5e2ff228ebca"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Triple_A_Sci_fi_effects_cc4eca32_a9bfe7_1.mat",
+                    "sha256": "697d4a257c8117814bebae2bf47ba3c920b48482d05a0c2a662c22600491566f"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Triple_A_Sci_fi_effects_cc4eca32_a9bfe7_2.mat",
+                    "sha256": "0158cd152b9ae2c0ff83931f07edcb5bcd46d2cbb939090695c67fd843edc323"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Triple_A_Sci_fi_effects_cc4eca32_a9bfe7_3.mat",
+                    "sha256": "5cd072c4c5310201926e3385bee97386bdc6e30bac31df1704ad943cc36a6a58"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Triple_A_Sci_fi_effects_cc4eca32_a9bfe7_4.mat",
+                    "sha256": "e9844fe2ae6489a352cd615c1db95a929ee2f082a81efe909d6b0df511f6d152"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Triple_A_Sci_fi_effects_cc4eca32_a9bfe7_5.mat",
+                    "sha256": "46733b99e86acbc05e84a521da138cda8bc67098d2cabeb2b55ee7ffcd033115"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Triple_A_Sci_fi_effects_cc4eca32_a9bfe7_6.mat",
+                    "sha256": "babca6f88e2df3b8242f2f1dcb224c3cdb81878faaa7239319ad899c2d3bbd30"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/Triple_A_Sci_fi_effects_cc4eca32_a9bfe7_7.mat",
+                    "sha256": "c1f8616b0cbad051a01638d028add81f7b4240c88e2e76cefaff920e53bd663b"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/SoftDot.png",
+                    "sha256": "f62202277ebded93d6ea85d4b3837d56d64db249ad582cb3e766b240d4dbf0e8"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Triple_A_Sci_fi_effects_cc4eca32_a9bfe7.prefab",
+                    "sha256": "f11486bb26c43e4feff2d252ce464212fb672759c9b5f19e16c99d7b826c7936"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Hovl Studio/HSFiles/Models/Cell.fbx",
+                    "sha256": "e9786ecaf6c4e52c234baa52f2d64a9ea401831546a61717bb0e63151987db14"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Hovl Studio/HSFiles/Textures/CircleRainbow11.png",
+                    "sha256": "74b19d5a038362c9ddc1600f07191ba5b0689ad53130a7912f5a557283ac4f59"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Hovl Studio/HSFiles/Textures/Crater17.png",
+                    "sha256": "abd014bdb7a4369db25e5f59556c373d3e9c8f57eb7bf474e221a526b94f2fa1"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Hovl Studio/HSFiles/Textures/EmberExpl10.png",
+                    "sha256": "36e1bdd754e5191273af8d696d2af31ca56f7fa1f6af65503e1951cd37628d90"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Hovl Studio/HSFiles/Textures/EmberExpl11.png",
+                    "sha256": "ad50f996caeebbec0ed8d702ec1449ed05c08ec25aa5502358bea75fd6360ee5"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Hovl Studio/HSFiles/Textures/Glow1.png",
+                    "sha256": "2687c2b0aa3ec835f4a8d4ace9879b544be6b2887a865dd977bc6405b6e4ead5"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/Hovl Studio/HSFiles/Textures/Stone3.png",
+                    "sha256": "8ad4ece3815c101d538e794aaea539e253e2d6901c7ae77705115cf00e6935dc"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAlphaBlended.shader",
+                    "sha256": "6ed26d258f93a839d59052b5b32020bed437a5b59d38d80ad2a6511ef5e9edbd"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesUber.shader",
+                    "sha256": "319d1cde2177467f580fc25da88dcd458d46a273426acf338d1409abdb231abf"
+                }
+            ]
+        },
+        {
+            "slug": "War_FX_c888f0c9_50dafc",
+            "id": "War-FX:c888f0c922d622147bbdbe2ca794142b|@flash",
+            "name": "橙色步枪枪口闪光",
+            "pack": "War FX",
+            "license": "Standard Unity Asset Store EULA (may ship inside built mod bundles; raw assets must not be redistributed or committed)",
+            "libraryPackage": "F:\\Unity\\特效\\asset-store\\War FX\\War FX.unitypackage",
+            "prefab": "Assets/ForgeVfx/Converted/War_FX_c888f0c9_50dafc.prefab",
+            "seconds": 3.0,
+            "loop": true,
+            "shaders": [
+                "ForgeVfx/Particles Alpha Blended",
+                "ForgeVfx/Particles Uber"
+            ],
+            "items": [
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/War_FX_c888f0c9_50dafc_0.mat",
+                    "sha256": "b89c56234bbfb19f9940a89dc639ff53b24ab75b8e24ec0626e5ba6f3e8ff54a"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/War_FX_c888f0c9_50dafc_1.mat",
+                    "sha256": "26a9edb3816aacbfe5b3ec45a5889d56515098c5bb3cd30aa68ccc93c03e58bb"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/War_FX_c888f0c9_50dafc_2.mat",
+                    "sha256": "1b526c53fec6fb7a4f8ce6b075f45f65b338cd6efd0ba7d3cb2f4f3693590e8e"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/Materials/War_FX_c888f0c9_50dafc_3.mat",
+                    "sha256": "06794ceab9100cab540a5d2b5d950d6ab1c5a571ba846400a35a0bd133f8c29f"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/SoftDot.png",
+                    "sha256": "f62202277ebded93d6ea85d4b3837d56d64db249ad582cb3e766b240d4dbf0e8"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Converted/War_FX_c888f0c9_50dafc.prefab",
+                    "sha256": "a21456088f19bd2b34c66308812cae506da2031b7bab30014b6e86923dad14d0"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Desktop/Textures/Misc/WFX_T_GlowCircle A8.png",
+                    "sha256": "a4d78687c7dd608b6ecb99ec01fee29e8240a7707f296654d5249d6fdc65e36a"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Desktop/Textures/MuzzleFlashes/WFX_T_MF Side RIFLE1 A8.png",
+                    "sha256": "a7d45e556f46ab53398c845aed0d3efa649853b1f1b348ecf3d05abc713afa48"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Desktop/Textures/MuzzleFlashes/WFX_T_MF Sparks RIFLE1 A8.tga",
+                    "sha256": "30b932d762ea2a6f665f357819f161f6063019d0cffe19eea2c20611aad17fff"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Library/JMO Assets/WarFX/Mesh/Plane1x1.FBX",
+                    "sha256": "2cf3065375c5b7e9f45823c8f17d8d1cb94a20e607ffaa31616c5229637da961"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesAlphaBlended.shader",
+                    "sha256": "6ed26d258f93a839d59052b5b32020bed437a5b59d38d80ad2a6511ef5e9edbd"
+                },
+                {
+                    "path": "Assets/ForgeVfx/Shaders/ForgeParticlesUber.shader",
+                    "sha256": "319d1cde2177467f580fc25da88dcd458d46a273426acf338d1409abdb231abf"
+                }
+            ]
+        }
+    ]
+}

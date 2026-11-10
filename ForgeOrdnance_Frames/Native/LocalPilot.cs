@@ -13,7 +13,8 @@ namespace ForgeOrdnanceFrames;
 
 /// <summary>This player's side of a suit: the boarding prompt (close behind the suit), the black as the suit stands open on boarding
 /// (<see cref="FrameSequence.Black"/>: the pilot is put on the seat under it), the camera riding the head of the pilot's leaving motion
-/// (<see cref="PilotBody"/>) with the flashlight carried along (the black clears once the head is out, <see cref="PilotMotion.HeadOut"/>), the raised
+/// (<see cref="PilotBody"/>) with the flashlight carried along (the black clears once the pilot has landed outside and the camera has
+/// eased to the player's own eye, <see cref="FrameBootScreen.DownClearStart"/>), the raised
 /// camera, the pilot's controls (special, rockets, leaving), sprint heat and the speed and jump of the movement hooks, the suit gun loan
 /// (<see cref="MechGun"/>), the first-person suit shell (ForgeVisual's <see cref="FirstPersonWear"/>) and the HUD with its boot sequence. Everything boarding and
 /// leaving show is created ahead of time (<see cref="FramePrewarm"/>, the shells of the picked and called-in models), so they only switch it on and off,
@@ -31,7 +32,11 @@ internal static class LocalPilot
     private const float HintDistance = 3.0f;
     internal const float ExitHoldSeconds = 0.8f;
     private const float AmmoReportInterval = 0.5f;
-    private const float BreachInterval = 0.2f;
+    private const float BreachInterval = 0.1f;
+    private const float BreachRehit = 0.4f;
+    private static float _lastBreachAt;
+    private static Vector3 _lastBreachPos;
+    private static readonly Dictionary<IntPtr, float> DoorHitAt = new();
 
     private static readonly InputAction[] Walking = { InputAction.MoveHorizontal, InputAction.MoveVertical };
     /// <summary>While boarding or leaving, the movement keys are held from the game (ForgeCore releases them too at level cleanup,
@@ -48,6 +53,43 @@ internal static class LocalPilot
     {
         _input?.Dispose();
         _input = null;
+    }
+
+    /// <summary>A charge started standing still goes where the pilot looks, so it is never wasted on the spot (any movement key takes over).</summary>
+    private static ForgeCore.InputLease? _chargeInput;
+    /// <summary>A planted suit stands on the ground: the jump key is held from the game.</summary>
+    private static ForgeCore.InputLease? _plantInput;
+    private static readonly InputAction[] Jumping = { InputAction.Jump };
+
+    private static void TickSkillInput(FrameRecord r, float now)
+    {
+        var steer = r.Boosting(now) && Math.Abs(ForgeCore.InputLease.Axis(InputAction.MoveHorizontal)) < 0.1f && Math.Abs(ForgeCore.InputLease.Axis(InputAction.MoveVertical)) < 0.1f;
+        if (steer && _chargeInput is not { IsHeld: true })
+        {
+            _chargeInput = ForgeCore.InputLease.Take(Plugin.Id);
+            _chargeInput.Block(Walking);
+            _chargeInput.Steer(0f, 1f);
+        }
+        else if (!steer && _chargeInput != null) ReleaseCharge();
+        var planted = FrameRules.Planted(r);
+        if (planted && _plantInput is not { IsHeld: true })
+        {
+            _plantInput = ForgeCore.InputLease.Take(Plugin.Id);
+            _plantInput.Block(Jumping);
+        }
+        else if (!planted && _plantInput != null) ReleasePlant();
+    }
+
+    private static void ReleaseCharge()
+    {
+        _chargeInput?.Dispose();
+        _chargeInput = null;
+    }
+
+    private static void ReleasePlant()
+    {
+        _plantInput?.Dispose();
+        _plantInput = null;
     }
 
     private static FrameUnit? _unit;
@@ -73,12 +115,12 @@ internal static class LocalPilot
     private static FrameUnit? _shellFor;
     private static int _reportedMagazine = -1, _reportedReserve = -1;
     private static float _rocketsReadyAt;
-    private static float _ammoReportAt, _exitHeld, _boardHeld, _phaseStart, _nextScan, _lastScan = -99f, _nextBreach, _seenBoostEnd;
-    private static bool _exitSent, _boardSent, _sprinting, _sprintBonus;
+    private static float _ammoReportAt, _exitHeld, _boardHeld, _phaseStart, _nextScan, _lastScan = -99f, _nextBreach;
+    private static bool _wasBoosting, _exitSent, _boardSent, _sprinting, _sprintBonus;
     /// <summary>The boarding prompt, through ForgeUI's claim on the game's interaction prompt; its line is rebuilt only when the key or language changes.</summary>
     private static readonly InteractPrompt? BoardPrompt = UIKit.Mod(Plugin.Id).AddInteractPrompt("Board");
     private static string _promptKey = "", _promptLine = "";
-    private static int _promptArmor = -1;
+    private static int _promptArmor = -1, _promptAmmo = -1;
     private static FrameWords? _promptWords;
     private static FrameRecord? _prewarmSample;
     private static FrameUnit? _boardTarget;
@@ -95,11 +137,7 @@ internal static class LocalPilot
     private static bool _settled;
     private static Vector3 _exitSpot, _handFrom;
     private static Quaternion _handFromLook = Quaternion.identity;
-    private static int _exitTried;
-    // Boarding or leaving, whether "the game took this pilot" (Taken) was logged.
-    private static bool _takenLogged;
     private static float _handBackAt;
-    private static bool _cameraLogged;
     private static readonly HashSet<IntPtr> Breached = new();
     /// <summary>The charge's query: weak doors and enemies ahead, on every layer (enemy-only queries are ForgeCore's).</summary>
     private static readonly ForgeCore.ColliderQuery Hits = new(64, grow: true);
@@ -125,6 +163,7 @@ internal static class LocalPilot
         var r = unit.Record;
         var m = r.Spec.Movement;
         var scale = FrameRules.SpeedMultiplier(r, Time.time);
+        if (Time.time < _hitchUntil) scale *= HitchSpeed;
         if (_sprinting)
         {
             if (_sprintBonus) scale *= m.Sprint;
@@ -164,16 +203,16 @@ internal static class LocalPilot
     internal static void Tick(float now)
     {
         // No suit exists or is coming, nothing is worn, handed back or lent: the last idle pass left the cockpit off and the plates empty.
-        if (_settled && _unit == null && !_handing && !PilotCarry.Pending && Quiet && MechGun.Idle) return;
+        if (_settled && _unit == null && !_handing && !ForgeCore.CarrySlot.Pending && Quiet && MechGun.Idle) return;
         _settled = false;
-        var agent = PlayerManager.GetLocalPlayerAgent();
+        var agent = ForgeCore.Players.Local;
         if (agent == null || agent.WasCollected || SNet.LocalPlayer == null)
         {
             if (_unit != null) Release("local player gone");
             return;
         }
         MechGun.Tick(now);
-        PilotCarry.Settle(now);
+        ForgeCore.CarrySlot.Settle(now);
         var me = SNet.LocalPlayer.Lookup;
         Hud.WorldMarkers();
         if (_unit == null)
@@ -184,14 +223,22 @@ internal static class LocalPilot
             {
                 Hud.Sync(CockpitPhase.Off);
                 TickBoarding(agent, now);
-                _settled = !_handing && !PilotCarry.Pending && Quiet && MechGun.Idle;
+                _settled = !_handing && !ForgeCore.CarrySlot.Pending && Quiet && MechGun.Idle;
                 return;
             }
         }
         var unit = _unit!;
         var r = unit.Record;
         HoldStamina(agent);
-        if (!r.HasPilot || r.Pilot != me || !Contains(unit)) { Release("the host released the suit (" + r.State + ")"); return; }
+        if (!r.HasPilot || r.Pilot != me || !Contains(unit))
+        {
+            // The host ends the leaving on the landing's own moment (Idle, no pilot), ahead of this frame's Leave: land first, but only
+            // for a leaving that ran to its end (not one the game cut off: a grab, a warp, a down pilot).
+            if (_phase == FrameState.Exiting && _out && !_placed && r.State == FrameState.Idle && !r.HasPilot && !FrameWorld.IsDown(agent) && !FrameWorld.IsSeized(agent)
+                && (agent.Position - new Vector3(r.X, r.Y, r.Z)).sqrMagnitude <= FrameRules.TetherReach * FrameRules.TetherReach) Land(unit, agent, now);
+            Release("the host released the suit (" + r.State + ")", _handing);
+            return;
+        }
         if (r.State != _phase)
         {
             Phase(unit, agent, now);
@@ -298,7 +345,7 @@ internal static class LocalPilot
         if (spec.Shell.Length == 0) return null;
         if (Models.Get(spec.Model) is not { } look)
         {
-            Plugin.Error("Exosuit first-person shell: ForgeVisual has no model " + spec.Model + "; the game's own body stays.");
+            Plugin.Logger.ErrorOnce("Exosuit first-person shell: ForgeVisual has no model " + spec.Model + "; the game's own body stays.");
             return null;
         }
         return Models.WearFirstPerson(agent, look, new FirstPersonWearOptions
@@ -317,7 +364,7 @@ internal static class LocalPilot
         _shellFor = unit;
     }
 
-    /// <summary>A shell costs about a quarter of a second to build, so none is built while the player can act. During the elevator ride
+    /// <summary>A shell costs about a quarter of a second to build, so none is built while a suit is being boarded. During the elevator ride
     /// (the player cannot move yet) the shells of the models the players picked in the lobby are built, one per frame (none when nobody
     /// picked a suit); a model nobody picked is built when a suit of it is called in (<see cref="Called"/>), before it lands.</summary>
     private static void BuildShellsInElevator(PlayerAgent agent)
@@ -327,6 +374,20 @@ internal static class LocalPilot
         for (var i = 0; i < Picked.Count; i++)
         {
             if (Picked[i] is not FrameSpec spec || spec.Shell.Length == 0 || Built(spec)) continue;
+            BuildAhead(spec, agent);
+            return;
+        }
+    }
+
+    /// <summary>A suit placed in the level (neither picked in the lobby nor called in) gets its shell as soon as the level has it, one per
+    /// frame, so boarding it for the first time builds nothing.</summary>
+    private static void BuildShellsOfPlacedSuits(PlayerAgent agent)
+    {
+        if (FrameAssets.Bundle == null) return;
+        foreach (var unit in FrameWorld.All)
+        {
+            var spec = unit.Record.Spec;
+            if (spec.Shell.Length == 0 || Built(spec)) continue;
             BuildAhead(spec, agent);
             return;
         }
@@ -348,7 +409,7 @@ internal static class LocalPilot
     internal static void Called(FrameSpec spec)
     {
         if (spec.Shell.Length == 0 || Built(spec)) return;
-        var agent = PlayerManager.GetLocalPlayerAgent();
+        var agent = ForgeCore.Players.Local;
         if (agent != null && !agent.WasCollected) BuildAhead(spec, agent);
     }
 
@@ -385,7 +446,7 @@ internal static class LocalPilot
     internal static void LateTick(float now)
     {
         if (_unit == null) { HandBack(now); return; }
-        var agent = PlayerManager.GetLocalPlayerAgent();
+        var agent = ForgeCore.Players.Local;
         if (agent == null || agent.WasCollected) return;
         _shell?.Follow();
         var camera = agent.FPSCamera;
@@ -428,10 +489,6 @@ internal static class LocalPilot
         }
         var lift = _phase is FrameState.Entering or FrameState.Piloted or FrameState.Exiting ? _cockpit : 0f;
         _view.Lift(lift);
-        if (!_cameraLogged && _phase == FrameState.Piloted && now - _phaseStart > 1f)
-        {
-            _cameraLogged = true;
-        }
     }
 
 
@@ -441,18 +498,15 @@ internal static class LocalPilot
     {
         _inside = true;
         var r = unit.Record;
-        var camera = agent.FPSCamera;
         Hud.Entering(1f);
         SyncHud(agent);
         FrameSequence.Ahead(r.X, r.Z, r.Yaw, FrameSequence.CockpitBack, out var x, out var z);
-        var seat = new Vector3(x, r.Y, z);
-        var from = agent.Position;
-        agent.TeleportTo(seat);
-        if (camera != null && !camera.WasCollected) camera.SetLookDirection(Quaternion.Euler(0f, r.Yaw, 0f) * Vector3.forward);
+        ForgeCore.Players.Warp(agent, agent.DimensionIndex, new Vector3(x, r.Y, z), Quaternion.Euler(0f, r.Yaw, 0f) * Vector3.forward, ForgeCore.WarpMode.Local);
     }
 
     /// <summary>Leaving, on the state's clock: once the plates stand open the shell comes off and the camera rides the head out of the suit,
-    /// still under the black, which clears when the head is out of the shell (<see cref="FrameBootScreen.DownClearStart"/>); at the
+    /// still under the black, which stays until the landing and the camera's hand-back are done (<see cref="FrameBootScreen.DownClearStart"/>),
+    /// so the inside of the suit is never shown; at the
     /// landing the pilot is put at the first exit spot the game's navigation and the level's geometry allow (<see cref="ForgeCore.Level.FindStandSpot"/>, straight
     /// behind the suit where the motion lands when it is free), facing the suit's forward, and from that frame the pilot moves: the movement
     /// keys are given back and the camera eases from the head to the player's own eye (<see cref="HandBack"/>) while the suit closes on its
@@ -464,20 +518,23 @@ internal static class LocalPilot
         {
             _out = true;
             if (_dressed) Undress();
-            _exitFound = ForgeCore.Level.FindStandSpot(new Vector3(r.X, r.Y, r.Z), r.Yaw, FrameSequence.ExitClearance, true, out _exitSpot, out _exitTried);
+            _exitFound = ForgeCore.Level.FindStandSpot(new Vector3(r.X, r.Y, r.Z), r.Yaw, FrameSequence.ExitClearance, true, out _exitSpot, out _);
         }
-        if (_out && !_placed && elapsed >= FrameSequence.ExitClipStart + PilotMotion.Land)
-        {
-            _placed = true;
-            if (_exitFound) agent.TeleportTo(_exitSpot);
-            var camera = agent.FPSCamera;
-            if (camera != null && !camera.WasCollected) camera.SetLookDirection(Quaternion.Euler(0f, r.Yaw, 0f) * Vector3.forward);
-            ReleaseInput();
-            _handedBack = _handing = true;
-            _handBackAt = now;
-            unit.Visual?.Body?.FirstPerson(false);
-            _view?.NearClip(null);
-        }
+        if (_out && !_placed && elapsed >= FrameSequence.ExitClipStart + PilotMotion.Land) Land(unit, agent, now);
+    }
+
+    /// <summary>The landing: the pilot is put at the exit spot facing the suit's forward, the controls are given back and the camera starts to ease to the player's eye.</summary>
+    private static void Land(FrameUnit unit, PlayerAgent agent, float now)
+    {
+        _placed = true;
+        var look = Quaternion.Euler(0f, unit.Record.Yaw, 0f) * Vector3.forward;
+        if (_exitFound) ForgeCore.Players.Warp(agent, agent.DimensionIndex, _exitSpot, look, ForgeCore.WarpMode.Local);
+        else if (agent.FPSCamera is { } camera && !camera.WasCollected) camera.SetLookDirection(look);
+        ReleaseInput();
+        _handedBack = _handing = true;
+        _handBackAt = now;
+        unit.Visual?.Body?.FirstPerson(false);
+        _view?.NearClip(null);
     }
 
     /// <summary>After the landing: the camera eases from where the head left it to the player's own eye over
@@ -486,9 +543,14 @@ internal static class LocalPilot
     {
         if (!_handing) return;
         var k = FrameSequence.Smooth((now - _handBackAt) / FrameSequence.HandBackSeconds);
-        var agent = PlayerManager.GetLocalPlayerAgent();
+        var agent = ForgeCore.Players.Local;
         var camera = agent == null || agent.WasCollected ? null : agent.FPSCamera;
-        if (k >= 1f || camera == null || camera.WasCollected) { _handing = false; return; }
+        if (k >= 1f || camera == null || camera.WasCollected)
+        {
+            _handing = false;
+            if (_unit == null) EndView();
+            return;
+        }
         var view = camera.transform;
         _view?.Look(Vector3.Lerp(_handFrom, view.position, k), Quaternion.Slerp(_handFromLook, view.rotation, k));
     }
@@ -501,12 +563,7 @@ internal static class LocalPilot
     {
         var feet = agent.Position;
         var seized = FrameWorld.IsSeized(agent);
-        if (!FrameRules.Interrupted(r, seized, feet.x, feet.y, feet.z)) return false;
-        if (!_takenLogged)
-        {
-            _takenLogged = true;
-        }
-        return true;
+        return FrameRules.Interrupted(r, seized, feet.x, feet.y, feet.z);
     }
 
 
@@ -557,12 +614,14 @@ internal static class LocalPilot
         Hud.Around(null);
         var key = UIKitKeys.Binding(InputAction.Use, "E");
         var armor = (int)Math.Round(100f * Math.Clamp(tr.Armor / Math.Max(1f, tr.Spec.Armor), 0f, 1f));
-        if (key != _promptKey || armor != _promptArmor || !ReferenceEquals(words, _promptWords))
+        var ammo = (int)Math.Round(100f * Math.Clamp((tr.Magazine + tr.Reserve) / (float)Math.Max(1, tr.Spec.Weapon.Magazine + tr.Spec.Weapon.Reserve), 0f, 1f));
+        if (key != _promptKey || armor != _promptArmor || ammo != _promptAmmo || !ReferenceEquals(words, _promptWords))
         {
             _promptKey = key;
             _promptArmor = armor;
+            _promptAmmo = ammo;
             _promptWords = words;
-            _promptLine = FrameWords.Format(words.BoardHold, key) + "   " + FrameWords.Format(words.BoardArmor, armor);
+            _promptLine = FrameWords.Format(words.BoardHold, key) + "   " + FrameWords.Format(words.BoardArmor, armor) + "   " + FrameWords.Format(words.BoardAmmo, ammo);
         }
         BoardPrompt?.Show(words.BoardHeader, _promptLine);
         if (InputMapper.GetButton != null && InputMapper.GetButton.Invoke(InputAction.Use, eFocusState.FPS))
@@ -585,11 +644,12 @@ internal static class LocalPilot
     }
 
     /// <summary>While no suit is worn: the first-person shells of the picked models during the elevator ride
-    /// (<see cref="BuildShellsInElevator"/>) and the prewarm (a step per frame, from the start of the level, so its one-time costs never
+    /// (<see cref="BuildShellsInElevator"/>), of the suits placed in the level (<see cref="BuildShellsOfPlacedSuits"/>) and the prewarm (a step per frame, from the start of the level, so its one-time costs never
     /// meet a suit's landing), so neither a landing nor a boarding builds anything.</summary>
     private static void Prepare(PlayerAgent agent, float now)
     {
         BuildShellsInElevator(agent);
+        BuildShellsOfPlacedSuits(agent);
         if (FramePrewarm.Done) return;
         var spec = FrameWorld.AnySpec;
         if (spec == null) return;
@@ -622,7 +682,7 @@ internal static class LocalPilot
         var spec = unit.Record.Spec;
         _reportedMagazine = unit.Record.Magazine;
         _reportedReserve = unit.Record.Reserve;
-        _seenBoostEnd = unit.Record.BoostEndsAt;
+        _wasBoosting = unit.Record.Boosting(now);
         _rocketsReadyAt = 0f;
         _nextScan = now + 1f;
         _lastScan = -99f;
@@ -642,8 +702,8 @@ internal static class LocalPilot
             _view?.Dispose();
             _view = ForgeCore.CameraLease.Take(Plugin.Id);
         }
-        else Plugin.Error("Exosuit boarding: the local camera is not available; the view stays at player height.");
-        _inside = _out = _placed = _handedBack = _takenLogged = _handing = false;
+        else Plugin.Logger.ErrorOnce("Exosuit boarding: the local camera is not available; the view stays at player height.");
+        _inside = _out = _placed = _handedBack = _handing = false;
     }
 
     private static void Phase(FrameUnit unit, PlayerAgent agent, float now)
@@ -654,11 +714,12 @@ internal static class LocalPilot
         _phaseStart = unit.Visual?.StateStart ?? now;
         _exitHeld = 0f;
         _exitSent = false;
-        _takenLogged = false;
+        ReleaseCharge();
+        ReleasePlant();
         switch (r.State)
         {
             case FrameState.Entering:
-                // The player stands still until the power-on's picture is whole (the state ends then and the controls open).
+                // The player stands still until the last block of the power-on starts to come on (the controls open then, <see cref="BootPlan.ControlsAt"/>).
                 HoldWalking();
                 // The shell is normally built already (the elevator ride or the call-in's countdown); otherwise (a suit this player never saw
                 // called in, as a late joiner) it is built here, as the boarding starts.
@@ -681,18 +742,18 @@ internal static class LocalPilot
                 MechGun.Begin(unit, now);
                 break;
             case FrameState.Exiting:
-            {
-                // The movement keys stay still until the landing (Leave); the leaving motion moves the body and the camera, the pilot lands behind.
-                HoldWalking();
-                // The own weapon is back long before the landing gives the controls back: its parts come at the game's own pace.
-                MechGun.End(now, paced: true);
-                _poweredOn = false;
-                _down = 0f;
-                _dark = false;
-                _out = _placed = _handedBack = _exitFound = false;
-                _view?.NearClip(null);
-                break;
-            }
+                {
+                    // The movement keys stay still until the landing (Leave); the leaving motion moves the body and the camera, the pilot lands behind.
+                    HoldWalking();
+                    // The own weapon is back long before the landing gives the controls back: its parts come at the game's own pace.
+                    MechGun.End(now, paced: true);
+                    _poweredOn = false;
+                    _down = 0f;
+                    _dark = false;
+                    _out = _placed = _handedBack = _exitFound = false;
+                    _view?.NearClip(null);
+                    break;
+                }
         }
         SyncHud(agent);
     }
@@ -702,6 +763,7 @@ internal static class LocalPilot
         var r = unit.Record;
         var spec = r.Spec;
         var dt = Time.deltaTime;
+        TickSkillInput(r, now);
 
         // Sprint heat: the game's own sprint (its key, its state) while moving.
         var locomotion = agent.Locomotion;
@@ -709,7 +771,7 @@ internal static class LocalPilot
         var moving = agent.PlayerCharacterController != null && new Vector3(agent.PlayerCharacterController.LastMove.x, 0f, agent.PlayerCharacterController.LastMove.z).sqrMagnitude > 1e-6f;
         _sprinting = running;
         _sprintBonus = Heat.Step(spec.Movement, running && moving, dt);
-        unit.Visual?.Overheat(Heat.Value, Heat.Overheated, now);
+        unit.Visual?.Overheat(Heat.Overheated);
         if (_sprintBonus != _wasSprintBonus)
         {
             // The bonus ends when the sprint stops and when the suit overheats; its start has no sound of its own (the footsteps only).
@@ -737,8 +799,8 @@ internal static class LocalPilot
 
         if (spec.CarryHeavy)
         {
-            PilotCarry.Track(agent);
-            Hud.CarryHint(PilotCarry.InHands);
+            ForgeCore.CarrySlot.Track(agent);
+            Hud.CarryHint(ForgeCore.CarrySlot.InHands);
         }
 
         // Rockets: their own key, at the point under the crosshair; while ready, the crosshair marks where they would land.
@@ -752,11 +814,14 @@ internal static class LocalPilot
         if (FrameKeys.Special.Pressed)
         {
             if (spec.Boost != null) FrameWorld.Request(unit, FrameRequestKind.Boost);
-            else if (spec.Siege != null) FrameWorld.Request(unit, FrameRequestKind.Siege);
-            else if (spec.CarryHeavy) PilotCarry.Toggle(agent, now);
+            else if (spec.Siege != null) FrameWorld.Request(unit, FrameRequestKind.Siege, value: FrameRules.Planted(r) ? (byte)0 : (byte)1);
+            else if (spec.CarryHeavy) ForgeCore.CarrySlot.Toggle(agent, now);
         }
-        if (r.BoostEndsAt != _seenBoostEnd) { _seenBoostEnd = r.BoostEndsAt; Breached.Clear(); }
-        if (spec.Boost != null && r.Boosting(now) && now >= _nextBreach) { _nextBreach = now + BreachInterval; Breach(agent, spec.Boost); }
+        // A new charge is the rising edge of Boosting: on a guest BoostEndsAt is recomputed from every state message, so it cannot tell charges apart.
+        var boosting = r.Boosting(now);
+        if (boosting && !_wasBoosting) { Breached.Clear(); DoorHitAt.Clear(); _lastBreachAt = 0f; }
+        _wasBoosting = boosting;
+        if (spec.Boost != null && boosting && now >= _nextBreach) { _nextBreach = now + BreachInterval; Breach(agent, spec.Boost); }
         if (spec.Scan != null && now >= _nextScan) { _nextScan = now + spec.Scan.Interval; _lastScan = now; Scan(agent, spec.Scan); }
 
         // Leaving: the exit key's box fills as it is held (the hold itself is timed here).
@@ -803,8 +868,15 @@ internal static class LocalPilot
         var muzzle = unit.Visual.Muzzle;
         FrameNetwork.Fire(new FrameFireMessage
         {
-            Thrower = unit.Record.Thrower, ThrowId = unit.Record.ThrowId, OriginX = muzzle.x, OriginY = muzzle.y, OriginZ = muzzle.z,
-            TargetX = hitPoint.x, TargetY = hitPoint.y, TargetZ = hitPoint.z, Shots = 1,
+            Thrower = unit.Record.Thrower,
+            ThrowId = unit.Record.ThrowId,
+            OriginX = muzzle.x,
+            OriginY = muzzle.y,
+            OriginZ = muzzle.z,
+            TargetX = hitPoint.x,
+            TargetY = hitPoint.y,
+            TargetZ = hitPoint.z,
+            Shots = 1,
         });
     }
 
@@ -816,19 +888,25 @@ internal static class LocalPilot
         if (camera == null || camera.WasCollected) return;
         var origin = camera.transform.position;
         var forward = camera.transform.forward;
-        var target = ForgeCore.Combat.ShooterRay(agent, origin, forward, rockets.Range, out var hit) ? hit.point : origin + forward * rockets.Range;
+        var struck = ForgeCore.Combat.ShooterRay(agent, origin, forward, rockets.Range, out var hit);
+        if (struck && !FrameRules.RocketsClear(rockets, hit.distance))
+        {
+            Hud.Refused(FrameRequestKind.Rockets, Hud.Words.TooClose);
+            return;
+        }
+        var target = struck ? hit.point : origin + forward * rockets.Range;
         _rocketsReadyAt = now + 0.5f;
-        FrameNetwork.RocketToHost(new FrameRocketMessage { Thrower = unit.Record.Thrower, ThrowId = unit.Record.ThrowId, TargetX = target.x, TargetY = target.y, TargetZ = target.z });
+        FrameNetwork.RocketToHost(new FrameRocketMessage { Thrower = unit.Record.Thrower, ThrowId = unit.Record.ThrowId, TargetX = target.x, TargetY = target.y, TargetZ = target.z, Epoch = OrdnanceApi.WorldEpoch, Drive = unit.Record.Drive });
     }
 
-    /// <summary>Where a salvo fired now would land (the same ray as <see cref="Rockets"/>), dim when the point is beyond the salvo's range.</summary>
+    /// <summary>Where a salvo fired now would land (the same ray as <see cref="Rockets"/>), dim when the point is beyond the salvo's range or so close its blast would reach the suit.</summary>
     private static void RocketMark(PlayerAgent agent, RocketsSpec rockets)
     {
         var camera = agent.FPSCamera;
         if (camera == null || camera.WasCollected) { Hud.RocketMark(null, false); return; }
         var origin = camera.transform.position;
         var forward = camera.transform.forward;
-        if (ForgeCore.Combat.ShooterRay(agent, origin, forward, rockets.Range * 1.5f, out var hit)) Hud.RocketMark(hit.point, hit.distance <= rockets.Range);
+        if (ForgeCore.Combat.ShooterRay(agent, origin, forward, rockets.Range * 1.5f, out var hit)) Hud.RocketMark(hit.point, hit.distance <= rockets.Range && FrameRules.RocketsClear(rockets, hit.distance));
         else Hud.RocketMark(null, false);
     }
 
@@ -852,8 +930,14 @@ internal static class LocalPilot
         var forward = agent.Rotation * Vector3.forward;
         forward.y = 0f;
         forward.Normalize();
-        var centre = agent.Position + Vector3.up * 1.1f + forward * 1.2f;
-        var count = Hits.Sphere(centre, 1.3f, ~0, QueryTriggerInteraction.Collide);
+        // The sphere also covers the ground the suit crossed since the last look (a charge is several metres a look), so a door is
+        // never stepped over between two looks.
+        var now = Time.time;
+        var travelled = _lastBreachAt > 0f && now - _lastBreachAt < 0.5f ? Mathf.Min(Vector3.Distance(agent.Position, _lastBreachPos), 3f) : 0f;
+        _lastBreachPos = agent.Position;
+        _lastBreachAt = now;
+        var centre = agent.Position + Vector3.up * 1.1f + forward * (1.2f - travelled * 0.5f);
+        var count = Hits.Sphere(centre, 1.3f + travelled * 0.5f, ~0, QueryTriggerInteraction.Collide);
         for (var i = 0; i < count; i++)
         {
             var collider = Hits[i];
@@ -861,10 +945,16 @@ internal static class LocalPilot
             if (boost.BreachDoors)
             {
                 var door = collider.GetComponentInParent<LG_WeakDoor>();
-                if (door != null && Breached.Add(door.Pointer))
+                if (door != null)
                 {
+                    // A door that one hit did not break is hit again every BreachRehit seconds for as long as the charge lasts; one that
+                    // is open, opening or already destroyed is left alone.
+                    if (door.LastStatus is eDoorStatus.Open or eDoorStatus.Opening or eDoorStatus.Destroyed) continue;
+                    if (DoorHitAt.TryGetValue(door.Pointer, out var at) && now < at) continue;
+                    DoorHitAt[door.Pointer] = now + BreachRehit;
                     door.AttemptDamage(eDoorDamageType.Explosion, centre, agent);
                     _unit?.Visual?.Sound(FrameSound.BreachHit);
+                    Bump(collider.bounds.ClosestPoint(centre), forward);
                     continue;
                 }
             }
@@ -875,20 +965,42 @@ internal static class LocalPilot
                 {
                     ForgeCore.Combat.Melee(enemy.Damage, boost.Shove, agent, enemy.Position, forward, 10f);
                     _unit?.Visual?.Sound(FrameSound.ShoveHit);
+                    Bump(collider.bounds.ClosestPoint(centre), forward);
                 }
             }
         }
     }
 
-    /// <summary>Scout passive scan: every awake enemy within the radius (sleeping ones are skipped) is tagged through the bio tracker's own entry.</summary>
+    private const float BumpGap = 0.6f;
+    /// <summary>The bump is felt: for this long the charge runs at this share of its speed (no camera movement).</summary>
+    private const float HitchSeconds = 0.12f, HitchSpeed = 0.35f;
+    private static float _nextBump, _hitchUntil;
+
+    /// <summary>The charge's shoulder meets a door or an enemy: this suit plays the bash and its impact, and every other peer is told to (at most
+    /// one bash per <see cref="BumpGap"/>, so a stretch of wall or a crowd is one bump).</summary>
+    private static void Bump(Vector3 point, Vector3 forward)
+    {
+        var unit = _unit;
+        var now = Time.time;
+        if (unit?.Visual == null || now < _nextBump) return;
+        _nextBump = now + BumpGap;
+        _hitchUntil = now + HitchSeconds;
+        unit.Visual.Bash(point, forward);
+        FrameNetwork.Bump(new FrameBumpMessage { Thrower = unit.Record.Thrower, ThrowId = unit.Record.ThrowId, X = point.x, Y = point.y, Z = point.z, DirX = forward.x, DirZ = forward.z });
+    }
+
+    /// <summary>Scout passive scan: every awake enemy within the radius (sleeping ones are skipped) is tagged through the bio tracker's own entry; a soft tone when it found any.</summary>
     private static void Scan(PlayerAgent agent, ScanSpec scan)
     {
+        var tagged = false;
         foreach (var found in ForgeCore.Enemies.Near(agent.Position, scan.Radius))
         {
             var enemy = found!;
             if (!FrameRules.ScanTags(ForgeCore.Enemies.Alert(enemy))) continue;
             ToolSyncManager.WantToTagEnemy(enemy);
+            tagged = true;
         }
+        if (tagged) FrameAudio.Local(FrameSound.HudSection, FrameAudio.Section(0));
     }
 
     // ---- release ----------------------------------------------------------------------------------------------
@@ -898,39 +1010,54 @@ internal static class LocalPilot
     private static void Step(string what, Action action)
     {
         try { action(); }
-        catch (Exception error) { Plugin.Error("Exosuit release step '" + what + "' failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Exosuit release step '" + what + "' failed: " + error); }
     }
 
-    internal static void Release(string reason)
+    private static void EndView()
+    {
+        if (_view == null) return;
+        var view = _view;
+        _view = null;
+        Step("camera", view.Dispose);
+    }
+
+    /// <param name="reason">Why the suit was released.</param>
+    /// <param name="keepView">The camera's hand-back after a landing is still running: its lease stays until <see cref="HandBack"/> ends it.</param>
+    internal static void Release(string reason, bool keepView = false)
     {
         Step("hit marks", Hits.Clear);
         _boardTarget = null;
         _wasSprintBonus = false;
         Step("prompt", ClearPrompt);
-        if (_unit == null) return;
+        if (_unit == null)
+        {
+            if (!keepView) { _handing = false; EndView(); }
+            return;
+        }
         var unit = _unit;
-        var id = unit.Record.ThrowId;
         // The own special weapon comes back first, while the suit's last stock can still be reported.
         Step("first-person body", () => unit.Visual?.Body?.FirstPerson(false));
         Step("special weapon", () => MechGun.End(Time.time));
         if (unit.Record.Spec.CarryHeavy)
         {
-            Step("carried object", PilotCarry.GiveBack);
+            Step("carried object", ForgeCore.CarrySlot.GiveBack);
             Hud.CarryHint(null);
         }
         _unit = null;
         _phase = (FrameState)255;
         Step("input", ReleaseInput);
+        Step("charge input", ReleaseCharge);
+        Step("planted input", ReleasePlant);
+        _hitchUntil = 0f;
         _poweredOn = false;
         if (_dressed) Step("shell", Undress);
         _dressed = false;
-        if (_view != null)
+        if (!keepView)
         {
-            var view = _view;
-            _view = null;
-            Step("camera", view.Dispose);
+            _handing = false;
+            EndView();
         }
-        _inside = _out = _placed = _handedBack = _takenLogged = false;
+        _inside = _out = _placed = _handedBack = false;
         _cockpit = 0f;
         _sprinting = _sprintBonus = false;
         Step("cockpit phase", () => Hud.Sync(CockpitPhase.Off));
@@ -944,6 +1071,9 @@ internal static class LocalPilot
         if (reason == FrameEjection.Destroyed) Hud.Banner(words.Destroyed, FrameAlertTone.Alert, 2.2f);
         else if (reason == FrameEjection.PilotDown) Hud.Banner(words.ForcedOut, FrameAlertTone.Alert, 2.2f);
     }
+
+    /// <summary>A line in the cockpit's notice list.</summary>
+    internal static void Notice(string text) => Hud.Notice(text);
 
     internal static void Refused(FrameRequestKind kind, FrameRejection reason)
     {

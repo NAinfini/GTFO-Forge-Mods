@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using GameData;
 using Gear;
 using Player;
@@ -33,7 +32,7 @@ namespace ForgeOrdnanceFrames;
 /// the rounds are written in that same frame. The slot's gear, weapon and model, and the swap's timing, are logged after each swap.</para></summary>
 internal static class MechGun
 {
-    private const float SwapTimeout = 8f, SettleSeconds = 1.5f;
+    private const float SwapTimeout = 8f, SettleSeconds = 1.5f, SlotWait = 3f;
 
     private static readonly SuitGunLoan Loan = new(ForgeCore.Gear.SpecialSlot, () => LocalPilot.Words.Piloting);
     private static FrameUnit? _unit;
@@ -44,6 +43,9 @@ internal static class MechGun
     private static uint _sum;
     // The swap asked at boarding waits for an older lease (a heavy weapon) to be put away first.
     private static bool _waiting;
+    // The special slot was not assembled at boarding (a fresh gear, a level start): boarding is tried again each frame until SlotWait ends.
+    private static bool _retry;
+    private static float _slotWaitUntil;
     // The suit gun's instance while it is settled in the slot (its identity), and its live stock.
     private static IntPtr _gun;
     private static int _overflow, _clip, _pack;
@@ -56,12 +58,14 @@ internal static class MechGun
     // An orderly leave (<see cref="End"/>): the pilot cannot act until the landing, so the own weapon's parts come at the game's own pace,
     // one per frame, instead of every part spawned in the frame its instance stands in the slot.
     private static bool _paced;
+    // The swap key was named this ride.
+    private static bool _swapHinted;
 
     /// <summary>The suit gun is settled in the special slot.</summary>
     internal static bool SuitInSlot => _gun != IntPtr.Zero;
 
     /// <summary>Nothing to advance: no suit gun, no swap in flight, no suit worn and no recoil copy held (so <see cref="Tick"/> would only return).</summary>
-    internal static bool Idle => !_waiting && _gun == IntPtr.Zero && Loan.Pending == null && !Loan.Piloting && GunHold.Idle;
+    internal static bool Idle => !_waiting && !_retry && _gun == IntPtr.Zero && Loan.Pending == null && !Loan.Piloting && GunSteady.Idle;
 
     /// <summary>The suit gun is in the slot (for the cockpit's magazine arc).</summary>
     internal static bool Active => SuitInSlot;
@@ -192,11 +196,12 @@ internal static class MechGun
     internal static void ToggleKey(float now)
     {
         if (!Loan.Piloting) return;
-        var agent = PlayerManager.GetLocalPlayerAgent();
+        var agent = ForgeCore.Players.Local;
         if (agent != null && FrameWorld.IsSeized(agent)) return;
         var ask = Loan.Toggle();
         if (ask == null)
         {
+            if (Loan.SuitSpent && Loan.Pending == null) LocalPilot.Notice(LocalPilot.Words.GunEmpty);
             return;
         }
         Send(ask, now);
@@ -209,8 +214,18 @@ internal static class MechGun
         if (Loan.Piloting) return;
         _paced = false;
         _unit = unit;
+        _swapHinted = false;
         var r = unit.Record;
         var slotReadable = LoanedGun.TryLocalSpecial(out _, out var item) && item!.GearIDRange != null && item.IsLoaded;
+        if (!slotReadable)
+        {
+            // Not assembled yet: wait for it (Tick tries again) and give up only when it never becomes readable.
+            if (_slotWaitUntil == 0f) _slotWaitUntil = now + SlotWait;
+            _retry = now < _slotWaitUntil;
+            if (_retry) return;
+        }
+        _retry = false;
+        _slotWaitUntil = 0f;
         // The slot's gear: the pilot's own weapon unless something else stands in it (the shared slot keeps the own weapon then).
         var slotJson = slotReadable ? item!.GearIDRange!.ToJSON() : null;
         var slotChecksum = slotReadable ? item!.GearIDRange!.GetChecksum() : 0u;
@@ -227,7 +242,7 @@ internal static class MechGun
         }
         if (failure != null)
         {
-            Plugin.Error("Exosuit gun: " + failure + "; the suit gun was not lent.");
+            Plugin.Logger.ErrorOnce("Exosuit gun: " + failure + "; the suit gun was not lent.");
             Dispatch(Loan.Board(0, 0, slotJson, slotChecksum), now);
             return;
         }
@@ -255,7 +270,8 @@ internal static class MechGun
     /// <summary>Every frame on the local player's machine.</summary>
     internal static void Tick(float now)
     {
-        GunHold.Keep(Loan.Piloting ? Wielded() : null, Recoil);
+        GunSteady.Keep(Loan.Piloting ? Wielded() : null, Recoil);
+        if (_retry && _unit != null) Begin(_unit, now);
         if (_waiting)
         {
             if (!Loan.SlotReady) return;
@@ -265,7 +281,7 @@ internal static class MechGun
         if (Loan.Pending == null && _gun == IntPtr.Zero) return;
         if (Loan.Pending != null && now - _swapStarted > SwapTimeout)
         {
-            Plugin.Error("Exosuit gun: the special slot did not finish taking " + (Loan.Pending == LoanGun.Suit ? "the suit gun" : "back the pilot's own weapon") + "; retrying with the pilot's own weapon.");
+            Plugin.Logger.ErrorOnce("Exosuit gun: the special slot did not finish taking " + (Loan.Pending == LoanGun.Suit ? "the suit gun" : "back the pilot's own weapon") + "; retrying with the pilot's own weapon.");
             Send(Loan.TimedOut(), now);
         }
         if (Loan.Pending != null && !_sent) Send(Loan.Pending, now);
@@ -279,33 +295,38 @@ internal static class MechGun
         switch (Loan.Pending)
         {
             case LoanGun.Suit:
-            {
-                if (checksum != _suitChecksum || instance == _swappedFrom) return;
-                var (clip, pack, overflow) = SuitGunStock.Split(Loan.SuitClip, Loan.SuitReserve, weapon!.GetMaxClip(), ammo.BulletsMaxCap);
-                _overflow = overflow;
-                if (!ForgeCore.Gear.WriteLocalAmmo(AmmoType.Special, weapon!, pack * ammo.CostOfBullet, clip)) Plugin.Error("Exosuit gun: the suit gun's ammunition did not read back as written.");
-                PlayerManager.GetLocalPlayerAgent()?.Sync.WantsToWieldSlot(InventorySlot.GearSpecial);
-                Loan.Arrived(LoanGun.Suit);
-                _gun = instance;
-                MechGunSound.Claim(item.Instance!);
-                _clip = clip;
-                _pack = pack;
-                _reloading = false;
-                ClipSize = weapon.GetMaxClip();
-                _settleUntil = now + SettleSeconds;
-                LoanedGun.EndSwap();
-                return;
-            }
+                {
+                    if (checksum != _suitChecksum || instance == _swappedFrom) return;
+                    var (clip, pack, overflow) = SuitGunStock.Split(Loan.SuitClip, Loan.SuitReserve, weapon!.GetMaxClip(), ammo.BulletsMaxCap);
+                    _overflow = overflow;
+                    if (!ForgeCore.Gear.WriteLocalAmmo(AmmoType.Special, weapon!, pack * ammo.CostOfBullet, clip)) Plugin.Logger.ErrorOnce("Exosuit gun: the suit gun's ammunition did not read back as written.");
+                    ForgeCore.Players.Local?.Sync.WantsToWieldSlot(InventorySlot.GearSpecial);
+                    Loan.Arrived(LoanGun.Suit);
+                    _gun = instance;
+                    MechGunSound.Claim(item.Instance!);
+                    _clip = clip;
+                    _pack = pack;
+                    _reloading = false;
+                    ClipSize = weapon.GetMaxClip();
+                    _settleUntil = now + SettleSeconds;
+                    LoanedGun.EndSwap();
+                    if (!_swapHinted && Loan.Own != null)
+                    {
+                        _swapHinted = true;
+                        LocalPilot.Notice(FrameWords.Format(LocalPilot.Words.GunSwap, ForgeUI.UIKitKeys.Binding(InputAction.SelectSpecial, "3")));
+                    }
+                    return;
+                }
             case LoanGun.Own:
-            {
-                var own = Loan.Own;
-                if (own == null || checksum != own.Checksum || instance == _swappedFrom) return;
-                if (!ForgeCore.Gear.WriteLocalAmmo(AmmoType.Special, weapon!, own.Pool, own.Clip)) Plugin.Error("Exosuit gun: the pilot's own weapon's ammunition did not read back as written.");
-                if (Loan.Piloting) PlayerManager.GetLocalPlayerAgent()?.Sync.WantsToWieldSlot(InventorySlot.GearSpecial);
-                LoanedGun.EndSwap();
-                Loan.Arrived(LoanGun.Own);
-                return;
-            }
+                {
+                    var own = Loan.Own;
+                    if (own == null || checksum != own.Checksum || instance == _swappedFrom) return;
+                    if (!ForgeCore.Gear.WriteLocalAmmo(AmmoType.Special, weapon!, own.Pool, own.Clip)) Plugin.Logger.ErrorOnce("Exosuit gun: the pilot's own weapon's ammunition did not read back as written.");
+                    if (Loan.Piloting) ForgeCore.Players.Local?.Sync.WantsToWieldSlot(InventorySlot.GearSpecial);
+                    LoanedGun.EndSwap();
+                    Loan.Arrived(LoanGun.Own);
+                    return;
+                }
         }
         // The suit gun settled in the slot.
         if (instance != _gun)
@@ -332,6 +353,7 @@ internal static class MechGun
         if (now >= _settleUntil && _clip + _pack + _overflow <= 0)
         {
             LocalPilot.ReportAmmo(0, 0);
+            LocalPilot.Notice(LocalPilot.Words.GunEmpty);
             Send(Loan.SuitEmpty(), now);
         }
     }
@@ -342,6 +364,8 @@ internal static class MechGun
     internal static void End(float now, bool paced = false)
     {
         _paced = paced;
+        _retry = false;
+        _slotWaitUntil = 0f;
         if (_waiting)
         {
             // Nothing was asked of the game yet: the slot is left as it is and the lease goes back.
@@ -350,7 +374,7 @@ internal static class MechGun
         }
         if (Loan.Piloting || Loan.Pending != null) Send(Loan.Leave(), now);
         _unit = null;
-        GunHold.Keep(null, 1f);
+        GunSteady.Keep(null, 1f);
     }
 
     /// <summary>After a checkpoint reload (the shared slot already put back as it was at the checkpoint): a suit gun the game brought back
@@ -372,11 +396,13 @@ internal static class MechGun
     /// <summary>Level end: forget everything (the game rebuilds the inventory for the next level).</summary>
     internal static void Clear()
     {
-        GunHold.Keep(null, 1f);
+        GunSteady.Keep(null, 1f);
         Loan.Clear();
         Forget();
         LoanedGun.EndSwap();
         _waiting = false;
+        _retry = false;
+        _slotWaitUntil = 0f;
         _paced = false;
         _unit = null;
         _suitRange = null;
@@ -413,7 +439,7 @@ internal static class MechGun
         catch (Exception error)
         {
             _sent = false;
-            Plugin.Error("Exosuit gun: asking the game for " + (gun == LoanGun.Suit ? "the suit gun" : "the pilot's own special weapon") + " failed (retrying): " + error);
+            Plugin.Logger.ErrorOnce("Exosuit gun: asking the game for " + (gun == LoanGun.Suit ? "the suit gun" : "the pilot's own special weapon") + " failed (retrying): " + error);
         }
     }
 
@@ -441,6 +467,9 @@ internal static class MechGun
     private static void Forget()
     {
         _gun = IntPtr.Zero;
+        // The next gun (or the next level's archetype at a reused address) starts its fire timing fresh.
+        _timedArchetype = IntPtr.Zero;
+        Clock.Stop();
         MechGunSound.Release();
         _clip = _pack = _overflow = 0;
         _reloading = false;
@@ -449,7 +478,7 @@ internal static class MechGun
     /// <summary>The local player's held gun, if it is a gun.</summary>
     private static BulletWeapon? Wielded()
     {
-        var held = PlayerManager.GetLocalPlayerAgent()?.Inventory?.WieldedItem;
+        var held = ForgeCore.Players.Local?.Inventory?.WieldedItem;
         return held != null && !held.WasCollected ? held.TryCast<BulletWeapon>() : null;
     }
 

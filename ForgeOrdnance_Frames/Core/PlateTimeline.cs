@@ -6,14 +6,14 @@ namespace ForgeOrdnanceFrames;
 
 /// <summary>One moment of the opening or closing, <see cref="At"/> seconds into its clip: a sound of the whole suit
 /// (<see cref="Sound"/>, null for none) and/or the puff of steam from the back's middle seam (<see cref="Steam"/>).</summary>
-public readonly record struct PlateEvent(float At, FrameSound? Sound, bool Steam = false);
+internal readonly record struct PlateEvent(float At, FrameSound? Sound, bool Steam = false);
 
 /// <summary>The key moments of the model's "open" and "close" clips, read off the parts' motion (the clips are the only source).
 /// The suit has dozens of moving plates and makes only three sounds for them, each from the suit itself: in the opening the
 /// first part to unlatch (<see cref="FrameSound.Unseal"/>) and the moment the main body opens (<see cref="FrameSound.PlateSlide"/>, when half of
 /// the moving parts have started to move); in the closing the moment the last part latches shut (<see cref="FrameSound.HatchClose"/>). The steam puffs from the back's middle
 /// seam when the first of the <see cref="OpeningPart.Seam"/> parts unlatches.</summary>
-public static class PlateTimeline
+internal static class PlateTimeline
 {
     /// <summary>A part this close to its first pose (metres, degrees) has not moved.</summary>
     public const float StillMetres = 0.0005f, StillDegrees = 0.2f;

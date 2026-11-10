@@ -27,3 +27,7 @@ foreach ($source in $names.Keys) {
 }
 Write-Host "Imported $(2 * $names.Count - $missing.Count) of $(2 * $names.Count) files into $([IO.Path]::GetFullPath($out))."
 if ($missing) { Write-Host "Missing (packaging refuses to build until delivered): $($missing -join ', ')" }
+# skill-carry (the tank's carry key) is not part of this delivery folder: it is placed in Assets/hud/ by hand, with its @2x.
+foreach ($carry in 'skill-carry.png', 'skill-carry@2x.png') {
+    if (!(Test-Path -LiteralPath (Join-Path $out $carry))) { Write-Host "Not in the delivery folder, place it in $([IO.Path]::GetFullPath($out)) by hand: $carry" }
+}

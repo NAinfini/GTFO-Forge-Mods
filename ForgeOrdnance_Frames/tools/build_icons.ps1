@@ -14,7 +14,7 @@ $ErrorActionPreference = 'Stop'
 $Models = [IO.Path]::GetFullPath($Models)
 $Out = [IO.Path]::GetFullPath($Out)
 $script = Join-Path $PSScriptRoot 'render_icon.py'
-$definitions = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../Definitions/frames.json') -Raw | ConvertFrom-Json
+$definitions = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../Definitions/frames.forge') -Raw | ConvertFrom-Json
 # Prefab name the definitions use ("Model" in the payload) -> model folder.
 $folders = @{ 'frame-m15' = 'M15'; 'frame-m16' = 'M16'; 'frame-m17' = 'M17'; 'frame-m18' = 'M18' }
 

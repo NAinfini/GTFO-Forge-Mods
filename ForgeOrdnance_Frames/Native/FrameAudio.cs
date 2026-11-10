@@ -4,7 +4,7 @@ using UnityEngine;
 namespace ForgeOrdnanceFrames;
 
 /// <summary>This package's sounds: the <c>audio</c> folder next to the DLL, loaded once through ForgeAudio. This class only
-/// chooses when and where they play; cue settings (including each sound's minimum gap, its group and ducking) live in <c>audio/cues.json</c>, and
+/// chooses when and where they play; cue settings (including each sound's minimum gap, its group and ducking) live in <c>audio/cues.forge</c>, and
 /// AudioKit logs every cue that cannot load or play by name. The suit gun keeps the selected vanilla weapon's Wwise events.</summary>
 internal static class FrameAudio
 {

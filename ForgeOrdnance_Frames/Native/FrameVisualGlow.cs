@@ -50,7 +50,7 @@ internal sealed partial class FrameVisual
             var glow = ForgeVisual.Glow.For(renderer);
             if (glow != null) _glows.Add(glow);
         }
-        if (_glows.Count == 0) Plugin.Error("Exosuit model " + _unit.Record.Spec.Model + " has no lit material; its light strips stay dark.");
+        if (_glows.Count == 0) Plugin.Logger.ErrorOnce("Exosuit model " + _unit.Record.Spec.Model + " has no lit material; its light strips stay dark.");
     }
 
     private void DestroyGlow()

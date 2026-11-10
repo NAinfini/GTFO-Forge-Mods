@@ -4,7 +4,7 @@ using ForgeCore;
 namespace ForgeOrdnanceFrames;
 
 /// <summary>Which of the two guns sharing the special weapon slot while piloting.</summary>
-public enum LoanGun : byte { Own, Suit }
+internal enum LoanGun : byte { Own, Suit }
 
 /// <summary>The special slot while a suit is worn: the suit gun and the pilot's own special weapon take turns in it (the game's own
 /// gear swap, which replicates), each keeping its magazine and reserve while the other is in the slot. Boarding takes ForgeCore's
@@ -16,7 +16,7 @@ public enum LoanGun : byte { Own, Suit }
 /// lease given back (the older lease then takes its heavy weapon back). A swap is pending until the new gun is in the slot; no other
 /// swap starts meanwhile. The suit gun is never refilled: while the own weapon is away, ForgeCore sends special ammunition into its
 /// kept pool.</summary>
-public sealed class SuitGunLoan
+internal sealed class SuitGunLoan
 {
     /// <summary>The lease's owner (this plugin).</summary>
     public const string Owner = "NAinfini.ForgeOrdnanceFrames";

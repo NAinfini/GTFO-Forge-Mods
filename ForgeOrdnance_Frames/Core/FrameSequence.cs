@@ -10,10 +10,10 @@ namespace ForgeOrdnanceFrames;
 /// <see cref="Black"/> the pilot's own screen is black, the pilot is put on the seat and is no longer drawn for anyone, the power-on starts and
 /// the plates close from there (<see cref="CloseStart"/>); the boarding ends, and the pilot moves, the moment the power-on's last block
 /// starts to come on (<see cref="BootPlan.ControlsAt"/>), the last blocks and the seams finishing while the pilot walks. Leaving (<see cref="ExitSeconds"/>): the power-down goes black block by block, the plates open under
-/// it, the pilot pulls out of the suit and hops back (<see cref="ExitClipStart"/>), the black clears once the head is out of the shell
-/// (<see cref="FrameBootScreen.DownClearStart"/>), and the leaving ends, and the pilot moves, on the landing; the suit then closes on its own
+/// it, the pilot pulls out of the suit and hops back (<see cref="ExitClipStart"/>), the black stays while the pilot lands behind the suit and
+/// the camera eases to the player's own eye (<see cref="FrameBootScreen.DownClearStart"/>), and the leaving ends once the black has cleared; the suit then closes on its own
 /// (<see cref="ClosePlates"/>) without holding anyone.</summary>
-public static class FrameSequence
+internal static class FrameSequence
 {
     /// <summary>Boarding: the pilot's screen fades to black over the last <see cref="FadeSeconds"/> up to <see cref="Black"/>, when the
     /// plates stand open: the pilot is inside (put on the seat, hidden from everyone) and the power-on starts.</summary>
@@ -38,8 +38,9 @@ public static class FrameSequence
     /// <summary>Leaving: the plates open from the start, under the power-down, and stand open by <see cref="ExitClipStart"/> (every block is
     /// black), when the pilot's leaving motion starts.</summary>
     public const float ExitOpenStart = 0f, ExitClipStart = FrameBootScreen.DownDark;
-    /// <summary>Leaving: the pilot lands behind the suit; the leaving state ends here.</summary>
-    public const float ExitSeconds = ExitClipStart + PilotMotion.Land;
+    /// <summary>Leaving: the pilot lands behind the suit; the leaving state ends here, but never before the power-down's black has cleared
+    /// (<see cref="FrameBootScreen.DownSeconds"/>), or releasing the suit would cut the black off half faded.</summary>
+    public const float ExitSeconds = ExitClipStart + PilotMotion.Land > FrameBootScreen.DownSeconds ? ExitClipStart + PilotMotion.Land : FrameBootScreen.DownSeconds;
     /// <summary>After leaving, the empty suit starts closing this long after the landing, at the close clip's own pace.</summary>
     public const float CloseAfterLand = 0.2f;
 
@@ -121,4 +122,4 @@ public static class FrameSequence
 
 /// <summary>Where the opening parts are: <see cref="Time"/> seconds into the model's "open" clip, or its "close" clip when
 /// <see cref="Closing"/>.</summary>
-public readonly record struct PlatePose(bool Closing, float Time);
+internal readonly record struct PlatePose(bool Closing, float Time);

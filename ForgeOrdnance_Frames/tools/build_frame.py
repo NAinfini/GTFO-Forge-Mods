@@ -3,23 +3,22 @@
   blender --background --factory-startup --disable-autoexec --python-exit-code 1 <baked.blend> --python build_frame.py -- \
       --model M15 --out <dir> [--preview]
 
-The input is the file the hinge add-on's bake.py writes from the owner's cut file (tools/hinge_tool: the owner cuts the parts
+The input is the file the hinge add-on's bake.py writes from the owner's cut file (Tools/Blender/hinge_tool: the owner cuts the parts
 and sets their hinges there): the mesh objects in the collection FIXED stay, those in every other collection open together as
 one rigid part, and every part carries its move as fh_motion (bake.py's docstring), expanded by the add-on's motion.sequence.
 Every object stands where it is on the shut suit (bake.py puts each part at its shut transform), so the shut shell is each
-object's mesh at its world transform. A part's lining (faces with the material LINING, the add-on's dark inner skin) ships as
-the model's second material, tiled with the lining textures baked from that material (lining_textures).
+object's mesh at its world transform. A part's lining (faces with the add-on's lining material) is inner wall like the shell's own (interior.py dresses it all).
 The scene's custom property "frame" holds the model, the joints and the source's triangle count.
 
 Steps: join the groups into one skinned body at the shut pose (each part its own piece, weighted to its own bone), give the
-shell real thickness closed on every edge (thin where a part has a lining, so the lining stays the inside one sees), darken
-every other face that looks into the suit (the dark cavity), check the shell is
+shell real thickness closed on every edge (thin where a part has a lining, so the lining stays the inside one sees), find
+every other face that looks into the suit (the cavity), check the shell is
 closed and outward, every pilot slot (the path of each of the pilot's body parts straight out of the back) clear with every
 part open, no part swept through the body or another part on its path, no second layer left under an opening part and no
 small fitting left hovering (check_entry, written to <model>_entry.json), paint the light strips along the shell's structural
-lines into the albedo, metallic and emission maps (glow.py), give each part its own bone, key
-the opening as the clip "open" (the parts' bones only), and write <model>_rigged.blend/.fbx, the four textures, the three
-lining textures and <model>_rig.json. Any failed check stops the build; with --preview the problems are only reported, so the owner can see the
+lines into the albedo, metallic and emission maps (glow.py), dress the inside (interior.py), give each part its own bone, key
+the opening as the clip "open" (the parts' bones only), and write <model>_rigged.blend/.fbx, the four textures, the lining
+textures and <model>_rig.json. Any failed check stops the build; with --preview the problems are only reported, so the owner can see the
 cut."""
 import argparse
 import json
@@ -35,8 +34,11 @@ from mathutils import Euler, Matrix, Vector
 from mathutils.bvhtree import BVHTree
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "Tools", "Blender"))  # hinge_tool, the Blender add-on
 import glow  # noqa: E402
-from hinge_tool.model import LINING, lining_slots  # noqa: E402
+import interior  # noqa: E402
+import wear  # noqa: E402
+from hinge_tool.model import lining_slots  # noqa: E402
 from hinge_tool.motion import FPS, Path, screw_parts, sequence  # noqa: E402
 # Final height (m), arm drop below horizontal (deg), skeleton family, texture layout.
 MODELS = {
@@ -59,11 +61,9 @@ TILE_V = (0.965, 0.995)
 SHELL_T = 0.02         # shell thickness (m)
 LINED_SHARE = 0.5      # an object with a lining: each of its two skins (the plate and its lining, 0.6 to 10 mm under it) is
 LINED_MIN_T = 0.001    # thickened at most this share of the gap to the other, so neither shows through the other and the
-                       # lining is the inside one sees; but at least LINED_MIN_T m (thinner slabs leave rims too small to
-                       # close), so where the gap is under 2 mm the two slabs cross by the difference
-LINING_CELL = 0.04     # m: a cell of the lining's grid, one unit of its UVs
-LINING_CELLS = 4       # lining UV units (cells) per tile of the lining textures
-LINING_SIZE = 512      # px: the lining textures (tiling)
+                       # lining is the inside one sees; but at least LINED_MIN_T m (thinner slabs leave rims too small to close)
+LINING_CLEAR = 0.004   # m: a lining stands at least this far under its plate (clear_lining), so the two slabs never cross
+ISLAND = 0.003         # m²: a patch of inner faces smaller than this, mostly bordered by armour seen from outside, is armour
 HEMISPHERE = 16        # rays per face for the cavity test (cavity_walls)
 WELD = 0.00002         # m: points of a lining this close are one point (slivers the lining work leaves)
 LINING_CRUMB = 1e-5    # m²: a loose bit of lining smaller than this is a sliver, not lining
@@ -632,10 +632,9 @@ def lined_thickness(bm):
 def solidify(body):
     """Gives every open sheet of the shell real thickness (SHELL_T inward; an object with a lining, which faces into the suit,
     lined_thickness: its plate and its lining each a thin slab growing toward the other), closed along every cut and outer
-    edge; the rim faces take the trim tile (cavity_walls() then darkens every wall that faces the inside). Pieces that are
-    already closed solids keep their shape (turned outward if the source had them inside out). The body ends with two
-    materials: 0 the armour (the atlas), 1 the lining's faces (face attribute "lining", its own side of its slab), their UVs
-    scaled so one unit is one tile of the lining textures."""
+    edge; the rim faces take the trim tile (cavity_walls() then finds every wall that faces the inside). Pieces that are
+    already closed solids keep their shape (turned outward if the source had them inside out). Faces end in material 0 the armour
+    (the atlas) or 1 the lining's (face attribute "lining", its own side of its slab), which interior.dress takes over."""
     me = body.data
     for p in me.polygons:
         p.material_index = 0
@@ -698,11 +697,13 @@ def solidify(body):
         final.append(1 if p.material_index == 0 and lining[p.index].value else 0)
     while len(me.materials) > 1:
         me.materials.pop()
-    lining_material = bpy.data.materials.new("lining")
-    me.materials.append(lining_material)
+    lining_materials = [bpy.data.materials.new("lining"), bpy.data.materials.new("lining-metal"), bpy.data.materials.new("lining-rubber")]
+    for m in lining_materials:
+        me.materials.append(m)
     me.polygons.foreach_set("material_index", final)
     if len(solid.data.polygons):
-        solid.data.materials.append(lining_material)
+        for m in lining_materials:
+            solid.data.materials.append(m)
         solid_lining = solid.data.attributes["lining"].data
         for p in solid.data.polygons:
             p.material_index = 1 if solid_lining[p.index].value else 0
@@ -711,13 +712,7 @@ def solidify(body):
     else:
         bpy.data.objects.remove(solid, do_unlink=True)
     body.vertex_groups.remove(body.vertex_groups["thickness"])
-    uvl = me.uv_layers["UVMap"].data
-    lining_faces = 0
-    for p in me.polygons:
-        if p.material_index == 1:
-            lining_faces += 1
-            for i in p.loop_indices:
-                uvl[i].uv = uvl[i].uv / LINING_CELLS
+    lining_faces = sum(1 for p in me.polygons if p.material_index)
     # A sheet the source had facing inward comes out as an inside-out slab (its inner wall outside): turn it round, so the
     # outside faces out.
     bm = bmesh.new()
@@ -737,11 +732,13 @@ def solidify(body):
 
 
 def cavity_walls(bm):
-    """Every face that looks into the suit's inside (not a lining's, material 1) takes the dark cavity tile, so an opened part shows a clean dark hollow
+    """Every face that looks into the suit's inside takes the cavity tile (interior.dress turns it into the wall), so an opened part shows a clean hollow
     whose edges are the shell's own rims, never armor texture or the source's undersuit seen from within. A face looks
     inside when, in the shut suit, nothing outside can see it: of HEMISPHERE rays spread over the side it faces, at most
     one gets out. A groove or the gap between the legs sees out; the inside of the shell does not. Judged per face, so a
-    source sheet whose winding changes part way is handled too. Returns how many faces turned dark."""
+    source sheet whose winding changes part way is handled too. A face one can see from outside stays armour (interior.exposed_faces:
+    a sliver in a crease fails the rays above from its middle, yet shows), and so does a small patch of inner faces lying
+    among such faces (ISLAND). Returns how many faces it took."""
     uv = bm.loops.layers.uv["UVMap"]
     link = bm.faces.layers.int["link"]
     cavity = tile_point("cavity")
@@ -753,11 +750,17 @@ def cavity_walls(bm):
         r = math.sqrt(max(0.0, 1 - z * z))
         a = k * 2.399963
         dirs.append(Vector((r * math.cos(a), r * math.sin(a), z)))
-    dark = 0
+    dark = set()
+    bm.faces.ensure_lookup_table()
+    seen_outside = interior.exposed_faces(bm)
+
+    def in_atlas(f):
+        return all(0.0 <= c <= 1.0 for l in f.loops for c in l[uv].uv)
+
     for f in bm.faces:
         n = f.normal
-        if n.length < 0.5 or f[link] or f.material_index == 1:     # a link keeps its piece's colour, a lining its own
-            continue
+        if n.length < 0.5 or f[link] or f.material_index != 0 or (f.index in seen_outside and in_atlas(f)):
+            continue     # a link keeps its piece's colour, a lining is wall already
         t = n.orthogonal().normalized()
         b = n.cross(t)
         c = f.calc_center_median() + n * 0.001
@@ -768,10 +771,107 @@ def cavity_walls(bm):
                 if out > 1:
                     break
         if out <= 1:
-            for l in f.loops:
-                l[uv].uv = cavity
-            dark += 1
-    return dark
+            dark.add(f)
+    kept = 0
+    for piece in pieces(dark):
+        own = set(piece)
+        border = outside = 0.0
+        for f in piece:
+            for e in f.edges:
+                for g in e.link_faces:
+                    if g not in own:
+                        border += e.calc_length()
+                        if g.index in seen_outside:
+                            outside += e.calc_length()
+        if sum(f.calc_area() for f in piece) < ISLAND and outside >= 0.6 * border and all(in_atlas(f) for f in piece):
+            dark -= own
+            kept += len(piece)
+    for f in dark:
+        for l in f.loops:
+            l[uv].uv = cavity
+    log("seen from outside: %d faces stay armour, %d more in small patches among them" % (len(seen_outside), kept))
+    return len(dark)
+
+
+def add_visor_pane(bm, deform, head, model):
+    """Closes a helmet's open visor hole with a pane of glass (glow.VISOR_PANES: its outline and light): a closed slab 2 mm thick on the head's bone, on a
+    curved surface fitted to the helmet's own front around the hole, 3 mm behind it, mapped flat on the atlas's glass tile."""
+    spec = glow.VISOR_PANES.get(model)
+    if not spec:
+        return
+    outline = spec["outline"]
+    tree = BVHTree.FromBMesh(bm)
+    cx, cz = sum(p[0] for p in outline) / len(outline), sum(p[1] for p in outline) / len(outline)
+    samples = []
+    for k, (x0, z0) in enumerate(outline):
+        x1, z1 = outline[(k + 1) % len(outline)]
+        for t in np.linspace(0.0, 1.0, 8, endpoint=False):
+            x, z = x0 + (x1 - x0) * t, z0 + (z1 - z0) * t
+            x, z = cx + (x - cx) * 1.05, cz + (z - cz) * 1.05
+            hit = tree.ray_cast(Vector((x, -1.0, z)), Vector((0, 1, 0)), 0.9)
+            if hit[0] is not None:
+                samples.append((x, z, hit[0].y))
+    a = np.asarray(samples, dtype=float)
+    A = np.stack([np.ones(len(a)), a[:, 0] ** 2, a[:, 1] - cz, (a[:, 1] - cz) ** 2], axis=1)
+    coef, *_ = np.linalg.lstsq(A, a[:, 2], rcond=None)
+
+    def surface(x, z, back):
+        return Vector((x, float(coef @ np.array([1.0, x * x, z - cz, (z - cz) ** 2])) + 0.003 + back, z))
+
+    uv = bm.loops.layers.uv["UVMap"]
+    u0, u1, v0, v1 = glow.PANE_TILE
+    xs, zs = [p[0] for p in outline], [p[1] for p in outline]
+    wide, low, high = max(abs(x) for x in xs), min(zs), max(zs)
+
+    def uv_of(p):
+        return (u0 + (u1 - u0) * (0.5 + p.x / (2 * wide)), v0 + (v1 - v0) * (p.z - low) / (high - low))
+
+    rings = 6
+    grid = []    # rings from the middle out; ring 0 one point
+    for back in (0.0, 0.002):
+        layer = [[surface(cx, cz, back)]]
+        for r in range(1, rings + 1):
+            ring = []
+            for k, (x0, z0) in enumerate(outline):
+                x1, z1 = outline[(k + 1) % len(outline)]
+                for t in np.linspace(0.0, 1.0, 4, endpoint=False):
+                    px, pz = x0 + (x1 - x0) * t, z0 + (z1 - z0) * t
+                    ring.append(surface(cx + (px - cx) * r / rings, cz + (pz - cz) * r / rings, back))
+            layer.append(ring)
+        grid.append([[bm.verts.new(p) for p in ring] for ring in layer])
+    for layer in grid:
+        for ring in layer:
+            for v in ring:
+                v[deform][head] = 1.0
+
+    def face(vs):
+        f = bm.faces.new(vs)
+        f.smooth = True
+        f.material_index = 0
+        for l in f.loops:
+            l[uv].uv = uv_of(l.vert.co)
+
+    for side, layer in enumerate(grid):
+        turn = side == 1
+        for r in range(rings):
+            inner, outer = layer[r], layer[r + 1]
+            n = len(outer)
+            for k in range(n):
+                if r == 0:
+                    q = [inner[0], outer[(k + 1) % n], outer[k]]
+                else:
+                    q = [inner[k], inner[(k + 1) % n], outer[(k + 1) % n], outer[k]]
+                face(q[::-1] if turn else q)
+    front, rear = grid[0][-1], grid[1][-1]
+    for k in range(len(front)):
+        face([front[k], front[(k + 1) % len(front)], rear[(k + 1) % len(front)], rear[k]])
+    bm.normal_update()
+    # Outward: the front must face the viewer (-Y).
+    if grid[0][1][0].link_faces and grid[0][1][0].link_faces[0].normal.y > 0:
+        all_faces = list({f for layer in grid for ring in layer for v in ring for f in v.link_faces})
+        bmesh.ops.reverse_faces(bm, faces=all_faces)
+    bmesh.ops.triangulate(bm, faces=list({f for layer in grid for ring in layer for v in ring for f in v.link_faces if len(f.verts) > 3}))
+    log("visor pane: %d samples of the helmet's front, fit %.1f mm" % (len(a), 1000 * float(np.abs(A @ coef - a[:, 2]).mean())))
 
 
 def check_closed(bm):
@@ -898,6 +998,29 @@ def orient_lining(me, slots):
     return turned
 
 
+def clear_lining(me, slots):
+    """Moves every point of a lining closer than LINING_CLEAR to its object's plate further into the suit (along the point's
+    normal: orient_lining turned the lining to face in), so its slab can never cross the plate's and show on the outside. Points shared
+    with the plate stay. Returns how many moved."""
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.normal_update()
+    own = [f for f in bm.faces if f.material_index not in slots]
+    moved = 0
+    if own:
+        plate = Surface(own)
+        for v in bm.verts:
+            if not v.link_faces or any(f.material_index not in slots for f in v.link_faces):
+                continue
+            gap = plate.tree.find_nearest(v.co)[3]
+            if gap is not None and gap < LINING_CLEAR:
+                v.co += v.normal * (LINING_CLEAR - gap)
+                moved += 1
+    bm.to_mesh(me)
+    bm.free()
+    return moved
+
+
 def tidy_lining(me, slots):
     """Makes a lined object's mesh something the thin slabs of its plate and lining can close (the add-on's lining work
     leaves slivers far below anything visible): points of its lining closer than WELD become one, loose bits of lining
@@ -952,7 +1075,7 @@ def read_cut(model):
     moved, samples = baked_tracks(parts, names)
     # Every object onto the suit's space at its shut place (where bake.py stands it), then one body.
     scene.frame_set(1)
-    turned = welded = crumbs = split = 0
+    turned = welded = crumbs = split = cleared = 0
     for k, (o, index) in enumerate(meshes):
         m = o.matrix_world.copy()
         if o.data.users > 1:
@@ -973,6 +1096,7 @@ def read_cut(model):
         lining = [int(p.material_index in slots) for p in me.polygons]
         if any(lining):
             turned += orient_lining(me, slots)
+            cleared += clear_lining(me, slots)
         for name, values in (("group", [index] * len(lining)), ("source", [k] * len(lining)),
                              ("link", [int(o in moved and moved[o]["link"])] * len(lining)), ("lining", lining),
                              ("lined", [int(any(lining))] * len(lining))):
@@ -1016,105 +1140,21 @@ def read_cut(model):
     for coll in list(bpy.data.collections):
         bpy.data.collections.remove(coll)
     opening = {"samples": samples}
-    log("cut file: %d mesh objects, %d samples, %d loose lining sheets turned into the suit, lined objects: %d points closer than %.2f mm "
+    log("cut file: %d mesh objects, %d samples, %d loose lining sheets turned into the suit, %d lining points moved clear of their plate, lined objects: %d points closer than %.2f mm "
         "merged, %d lining slivers removed, %d edges with more than two faces split; %d parts: %s" % (
-            len(objs), samples, turned, welded, 1000 * WELD, crumbs, split, len(plates), ", ".join(p["name"] for p in plates)))
+            len(objs), samples, turned, cleared, welded, 1000 * WELD, crumbs, split, len(plates), ", ".join(p["name"] for p in plates)))
     return body, plates, joints, meta["tris0"], opening
 
 
-def lining_textures(model, out):
-    """Bakes the lining material (LINING: a procedural grid on the faces' UVs, one UV unit a cell) into textures that tile every
-    LINING_CELLS cells: <model>_lining_albedo.png (base colour), _lining_normal.png (tangent space) and _lining_metallic.png
-    (R metal, G and A smoothness, as the body's). The grid repeats every cell; the roughness noise does not, so its tile is
-    blended across its edges (offset and cross-faded) to wrap."""
-    scene = bpy.context.scene
-    source = bpy.data.materials.get(LINING)
-    if source is None or source.node_tree is None:
-        raise SystemExit("The cut file has no lining material %s" % LINING)
-    mat = source.copy()
-    nt = mat.node_tree
-    bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
-    if bsdf.inputs["Metallic"].is_linked:
-        raise SystemExit("The lining's metallic is a texture; the lining bake reads one value")
-    metal = bsdf.inputs["Metallic"].default_value
-    output = next(n for n in nt.nodes if n.type == "OUTPUT_MATERIAL" and n.is_active_output)
-    # The bake fills the image from UV 0..1: the material reads those UVs times LINING_CELLS, on a tile as large as that many
-    # cells (LINING_CELL m each), so the bump's slopes are the lining's own.
-    for coord in [n for n in nt.nodes if n.type == "TEX_COORD"]:
-        for link in [l for l in nt.links if l.from_node == coord and l.from_socket.identifier == "UV"]:
-            scale = nt.nodes.new("ShaderNodeVectorMath")
-            scale.operation = "SCALE"
-            scale.inputs["Scale"].default_value = LINING_CELLS
-            nt.links.new(coord.outputs["UV"], scale.inputs[0])
-            nt.links.new(scale.outputs["Vector"], link.to_socket)
-    size = LINING_CELLS * LINING_CELL
-    me = bpy.data.meshes.new("lining-tile")
-    bm = bmesh.new()
-    face = bm.faces.new([bm.verts.new(c) for c in ((0, 0, 0), (size, 0, 0), (size, size, 0), (0, size, 0))])
-    uv = bm.loops.layers.uv.new("UVMap")
-    for loop, c in zip(face.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
-        loop[uv].uv = c
-    bm.to_mesh(me)
-    bm.free()
-    me.materials.append(mat)
-    tile = bpy.data.objects.new("lining-tile", me)
-    scene.collection.objects.link(tile)
-    engine = scene.render.engine
-    scene.render.engine = "CYCLES"
-    scene.cycles.device = "CPU"
-    scene.cycles.samples = 16
-    scene.render.bake.margin = 0
-    scene.render.bake.use_selected_to_active = False
-    bpy.context.view_layer.objects.active = tile
-    for o in bpy.context.view_layer.objects:
-        o.select_set(o is tile)
-    target = nt.nodes.new("ShaderNodeTexImage")
-    nt.nodes.active = target
-
-    def bake(kind, colour, **settings):
-        img = bpy.data.images.new("lining-" + kind.lower(), LINING_SIZE, LINING_SIZE, alpha=False)
-        img.colorspace_settings.name = "sRGB" if colour else "Non-Color"
-        target.image = img
-        bpy.ops.object.bake(type=kind, **settings)
-        px = np.empty(LINING_SIZE * LINING_SIZE * 4, dtype=np.float32)
-        img.pixels.foreach_get(px)
-        bpy.data.images.remove(img)
-        return px.reshape(LINING_SIZE, LINING_SIZE, 4)
-
-    # Base colour: whatever feeds the BSDF's base colour, shown as emission (no light, no metal darkening).
-    base = bsdf.inputs["Base Color"]
-    emit = nt.nodes.new("ShaderNodeEmission")
-    if base.is_linked:
-        nt.links.new(base.links[0].from_socket, emit.inputs["Color"])
-    else:
-        emit.inputs["Color"].default_value = base.default_value
-    surface = output.inputs["Surface"]
-    shader = surface.links[0].from_socket
-    nt.links.new(emit.outputs["Emission"], surface)
-    albedo = bake("EMIT", True)
-    nt.links.new(shader, surface)
-    normal = bake("NORMAL", False, normal_space="TANGENT")
-    rough = bake("ROUGHNESS", False)[..., 0]
-    n = LINING_SIZE
-    ramp = np.clip(np.abs(np.arange(n) - (n - 1) / 2) / (n / 4) - 1, 0, 1)   # 0 in the middle half, 1 at the edges
-    for axis in (1, 0):
-        w = ramp[None, :] if axis == 1 else ramp[:, None]
-        rough = rough * (1 - w) + np.roll(rough, n // 2, axis=axis) * w
-    smooth = 1.0 - rough
-    metallic = np.stack([np.full_like(smooth, metal), smooth, np.zeros_like(smooth), smooth], axis=-1)
-    for kind, px, colour in (("albedo", albedo, True), ("normal", normal, False), ("metallic", metallic, False)):
-        img = bpy.data.images.new("%s_lining_%s" % (model, kind), n, n, alpha=kind == "metallic")
-        img.colorspace_settings.name = "sRGB" if colour else "Non-Color"
-        img.pixels.foreach_set(np.ascontiguousarray(px, dtype=np.float32).reshape(-1))
-        img.filepath_raw = os.path.join(out, "%s_lining_%s.png" % (model, kind))
-        img.file_format = "PNG"
-        img.save()
-        bpy.data.images.remove(img)
-    bpy.data.objects.remove(tile, do_unlink=True)
-    bpy.data.meshes.remove(me)
-    bpy.data.materials.remove(mat)
-    scene.render.engine = engine
-    log("lining textures: %d px, %d cells a tile, metal %.2f, smoothness %.2f..%.2f" % (n, LINING_CELLS, metal, smooth.min(), smooth.max()))
+def save_png(path, px, colour, alpha):
+    h, w = px.shape[:2]
+    img = bpy.data.images.new(os.path.basename(path), w, h, alpha=alpha)
+    img.colorspace_settings.name = "sRGB" if colour else "Non-Color"
+    img.pixels.foreach_set(np.ascontiguousarray(px, dtype=np.float32).reshape(-1))
+    img.filepath_raw = path
+    img.file_format = "PNG"
+    img.save()
+    bpy.data.images.remove(img)
 
 
 def shape(args, body, plates, joints, tris0, opening_info):
@@ -1135,7 +1175,7 @@ def shape(args, body, plates, joints, tris0, opening_info):
         if source !=os.path.abspath(os.path.join(args.out, name)):
             shutil.copyfile(source, os.path.join(args.out, name))
         img.filepath = os.path.join(args.out, name)
-    lining_textures(args.model, args.out)
+    interior.write_textures(args.model, args.out, save_png)
     me = body.data
     j = joints
     bm0 = bmesh.new()
@@ -1275,6 +1315,14 @@ def shape(args, body, plates, joints, tris0, opening_info):
         tidy_faces = [f for f in bm.faces if len(f.verts) > 3]
         if tidy_faces:
             bmesh.ops.triangulate(bm, faces=tidy_faces)
+    # A needle nothing above could take: its far corner moves off its longest edge, out of the neighbour's plane, by the little it takes.
+    for _ in range(3):
+        for f in [f for f in bm.faces if f.calc_area() < TINY_AREA]:
+            e = max(f.edges, key=lambda e: e.calc_length())
+            apex = next(v for v in f.verts if v not in e.verts)
+            other = next((g for g in e.link_faces if g is not f), None)
+            if other is not None and e.calc_length() > 1e-6:
+                apex.co += other.normal * (3.0 * TINY_AREA / e.calc_length())
     # A paper-thin closed piece (a doubled decal in the source) has almost no volume, and a collapse can tip its sign:
     # turn such a piece round as the thickening step does.
     for piece in pieces(bm.faces):
@@ -1283,25 +1331,30 @@ def shape(args, body, plates, joints, tris0, opening_info):
             bmesh.ops.reverse_faces(bm, faces=piece)
             log("tiny-triangle collapse: turned a %d-face piece round (volume %.1e)" % (len(piece), vol))
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    add_visor_pane(bm, deform, ids["head"], args.model)
     check_closed(bm)
     check_entry(bm, deform, ids, plates, slots, os.path.join(args.out, args.model + "_entry.json"), layers, fittings, args.preview)
     bm.normal_update()
     glow.paint(bm, {i: n for n, i in ids.items()}, joints, sources,
-               {k: os.path.join(args.out, "%s_%s.png" % (args.model, k)) for k in TEXTURES}, log)
+               {k: os.path.join(args.out, "%s_%s.png" % (args.model, k)) for k in TEXTURES}, log, args.model)
+    interior.dress(bm, deform, joints, torso.a, torso.b, [ids[p["node"]] for p in plates], args.model, log)
+    check_closed(bm)
     bm.to_mesh(me)
     bm.free()
     me.update()
+    # Wear and rust on the finished shell's armour maps.
+    wear.paint(body, args.model, args.out, log)
     tris = sum(len(p.vertices) - 2 for p in me.polygons)
-    lining_tris = sum(len(p.vertices) - 2 for p in me.polygons if p.material_index == 1)
-    if not lining_tris:
-        raise SystemExit("No part has a lining (faces with the material %s)" % LINING)
+    lining_tris = [sum(len(p.vertices) - 2 for p in me.polygons if p.material_index == m) for m in (1, 2, 3)]
+    if not all(lining_tris):
+        raise SystemExit("The inside has no fabric, metal or rubber faces (triangles %s)" % lining_tris)
     uvs = me.uv_layers["UVMap"].data
     outside = [p.index for p in me.polygons if p.material_index == 0
                and any(not (0.0 <= c <= 1.0) for i in p.loop_indices for c in uvs[i].uv)]
     if outside:
         raise SystemExit("%d armour faces have UVs outside the atlas (the bundle build refuses them), e.g. at (%.3f %.3f %.3f)" % (
             len(outside), *me.polygons[outside[0]].center))
-    log("triangles", tris, "lining", lining_tris)
+    log("triangles", tris, "lining fabric/metal/rubber", lining_tris)
     # Second UV set for the bundle's closed-shell check: (vertex index, 0). The bundle drops it after the check.
     idl = me.uv_layers.new(name="ids")
     for p in me.polygons:
@@ -1347,7 +1400,7 @@ def shape(args, body, plates, joints, tris0, opening_info):
                              bake_anim_use_all_actions=True, bake_anim_use_nla_strips=False, bake_anim_force_startend_keying=True,
                              bake_anim_simplify_factor=0.0, embed_textures=False, path_mode="STRIP")
     record = {"model": args.model, "name": cfg["name"], "height": H, "fps": FPS, "sourceTriangles": tris0, "triangles": tris,
-              "shellThickness": SHELL_T, "liningTriangles": lining_tris, "liningCells": LINING_CELLS,
+              "shellThickness": SHELL_T, "liningTriangles": lining_tris,
               "clips": {"open": [1, opening_info["samples"]],
                         "close": [1, len(plates[0]["close"]) if plates else 1]},
               "opening": opening_info,

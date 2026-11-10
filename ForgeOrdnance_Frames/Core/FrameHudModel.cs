@@ -4,14 +4,14 @@ namespace ForgeOrdnanceFrames;
 
 /// <summary>The suit gun as the pilot's game holds it this frame (the lent special-slot weapon); <see cref="ReloadProgress"/> is how far
 /// the running reload is, 0..1, or -1 while none runs.</summary>
-public readonly record struct FrameGunReading(bool Lent, int Clip, int Reserve, bool Reloading, float ReloadProgress = -1f);
+internal readonly record struct FrameGunReading(bool Lent, int Clip, int Reserve, bool Reloading, float ReloadProgress = -1f);
 
 /// <summary>Which special the suit has, for its skill slot.</summary>
-public enum FrameSpecialKind : byte { None, Charge, Siege, Scan }
+internal enum FrameSpecialKind : byte { None, Charge, Siege, Scan }
 
 /// <summary>How the barrier layer over the armour bar reads: none (no barrier), standing, stowed (a planted-only barrier while the suit
 /// walks: the layer and its number are not drawn) or broken.</summary>
-public enum BarrierState : byte { None, Up, Standby, Broken }
+internal enum BarrierState : byte { None, Up, Standby, Broken }
 
 /// <summary>
 /// What the cockpit shows, computed each frame from the suit's record, the pilot's sprint heat and clocks; ForgeUI's elements read
@@ -19,7 +19,7 @@ public enum BarrierState : byte { None, Up, Standby, Broken }
 /// <see cref="Segments"/>, red under <see cref="LowArmor"/> with a flash per segment lost, flashing without pause under
 /// <see cref="FrameAlerts.FailingArmor"/>); the model only gives the real share.
 /// </summary>
-public sealed class FrameHudModel
+internal sealed class FrameHudModel
 {
     /// <summary>Segments of the armour bar.</summary>
     public const int Segments = 10;

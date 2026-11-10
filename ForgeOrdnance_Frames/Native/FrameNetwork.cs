@@ -21,6 +21,7 @@ internal static class FrameNetwork
         _channel.On<FrameRequestMessage>(FrameMessages.RequestEvent, FrameWorld.OnRequest);
         _channel.On<FrameRejectMessage>(FrameMessages.RejectEvent, FrameWorld.OnReject);
         _channel.On<FrameFireMessage>(FrameMessages.FireEvent, FrameWorld.OnFire, NetDelivery.Lossy);
+        _channel.On<FrameBumpMessage>(FrameMessages.BumpEvent, FrameWorld.OnBump, NetDelivery.Lossy);
         _channel.On<FrameRocketMessage>(FrameMessages.RocketRequestEvent, FrameWorld.OnRocketRequest);
         _channel.On<FrameRocketMessage>(FrameMessages.RocketLaunchEvent, FrameWorld.OnRocketLaunch);
         _channel.On<FrameCheckpointMessage>(FrameMessages.CheckpointEvent, FrameWorld.OnCheckpoint);
@@ -38,21 +39,21 @@ internal static class FrameNetwork
     /// <summary>Requests go to the host; the host handles its own directly.</summary>
     internal static void ToHost(FrameRequestMessage message)
     {
-        if (SNet.IsMaster) { FrameWorld.OnRequest(SNet.LocalPlayer.Lookup, message); return; }
+        if (Session.IsHost) { FrameWorld.OnRequest(SNet.LocalPlayer.Lookup, message); return; }
         // No host (the session is ending or the host left): the request has nowhere to go and the local state is released anyway.
         Channel.TryToHost(FrameMessages.RequestEvent, message);
     }
 
     internal static void Reject(ulong to, FrameRejectMessage message)
     {
-        if (!SNet.IsMaster) return;
+        if (!Session.IsHost) return;
         if (to == SNet.LocalPlayer.Lookup) { FrameWorld.OnReject(SNet.LocalPlayer.Lookup, message); return; }
         if (SNet.TryGetPlayer(to, out _)) Channel.To(to, FrameMessages.RejectEvent, message);
     }
 
     internal static void RocketToHost(FrameRocketMessage message)
     {
-        if (SNet.IsMaster) { FrameWorld.OnRocketRequest(SNet.LocalPlayer.Lookup, message); return; }
+        if (Session.IsHost) { FrameWorld.OnRocketRequest(SNet.LocalPlayer.Lookup, message); return; }
         Channel.TryToHost(FrameMessages.RocketRequestEvent, message);
 
     }
@@ -60,7 +61,7 @@ internal static class FrameNetwork
     /// <summary>Host: a granted salvo to every other peer.</summary>
     internal static void RocketLaunch(FrameRocketMessage message)
     {
-        if (!SNet.IsMaster) return;
+        if (!Session.IsHost) return;
         FrameWorld.OnRocketLaunch(SNet.LocalPlayer.Lookup, message);
         Channel.Broadcast(FrameMessages.RocketLaunchEvent, message);
     }
@@ -78,5 +79,8 @@ internal static class FrameNetwork
     }
 
     /// <summary>Shots, for every other peer's sound and tracer: presentation only, sent lossy.</summary>
+    /// <summary>The charge hit something, for every other peer's shoulder-bash and impact: presentation only, sent lossy.</summary>
+    internal static void Bump(FrameBumpMessage message) => Channel.Broadcast(FrameMessages.BumpEvent, message);
+
     internal static void Fire(FrameFireMessage message) => Channel.Broadcast(FrameMessages.FireEvent, message);
 }

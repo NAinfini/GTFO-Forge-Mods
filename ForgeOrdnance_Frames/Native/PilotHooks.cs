@@ -3,7 +3,6 @@ using Agents;
 using Gear;
 using HarmonyLib;
 using Player;
-using SNetwork;
 using UnityEngine;
 
 namespace ForgeOrdnanceFrames;
@@ -11,18 +10,17 @@ namespace ForgeOrdnanceFrames;
 /// <summary>The hooks that sit on the game's busiest paths and matter only while a suit is worn. They are put on the first time the
 /// local player puts a suit on (<see cref="LocalPilot"/>) and stay: under Il2CppInterop a removed patch leaves the forwarding detour
 /// and the generated method behind, so taking them off would save no call and leak one method each time. Each hook returns at once
-/// while no suit is worn. The suit's walk speed, jump, stamina and flinch are <see cref="LocalStats"/> sources set here; the reload
+/// while no suit is worn. The suit's walk speed, jump, stamina and flinch are <see cref="ForgeCore.PlayerStats"/> sources set here; the reload
 /// time is a ForgeCore handling lease (<see cref="ForgeCore.Gear.LeaseReload"/>).</summary>
 internal static class PilotLazyHooks
 {
     internal static readonly ForgeCore.LazyPatches Hooks = ForgeCore.Patches.Lazy(Plugin.Id, harmony =>
     {
-        LocalStats.Velocity = static (owner, velocity) => LocalPilot.Unit == null ? velocity : LocalPilot.Velocity(owner, velocity);
-        LocalStats.CarryUnslowed = static () => LocalPilot.Unit != null && LocalPilot.CarriesHeavy;
-        LocalStats.JumpSpeed = static owner => LocalPilot.Unit == null ? 1f : LocalPilot.JumpSpeed(owner);
-        LocalStats.NoStamina = static owner => LocalPilot.NoStamina(owner);
-        LocalStats.NoHitreact = static () => LocalPilot.Unit != null;
-        LocalStats.Ensure(harmony);
+        ForgeCore.PlayerStats.Walk(static (owner, velocity) => LocalPilot.Unit == null ? velocity : LocalPilot.Velocity(owner, velocity));
+        ForgeCore.PlayerStats.CarryUnslowed(static () => LocalPilot.Unit != null && LocalPilot.CarriesHeavy);
+        ForgeCore.PlayerStats.Jump(static owner => LocalPilot.Unit == null ? 1f : LocalPilot.JumpSpeed(owner));
+        ForgeCore.PlayerStats.NoStamina(static owner => LocalPilot.NoStamina(owner));
+        ForgeCore.PlayerStats.NoFlinch(static () => LocalPilot.Unit != null);
         harmony.Patch(AccessTools.Method(typeof(PlayerInventoryLocal), nameof(PlayerInventoryLocal.CheckAndWield)),
             prefix: new HarmonyMethod(typeof(PilotGunSwap), nameof(PilotGunSwap.Prefix)));
         ForgeCore.Gear.LeaseReload(Plugin.Id, PilotReload.Factor);
@@ -33,28 +31,33 @@ internal static class PilotLazyHooks
 
 /// <summary>The game puts a third-person body's hands on its item's grips with FinalIK limbs in <c>PlayerSyncIK.UpdateIK</c>, run from
 /// a game <c>LateUpdate</c> whose order against Forge's own is not fixed. A worn suit that already copied its pilot's body this frame
-/// (<see cref="FrameVisual.LateTick"/>) copies it again once that body's hands are solved, so the suit's hands land on the grips. Put on
-/// the first time a suit takes a pilot; returns at once while none is worn.</summary>
+/// (<see cref="FrameVisual.LateTick"/>) copies it again once that body's hands are solved, so the suit's hands land on the grips. ForgeCore
+/// patches the method once (<see cref="ForgeCore.GameHooks.SyncIkSolved"/>); this subscribes the first time a suit takes a pilot and returns at once while none is worn.</summary>
 internal static class PoseAfterIK
 {
-    internal static readonly ForgeCore.LazyPatches Hooks = ForgeCore.Patches.Lazy(Plugin.Id, harmony =>
-        harmony.Patch(AccessTools.Method(typeof(PlayerSyncIK), nameof(PlayerSyncIK.UpdateIK)),
-            postfix: new HarmonyMethod(typeof(PoseAfterIK), nameof(Postfix))));
+    private static bool _subscribed;
 
-    private static void Postfix(PlayerSyncIK __instance)
+    internal static void Ensure()
     {
-        try { FrameWorld.HandsSolved(__instance.Pointer); }
-        catch (Exception error) { Plugin.Error("Exosuit pose after the hands' IK failed: " + error); }
+        if (_subscribed) return;
+        _subscribed = true;
+        ForgeCore.GameHooks.SyncIkSolved.After(static (ik, _) =>
+        {
+            try { FrameWorld.HandsSolved(ik.Pointer); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("frames-pose-after-ik-failed", "exosuit pose after the hands' IK failed: " + error); }
+        });
     }
 }
 
 /// <summary>A raised barrier (tank model) takes every hit an attacker outside its dome lands on a player inside it, the pilot
 /// included; the attacker's position decides, because vanilla melee and projectiles damage what they reach without a line-of-sight
-/// test against colliders (see DEVELOPERS.md). Every hit on a player funnels through <c>Dam_PlayerDamageBase.OnIncomingDamage</c> (its receive entries call it on
+/// test against colliders (see DEVELOPERS.md). A projectile's hit names no attacker, so a projectile from outside is stopped in
+/// flight at the dome instead (<see cref="BarrierProjectiles"/>). Every hit on a player funnels through <c>Dam_PlayerDamageBase.OnIncomingDamage</c> (its receive entries call it on
 /// whichever peer receives the damage packet; it then sends the new health). For a pilot the damage goes to the suit's armour
 /// on the host and the player's own damage is set to zero on every peer, so a pilot never loses health or goes down while the
-/// suit stands. The first time each peer sees a hit on a pilot it logs whether it is the host and whether the pilot is local:
-/// the plan's first-run question of where the receive entries run. ForgeCore patches the method once
+/// suit stands. The game changes a player's health only on the host, and a peer that applies a hit itself also sends it there (a
+/// projectile is applied by the hit player's own peer), so the host sees every hit. Hits on the suit's shell outside the person reach
+/// this through <see cref="PilotHull"/>. ForgeCore patches the method once
 /// (<see cref="ForgeCore.PlayerHits.Redirect"/>); this is the redirect it calls.</summary>
 internal static class PilotDamage
 {
@@ -68,12 +71,12 @@ internal static class PilotDamage
             var unit = FrameWorld.PilotUnit(agent.Owner.Lookup);
             var shelter = FrameWorld.ShelterFor(agent.Position, sourceAgent);
             if (unit == null && shelter == null) return damage;
-            if (!SNet.IsMaster) return 0f;
-            if (shelter != null) FrameWorld.HostShield(shelter, damage, sourceAgent, unit == shelter);
+            if (!ForgeCore.Session.IsHost) return 0f;
+            if (shelter != null) FrameWorld.HostShield(shelter, damage, FrameWorld.From(sourceAgent), unit == shelter);
             else FrameWorld.HostDamage(unit!, agent, damage, sourceAgent);
             return 0f;
         }
-        catch (Exception error) { Plugin.Error("Exosuit damage redirect failed: " + error); return damage; }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Exosuit damage redirect failed: " + error); return damage; }
     }
 }
 
@@ -103,7 +106,7 @@ internal static class PilotGunSwap
             if (__instance.WieldedSlot != InventorySlot.GearSpecial || InputMapper.GetButtonDown == null || !InputMapper.GetButtonDown.Invoke(action, eFocusState.FPS)) return;
             MechGun.ToggleKey(Time.time);
         }
-        catch (Exception error) { Plugin.Error("Exosuit gun swap hook failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Exosuit gun swap hook failed: " + error); }
     }
 }
 
@@ -132,7 +135,7 @@ internal static class PilotBullet
             }
             LocalPilot.Shot(weaponRayData.rayHit.point);
         }
-        catch (Exception error) { Plugin.Error("Exosuit bullet hook failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Exosuit bullet hook failed: " + error); }
         return state;
     }
 
@@ -152,7 +155,7 @@ internal static class SiegeFireRate
     {
         if (LocalPilot.Unit == null || __instance == null) return;
         try { MechGun.AfterShot(__instance); }
-        catch (Exception error) { Plugin.Error("Exosuit siege fire-rate hook failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Exosuit siege fire-rate hook failed: " + error); }
     }
 }
 
@@ -171,6 +174,6 @@ internal static class PilotReload
             if (factor != 1f) MechGun.ReloadAsked(weapon, duration, factor);
             return factor;
         }
-        catch (Exception error) { Plugin.Error("Exosuit reload hook failed: " + error); return 1f; }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Exosuit reload hook failed: " + error); return 1f; }
     }
 }

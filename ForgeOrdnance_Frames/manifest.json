@@ -1,15 +1,15 @@
 {
   "name": "ForgeOrdnance_Frames",
-  "version_number": "1.0.0",
+  "version_number": "1.0.1",
   "website_url": "https://github.com/NAinfini/GTFO-Forge-Mods",
   "description": "Four powered exosuits for Forge Ordnance: call one in, it drops through the ceiling, climb in and fight in heavy armour. Sirius (assault), Taishan (tank), Thunderbird (firepower) and Nightowl (recon).",
   "dependencies": [
     "BepInEx-BepInExPack_GTFO-3.2.4",
     "GTFOModding-GTFO_API-0.6.1",
-    "NAinfini-ForgeCore-0.1.0",
-    "NAinfini-ForgeOrdnance-1.0.0",
-    "NAinfini-ForgeAudio-0.1.0",
-    "NAinfini-ForgeUI-0.1.0",
-    "NAinfini-ForgeVisual-0.1.0"
+    "NAinfini-ForgeCore-1.0.0",
+    "NAinfini-ForgeOrdnance-1.0.1",
+    "NAinfini-ForgeAudio-1.0.0",
+    "NAinfini-ForgeUI-1.0.0",
+    "NAinfini-ForgeVisual-1.0.0"
   ]
 }

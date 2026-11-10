@@ -6,22 +6,20 @@ namespace ForgeOrdnanceFrames;
 /// <summary>Every word the suit shows the player, read from this package's <c>lang/&lt;language&gt;.json</c> through ForgeUI (the native
 /// side passes its text lookup; the offline tests pass the shipped files). Made again whenever the language changes; nothing here
 /// allocates per frame. Texts with a <c>{0}</c> are formatted with <see cref="Format"/>.</summary>
-public sealed class FrameWords
+internal sealed class FrameWords
 {
-    private readonly Func<string, string> _text;
-
     public FrameWords(Func<string, string> text)
     {
-        _text = text ?? throw new ArgumentNullException(nameof(text));
+        ArgumentNullException.ThrowIfNull(text);
         Barrier = text("hud.barrier"); Pilot = text("hud.pilot");
         Heat = text("hud.heat"); Overheat = text("hud.overheat"); Ready = text("hud.ready"); Active = text("hud.active"); On = text("hud.on");
         Off = text("hud.off"); Deploying = text("hud.deploying"); Rockets = text("hud.rockets"); Lamp = text("hud.lamp"); Exit = text("hud.exit"); CarryTake = text("hud.carryTake"); CarryStow = text("hud.carryStow");
         Charge = text("special.charge"); Siege = text("special.siege"); Scan = text("special.scan");
-        BoardHeader = text("board.header"); BoardHold = text("board.hold"); BoardBehind = text("board.behind"); BoardArmor = text("board.armor");
+        BoardHeader = text("board.header"); BoardHold = text("board.hold"); BoardBehind = text("board.behind"); BoardArmor = text("board.armor"); BoardAmmo = text("board.ammo");
         Failing = text("banner.failing"); Destroyed = text("banner.destroyed"); ForcedOut = text("banner.forcedOut");
         NotFree = text("refuse.notFree"); TooFar = text("refuse.tooFar"); AlreadyIn = text("refuse.alreadyIn"); PilotDown = text("refuse.pilotDown");
         NotReady = text("refuse.notReady"); Planted = text("refuse.planted"); Charging = text("refuse.charging"); RocketRange = text("refuse.range");
-        NotNow = text("refuse.notNow");
+        NotNow = text("refuse.notNow"); TooClose = text("refuse.tooClose"); GunEmpty = text("gun.empty"); GunSwap = text("gun.swap");
         Link = text("boot.link"); BootSeal = text("boot.seal"); BootArmor = text("boot.armor"); BootServos = text("boot.servos");
         BootWeapon = text("boot.weapon"); BootSensors = text("boot.sensors"); LinkHeader = text("boot.header"); BootOk = text("boot.ok"); BootSync = text("boot.sync");
         Shutdown = text("boot.shutdown");
@@ -64,6 +62,8 @@ public sealed class FrameWords
     public string BoardBehind { get; }
     /// <summary>"Armor {0}%".</summary>
     public string BoardArmor { get; }
+    /// <summary>"Ammo {0}%".</summary>
+    public string BoardAmmo { get; }
     public string Failing { get; }
     public string Destroyed { get; }
     public string ForcedOut { get; }
@@ -76,6 +76,12 @@ public sealed class FrameWords
     public string Charging { get; }
     public string RocketRange { get; }
     public string NotNow { get; }
+    /// <summary>The rocket salvo refused: the point is close enough for the blast to reach the suit.</summary>
+    public string TooClose { get; }
+    /// <summary>The suit gun ran dry; and asked for again after that.</summary>
+    public string GunEmpty { get; }
+    /// <summary>"{0} swaps guns": the suit gun came into the hands.</summary>
+    public string GunSwap { get; }
     /// <summary>The power-on's big message (NEURAL LINK OK) and the bar's header over it (NEURAL LINK).</summary>
     public string Link { get; }
     public string LinkHeader { get; }

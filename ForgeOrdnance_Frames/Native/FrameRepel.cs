@@ -24,6 +24,10 @@ internal static class FrameRepel
     private const float EnemyCooldown = 0.75f;
     private const float Strength = 1f;
 
+    /// <summary>The wreck's blast: this far and this many enemies, shoved once.</summary>
+    private const float WreckReach = 4f;
+    private const int WreckBudget = 12;
+
     private static readonly Dictionary<IntPtr, float> NextPush = new();
     private static readonly List<IntPtr> Expired = new();
 
@@ -46,11 +50,28 @@ internal static class FrameRepel
             if (away.sqrMagnitude < 0.01f) away = pilot.Rotation * Vector3.forward;
             away.y = 0f;
             try { ForgeCore.Combat.Push(enemy.Damage, Strength, pilot, p, away.normalized); }
-            catch (Exception error) { Plugin.Error("Exosuit barrier push failed: " + error); return; }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("Exosuit barrier push failed: " + error); return; }
             pushed++;
         }
         if (pushed > 0) unit.Visual?.Pulse(now);
         if (NextPush.Count > 128) Prune(now);
+    }
+
+    /// <summary>Host: the suit is wrecked and its pilot thrown out: the enemies around it are shoved once by the blast, which gives the pilot a moment (the game's own push: no damage).</summary>
+    internal static void Wrecked(PlayerAgent pilot, Vector3 at)
+    {
+        var pushed = 0;
+        foreach (var found in ForgeCore.Enemies.Near(at, WreckReach))
+        {
+            if (pushed++ >= WreckBudget) break;
+            var enemy = found!;
+            var away = enemy.Position - at;
+            away.y = 0f;
+            if (away.sqrMagnitude < 0.01f) away = pilot.Rotation * Vector3.forward;
+            away.y = 0f;
+            try { ForgeCore.Combat.Push(enemy.Damage, Strength, pilot, enemy.Position, away.normalized); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("frames-wreck-push-failed", "exosuit wreck push failed: " + error); return; }
+        }
     }
 
     /// <summary>Not the host: whether an enemy the game would shove stands inside the raised dome (the host's own rule, without the

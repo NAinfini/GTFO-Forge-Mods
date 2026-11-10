@@ -7,7 +7,7 @@ namespace ForgeOrdnanceFrames;
 /// the moment its first rocket of the salvo leaves until the last of them is reloaded; the salvo's rockets are reloaded in firing
 /// order, evenly over the cooldown, rocket <c>i</c> at <c>(i + 1) / salvo</c> of it, so the last tube fills the moment the next salvo
 /// is ready. Every peer computes this from the salvo's launch time; nothing is sent per tube.</summary>
-public static class FrameRocketRack
+internal static class FrameRocketRack
 {
     /// <summary>A launcher's tubes are its children <c>muzzle_1</c>, <c>muzzle_2</c>, ... (no gaps), each at a tube's mouth.</summary>
     public const string MuzzlePrefix = "muzzle_", FirstMuzzle = MuzzlePrefix + "1";
