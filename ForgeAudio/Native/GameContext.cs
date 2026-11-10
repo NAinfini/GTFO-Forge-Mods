@@ -21,7 +21,7 @@ internal static class GameContext
     /// <summary>The kit's own master and per-category volumes (its config), updated when a value changes (see <see cref="Plugin.ReadVolumes"/>).</summary>
     internal static float KitMaster = 1;
     internal static readonly float[] KitVolume = Enumerable.Repeat(1f, AudioCategories.Count).ToArray();
-    internal static bool MuteBackground, Focused, Suspended;
+    internal static bool MuteBackground, Focused;
     /// <summary>The game's volume sliders were read this frame (<see cref="Music"/> holds the player's setting).</summary>
     internal static bool SlidersRead;
     private static bool _hadLevel, _settingsError, _wasReloading, _levelEnded, _checkpointReloaded;
@@ -72,11 +72,10 @@ internal static class GameContext
     internal static void Refresh()
     {
         Now = AudioClock.Now;
-        Focused = Application.isFocused && !Suspended;
+        Focused = Application.isFocused;
         if (Now >= _nextSliders) { _nextSliders = Now + .25; ReadSliders(); }
         InLevel = GameStateManager.CurrentStateName == eGameStateName.InLevel;
-        var state = InLevel ? CheckpointManager.Current?.m_stateReplicator : null;
-        Reloading = InLevel && (CheckpointManager.IsReloadingCheckpoint || state != null && state.State.isReloadingCheckpoint);
+        Reloading = InLevel && ForgeCore.Checkpoint.Recalling;
         var levelEnded = _levelEnded; _levelEnded = false;
         var checkpointChanged = _checkpointReloaded; _checkpointReloaded = false;
         if (_hadLevel && (!InLevel || levelEnded))
@@ -98,21 +97,16 @@ internal static class GameContext
             return;
         }
         _idleSettled = !InLevel;
-        var player = PlayerManager.GetLocalPlayerAgent();
-        var current = CameraManager.CurrentCam;
-        var camera = current == null || current.WasCollected ? null : current.m_camera;
-        if (!ListenerOutput.Active(camera) && player != null && !player.WasCollected)
-        {
-            var fps = player.FPSCamera;
-            camera = fps == null || fps.WasCollected ? null : fps.m_camera;
-        }
+        var player = ForgeCore.Players.Local;
+        var camera = ForgeCore.Players.WorldCamera();
         ListenerOutput.Refresh(camera, Now, levelChanged);
         // A level camera with an active listener is enough; the local player object only refines the dimension.
         HasListener = ListenerOutput.Present && ListenerOutput.Active(camera) && InLevel && !Reloading;
         if (!HasListener) { _hadEar = false; EarVelocity = Vector3.zero; }
         if (HasListener)
         {
-            Ear = camera!.transform.position; Right = camera.transform.right;
+            var ear = camera!.transform;
+            Ear = ear.position; Right = ear.right;
             var elapsed = Now - _previousEarTime;
             EarVelocity = _hadEar && elapsed > .001 && elapsed < .5 ? (Ear - _previousEar) / (float)elapsed : Vector3.zero;
             _previousEar = Ear; _previousEarTime = Now; _hadEar = true;
@@ -142,16 +136,18 @@ internal static class GameContext
     /// <summary>The dimension of the player whose eyes the camera is at (watching a teammate), or null when it is at nobody's.</summary>
     private static int? Followed(Vector3 ear)
     {
-        var agents = PlayerManager.PlayerAgentsInLevel;
-        if (agents == null) return null;
-        for (var i = 0; i < agents.Count; i++)
-        {
-            var agent = agents[i];
-            if (agent == null || agent.WasCollected) continue;
-            if ((agent.EyePosition - ear).sqrMagnitude < 4f) return (int)agent.DimensionIndex;
-        }
-        return null;
+        _followedEar = ear;
+        _followedDimension = -1;
+        ForgeCore.Players.Each(FollowCheck);
+        return _followedDimension < 0 ? null : _followedDimension;
     }
+
+    private static Vector3 _followedEar;
+    private static int _followedDimension;
+    private static readonly Action<ForgeCore.PlayerInfo> FollowCheck = static info =>
+    {
+        if (_followedDimension < 0 && (info.Agent.EyePosition - _followedEar).sqrMagnitude < 4f) _followedDimension = (int)info.Agent.DimensionIndex;
+    };
 
     private static double _nextDimension;
     /// <summary>The dimension whose navigation mesh holds <paramref name="position"/>, the listener's first. Points off every
@@ -160,7 +156,7 @@ internal static class GameContext
     {
         if (!InLevel) return Dimension;
         var near = Dimension;
-        if (preferLocalPlayer && PlayerManager.GetLocalPlayerAgent() is { } player && !player.WasCollected) near = (int)player.DimensionIndex;
+        if (preferLocalPlayer && ForgeCore.Players.Local is { } player && !player.WasCollected) near = (int)player.DimensionIndex;
         return ForgeCore.Level.CourseNodeAt(position, 1f, out _, out var d, preferredDimension: near) ? d : near;
     }
     internal static float Volume(AudioCategory category)

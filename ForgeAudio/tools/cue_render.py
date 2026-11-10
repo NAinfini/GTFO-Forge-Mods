@@ -2,11 +2,11 @@
 
 This is the source step: silence and weak lead-in removed, a short declick fade at both ends, linearly loudness-normalised
 (or, for a loop, joined with an equal-power crossfade), mono 48 kHz.  Everything that makes a *cue* out of clips (layers,
-offsets, caps, distance versions, buses) belongs to ForgeAudio's cues.json and is mixed by AudioKit at load; to hear a
+offsets, caps, distance versions, buses) belongs to ForgeAudio's cues.forge and is mixed by AudioKit at load; to hear a
 finished cue exactly as the game plays it, use ``convert_audio.py render`` (ForgeAudio/tools).  The Ogg Vorbis encode
 (``convert_audio.py convert``) is the only step after this one.
 
-Rules (the fields of a sources.json cue, all optional):
+Rules (the fields of a sources.forge cue, all optional):
 
 ``loop``        true for a loop: audible bounds, then an equal-power 0.25 s crossfade join.
 ``leadIn``      true keeps the quiet build-up before the first transient (an incoming shell's whistle); by default the clip

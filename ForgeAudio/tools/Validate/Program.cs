@@ -37,6 +37,10 @@ foreach (var file in catalog.Files)
     catch (Exception e) when (e is InvalidDataException or IOException or UnauthorizedAccessException)
     { broken[file] = "DecodeFailed: " + e.Message; }
 }
+// What the game keeps resident once loaded: the clips of direct cues and every mix (the PCM a mix was made from is freed). A mix that
+// would not fit beside them fails its cue, as in the game.
+var resident = catalog.Cues.Values.Where(cue => cue.IsDirect).SelectMany(cue => cue.Clips).Distinct(StringComparer.OrdinalIgnoreCase)
+    .Where(pcm.ContainsKey).Sum(file => (long)pcm[file].Samples.Length * sizeof(float));
 foreach (var cue in catalog.Cues.Values)
 {
     if (cue.Clips.FirstOrDefault(broken.ContainsKey) is { } file) { problems[cue.Name] = file + ": " + broken[file]; continue; }
@@ -44,7 +48,13 @@ foreach (var cue in catalog.Cues.Values)
     try
     {
         foreach (var profile in CueMix.Profiles(cue))
-            for (var variant = 0; variant < CueMix.Variants(cue); variant++) CueMix.Render(cue, profile, variant, name => pcm[name]);
+            for (var variant = 0; variant < CueMix.Variants(cue) && !problems.ContainsKey(cue.Name); variant++)
+            {
+                var mixed = CueMix.Render(cue, profile, variant, name => pcm[name]);
+                if (mixed == null) continue;
+                if (!CueMix.Fits(resident, mixed, AssetValidation.MaxDecodedBytes)) problems[cue.Name] = "AssetLimit: the mix would exceed the audio cache (512 MiB decoded in total).";
+                else resident += (long)mixed.Samples.Length * sizeof(float);
+            }
     }
     catch (InvalidDataException e) { problems[cue.Name] = "cannot be mixed: " + e.Message; }
 }
@@ -121,8 +131,16 @@ static int Render(string[] args)
         WriteWave(output, mixed, loudness);
         Console.WriteLine(JsonSerializer.Serialize(new
         {
-            audible = true, distance, stretch, stretches = profiles.Length, variants, variant, loudness,
-            seconds = Math.Round(mixed.Seconds, 6), channels = mixed.Channels, sampleRate = mixed.SampleRate,
+            audible = true,
+            distance,
+            stretch,
+            stretches = profiles.Length,
+            variants,
+            variant,
+            loudness,
+            seconds = Math.Round(mixed.Seconds, 6),
+            channels = mixed.Channels,
+            sampleRate = mixed.SampleRate,
         }));
         return 0;
     }

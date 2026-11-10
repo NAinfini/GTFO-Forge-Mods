@@ -120,7 +120,7 @@ internal static class SyncPlays
 
     private static void Send(SyncedPlay message, bool reliable, CueHandle cue)
     {
-        if (_channel == null || SNet.Master == null || SNet.LocalPlayer == null) return;
+        if (_channel == null || ForgeCore.Session.HostLookup == 0 || ForgeCore.Session.LocalLookup == 0) return;
         try { _channel.Broadcast(reliable ? ReliableName : LossyName, message); }
         catch (Exception error)
         {
@@ -134,14 +134,27 @@ internal static class SyncPlays
         if (!AudioKit.Ready) return;
         if (!SyncCodec.TryDecode(message, out var request, out var reason))
         {
+            Net.Drop("audio-play-unreadable");
             AudioLog.Report("everywhere-bad|" + sender, new AudioFailure(AudioError.InvalidOptions, "A play from player " + sender + " was dropped: " + reason + "."));
             return;
         }
-        // A library or cue this player does not have (the mod is missing or still loading here) is an ordinary refusal, not logged.
-        if (!Libraries.TryGetValue(request.Library, out var library) || library.IsDisposed) return;
-        if (!library.CueKeys.TryGetValue(request.Cue, out var cue)) return;
+        // A library or cue this player does not have is reported once per key, naming the sender: the copies of the mod differ.
+        if (!Libraries.TryGetValue(request.Library, out var library) || library.IsDisposed)
+        {
+            AudioLog.Report("everywhere-no-library|" + request.Library, new AudioFailure(AudioError.CueNotFound, "A play from player " + sender
+                + " names a sound library (network id " + request.Library.ToString("x") + ") this player does not have; the two copies of the mod differ."));
+            return;
+        }
+        if (!library.IsLoaded) return; // still loading here: ordinary, not a fault
+        if (!library.CueKeys.TryGetValue(request.Cue, out var cue))
+        {
+            AudioLog.Report("everywhere-no-cue|" + library.Identity + "|" + request.Cue, new AudioFailure(AudioError.CueNotFound, library.Identity + ": a play from player " + sender
+                + " names a cue (network id " + request.Cue.ToString("x") + ") this player's library does not have or could not load; the two copies of the mod differ."));
+            return;
+        }
         if (cue.Definition.Loop || request.Variant >= cue.Variants)
         {
+            Net.Drop("audio-play-mismatch");
             AudioLog.Report("everywhere-shape|" + library.Identity + "|" + cue.Definition.Name, new AudioFailure(AudioError.InvalidOptions, library.Identity + "/"
                 + cue.Definition.Name + ": a play from player " + sender + " does not fit this player's cue (a loop, or variant " + request.Variant
                 + " of " + cue.Variants + "); the two copies of the mod differ."));
@@ -149,8 +162,14 @@ internal static class SyncPlays
         }
         var play = new PlayRequest
         {
-            Gain = request.Gain, CueGain = request.CueGain, Pitch = request.Pitch, StartSeconds = request.StartSeconds, Variant = request.Variant,
-            IsSelf = false, Dimension = request.Dimension, FixedDimension = request.Place == SyncPlace.World,
+            Gain = request.Gain,
+            CueGain = request.CueGain,
+            Pitch = request.Pitch,
+            StartSeconds = request.StartSeconds,
+            Variant = request.Variant,
+            IsSelf = false,
+            Dimension = request.Dimension,
+            FixedDimension = request.Place == SyncPlace.World,
         };
         var world = request.Place == SyncPlace.World;
         Engine.Play(cue, world ? EmitterKind.Positioned : EmitterKind.TwoD, world ? new Vector3(request.X, request.Y, request.Z) : default, null, play);

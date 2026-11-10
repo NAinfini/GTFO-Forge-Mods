@@ -28,15 +28,25 @@ internal readonly record struct SyncRequest(ulong Library, ulong Cue, SyncPlace 
 
 internal static class SyncCodec
 {
-    /// <summary>The highest variant number a message carries (a cue has at most <see cref="CueMix.MaxVariants"/>).</summary>
+    /// <summary>The highest variant number a message carries (a cue has at most <see cref="CueSchema.MaxClips"/>).</summary>
     internal const int MaxVariant = 254;
 
     internal static SyncedPlay Encode(ulong library, ulong cue, SyncPlace place, float x, float y, float z, float gain, float cueGain, float pitch,
         float startSeconds, int dimension, int variant)
         => new()
         {
-            Library = library, Cue = cue, Place = (byte)place, X = x, Y = y, Z = z, Gain = gain, CueGain = cueGain, Pitch = pitch,
-            StartSeconds = startSeconds, Dimension = place == SyncPlace.TwoD ? -1 : dimension, Variant = (byte)Math.Clamp(variant, 0, MaxVariant),
+            Library = library,
+            Cue = cue,
+            Place = (byte)place,
+            X = x,
+            Y = y,
+            Z = z,
+            Gain = gain,
+            CueGain = cueGain,
+            Pitch = pitch,
+            StartSeconds = startSeconds,
+            Dimension = place == SyncPlace.TwoD ? -1 : dimension,
+            Variant = (byte)Math.Clamp(variant, 0, MaxVariant),
         };
 
     /// <summary>Checks a received message: a known place, finite values in the ranges a play accepts (gain 0 to 4, cue volume 0 to 4,

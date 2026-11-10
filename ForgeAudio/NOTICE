@@ -1,0 +1,12 @@
+ForgeAudio - notices and credits
+Copyright (c) 2026 NAinfini. Licensed under the MIT License (see LICENSE), except for the third-party material listed below,
+which keeps its own licence.
+
+This is an unofficial fan-made mod for GTFO. It is not made, endorsed or supported by 10 Chambers Collective.
+GTFO and its game data belong to their owners; no file taken from the game is included in this package.
+Bundled library (NVorbis.dll), MIT:
+- NVorbis 0.10.5, Copyright (c) 2020 Andrew Ward, https://github.com/NVorbis/NVorbis, used unmodified as the Ogg Vorbis decoder.
+  Its licence text is shipped in this package as NVorbis.LICENSE.forge.
+
+Everything else in the zip is written for this project. No sound recording is included; audio comes from the mods that use ForgeAudio.
+The package is compiled against BepInEx, HarmonyX, Il2CppInterop and the game's interop assemblies, which are installed separately and not included here.

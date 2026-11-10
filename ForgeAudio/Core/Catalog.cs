@@ -13,7 +13,7 @@ internal sealed class Catalog
     internal readonly Dictionary<string, CueDefinition> Cues = new(StringComparer.OrdinalIgnoreCase);
     internal readonly Dictionary<string, BusDefinition> Buses = new(StringComparer.OrdinalIgnoreCase);
     internal readonly Dictionary<string, AudioFailure> Failures = new(StringComparer.OrdinalIgnoreCase);
-    /// <summary>A failure of the whole folder (unreadable cues.json); no cue loads.</summary>
+    /// <summary>A failure of the whole folder (unreadable cues.forge); no cue loads.</summary>
     internal AudioFailure? Error;
     /// <summary>Distinct clip files the playable cues use, in a stable order.</summary>
     internal string[] Files => Cues.Values.SelectMany(cue => cue.Clips).Distinct(StringComparer.OrdinalIgnoreCase)
@@ -24,13 +24,13 @@ internal sealed class Catalog
     internal HashSet<string> MixedFiles => new(Cues.Values.Where(cue => !cue.IsDirect).SelectMany(cue => cue.Clips), StringComparer.OrdinalIgnoreCase);
 }
 
-/// <summary>The folder convention. <c>cues.json</c> is <c>{"buses": {...}, "cues": {...}}</c>: buses by name, each mapped to a
+/// <summary>The folder convention. <c>cues.forge</c> is <c>{"buses": {...}, "cues": {...}}</c>: buses by name, each mapped to a
 /// global category, and cues by name, each on one bus. A cue named like a file (<c>name.ogg</c>, a file in a subfolder is
 /// <c>sub/name</c>) plays that file unless it lists its <c>layers</c>; a file used by a layer of another cue is not a cue of its own.
 /// A file no cue names is reported, not played: without a bus it has no category.</summary>
 internal static class CueCatalog
 {
-    internal const string SettingsFile = "cues.json";
+    internal const string SettingsFile = "cues.forge";
     internal const int MaxSettingsBytes = 1024 * 1024;
     private static readonly string[] OtherAudio = { ".wav", ".mp3", ".flac", ".m4a", ".aac", ".opus", ".wma", ".aif", ".aiff" };
     private static readonly string[] CueFields = CueSchema.Names(CueSchema.Cue.All);
@@ -47,7 +47,7 @@ internal static class CueCatalog
     internal static bool IsOgg(string file) => string.Equals(Path.GetExtension(file), ".ogg", StringComparison.OrdinalIgnoreCase);
 
     /// <param name="files">Every file in the folder, relative to it.</param>
-    /// <param name="settings">The text of cues.json, or null when the folder has none (the folder then fails: no cue has a bus).</param>
+    /// <param name="settings">The text of cues.forge, or null when the folder has none (the folder then fails: no cue has a bus).</param>
     internal static Catalog Build(IEnumerable<string> files, string? settings)
     {
         var catalog = new Catalog();
@@ -143,8 +143,10 @@ internal static class CueCatalog
             CheckFields(value, BusFields, "bus");
             var bus = new BusDefinition
             {
-                Name = name, Category = CategoryOf(value, CueSchema.Bus.Category.Name, "category"),
-                Gain = GainOf(value, CueSchema.Bus.Gain, CueSchema.Bus.GainDb, 1), Seats = Integer(value, CueSchema.Bus.Seats, 0),
+                Name = name,
+                Category = CategoryOf(value, CueSchema.Bus.Category.Name, "category"),
+                Gain = GainOf(value, CueSchema.Bus.Gain, CueSchema.Bus.GainDb, 1),
+                Seats = Integer(value, CueSchema.Bus.Seats, 0),
             };
             if (value.TryGetProperty(CueSchema.Bus.Duck.Name, out var duck))
             {
@@ -262,9 +264,12 @@ internal static class CueCatalog
         CheckFields(value, SpaceFields, "space");
         var space = new SpaceDefinition
         {
-            Near = Number(value, CueSchema.Space.Near, 2), Far = Number(value, CueSchema.Space.Far, 30),
-            Blend = Number(value, CueSchema.Space.Blend, 1), Spread = Number(value, CueSchema.Space.Spread, 0),
-            Doppler = Number(value, CueSchema.Space.Doppler, 0), Cull = Flag(value, CueSchema.Space.Cull.Key, true),
+            Near = Number(value, CueSchema.Space.Near, 2),
+            Far = Number(value, CueSchema.Space.Far, 30),
+            Blend = Number(value, CueSchema.Space.Blend, 1),
+            Spread = Number(value, CueSchema.Space.Spread, 0),
+            Doppler = Number(value, CueSchema.Space.Doppler, 0),
+            Cull = Flag(value, CueSchema.Space.Cull.Key, true),
         };
         if (space.Far <= space.Near) throw new FormatException("far must be greater than near.");
         if (value.TryGetProperty(CueSchema.Space.Curve.Key, out var curve))
@@ -272,7 +277,8 @@ internal static class CueCatalog
             if (curve.ValueKind == JsonValueKind.String)
                 space.Curve.Shape = curve.GetString() switch
                 {
-                    "linear" => DistanceCurve.Kind.Linear, "log" => DistanceCurve.Kind.Log,
+                    "linear" => DistanceCurve.Kind.Linear,
+                    "log" => DistanceCurve.Kind.Log,
                     _ => throw new FormatException("curve must be \"linear\", \"log\" or a list of [metres, gain] points."),
                 };
             else if (curve.ValueKind == JsonValueKind.Array && curve.GetArrayLength() is >= 2 and <= 32)
@@ -315,7 +321,10 @@ internal static class CueCatalog
     private static Place PlaceOf(JsonElement e)
         => e.ValueKind == JsonValueKind.String ? e.GetString() switch
         {
-            "auto" => Place.Auto, "2d" => Place.TwoD, "world" => Place.World, "follow" => Place.Follow,
+            "auto" => Place.Auto,
+            "2d" => Place.TwoD,
+            "world" => Place.World,
+            "follow" => Place.Follow,
             _ => throw new FormatException("place must be \"2d\", \"world\", \"follow\" or \"auto\"."),
         } : throw new FormatException("place must be \"2d\", \"world\", \"follow\" or \"auto\".");
     private static float GainOf(JsonElement e, Field linear, Field decibels, float fallback)
@@ -345,7 +354,9 @@ internal static class CueCatalog
     private static bool Flag(JsonElement e, string key, bool fallback)
         => !e.TryGetProperty(key, out var v) ? fallback : v.ValueKind switch
         {
-            JsonValueKind.True => true, JsonValueKind.False => false, _ => throw new FormatException(key + " must be true or false."),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            _ => throw new FormatException(key + " must be true or false."),
         };
     private static int Integer(JsonElement e, Field field, int fallback) => Integer(e, field.Key, field.MinI, field.MaxI, fallback);
     private static int Integer(JsonElement e, Field field, int max, int fallback) => Integer(e, field.Key, field.MinI, max, fallback);

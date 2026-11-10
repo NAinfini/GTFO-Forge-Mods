@@ -17,9 +17,9 @@ internal static class ListenerOutput
     internal static bool Present => Active(_selected);
 
     // Emitter.Gone also catches an object Unity destroyed (its wrapper stays; reading it would throw).
-    private static bool Alive(AudioListener? listener) => !Emitter.Gone(listener);
+    private static bool Alive(AudioListener? listener) => !ForgeCore.NativeObjects.Gone(listener);
     private static bool Active(AudioListener? listener) => Alive(listener) && listener!.isActiveAndEnabled;
-    internal static bool Active(Camera? camera) => !Emitter.Gone(camera) && camera!.isActiveAndEnabled;
+    internal static bool Active(Camera? camera) => !ForgeCore.NativeObjects.Gone(camera) && camera!.isActiveAndEnabled;
 
     internal static void Refresh(Camera? camera, double now, bool levelChanged)
     {

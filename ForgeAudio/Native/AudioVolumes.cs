@@ -5,10 +5,13 @@ using UnityEngine;
 
 namespace ForgeAudio;
 
-/// <summary>One of the kit's volumes: the master or a global category. <see cref="Id"/> is <c>master</c> or the category's cues.json name;
-/// <see cref="English"/> and <see cref="Chinese"/> are its labels for a settings row; <see cref="Get"/> and <see cref="Set"/> read and write
-/// the value, 0 to 1.</summary>
-public sealed record VolumeControl(string Id, string English, string Chinese, Func<float> Get, Action<float> Set);
+/// <summary>One of the kit's volumes: the master or a global category. <see cref="Id"/> is <c>master</c> or the category's cues.forge name;
+/// <see cref="TextKey"/> is the language key of its settings row label (ForgeUI's language files hold the words); <see cref="Get"/> and
+/// <see cref="Set"/> read and write the value, 0 to 1.</summary>
+public sealed record VolumeControl(string Id, Func<float> Get, Action<float> Set)
+{
+    public string TextKey => AudioVolumes.KeyPrefix + Id;
+}
 
 /// <summary>Reads and sets the kit's volumes (the master and one per global category, the same for every mod's sounds). The values live in
 /// the kit's configuration file and take effect the same frame; a change is written to the file half a second after the last one.
@@ -17,20 +20,20 @@ public sealed record VolumeControl(string Id, string English, string Chinese, Fu
 public static class AudioVolumes
 {
     private const float SaveDelay = .5f;
-    private static readonly string[] EnglishNames = { "Interface", "Weapons", "Explosions", "Debris", "Ambience", "Voices", "Vehicles", "Devices", "Music" };
-    private static readonly string[] ChineseNames = { "界面", "武器", "爆炸", "碎片", "环境", "语音", "载具", "设备", "音乐" };
+    /// <summary>The start of every <see cref="VolumeControl.TextKey"/>: the key of a row is this and its <see cref="VolumeControl.Id"/>.</summary>
+    public const string KeyPrefix = "volume.";
     private static float _saveAt = -1f;
 
-    /// <summary>The master first, then the nine categories in cues.json order.</summary>
+    /// <summary>The master first, then the nine categories in cues.forge order.</summary>
     public static IReadOnlyList<VolumeControl> Controls { get; } = BuildControls();
 
-    /// <summary>The heading of the group of <see cref="Controls"/> on a settings page.</summary>
-    public const string HeadingEnglish = "MOD AUDIO", HeadingChinese = "模组声音";
+    /// <summary>The language key of the heading of the group of <see cref="Controls"/> on a settings page.</summary>
+    public const string HeadingKey = "volume.heading";
 
     /// <summary>The master volume of every sound the kit plays, 0 to 1.</summary>
     public static float Master { get => Plugin.MasterVolume?.Value ?? 1f; set => Write(Plugin.MasterVolume, value); }
 
-    /// <summary>The volume of a global category (its cues.json name: ui, weapon, explosion, debris, ambience, voice, vehicle, device, music).</summary>
+    /// <summary>The volume of a global category (its cues.forge name: ui, weapon, explosion, debris, ambience, voice, vehicle, device, music).</summary>
     public static float Get(string category) => Entry(category)?.Value ?? 1f;
 
     /// <summary>Sets the volume of a global category; an unknown name throws.</summary>
@@ -69,11 +72,11 @@ public static class AudioVolumes
     private static VolumeControl[] BuildControls()
     {
         var controls = new VolumeControl[AudioCategories.Count + 1];
-        controls[0] = new VolumeControl("master", "All mod sounds", "全部模组声音", () => Master, value => Master = value);
+        controls[0] = new VolumeControl("master", () => Master, value => Master = value);
         for (var c = 0; c < AudioCategories.Count; c++)
         {
             var name = AudioCategories.Names[c];
-            controls[c + 1] = new VolumeControl(name, EnglishNames[c], ChineseNames[c], () => Get(name), value => Set(name, value));
+            controls[c + 1] = new VolumeControl(name, () => Get(name), value => Set(name, value));
         }
         return controls;
     }

@@ -2,13 +2,13 @@
 
 This file is for mod authors. Players should read `README.md`.
 
-Drop Ogg files and a `cues.json` in a folder next to your DLL, load it with one line, and play by cue name. 2D, positioned and following sounds, volume values, voice limits and wall occlusion are handled for you. Every mod using the kit shares one mix: global categories with one voice limit each, ducking across mods, and one master and per-category volume in the game's own audio settings. The kit also plays a sound for every player in the session and picks a volume and pitch per play from a range.
+Drop Ogg files and a `cues.forge` in a folder next to your DLL, load it with one line, and play by cue name. 2D, positioned and following sounds, volume values, voice limits and wall occlusion are handled for you. Every mod using the kit shares one mix: global categories with one voice limit each, ducking across mods, and one master and per-category volume in the game's own audio settings. The kit also plays a sound for every player in the session and picks a volume and pitch per play from a range.
 
 The kit needs only BepInExPack_GTFO and the game. Within 1.x, public members are only added, never removed or changed. Internal classes, log wording and packaging are not part of the public API.
 
 ## Layering: what this package holds and what it does not
 
-ForgeAudio holds sound mechanisms: playing plain audio files by cue, 3D positioning, mix categories and global limits, occlusion, long-running sounds, plays every player hears, and replacing or muting vanilla sounds (player body sounds, weapon action sounds). It ships no sounds. Your audio files and `cues.json` stay in your mod; load them once and decide when to play and what to replace. A reusable mechanism goes here even before a second mod needs it.
+ForgeAudio holds sound mechanisms: playing plain audio files by cue, 3D positioning, mix categories and global limits, occlusion, long-running sounds, plays every player hears, and replacing or muting vanilla sounds (player body sounds, weapon action sounds). It ships no sounds. Your audio files and `cues.forge` stay in your mod; load them once and decide when to play and what to replace. A reusable mechanism goes here even before a second mod needs it.
 
 ## Folder layout
 
@@ -33,11 +33,11 @@ python Mods/ForgeAudio/tools/package_release.py --artifacts-path artifacts/dotne
 
 When a game profile is configured, the tests also check every installed `audio` folder. Without one those checks report "not run".
 
-`package_release.py` checks the Thunderstore metadata, the BepInEx-only dependency, version equality and the 256 x 256 icon. It writes a deterministic zip with the DLL, NVorbis and its license, `manifest.json`, `README.md`, `DEVELOPERS.md`, `CHANGELOG.md`, `LICENSE` and `icon.png`. It does not publish.
+`package_release.py` (the shared `Mods/Build/package_common.py`) checks the Thunderstore metadata, that the project and manifest versions agree and the 256 x 256 icon. It writes a deterministic zip with the DLL, NVorbis and its license, `manifest.json`, `README.md`, `DEVELOPERS.md`, `CHANGELOG.md`, `LICENSE` and `icon.png`. It does not publish.
 
 ## Quick start
 
-**1. Put your sounds next to your DLL, with `cues.json`.**
+**1. Put your sounds next to your DLL, with `cues.forge`.**
 
 ```
 BepInEx/plugins/MyMod/
@@ -46,7 +46,7 @@ BepInEx/plugins/MyMod/
     click.ogg
     explosion.ogg
     engine.ogg
-    cues.json
+    cues.forge
 ```
 
 ```json
@@ -102,7 +102,7 @@ var engine = Plugin.Sounds.Play("engine", vehicle).Handle;            // 3D, fol
 engine?.Stop(0.5f);                                                   // fade out over half a second
 ```
 
-Add `NAinfini-ForgeAudio-0.1.0` to your Thunderstore `dependencies`. Files decode in the background right after `Load`. Problems (a missing folder, a file that is not Ogg Vorbis, an unknown cue name) are written to the BepInEx log as `author.mymod/cue`.
+Add `NAinfini-ForgeAudio-1.0.0` to your Thunderstore `dependencies`. Files decode in the background right after `Load`. Problems (a missing folder, a file that is not Ogg Vorbis, an unknown cue name) are written to the BepInEx log as `author.mymod/cue`.
 
 ## Joining the shared mix
 
@@ -114,18 +114,18 @@ Add `NAinfini-ForgeAudio-0.1.0` to your Thunderstore `dependencies`. Files decod
 
 ### Volumes
 
-The kit's volumes (the master and one per category) are `AudioVolumes`: `Master`, `Get(category)` / `Set(category, value)` (0 to 1, the cues.json category names), `ResetAll()` (everything to full, saved at once) and `Controls` (the master, then the nine categories: `VolumeControl` with `Id`, `English`, `Chinese`, `Get`, `Set`; `HeadingEnglish` / `HeadingChinese` name the group). A change applies to every mod's sounds the same frame and is saved to `BepInEx/config/NAinfini.ForgeAudio.cfg` (`Volume / Master` and one entry per category) half a second later. A category's volume is the game's master x the slider it follows (Music, Dialogue or SFX) x the kit's master x the category's value.
+The kit's volumes (the master and one per category) are `AudioVolumes`: `Master`, `Get(category)` / `Set(category, value)` (0 to 1, the cues.forge category names), `ResetAll()` (everything to full, saved at once) and `Controls` (the master, then the nine categories: `VolumeControl` with `Id`, `TextKey`, `Get`, `Set`; `HeadingKey` names the group; both are keys of ForgeUI's language files). A change applies to every mod's sounds the same frame and is saved to `BepInEx/config/NAinfini.ForgeAudio.cfg` (`Volume / Master` and one entry per category) half a second later. A category's volume is the game's master x the slider it follows (Music, Dialogue or SFX) x the kit's master x the category's value.
 
 The kit draws no settings page (ForgeAudio does not depend on ForgeUI). A package that uses both libraries lists the volumes in the game's Settings, Audio page once, in its `Load`:
 
 ```csharp
-ForgeUI.SettingsPages.AddAudioSliders("ForgeAudio.volumes", AudioVolumes.HeadingEnglish, AudioVolumes.HeadingChinese,
-    AudioVolumes.Controls.Select(c => new ForgeUI.SettingsSlider(c.Id, c.English, c.Chinese, c.Get, c.Set)).ToList(), AudioVolumes.ResetAll);
+ForgeUI.SettingsPages.AddAudioSliders("ForgeAudio.volumes", AudioVolumes.HeadingKey,
+    AudioVolumes.Controls.Select(c => new ForgeUI.SettingsSlider(c.Id, c.TextKey, c.Get, c.Set)).ToList(), AudioVolumes.ResetAll);
 ```
 
 The same section id is added only once however many packages call it. ForgeEngine, ForgeOrdnance (with Arsenal and Frames) and ForgeWeapon_EnergyLab do. If none of the installed packages does, the volumes stay in the config file.
 
-## `audio/cues.json`
+## `audio/cues.forge`
 
 The file has two sections: `buses` (groups, each mapped to a global category) and `cues`. Every cue plays on a bus.
 
@@ -214,7 +214,7 @@ One limit per category, shared by all mods: ui 8, weapon 16, explosion 10, debri
 
 ### Errors
 
-A misspelled or out-of-range cue setting makes only that cue unavailable, with the reason in the log. An unreadable or missing `cues.json`, an unknown top-level section, a bus without a known category, or a duck naming an unknown category fails the whole folder. A library holds at most 1024 cues and 1 MiB of settings.
+A misspelled or out-of-range cue setting makes only that cue unavailable, with the reason in the log. An unreadable or missing `cues.forge`, an unknown top-level section, a bus without a known category, or a duck naming an unknown category fails the whole folder. A library holds at most 1024 cues and 1 MiB of settings.
 
 ## API
 
@@ -225,10 +225,21 @@ Namespace `ForgeAudio`. Call everything on Unity's main thread.
 | Member | |
 |---|---|
 | `const string PluginId` | `"NAinfini.ForgeAudio"`, for `[BepInDependency]` |
-| `AudioLibrary Load(string identity, string? folder = null)` | Loads the cues `cues.json` lists in `folder` (by default the `audio` folder next to the calling DLL). `identity` is your plugin GUID and unique among libraries. Never throws. A library that cannot load has `Error` set and refuses every play |
+| `AudioLibrary Load(string identity, string? folder = null)` | Loads the cues `cues.forge` lists in `folder` (by default the `audio` folder next to the calling DLL). `identity` is your plugin GUID and unique among libraries. Never throws. A library that cannot load has `Error` set and refuses every play |
+| `AudioLibrary Load(string identity, string cues, IReadOnlyDictionary<string, string> files)` | The same library from a list of files instead of a folder, for a mod whose sounds sit in other folders or packages and should play from where they are (nothing is copied). `cues` is the text of a `cues.forge`; each key of `files` is a clip name as `cues` spells it (`name.ogg`, a cue named like a file plays that file) and each value the absolute path of an Ogg Vorbis file. `Folder` is empty. Never throws; a path that is not absolute or a file that does not read fails that cue with its reason |
 | `int DimensionAt(Vector3 position, bool preferLocalPlayer = false)` | The dimension `Play` would use for a sound at `position`. Ask it for a point other than the sound's own, for example a pod's landing point while the pod is still in the sky, and pass the result as `PlayOptions.Dimension`. With `preferLocalPlayer` the local player's own dimension is asked first and stands in for a point off every mesh, even while the camera is elsewhere (a sound nearly always heard where the player is); with no local player the listener's dimension is used |
 | `bool PostGameEvent(uint eventId, Vector3 position)` | Plays one of the game's own sound events at a world position, through the game's `CellSound` (the game's mix and sliders; not the kit's categories, limits or cues). False, logged, when the ID is 0, the call is off the main thread or the game refuses it. The game's grenade, mine and enemy explosion events (`FRAGGRENADEEXPLODE`, `STICKYMINEEXPLODE`, `EXPLODEREXPLODE`, `ENEMYEXPLODE`) start no voice when posted this way: play an explosion as a cue of your own |
 | `bool PostGameEvent(string eventName, Vector3 position)` | The same, naming the event as `AK.EVENTS` does (case ignored), so your mod needs no reference to the game's Wwise or CellSound assemblies. The ID is looked up once. False, logged, for an unknown name |
+| `bool PostGameEvent(uint eventId, Vector3 position, uint switchGroup, uint switchValue)` | The same with the sound engine's switch `switchGroup` set to `switchValue` on the play's own emitter first: what picks a character's voice line (the game's `AK.SWITCHES.CHARACTER` group), so a line plays as another character than the local player. The emitter is not shared; the oldest of eight is given back when a ninth is needed, all when the level ends |
+| `GameSoundHandle? PlayGameEvent(uint eventId, Vector3 position)` (also `(uint, IReadOnlyList<Vector3>)`, `(uint)` level-wide, `(string name, Vector3)`) | `PostGameEvent` that answers a handle: `Stop()` ends that one play through the sound engine's own playing id (not other plays of the event, not the game's own), `IsPlaying` asks whether it still sounds. Positioned plays go through point emitters ForgeAudio keeps (reused within 1 m, the oldest of 32 recycled, all given back on level end and checkpoint reload). Null, logged, when the ID is 0, off the main thread or the game posted nothing |
+| `GameSoundHandle? PlayGameEvent(uint eventId, GameObject target)` (also `(string name, GameObject)`) | The event posted on `target` so the sound follows it (the target gets an `AkGameObj` if it has none) and ends with it; the handle stops it earlier |
+| `int StopGameEventAtPoints(uint stopEventId)` | Posts a stop event on every point emitter `PlayGameEvent` keeps, for a loop the game stops with its paired stop event (a stop acts on the sound object it is posted to). Answers how many emitters it reached, -1 (logged) on a refusal |
+| `void ClearGameSoundPoints()` | Gives the point emitters back now; the library does it itself on the level and checkpoint events |
+| `void SilenceGame(bool silent)` | Silences or restores every game sound at once, whoever posts it: `CellSettingsApply.ApplyMasterVolume`, the parameter the settings write; the slider is not changed and restoring reads it. Costs nothing while it stays as it is. Main thread. |
+| `bool StopGameEvent(uint eventId)` | Stops every voice of one of the game's sound events, wherever it was posted from. Main thread. False, logged, when the ID is 0 or the game refuses. |
+| `bool TryGameEventId(string eventName, out uint id)` | The ID of a game sound event by its `AK.EVENTS` name (case ignored): the ID `PostGameEvent` posts and the game's own scripts post under. Looked up once and kept. False, logged, for an empty or unknown name |
+| `IDisposable? ObserveGameEvents(Action<uint> observer)` | Tells the observer the ID of every sound event the game's own scripts post through its point emitter (`CellSoundPlayer.Post`, at a position and global), so you can tell whether the game just played an event before you play the same one. Your own `PostGameEvent` posts are not reported. Any number of observers coexist; dispose the returned handle to stop yours (it never affects the others). Runs on the main thread inside the game's post: do not allocate or throw. The hook goes on the game at the first observer; with none, a post costs one empty-array check. Null, logged, off the main thread |
+| `uint ReserveGameEvent(string modId, IReservedEventHandler handler)` | Gives you an event ID of your own to write where the game reads one (a data block field). The game posts it like any of its own and your handler plays instead: `Play(eventId, soundPlayer, position, positioned)`. This replaces one place exactly, unlike matching a game event ID, which many places share. Returns 0 (write nothing, the game's sound stays) when it cannot; the hooks go on at the first reservation. Main thread only. |
 
 ### `AudioLibrary`
 
@@ -238,7 +249,7 @@ Namespace `ForgeAudio`. Call everything on Unity's main thread.
 | `PlayResult Play(string cue, Vector3 position, PlayOptions? options = null)` | 3D at a world position |
 | `PlayResult Play(string cue, Transform follow, PlayOptions? options = null)` | 3D following a transform. If it is destroyed, the sound fades out over 150 ms and ends with `TargetDestroyed` |
 | `PlayResult Play(string cue, GameObject follow, PlayOptions? options = null)` | The same on a game object. A destroyed object is refused as `TargetDestroyed` (logged quietly, an owner that is gone is an ordinary end), so check nothing before calling |
-| `AudioVoice Voice(Transform anchor)` | A sound slot riding on `anchor`: at most one cue plays on it and a new play replaces the old. `Play(cue, gain = 1)` stops and starts (false when refused), `Hold(cue, gain)` keeps a loop going and only changes its level once it plays, `SetGain(gain)`, `Stop(fadeSeconds = 0)`, `Playing`, `IsPlaying(cue)`, `Anchor` |
+| `AudioVoice Voice(Transform anchor)` | A sound slot riding on `anchor`: at most one cue plays on it and a new play replaces the old. `Play(cue, gain = 1)` stops and starts (false when refused), `Hold(cue, gain)` keeps a loop going and only changes its level once it plays, `SetGain(gain)`, `Stop(fadeSeconds = 0)`, `Playing`, `IsPlaying(cue)`, `Anchor`. `Play`, `Hold` and `IsPlaying` also take an `AudioCue` (`library.Cue(name)`), so one slot can play a cue of any library, for a mod that lets another mod's sound stand in for its own |
 | `void Require(params string[] cues)` | Throws `InvalidDataException` naming every cue the library lacks (or the load error); `InvalidOperationException` before loading finished. Call once after `IsLoaded`, before playing, so a missing cue stops the mod at startup |
 | `bool Prewarm()` | Starts the next non-looping cue at zero volume so its first real play has no first-start hitch. Call once per frame; true when every cue was started or there is nothing to start, false while cues remain, the library is loading or no level camera has a listener yet. Other refusals of one cue 600 times in a row end it with one error line. The next level starts over |
 | `AudioSustain Sustain(string cue, GameObject owner, PlayOptions? options = null, Func<bool>? keepWhile = null)` | The same on a game object; an owner that is already destroyed gives a sustain whose `IsActive` is false |
@@ -262,7 +273,7 @@ Optional and read-only after creation. Reuse one instance for repeated plays; `P
 | `StartSeconds` | `0` | Start offset. Loops wrap it |
 | `IsSelf` | `false` | The sound belongs to the local player, so the cue's `place.self` applies instead of `place.other` |
 | `Dimension` | automatic | Game dimension of a world sound |
-| `Emitter` | see right | Groups plays for `maxPerEmitter`. Default: one emitter per followed transform, one for all 2D plays, and each positioned play is its own |
+| `Emitter` | see right | Groups plays for `maxPerEmitter`. Default: one emitter per followed transform, one for all 2D plays, and each positioned play is its own for `maxPerEmitter`; for bus `seats` positioned plays without an `Emitter` share one bucket, so give them an `Emitter` to keep them apart |
 
 ### `PlayResult` and `AudioHandle`
 
@@ -277,6 +288,13 @@ Optional and read-only after creation. Reuse one instance for repeated plays; `P
 | `handle.State` | `Playing`, `Virtualized`, `Fading`, `Ended` |
 | `handle.Ended` | Event, runs once on the main thread with the `EndReason`: `Completed`, `Stopped`, `Stolen`, `TargetDestroyed`, `LevelExit`, `CheckpointReload`, `LibraryDisposed`, `DeviceChanged`, `Failed`, `PluginUnloaded`, `Replaced`, `PushedOut` |
 
+### Supporting types
+
+`AudioError` is the code in every `AudioFailure` and `PlayResult` (new values are only appended; the list is in Errors above). `PlaybackState` is `AudioHandle.State`: playing, ended and the states between. Nothing else is public beyond the types of this API section.
+
+### Observing plays
+
+`AudioLibrary.Find(identity)` returns the loaded library of a mod ID or null. Every valid play (`Engine.Play`, so `Play`, `AudioCue.Play` and `PlayEverywhere`) is reported to ForgeCore `Recording.Sound` with the cue's number (`identity/cue`), place, position, picked variant and pitch, gain and self flag, whether or not this machine can hear it; a loop is reported once it has its handle and carries its own number, and `Recording.SoundEnded` names it when it ends. Without an observer the cost is one field read.
 ### `AudioCue`: a cue found once, and plays every player hears
 
 | Member | |
@@ -358,8 +376,8 @@ sealed class SuitGunSound : IWeaponActionHandler
 
 - **The kit plays local sounds unless asked.** It does not decide when or for whom a sound plays. `Play` plays on this client only: your mod triggers it on every client that should hear it and passes `IsSelf` for the local player's own sounds. `AudioCue.PlayEverywhere` is the one call that sends: a one-shot every player hears, without a network message of your own.
 - **Lifecycle.** Sounds end at level exit and checkpoint reload. Start the loops you still want again afterwards, or use `Sustain`. Saving a checkpoint does not stop sounds. When the output device changes, one-shots end with `DeviceChanged` and loops resume.
-- **Loading.** `Load` returns at once. Decoding runs on worker threads. Playing a cue before its files finish returns `Failed` with `NotReady`. Decoded audio is cached (at most 256 MiB compressed, 512 MiB decoded) and identical files are shared between libraries. Each file is limited to 64 MiB compressed and one hour. Ogg Vorbis only: Opus and chained or multiplexed streams are refused.
-- **Mixing.** A cue with more than one plain layer (or a `maxSeconds` cap) is mixed once after its files decode, so playing it costs one voice. The mixer's rules: the output rate is the first layer's; other rates are resampled; each layer is trimmed, pitched, low-passed, scaled, faded and summed at its offset; the sum is clamped. A random pitch comes from a hash of the cue, variant and layer, so the same variant always sounds the same.
+- **Loading.** `Load` returns at once. Decoding runs on worker threads. Playing a cue before its files finish returns `Failed` with `NotReady`. Decoded audio is cached (at most 256 MiB compressed, 512 MiB decoded; the decoded PCM waiting to be mixed and every mixed clip count, and a mix is held twice while Unity takes its copy, so a mix that would pass the limit is refused and its cue fails with `AssetLimit`) and identical files are shared between libraries. Each file is limited to 64 MiB compressed and one hour. Ogg Vorbis only: Opus and chained or multiplexed streams are refused.
+- **Mixing.** A cue with more than one plain layer (or a `maxSeconds` cap) is mixed once after its files decode (on a worker, one variant of one distance stretch at a time, uploaded one clip per frame; the decoded PCM is freed after the last cue that uses it), so playing it costs one voice. The mixer's rules: the output rate is the first layer's; other rates are resampled; each layer is trimmed, pitched, low-passed, scaled, faded and summed at its offset; the sum is clamped. A random pitch comes from a hash of the cue, variant and layer, so the same variant always sounds the same.
 - **Distance stretches.** The `distance` ranges of the layers split the listener distance into stretches. `Play` picks the stretch from the distance at the start of the play. A stretch where no layer plays returns `DistanceCulled`.
 - **Voices.** There are 64 real voices and 256 logical states. Speech, warnings (`priority` 200 or more) and ambience loops each reserve eight voices. Higher priority steals from lower. Loops that lose their voice keep their place in the loop and resume.
 - **Occlusion.** Walls and closed doors between the camera and the sound lower its volume, down to 0.35. At most four rays are cast per frame, and no voice is tested more often than every 0.2 s. There is no reverb and no low-pass at play time; make a distant version with a layer that has a `distance` range and `lowpassHz`.
@@ -386,4 +404,4 @@ Ship recordings you own or have the right to use, as real Ogg Vorbis. Rights rem
 
 ## Logging
 
-Logging goes through ForgeCore's `ModLog` and only real failures are written: every `AudioLog.Report` failure (except a voice restarted after a device change) goes through one dedup layer, `AudioLog.Report(key, ...)` into `ErrorOnce`, so one key is written once. Periodic reports have fixed keys (`clip-destroyed`, `voice-destroyed`, `one-shot-stalled`, `emitter-non-finite`, `driver-update`). There are no information lines, timing, play counters or a Diagnostics setting.
+Logging goes through ForgeCore's `ModLog` and only real failures are written: every `AudioLog.Report` failure (except a voice restarted after a device change) goes through one dedup layer, `AudioLog.Report(key, ...)` into `ErrorOnce`, so one key is written once. Periodic reports have fixed keys (`clip-destroyed`, `voice-destroyed`, `one-shot-stalled`, `emitter-non-finite`, and `driver-update-<step>` for each of the driver's per-frame steps, which run and fail on their own). There are no information lines, timing, play counters or a Diagnostics setting.

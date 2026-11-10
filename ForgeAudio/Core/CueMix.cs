@@ -25,7 +25,6 @@ internal readonly record struct MixProfile(float Min, float Max, int Mask)
 /// variant and layer.</summary>
 internal static class CueMix
 {
-    internal const int MaxVariants = 16;
     internal const double MaxMixSeconds = 60;
     internal const float CapFadeRatio = .12f, CapFadeMin = .04f, CapFadeMax = .15f;
 
@@ -59,7 +58,7 @@ internal static class CueMix
     }
 
     /// <summary>How many variants the cue has: the clip count of its largest layer pool.</summary>
-    internal static int Variants(CueDefinition cue) => Math.Min(MaxVariants, cue.Layers.Max(layer => layer.Clips.Length));
+    internal static int Variants(CueDefinition cue) => cue.Layers.Max(layer => layer.Clips.Length);
 
     /// <summary>The pitch a layer takes in a variant: fixed, or a reproducible pick inside its range.</summary>
     internal static float LayerPitch(CueDefinition cue, LayerDefinition layer, int variant, int layerIndex)
@@ -87,16 +86,20 @@ internal static class CueMix
         var channels = cue.Clips.Any(file => source(file).Channels > 1) ? 2 : 1;
         var parts = new List<(int Offset, float[] Samples)>();
         var frames = 0L;
+        var cap = cue.MaxSeconds > 0 ? (long)Math.Round(cue.MaxSeconds * rate) : (long)(MaxMixSeconds * rate) + 1;
+        var reachesCap = false;
         for (var l = 0; l < cue.Layers.Length; l++)
         {
             if ((profile.Mask & (1 << l)) == 0) continue;
             var layer = cue.Layers[l];
-            var samples = RenderLayer(cue, layer, l, variant, source(layer.Clips[variant % layer.Clips.Length]), rate, channels);
             var offset = (int)Math.Round(layer.OffsetMs * rate / 1000.0);
+            // A layer is rendered only as far as the mix keeps it: what lies past the cap is never read, so it is never allocated.
+            var samples = RenderLayer(cue, layer, l, variant, source(layer.Clips[variant % layer.Clips.Length]), rate, channels, Math.Max(0L, cap - offset), out var full);
             parts.Add((offset, samples));
-            frames = Math.Max(frames, offset + (long)samples.Length / channels);
+            frames = Math.Max(frames, offset + full);
+            reachesCap |= offset + full > cap;
         }
-        if (cue.MaxSeconds > 0) frames = Math.Min(frames, (long)Math.Round(cue.MaxSeconds * rate));
+        if (cue.MaxSeconds > 0) frames = Math.Min(frames, cap);
         if (frames <= 0 || frames > MaxMixSeconds * rate) throw new InvalidDataException("the mix is empty or longer than " + MaxMixSeconds + " seconds.");
         var mix = new float[frames * channels];
         foreach (var (offset, samples) in parts)
@@ -104,7 +107,7 @@ internal static class CueMix
             var count = (int)Math.Min(samples.Length, (frames - offset) * channels);
             for (var i = 0; i < count; i++) mix[offset * channels + i] += samples[i];
         }
-        var capped = cue.MaxSeconds > 0 && parts.Any(part => part.Offset + (long)part.Samples.Length / channels > frames);
+        var capped = cue.MaxSeconds > 0 && reachesCap;
         if (capped)
         {
             var fade = (int)Math.Min(frames / 2, Math.Round(Math.Clamp(cue.MaxSeconds * CapFadeRatio, CapFadeMin, CapFadeMax) * rate));
@@ -118,14 +121,17 @@ internal static class CueMix
         return new MixedAudio(mix, channels, rate);
     }
 
-    private static float[] RenderLayer(CueDefinition cue, LayerDefinition layer, int index, int variant, DecodedAudio clip, int rate, int channels)
+    /// <summary>The layer's samples for its first <paramref name="room"/> frames at most (its fades still work from its full length, <paramref name="fullLength"/>).</summary>
+    private static float[] RenderLayer(CueDefinition cue, LayerDefinition layer, int index, int variant, DecodedAudio clip, int rate, int channels, long room, out long fullLength)
     {
         var frames = clip.Frames;
         var from = Math.Min(frames, (int)Math.Round(layer.RangeStart * clip.SampleRate));
         var to = layer.RangeEnd < 0 ? frames : Math.Min(frames, (int)Math.Round(layer.RangeEnd * clip.SampleRate));
         if (from >= to) throw new InvalidDataException("layer range is outside the clip (" + (frames / (double)clip.SampleRate).ToString("F3", System.Globalization.CultureInfo.InvariantCulture) + " s long).");
         var step = (double)clip.SampleRate / rate * LayerPitch(cue, layer, variant, index);
-        var length = (int)Math.Floor((to - from - 1) / step) + 1;
+        var total = (long)Math.Floor((to - from - 1) / step) + 1;
+        fullLength = total;
+        var length = (int)Math.Min(total, room);
         var output = new float[length * channels];
         for (var i = 0; i < length; i++)
         {
@@ -153,13 +159,13 @@ internal static class CueMix
                 }
             }
         }
-        var fadeIn = Math.Min(length, (int)Math.Round(layer.FadeInMs * rate / 1000.0));
-        var fadeOut = Math.Min(length, (int)Math.Round(layer.FadeOutMs * rate / 1000.0));
+        var fadeIn = (int)Math.Min(total, (long)Math.Round(layer.FadeInMs * rate / 1000.0));
+        var fadeOut = (int)Math.Min(total, (long)Math.Round(layer.FadeOutMs * rate / 1000.0));
         for (var i = 0; i < length; i++)
         {
             var gain = layer.Gain;
             if (i < fadeIn) gain *= i / (float)Math.Max(1, fadeIn);
-            var tail = length - 1 - i;
+            var tail = total - 1 - i;
             if (tail < fadeOut) gain *= tail / (float)Math.Max(1, fadeOut);
             if (gain == 1) continue;
             for (var c = 0; c < channels; c++) output[i * channels + c] *= gain;
@@ -167,6 +173,9 @@ internal static class CueMix
         return output;
     }
 
+    /// <summary>True when keeping this mix still fits the decoded-audio budget: <paramref name="used"/> already counts the decoded PCM
+    /// waiting to be mixed and every clip made so far; the mix is held twice while Unity takes its copy.</summary>
+    internal static bool Fits(long used, MixedAudio mix, long limit) => used + 2L * mix.Samples.Length * sizeof(float) <= limit;
     /// <summary>The loudness of a cue heard at <paramref name="distance"/>: cue gain, its bus gain and the distance curve.</summary>
     internal static float Loudness(CueDefinition cue, float busGain, float distance) => cue.Gain * busGain * cue.Space.Attenuation(distance);
 }

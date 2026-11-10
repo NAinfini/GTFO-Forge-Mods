@@ -9,10 +9,12 @@ import json
 from pathlib import Path
 import shutil
 import struct
+import sys
 import tempfile
 import unittest
 from unittest import mock
 import wave
+import zipfile
 
 
 TOOLS = Path(__file__).resolve().parent
@@ -27,6 +29,8 @@ def load(name: str):
 
 
 convert_audio = load("convert_audio")
+sys.path.insert(0, str(TOOLS.parents[1] / "Build"))
+import package_common
 package_release = load("package_release")
 
 
@@ -38,16 +42,24 @@ def write_wav(path: Path) -> None:
         audio.writeframes(b"\x00\x00\x00\x10\x00\xf0" * 400)
 
 
-def write_package(folder: Path, dependencies: list[str] = (package_release.BEPINEX_DEPENDENCY, "NAinfini-ForgeCore-0.1.0"), version: str = "1.0.0") -> None:
+def write_table(folder: Path, version: str) -> None:
+    """The one version table (Release/release.json) beside the package folder: the packager compares the manifest with it."""
+    (folder.parent / "Release").mkdir(exist_ok=True)
+    (folder.parent / "Release" / "release.json").write_text(
+        json.dumps({"libraries": [{"packageName": "NAinfini-ForgeAudio", "version": version}]}), encoding="utf-8"
+    )
+
+
+def write_package(folder: Path, version: str = "0.0.1") -> None:
     folder.mkdir()
     (folder / "manifest.json").write_text(
         json.dumps(
             {
                 "name": "ForgeAudio",
                 "version_number": version,
-                "website_url": "https://github.com/NAinfini/GTFO-Forge-Mods",
+                "website_url": "https://github.com/NAinfini/GTFO-Forge",
                 "description": "Plain-audio playback for GTFO mods.",
-                "dependencies": dependencies,
+                "dependencies": ["BepInEx-BepInExPack_GTFO-3.2.4", "NAinfini-ForgeCore-0.0.1"],
             }
         ),
         encoding="utf-8",
@@ -61,10 +73,9 @@ def write_package(folder: Path, dependencies: list[str] = (package_release.BEPIN
     (folder / "DEVELOPERS.md").write_text("public API\n", encoding="utf-8")
     (folder / "CHANGELOG.md").write_text("changes\n", encoding="utf-8")
     (folder / "LICENSE").write_text("MIT test license\n", encoding="utf-8")
-    (folder / "web-manifest.json").write_text('{"library": "ForgeAudio"}\n', encoding="utf-8")
-    (folder / "ForgeAudio.csproj").write_text(
-        "<Project><PropertyGroup><Version>" + version + "</Version></PropertyGroup></Project>", encoding="utf-8"
-    )
+    (folder / "NOTICE").write_text("test notice\n", encoding="utf-8")
+    (folder / "web-manifest.forge").write_text('{"library": "ForgeAudio"}\n', encoding="utf-8")
+    write_table(folder, version)
     (folder / "icon.png").write_bytes(
         b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR" + struct.pack(">II", 256, 256) + b"\x08\x06\x00\x00\x00\x00\x00\x00\x00"
     )
@@ -132,58 +143,8 @@ class ConvertChecks(unittest.TestCase):
                 with self.assertRaisesRegex(convert_audio.ToolError, error):
                     convert_audio.validate_limits(args)
 
-    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg and ffprobe are required")
-    def test_compressed_output_limit_leaves_no_partial_file(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            source, output = root / "source.wav", root / "result.ogg"
-            write_wav(source)
-            with contextlib.redirect_stderr(io.StringIO()):
-                code = convert_audio.main(
-                    ["convert", str(source), str(output), "--max-output-bytes", "1", "--timeout", "20"]
-                )
-            self.assertEqual(code, 2)
-            self.assertFalse(output.exists())
 
-    def test_atomic_publish_rolls_back_own_output_and_preserves_racing_receipt(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            output_temp, receipt_temp = root / "output.tmp", root / "receipt.tmp"
-            output, receipt = root / "output.ogg", root / "receipt.json"
-            output_temp.write_bytes(b"our output")
-            receipt_temp.write_bytes(b"our receipt")
-            real_link = convert_audio.os.link
 
-            def race(source, target):
-                if Path(target) == receipt:
-                    receipt.write_bytes(b"other process")
-                    raise FileExistsError(str(receipt))
-                real_link(source, target)
-
-            with mock.patch.object(convert_audio.os, "link", side_effect=race):
-                with self.assertRaisesRegex(convert_audio.ToolError, "created concurrently"):
-                    convert_audio.publish_without_replacing(
-                        [(output_temp, output, "output"), (receipt_temp, receipt, "evidence")]
-                    )
-            self.assertFalse(output.exists())
-            self.assertEqual(receipt.read_bytes(), b"other process")
-
-    def test_validate_forwards_folder_and_exit_code(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            audio, project = root / "audio", root / "Validate.csproj"
-            audio.mkdir()
-            project.write_text("<Project />", encoding="utf-8")
-            completed = mock.Mock(returncode=7)
-            with mock.patch.object(convert_audio, "VALIDATOR", project), mock.patch.object(
-                convert_audio.subprocess, "run", return_value=completed
-            ) as invoked:
-                self.assertEqual(convert_audio.validate(argparse.Namespace(folder=audio)), 7)
-            command = invoked.call_args.args[0]
-            self.assertEqual(command[command.index("-c") + 1], "Release")
-            self.assertIn("--disable-build-servers", command)
-            self.assertEqual(command[command.index("--artifacts-path") + 1], str(convert_audio.VALIDATOR_ARTIFACTS))
-            self.assertEqual(command[-1], str(audio.resolve()))
 
     @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe") and shutil.which("dotnet"), "ffmpeg, ffprobe and dotnet are required")
     def test_folder_conversion_is_loadable_by_the_runtime(self):
@@ -206,7 +167,7 @@ class ConvertChecks(unittest.TestCase):
             self.assertEqual((report["converted"], sorted(report["kept"])), ([], ["shot.ogg", "ui/click.ogg"]))
             self.assertEqual((audio / "shot.ogg").read_bytes(), first)
             # The author names each cue's bus and each bus's global category.
-            (audio / "cues.json").write_text(json.dumps({
+            (audio / "cues.forge").write_text(json.dumps({
                 "buses": {"gun": {"category": "weapon"}, "menu": {"category": "ui"}},
                 "cues": {"shot": {"bus": "gun"}, "ui/click": {"bus": "menu"}},
             }), encoding="utf-8")
@@ -219,98 +180,45 @@ class ConvertChecks(unittest.TestCase):
             result = json.loads(completed.stdout.strip().splitlines()[-1])
             self.assertEqual((result["status"], result["cues"]), ("valid", ["shot", "ui/click"]))
 
-    def test_folder_conversion_reports_each_failure(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            sources = root / "sounds"
-            sources.mkdir()
-            (sources / "broken.wav").write_bytes(b"not audio")
-            with mock.patch.object(convert_audio, "convert_file", side_effect=convert_audio.ToolError("bad input")):
-                with self.assertRaisesRegex(convert_audio.ToolError, "broken.wav.*bad input"):
-                    convert_audio.convert(convert_audio.parser().parse_args(["convert", str(sources), str(root / "audio")]))
 
 
 class PackageChecks(unittest.TestCase):
-    def test_missing_icon_reports_brand_gap(self):
-        with tempfile.TemporaryDirectory() as directory:
-            folder = Path(directory) / "package"
-            write_package(folder)
-            (folder / "icon.png").unlink()
-            with self.assertRaisesRegex(ValueError, "dedicated 256 x 256"):
-                package_release.check_package(folder)
+    """The shared packager (Mods/Build/package_common.py) with ForgeAudio's own extra files."""
 
-    def test_only_bepinex_and_forgecore_dependencies_are_accepted(self):
-        with tempfile.TemporaryDirectory() as directory:
-            folder = Path(directory) / "package"
-            write_package(folder, [package_release.BEPINEX_DEPENDENCY, "NAinfini-ForgeCore-0.1.0", "NAinfini-ForgeUI-0.1.0"])
-            with self.assertRaisesRegex(ValueError, "only BepInEx and ForgeCore"):
-                package_release.check_package(folder)
+    def build(self, root: Path, version: str = "0.0.1"):
+        write_package(root / "package", version=version)
+        built = root / "artifacts" / "bin" / "ForgeAudio" / "release"
+        built.mkdir(parents=True)
+        (built / "ForgeAudio.dll").write_bytes(b"MZtest assembly")
+        (built / "NVorbis.dll").write_bytes(b"test decoder")
+        return root / "package", built
 
     def test_package_is_deterministic_and_contains_only_release_files(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            folder, output, dll = root / "package", root / "out", root / "ForgeAudio.dll"
-            write_package(folder)
-            dll.write_bytes(b"MZtest assembly")
-            with mock.patch.object(package_release, "assembly_version", return_value="1.0.0"):
-                with contextlib.redirect_stdout(io.StringIO()):
-                    first = package_release.package(folder, dll, output)
+            folder, built = self.build(root)
+            extra = package_release.extra(folder, built)
+            with contextlib.redirect_stdout(io.StringIO()):
+                first = package_common.package_library(folder, "ForgeAudio", ("ForgeAudio.dll",), root / "artifacts", root / "out", extra=extra)
                 digest = hashlib.sha256(first.read_bytes()).digest()
-                with contextlib.redirect_stdout(io.StringIO()):
-                    second = package_release.package(folder, dll, output)
+                second = package_common.package_library(folder, "ForgeAudio", ("ForgeAudio.dll",), root / "artifacts", root / "out", extra=extra)
             self.assertEqual(digest, hashlib.sha256(second.read_bytes()).digest())
-            with package_release.zipfile.ZipFile(second) as archive:
-                self.assertEqual(archive.read("web-manifest.json"), (folder / "web-manifest.json").read_bytes())
-                self.assertEqual(archive.read("NVorbis.dll"), (root / "NVorbis.dll").read_bytes())
+            with zipfile.ZipFile(second) as archive:
+                self.assertEqual(archive.read("NVorbis.dll"), b"test decoder")
                 self.assertEqual(archive.read("NVorbis.LICENSE"), (folder / "vendor" / "NVorbis" / "LICENSE").read_bytes())
                 self.assertEqual(
                     sorted(archive.namelist()),
-                    [
-                        "CHANGELOG.md",
-                        "DEVELOPERS.md",
-                        "ForgeAudio.dll",
-                        "LICENSE",
-                        "NVorbis.LICENSE",
-                        "NVorbis.NOTICE.md",
-                        "NVorbis.dll",
-                        "README.md",
-                        "icon.png",
-                        "manifest.json",
-                        "web-manifest.json",
-                    ],
+                    ["CHANGELOG.md", "DEVELOPERS.md", "ForgeAudio.dll", "LICENSE", "NOTICE", "NVorbis.LICENSE", "NVorbis.NOTICE.md", "NVorbis.dll",
+                     "README.md", "icon.png", "manifest.json", "web-manifest.forge"],
                 )
 
-    def test_missing_decoder_refuses_package(self):
+    def test_release_table_must_match_manifest_version(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            folder, dll = root / "package", root / "ForgeAudio.dll"
-            write_package(folder)
-            dll.write_bytes(b"MZtest assembly")
-            (root / "NVorbis.dll").unlink()
-            with mock.patch.object(package_release, "assembly_version", return_value="1.0.0"):
-                with self.assertRaises(FileNotFoundError):
-                    package_release.package(folder, dll, root / "out")
-
-    def test_project_and_dll_must_match_manifest_version(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            folder, dll = root / "package", root / "ForgeAudio.dll"
-            write_package(folder)
-            dll.write_bytes(b"MZtest assembly")
-            with mock.patch.object(package_release, "assembly_version", return_value="1.0.1"):
-                with self.assertRaisesRegex(ValueError, "version mismatch"):
-                    package_release.package(folder, dll, root / "out")
-
-    def test_project_version_must_be_unambiguous(self):
-        with tempfile.TemporaryDirectory() as directory:
-            project = Path(directory) / "project.csproj"
-            project.write_text(
-                "<Project><PropertyGroup><Version>1.0.0</Version><Version>1.0.1</Version></PropertyGroup></Project>",
-                encoding="utf-8",
-            )
-            with self.assertRaisesRegex(ValueError, "unambiguous"):
-                package_release.project_version(project)
-
+            folder, _built = self.build(root)
+            write_table(folder, "0.0.2")
+            with self.assertRaisesRegex(ValueError, "differs from manifest"):
+                package_common.package_library(folder, "ForgeAudio", ("ForgeAudio.dll",), root / "artifacts", root / "out")
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

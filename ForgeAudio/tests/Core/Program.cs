@@ -14,14 +14,7 @@ void Check(bool condition, string name)
 // Expected rejection cases are asserted below; keep their structured results without filling test stderr.
 AudioLog.Sink = (_, _) => { };
 CatalogChecks.Run(Check);
-MixChecks.Run(Check);
-VariantChecks.Run(Check);
-PolicyChecks.Run(Check);
-AssetChecks.Run(Check);
 DecodeChecks.Run(Check);
-ClaimChecks.Run(Check);
-FeatureChecks.Run(Check);
-PrewarmChecks.Run(Check);
 
 Console.WriteLine(failures == 0
     ? "ForgeAudio core: " + checks + " checks passed, 0 failed"

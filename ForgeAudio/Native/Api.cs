@@ -27,8 +27,11 @@ public sealed class PlayOptions
     /// or the local player's dimension for points off the mesh (in the air).</summary>
     public int? Dimension { get; init; }
     /// <summary>Groups plays for the cue's <c>maxPerEmitter</c> limit (compared with Equals). By default a followed
-    /// transform is one emitter, all 2D plays are one emitter, and each positioned play is its own emitter.</summary>
+    /// transform is one emitter, all 2D plays are one emitter, and each positioned play is its own emitter for <c>maxPerEmitter</c>;
+    /// for a bus's <c>seats</c> the positioned plays without an emitter share one bucket (give them an emitter to separate them).</summary>
     public object? Emitter { get; init; }
+    /// <summary>A silent start-up play of <see cref="AudioLibrary.Prewarm"/> (see <see cref="PlayRequest.Prewarm"/>).</summary>
+    internal bool Prewarm { get; init; }
 
     private static readonly System.Collections.Generic.Dictionary<float, PlayOptions> Gains = new();
 
@@ -78,6 +81,7 @@ public sealed class AudioHandle
     }
     internal void DispatchEnded()
     {
+        if (ForgeCore.Recording.Watched) ForgeCore.Recording.SoundEnded(Generation);
         var callbacks = Ended; Ended = null;
         if (callbacks == null) return;
         foreach (Action<EndReason> callback in callbacks.GetInvocationList())
@@ -90,11 +94,12 @@ public sealed partial class AudioLibrary : IDisposable
 {
     /// <summary>The mod's ID: log lines name its cues <c>Identity/cue</c>.</summary>
     public string Identity { get; }
+    /// <summary>The folder the library was loaded from; empty for a library loaded from a list of files (<see cref="AudioKit.Load(string, string, System.Collections.Generic.IReadOnlyDictionary{string, string})"/>).</summary>
     public string Folder { get; }
     /// <summary>True once every file has been decoded (or has failed with a logged reason).</summary>
     public bool IsLoaded { get; internal set; }
     public bool IsDisposed { get; private set; }
-    /// <summary>Set when the whole library cannot load (missing folder, invalid cues.json, duplicate identity).</summary>
+    /// <summary>Set when the whole library cannot load (missing folder, invalid cues.forge, duplicate identity).</summary>
     public AudioFailure? Error { get; internal set; }
 
     internal Catalog Catalog = new();
@@ -103,12 +108,19 @@ public sealed partial class AudioLibrary : IDisposable
     /// <summary>The library's and its cues' network names (<see cref="SyncKey"/>), for plays every player hears.</summary>
     internal readonly ulong Key;
     internal readonly System.Collections.Generic.Dictionary<ulong, CueHandle> CueKeys = new();
+    /// <summary>The absolute path of each clip of a library loaded from a list of files (null for a folder library).</summary>
+    internal System.Collections.Generic.Dictionary<string, string>? Files;
     internal AudioLibrary(string identity, string folder) { Identity = identity; Folder = folder; Key = SyncKey.Of(identity); }
+    /// <summary>Where the clip <paramref name="file"/> (a name <see cref="Catalog"/> lists) is read from.</summary>
+    internal string PathOf(string file) => Files != null ? Files[file] : Path.Combine(Folder, file);
 
     /// <summary>A reference to <paramref name="cue"/> that finds the cue once and then plays it without looking its name up again, and
     /// plays it for every player (<see cref="AudioCue.PlayEverywhere(Vector3, PlayOptions?, bool)"/>). Make it once (for example in your
     /// plugin's <c>Load</c>, before the library finished loading) and keep it.</summary>
     public AudioCue Cue(string cue) => new(this, cue ?? throw new ArgumentNullException(nameof(cue)));
+
+    /// <summary>The loaded library of <paramref name="identity"/> (case ignored), or null: a replay plays a recorded sound through the library that made it.</summary>
+    public static AudioLibrary? Find(string identity) => ForgeAudio.Assets.Find(identity);
 
     /// <summary>True when <paramref name="cue"/> loaded and can play.</summary>
     public bool Has(string cue) => cue != null && Cues.ContainsKey(cue);
@@ -177,7 +189,7 @@ public static partial class AudioKit
     internal static bool Ready;
     internal static bool OnMainThread => Ready && Environment.CurrentManagedThreadId == MainThread;
 
-    /// <summary>Loads the cues <c>cues.json</c> lists in <paramref name="folder"/> (default: the <c>audio</c> folder next to the
+    /// <summary>Loads the cues <c>cues.forge</c> lists in <paramref name="folder"/> (default: the <c>audio</c> folder next to the
     /// calling plugin's DLL): each cue on one of the folder's buses, each bus mapped to a global category. Call once on the main
     /// thread, usually in your plugin's <c>Load</c>. Returns at once; files decode in the background and plays before that are
     /// refused with NotReady. Problems are logged and reported per cue; this never throws.</summary>
@@ -191,8 +203,17 @@ public static partial class AudioKit
             var location = System.Reflection.Assembly.GetCallingAssembly().Location;
             folder = string.IsNullOrEmpty(location) ? "" : Path.Combine(Path.GetDirectoryName(location)!, FolderName);
         }
-        return Assets.Load(identity, folder);
+        return Assets.Load(identity, folder, null, null);
     }
+
+    /// <summary>Loads the cues of <paramref name="cues"/> (the text of a <c>cues.forge</c>) from the listed files, wherever they are: a
+    /// mod whose sounds sit in several folders, or inside other packages, plays them from there without copying them. Each key of
+    /// <paramref name="files"/> is a clip name as <c>cues</c> spells it (<c>name.ogg</c>, a cue named like a file plays that file) and each
+    /// value the absolute path of an Ogg Vorbis file. Everything else is <see cref="Load(string, string?)"/>: call once on the main thread,
+    /// returns at once, files decode in the background, problems are logged and reported per cue, this never throws.</summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static AudioLibrary Load(string identity, string cues, System.Collections.Generic.IReadOnlyDictionary<string, string> files)
+        => Assets.Load(identity, "", files ?? throw new ArgumentNullException(nameof(files)), cues ?? throw new ArgumentNullException(nameof(cues)));
 
     internal static bool ValidIdentity(string? identity) => identity != null && identity.Length <= 100 && Regex.IsMatch(identity, "^[A-Za-z0-9][A-Za-z0-9_.-]*$");
 }
@@ -230,7 +251,7 @@ public sealed class BodySoundClaim : IDisposable
     public void Refresh()
     {
         if (!Active) return;
-        if (Root == null || Root.WasCollected) { Dispose(); return; }
+        if (ForgeCore.NativeObjects.Gone(Root)) { Dispose(); return; }
         BodySounds.Book.Reset(Entry!, BodySounds.Collect(Root));
     }
 

@@ -22,11 +22,11 @@ Report bugs on [GitHub](https://github.com/NAinfini/GTFO-Forge-Mods/issues), or 
 
 ## Settings
 
-When a mod that also uses ForgeUI is installed (Forge Engine, Forge Ordnance and Forge Weapon Energy Lab do), the game's **Settings → Audio** page has, under the game's own sliders, a **MOD AUDIO** group: one slider for all mod sounds and one for each category (ForgeUI draws the rows; ForgeAudio keeps the values). They apply to every mod's sounds on top of the game's own sliders, take effect at once and are saved in `BepInEx/config/NAinfini.ForgeAudio.cfg` (**Volume / Master** and one entry per category, 0 to 1, default 1). The page's Reset puts them back to full.
+When a mod that also uses ForgeUI is installed (Forge Ordnance and Forge Weapon Energy Lab do), the game's **Settings → Audio** page has, under the game's own sliders, a **MOD AUDIO** group: one slider for all mod sounds and one for each category (ForgeUI draws the rows; ForgeAudio keeps the values). They apply to every mod's sounds on top of the game's own sliders, take effect at once and are saved in `BepInEx/config/NAinfini.ForgeAudio.cfg` (**Volume / Master** and one entry per category, 0 to 1, default 1). The page's Reset puts them back to full.
 
 | Category | Covers |
 |---|---|
-| `ui` | Menus, prompts, alarms |
+| `ui` | Menus, prompts, confirmations and warnings |
 | `weapon` | Gunfire, reloads |
 | `explosion` | Blasts, impacts |
 | `debris` | Shrapnel, rubble |

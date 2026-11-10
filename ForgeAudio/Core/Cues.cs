@@ -12,7 +12,7 @@ internal enum AudioCategory { Ui, Weapon, Explosion, Debris, Ambience, Voice, Ve
 internal static class AudioCategories
 {
     internal const int Count = 9;
-    /// <summary>The names cues.json and the config use, in enum order.</summary>
+    /// <summary>The names cues.forge and the config use, in enum order.</summary>
     internal static readonly string[] Names = { "ui", "weapon", "explosion", "debris", "ambience", "voice", "vehicle", "device", "music" };
     /// <summary>How many sounds of the category may play at once across every mod (virtual loops included; fading sounds not).</summary>
     internal static readonly int[] Limits = { 8, 16, 10, 12, 8, 4, 48, 10, 2 };
@@ -72,10 +72,10 @@ internal sealed class DistanceCurve
         switch (Shape)
         {
             case Kind.Log:
-            {
-                var floor = near / far;
-                return Math.Clamp((near / distance - floor) / (1 - floor), 0, 1);
-            }
+                {
+                    var floor = near / far;
+                    return Math.Clamp((near / distance - floor) / (1 - floor), 0, 1);
+                }
             case Kind.Points: return PointGain(distance);
             default: return distance >= far ? 0 : 1 - (distance - near) / (far - near);
         }

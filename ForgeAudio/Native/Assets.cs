@@ -41,12 +41,17 @@ internal sealed class CueHandle
     {
         Library = library; Definition = definition; Bus = bus; Profiles = profiles; Clips = clips;
         Variants = clips.First(stretch => stretch != null)!.Length;
+        Seen = ForgeCore.RecordingNames.Of(library.Identity + "/" + definition.Name);
     }
+
+    /// <summary>The number of <c>identity/cue</c> for reports to <see cref="ForgeCore.Recording"/>.</summary>
+    internal readonly int Seen;
 }
 
 /// <summary>Loading runs one file at a time: a worker reads, checks and hashes it; a second worker decodes it unless an
 /// identical file is already cached; the main thread creates the Unity clip. Workers touch managed data only and hand
-/// results over through their Task, which the main thread polls.</summary>
+/// results over through their Task, which the main thread polls. Layered cues are then mixed on a worker one (stretch,
+/// variant) at a time and uploaded one per frame; decoded PCM, mix output and the upload copy all count against the decoded budget.</summary>
 internal static class Assets
 {
     private sealed class Prepared
@@ -63,10 +68,16 @@ internal static class Assets
         internal readonly CancellationTokenSource Cancel = new();
         internal readonly Dictionary<string, ClipLease> Clips = new(StringComparer.OrdinalIgnoreCase);
         internal readonly Dictionary<string, AudioFailure> Failed = new(StringComparer.OrdinalIgnoreCase);
-        internal readonly Dictionary<string, DecodedAudio> Pcm = new(StringComparer.OrdinalIgnoreCase);
+        internal Dictionary<string, DecodedAudio> Pcm = new(StringComparer.OrdinalIgnoreCase);
+        internal readonly Dictionary<string, int> PcmUsers = new(StringComparer.OrdinalIgnoreCase);
         internal readonly Dictionary<string, (MixProfile[] Profiles, ClipLease[]?[] Clips)> Mixed = new(StringComparer.OrdinalIgnoreCase);
         internal readonly HashSet<string> DirectFiles, MixedFiles;
         internal Queue<CueDefinition>? Todo;
+        internal CueDefinition? MixCue;
+        internal MixProfile[] MixProfiles = Array.Empty<MixProfile>();
+        internal ClipLease[]?[] MixClips = Array.Empty<ClipLease[]?>();
+        internal int MixProfile, MixVariant, MixVariants;
+        internal Task<MixedAudio?>? Mixing;
         internal int Index;
         internal Task<Prepared>? Preparing;
         internal Prepared? Ready;
@@ -78,21 +89,33 @@ internal static class Assets
     private static readonly Queue<Loading> Pending = new();
     private static readonly Dictionary<string, ClipLease> Cache = new(StringComparer.Ordinal);
     private static readonly List<AudioLibrary> Libraries = new();
+    private static readonly Dictionary<string, AudioLibrary> ByIdentity = new(StringComparer.OrdinalIgnoreCase);
     private static Loading? _active;
     internal static long CompressedBytes, DecodedBytes;
     /// <summary>The libraries loaded (or loading), in load order.</summary>
     internal static IReadOnlyList<AudioLibrary> Loaded => Libraries;
 
-    internal static AudioLibrary Load(string identity, string folder)
+    /// <summary>The loaded library of <paramref name="identity"/> (case ignored), or null.</summary>
+    internal static AudioLibrary? Find(string identity) => ByIdentity.TryGetValue(identity, out var library) ? library : null;
+
+    /// <summary>Loads a folder (<paramref name="files"/> and <paramref name="cues"/> null) or, when a file list is given, the cues of
+    /// <paramref name="cues"/> from exactly those files.</summary>
+    internal static AudioLibrary Load(string identity, string folder, IReadOnlyDictionary<string, string>? files, string? cues)
     {
         var library = new AudioLibrary(identity ?? "", folder);
+        if (files != null) library.Files = new Dictionary<string, string>(files, StringComparer.OrdinalIgnoreCase);
         AudioFailure? error = null;
         if (!AudioKit.Ready) error = new AudioFailure(AudioError.NotReady, "ForgeAudio is not loaded; add [BepInDependency(AudioKit.PluginId)] to your plugin.");
         else if (!AudioKit.OnMainThread) error = new AudioFailure(AudioError.WrongThread, "AudioKit.Load must run on the Unity main thread (your plugin's Load).");
         else if (ClipUpload.Failure is { } upload) error = upload;
         else if (!AudioKit.ValidIdentity(identity)) error = new AudioFailure(AudioError.InvalidIdentity, "identity '" + identity + "' must be letters, digits, '.', '_' or '-' (at most 100).");
-        else if (Libraries.Any(other => string.Equals(other.Identity, identity, StringComparison.OrdinalIgnoreCase)))
+        else if (ByIdentity.ContainsKey(library.Identity))
             error = new AudioFailure(AudioError.DuplicateLibrary, "a library named '" + identity + "' is already loaded.");
+        else if (library.Files != null)
+        {
+            var relative = library.Files.FirstOrDefault(row => !Path.IsPathFullyQualified(row.Value));
+            if (relative.Key != null) error = new AudioFailure(AudioError.PathOutsideRoot, "clip '" + relative.Key + "' is not an absolute path.");
+        }
         else if (string.IsNullOrEmpty(folder) || !Path.IsPathFullyQualified(folder))
             error = new AudioFailure(AudioError.PathOutsideRoot, "audio folder '" + folder + "' is not an absolute path; pass the folder to AudioKit.Load.");
         else if (!Directory.Exists(folder)) error = new AudioFailure(AudioError.InvalidSource, "audio folder not found: " + folder);
@@ -100,10 +123,14 @@ internal static class Assets
         {
             try
             {
-                var root = Path.GetFullPath(folder);
-                var files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Select(file => Path.GetRelativePath(root, file)).ToArray();
-                var settings = Path.Combine(root, CueCatalog.SettingsFile);
-                library.Catalog = CueCatalog.Build(files, File.Exists(settings) ? File.ReadAllText(settings) : null);
+                if (library.Files != null) library.Catalog = CueCatalog.Build(library.Files.Keys, cues);
+                else
+                {
+                    var root = Path.GetFullPath(folder);
+                    var names = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Select(file => Path.GetRelativePath(root, file)).ToArray();
+                    var settings = Path.Combine(root, CueCatalog.SettingsFile);
+                    library.Catalog = CueCatalog.Build(names, File.Exists(settings) ? File.ReadAllText(settings) : null);
+                }
                 error = library.Catalog.Error;
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -117,7 +144,7 @@ internal static class Assets
             return library;
         }
         foreach (var unavailable in library.Catalog.Failures) AudioLog.Report(unavailable.Value.Code, identity + ": " + unavailable.Value.Detail);
-        Libraries.Add(library);
+        Libraries.Add(library); ByIdentity[library.Identity] = library;
         SyncPlays.Register(library);
         var loading = new Loading(library, library.Catalog.Files);
         Pending.Enqueue(loading);
@@ -137,7 +164,7 @@ internal static class Assets
             var needPcm = r.MixedFiles.Contains(file); var needClip = r.DirectFiles.Contains(file);
             if (r.Ready == null)
             {
-                r.Preparing ??= Task.Run(() => Prepare(Path.Combine(r.Library.Folder, file), r.Cancel.Token));
+                r.Preparing ??= Task.Run(() => Prepare(r.Library.PathOf(file), r.Cancel.Token));
                 if (!r.Preparing.IsCompleted) return;
                 r.Ready = r.Preparing.GetAwaiter().GetResult();
                 r.Preparing = null;
@@ -145,7 +172,9 @@ internal static class Assets
                 // Identical content (in this or any library) decodes once, unless a mixed cue needs its PCM.
                 if (needClip && !needPcm && Cache.TryGetValue(r.Ready.Hash, out var cached)) { cached.References++; Accept(r, cached); return; }
                 var info = r.Ready.Info;
-                if (DecodedBytes + info.DecodedBytes > AssetValidation.MaxDecodedBytes || CompressedBytes + r.Ready.Data.Length > AssetValidation.MaxCompressedCache)
+                // A file wanted both mixed and played directly stays resident twice (its PCM and its clip, unless the clip is cached already).
+                var copies = (needPcm ? 1 : 0) + (needClip && !Cache.ContainsKey(r.Ready.Hash) ? 1 : 0);
+                if (DecodedBytes + copies * info.DecodedBytes > AssetValidation.MaxDecodedBytes || CompressedBytes + r.Ready.Data.Length > AssetValidation.MaxCompressedCache)
                 { Fail(r, new AudioFailure(AudioError.AssetLimit, "the audio cache is full (512 MiB decoded / 256 MiB compressed in total).")); return; }
             }
             if (r.Decoding == null)
@@ -158,7 +187,7 @@ internal static class Assets
             if (!r.Decoding.IsCompleted) return;
             var audio = r.Decoding.GetAwaiter().GetResult();
             r.Decoding = null;
-            if (needPcm) r.Pcm[file] = audio;
+            if (needPcm) { r.Pcm[file] = audio; DecodedBytes += (long)audio.Samples.Length * sizeof(float); }
             if (!needClip) { Next(r); return; }
             if (Cache.TryGetValue(r.Ready.Hash, out var shared)) { shared.References++; Accept(r, shared); return; }
             var clip = MakeClip(r.Library.Identity + "/" + CueCatalog.CueName(file), audio);
@@ -189,40 +218,100 @@ internal static class Assets
         return clip;
     }
 
-    /// <summary>Mixes one layered or capped cue (all its variants and distance stretches); true when none is left.</summary>
+    /// <summary>Advances the mixing of layered or capped cues by one step and returns true when none is left. A step starts the
+    /// background render of one (distance stretch, variant) or uploads the one that finished, so the main thread creates at most
+    /// one Unity clip per frame and never mixes.</summary>
     private static bool BuildNext(Loading r)
     {
         var library = r.Library;
-        r.Todo ??= new Queue<CueDefinition>(library.Catalog.Cues.Values.Where(cue => !cue.IsDirect && !cue.Clips.Any(r.Failed.ContainsKey)).OrderBy(cue => cue.Name, StringComparer.OrdinalIgnoreCase));
-        if (r.Todo.Count == 0) return true;
-        var cue = r.Todo.Dequeue();
+        if (r.Todo == null)
+        {
+            r.Todo = new Queue<CueDefinition>(library.Catalog.Cues.Values.Where(cue => !cue.IsDirect && !cue.Clips.Any(r.Failed.ContainsKey)).OrderBy(cue => cue.Name, StringComparer.OrdinalIgnoreCase));
+            foreach (var file in r.Todo.SelectMany(cue => cue.Clips)) r.PcmUsers[file] = r.PcmUsers.GetValueOrDefault(file) + 1;
+        }
+        var cue = r.MixCue;
         try
         {
-            var profiles = CueMix.Profiles(cue);
-            var variants = CueMix.Variants(cue);
-            var clips = new ClipLease[]?[profiles.Length];
-            for (var p = 0; p < profiles.Length; p++)
+            if (cue == null)
             {
-                if (profiles[p].Silent) continue;
-                clips[p] = new ClipLease[variants];
-                for (var v = 0; v < variants; v++)
-                {
-                    var mixed = CueMix.Render(cue, profiles[p], v, file => r.Pcm[file])!;
-                    var audio = new DecodedAudio(mixed.Samples, mixed.Channels, mixed.SampleRate);
-                    var clip = MakeClip(library.Identity + "/" + cue.Name + "#" + p + "." + v, audio);
-                    var lease = new ClipLease("mix:" + library.Identity + "/" + cue.Name + "#" + p + "." + v, clip, 0, (long)audio.Samples.Length * sizeof(float)) { References = 1 };
-                    DecodedBytes += lease.DecodedBytes; library.Assets.Add(lease); clips[p]![v] = lease;
-                }
+                if (r.Todo.Count == 0) return true;
+                cue = r.MixCue = r.Todo.Dequeue();
+                r.MixProfiles = CueMix.Profiles(cue);
+                r.MixVariants = CueMix.Variants(cue);
+                r.MixClips = new ClipLease[]?[r.MixProfiles.Length];
+                r.MixProfile = r.MixVariant = 0;
             }
-            r.Mixed[cue.Name] = (profiles, clips);
+            while (r.MixProfile < r.MixProfiles.Length && r.MixProfiles[r.MixProfile].Silent) r.MixProfile++;
+            if (r.MixProfile == r.MixProfiles.Length)
+            {
+                r.Mixed[cue.Name] = (r.MixProfiles, r.MixClips);
+                EndMix(r);
+                return false;
+            }
+            if (r.Mixing == null)
+            {
+                var profile = r.MixProfiles[r.MixProfile]; var variant = r.MixVariant; var pcm = r.Pcm;
+                r.Mixing = Task.Run(() => CueMix.Render(cue, profile, variant, file => pcm[file]));
+                return false;
+            }
+            if (!r.Mixing.IsCompleted) return false;
+            var done = r.Mixing; r.Mixing = null;
+            var mixed = done.GetAwaiter().GetResult()!;
+            if (!CueMix.Fits(DecodedBytes, mixed, AssetValidation.MaxDecodedBytes))
+            {
+                Report(library, cue, new AudioFailure(AudioError.AssetLimit, "the mix would exceed the audio cache (512 MiB decoded in total)."));
+                DropMixed(r);
+                EndMix(r);
+                return false;
+            }
+            var audio = new DecodedAudio(mixed.Samples, mixed.Channels, mixed.SampleRate);
+            var name = cue.Name + "#" + r.MixProfile + "." + r.MixVariant;
+            var clip = MakeClip(library.Identity + "/" + name, audio);
+            var lease = new ClipLease("mix:" + library.Identity + "/" + name, clip, 0, (long)audio.Samples.Length * sizeof(float)) { References = 1 };
+            DecodedBytes += lease.DecodedBytes; library.Assets.Add(lease);
+            (r.MixClips[r.MixProfile] ??= new ClipLease[r.MixVariants])[r.MixVariant] = lease;
+            if (++r.MixVariant == r.MixVariants) { r.MixVariant = 0; r.MixProfile++; }
         }
         catch (Exception e) when (e is InvalidDataException or KeyNotFoundException or ArgumentException)
         {
-            var failure = new AudioFailure(AudioError.DecodeFailed, library.Identity + ": cue '" + cue.Name + "' cannot be mixed: " + e);
-            library.Catalog.Failures[cue.Name] = failure;
-            AudioLog.Report(failure);
+            Report(library, cue!, new AudioFailure(AudioError.DecodeFailed, library.Identity + ": cue '" + cue!.Name + "' cannot be mixed: " + e));
+            DropMixed(r);
+            EndMix(r);
         }
         return false;
+    }
+    /// <summary>The cue failed part way: the clips already made for its earlier variants and stretches are given back (the cue is not played, nothing else holds them).</summary>
+    private static void DropMixed(Loading r)
+    {
+        foreach (var row in r.MixClips)
+        {
+            if (row == null) continue;
+            foreach (var lease in row)
+            {
+                if (lease == null) continue;
+                r.Library.Assets.Remove(lease);
+                Release(lease);
+            }
+        }
+    }
+    private static void Report(AudioLibrary library, CueDefinition cue, AudioFailure failure)
+    {
+        if (failure.Code == AudioError.AssetLimit) failure = new AudioFailure(failure.Code, library.Identity + ": cue '" + cue.Name + "' cannot be mixed: " + failure.Detail);
+        library.Catalog.Failures[cue.Name] = failure;
+        AudioLog.Report(failure);
+    }
+    /// <summary>The cue is finished (mixed or failed): the decoded PCM no cue still waiting needs is freed.</summary>
+    private static void EndMix(Loading r)
+    {
+        foreach (var file in r.MixCue!.Clips)
+            if (--r.PcmUsers[file] == 0 && r.Pcm.Remove(file, out var audio)) DecodedBytes -= (long)audio.Samples.Length * sizeof(float);
+        r.MixCue = null; r.MixClips = Array.Empty<ClipLease[]?>();
+    }
+    /// <summary>Frees every PCM a loading still holds. A render still running keeps reading the dictionary it captured, so it is replaced.</summary>
+    private static void FreePcm(Loading r)
+    {
+        foreach (var audio in r.Pcm.Values) DecodedBytes -= (long)audio.Samples.Length * sizeof(float);
+        r.Pcm = new(StringComparer.OrdinalIgnoreCase);
     }
     private static Prepared Prepare(string path, CancellationToken cancellation)
     {
@@ -285,7 +374,7 @@ internal static class Assets
                     + "' have the same network name; '" + cue.Definition.Name + "' is not played for other players.");
             else library.CueKeys[key] = cue;
         }
-        r.Pcm.Clear();
+        FreePcm(r);
         library.IsLoaded = true;
         _active = null;
         r.Cancel.Dispose();
@@ -294,6 +383,7 @@ internal static class Assets
     private static void Abort(Loading r)
     {
         r.Cancel.Cancel();
+        FreePcm(r);
         if (_active == r) _active = null;
         r.Library.IsLoaded = true;
     }
@@ -304,6 +394,8 @@ internal static class Assets
         foreach (var lease in library.Assets) Release(lease);
         library.Assets.Clear(); library.Cues.Clear(); library.CueKeys.Clear();
         Libraries.Remove(library);
+        // A library refused for a taken name never owned the entry; releasing it must not drop the owner's.
+        if (ByIdentity.TryGetValue(library.Identity, out var owner) && ReferenceEquals(owner, library)) ByIdentity.Remove(library.Identity);
         SyncPlays.Forget(library);
     }
     private static void Release(ClipLease lease)

@@ -22,9 +22,11 @@ internal struct PlayRequest
     internal int Dimension;
     internal bool FixedDimension;
     internal object? Emitter;
+    /// <summary>A silent start-up play (<see cref="AudioLibrary.Prewarm"/>): it takes no voice place, throttle, seat or category place from real sounds and evicts none of them.</summary>
+    internal bool Prewarm;
 }
 
-/// <summary>Where a sound plays. Key groups plays for maxPerEmitter; null makes the play its own emitter.</summary>
+/// <summary>Where a sound plays. Key groups plays for maxPerEmitter; null makes the play its own emitter for maxPerEmitter, while bus seats count every null-key play as one bucket.</summary>
 internal sealed class Emitter
 {
     /// <summary>The one emitter every 2D play shares; it names itself in the log (an anonymous object printed as System.Object).</summary>
@@ -41,8 +43,6 @@ internal sealed class Emitter
     internal Emitter(EmitterKind kind, object? key, Vector3 position, Transform? target, int dimension, bool fixedDimension)
     { Kind = kind; Key = key; Position = position; Target = target; Dimension = dimension; FixedDimension = fixedDimension; }
 
-    /// <summary>A Unity object that was destroyed keeps its managed wrapper: only the cached native pointer says it is gone.</summary>
-    internal static bool Gone(UnityEngine.Object? target) => target == null || target.WasCollected || target.m_CachedPtr == IntPtr.Zero;
 }
 
 internal static class AudioClock
@@ -64,6 +64,8 @@ internal sealed class Playback
     internal float Gain, Pitch, Attenuation, Audibility, Occlusion = 1, OcclusionTarget = 1, Duck = 1, DuckTarget = 1;
     /// <summary>The cue's volume this play picked from the cue's range (<see cref="CueDefinition.GainMin"/> to <see cref="CueDefinition.Gain"/>).</summary>
     internal float CueGain = 1;
+    /// <summary>Started by <see cref="PlayRequest.Prewarm"/>: not counted against any limit of real sounds.</summary>
+    internal bool Prewarm;
     /// <summary>The followed transform is gone: the sound stays where it was and fades out.</summary>
     internal bool TargetLost;
     /// <summary>Where a followed sound was when its dimension was last placed.</summary>
@@ -177,7 +179,7 @@ internal static class Engine
     {
         if (cueName != null && library.Catalog.Failures.TryGetValue(cueName, out var unavailable)) return Fail(library, cueName, unavailable.Code, unavailable.Detail);
         if (!library.IsLoaded) return Fail(library, cueName, AudioError.NotReady, "still loading; play after library.IsLoaded.");
-        return Fail(library, cueName, AudioError.CueNotFound, "does not exist in " + library.Folder + " (cues: "
+        return Fail(library, cueName, AudioError.CueNotFound, "does not exist in " + (library.Files != null ? "its file list" : library.Folder) + " (cues: "
             + string.Join(", ", System.Linq.Enumerable.Take(library.Cues.Keys, 12)) + (library.Cues.Count > 12 ? ", ..." : "") + ").");
     }
 
@@ -195,8 +197,13 @@ internal static class Engine
         var definition = cue.Definition;
         return new PlayRequest
         {
-            Gain = options.Gain, StartSeconds = options.StartSeconds, IsSelf = options.IsSelf, Emitter = options.Emitter,
-            Dimension = options.Dimension ?? -1, FixedDimension = options.Dimension != null,
+            Gain = options.Gain,
+            StartSeconds = options.StartSeconds,
+            IsSelf = options.IsSelf,
+            Emitter = options.Emitter,
+            Prewarm = options.Prewarm,
+            Dimension = options.Dimension ?? -1,
+            FixedDimension = options.Dimension != null,
             Variant = options.Variant ?? VariantPick.Next(cue.Variants, ref cue.LastVariant, Random),
             Pitch = options.Pitch ?? definition.PitchMin + (float)Random.NextDouble() * (definition.PitchMax - definition.PitchMin),
             CueGain = GainPick.At(definition.GainMin, definition.Gain, Random.NextDouble()),
@@ -212,13 +219,15 @@ internal static class Engine
         if (_clearing || GameContext.Reloading) return Fail(library, cueName, AudioError.NotReady, "refused during a level or checkpoint transition.");
         var now = AudioClock.Now;
         if (now < cue.NextAllowed) return new PlayResult(PlayStatus.Throttled);
-        if (kind == EmitterKind.Attached && Emitter.Gone(target)) return TargetGone(library, cueName);
+        if (kind == EmitterKind.Attached && ForgeCore.NativeObjects.Gone(target)) return TargetGone(library, cueName);
         var variant = request.Variant;
         var pitch = request.Pitch;
         if (kind == EmitterKind.Attached) position = target!.position;
         if (!Finite(request.Gain, 0, 4) || !Finite(pitch, .1f, 3) || !Finite(request.StartSeconds, 0, float.MaxValue) || !Finite(request.CueGain, 0, 4)
             || variant < 0 || variant >= cue.Variants || !Finite(position) || request.FixedDimension && request.Dimension < 0)
             return Fail(library, cueName, AudioError.InvalidOptions, "needs gain 0-4, pitch 0.1-3, StartSeconds >= 0, Variant below the variant count, a finite position and Dimension >= 0.");
+        // Every valid play is reported, heard here or not (the listener of a replay stands elsewhere); a loop once it has its handle, so its end can name it.
+        if (!definition.Loop && !request.Prewarm && ForgeCore.Recording.Watched) Report(cue, kind, position, in request, 0);
         // The cue's own placement for this side decides how the caller's position or transform is used.
         switch (request.IsSelf ? definition.SelfPlace : definition.OtherPlace)
         {
@@ -239,7 +248,7 @@ internal static class Engine
         {
             var p = Logical[i];
             if (p == null) { if (free < 0) free = i; continue; }
-            if (!ReferenceEquals(p.Cue, cue)) continue;
+            if (p.Prewarm || !ReferenceEquals(p.Cue, cue)) continue;
             count++; if (key != null && key.Equals(p.Emitter.Key)) { emitterCount++; clash = p; }
         }
         if (free < 0 || count >= definition.MaxVoices || emitterCount >= definition.MaxPerEmitter)
@@ -252,7 +261,7 @@ internal static class Engine
         var dimension = kind == EmitterKind.TwoD ? -1 : request.FixedDimension ? request.Dimension : GameContext.DimensionAt(position);
         var emitter = new Emitter(kind, key, position, target, dimension, request.FixedDimension);
         var handle = new AudioHandle(++_generation);
-        var playback = new Playback(handle, cue, emitter, clip, spatial, free, request.Gain, pitch, request.StartSeconds % clip.length, now) { CueGain = request.CueGain };
+        var playback = new Playback(handle, cue, emitter, clip, spatial, free, request.Gain, pitch, request.StartSeconds % clip.length, now) { CueGain = request.CueGain, Prewarm = request.Prewarm };
         UpdatePosition(playback); Measure(playback);
         playback.PlacedAt = playback.Position;
         if (playback.Attenuation <= 0 && !definition.Loop) return new PlayResult(PlayStatus.DistanceCulled);
@@ -264,11 +273,12 @@ internal static class Engine
             for (var i = 0; i < Logical.Length; i++)
             {
                 var p = Logical[i];
-                if (p == null || p.FadeEnd > 0 || p.Cue.Bus != bus || !Equals(key, p.Emitter.Key)) continue;
+                if (p == null || p.Prewarm || p.FadeEnd > 0 || p.Cue.Bus != bus || !Equals(key, p.Emitter.Key)) continue;
                 BusPlays[holders] = p; BusMembers[holders++] = new BusMember(p.Cue.Definition.Priority, p.Audibility, p.Started);
             }
             evictions = BusPolicy.Evict(BusMembers.AsSpan(0, holders), bus.Seats, definition.Priority, playback.Audibility, Victims);
             if (evictions < 0) return Reject(cue, "bus '" + bus.Name + "' holds stronger sounds in all " + bus.Seats + " seats for emitter '" + key + "'.", quiet: true);
+            if (evictions > 0 && request.Prewarm) return Reject(cue, "a silent prewarm never replaces a sound on bus '" + bus.Name + "'.", quiet: true);
         }
         // The global category limit, over every mod's sounds; the bus's own replacements already free their places.
         var category = bus.Category;
@@ -276,7 +286,7 @@ internal static class Engine
         for (var i = 0; i < Logical.Length; i++)
         {
             var p = Logical[i];
-            if (p == null || p.FadeEnd > 0 || p.Category != category || Replacing(p, evictions)) continue;
+            if (p == null || p.Prewarm || p.FadeEnd > 0 || p.Category != category || Replacing(p, evictions)) continue;
             CategoryPlays[members] = p; CategoryMembers[members++] = new BusMember(p.Cue.Definition.Priority, p.Audibility, p.Started);
         }
         var admission = CategoryPolicy.Admit(CategoryMembers.AsSpan(0, members), AudioCategories.Limits[(int)category], definition.Priority, playback.Audibility, out var pushed);
@@ -285,6 +295,8 @@ internal static class Engine
             return Reject(cue, "category '" + AudioCategories.Name(category) + "' has all " + AudioCategories.Limits[(int)category]
                 + " places held by stronger or nearer sounds of every mod.", quiet: true);
         }
+        if (admission == CategoryAdmission.PushOut && request.Prewarm)
+            return Reject(cue, "a silent prewarm never pushes out a sound of category '" + AudioCategories.Name(category) + "'.", quiet: true);
         var slot = playback.Audibility > 0 || !definition.Loop ? FindVoice(playback, now) : -1;
         if (slot < 0 && !definition.Loop) return Reject(cue, "all 64 voices are busy with sounds that may not be stolen.");
         for (var i = 0; i < evictions; i++) FadeOut(BusPlays[Victims[i]]!, BusPolicy.ReplaceFade, EndReason.Replaced);
@@ -294,7 +306,8 @@ internal static class Engine
             FadeOut(victim, BusPolicy.ReplaceFade, EndReason.PushedOut);
         }
         Logical[free] = playback; _active++; handle.Playback = playback;
-        cue.NextAllowed = now + definition.MinInterval;
+        if (!request.Prewarm) cue.NextAllowed = now + definition.MinInterval;
+        if (definition.Loop && ForgeCore.Recording.Watched) Report(cue, kind, position, in request, handle.Generation);
         try
         {
             if (slot >= 0) StartVoice(playback, slot, now);
@@ -304,6 +317,13 @@ internal static class Engine
         catch (Exception e) { End(playback, EndReason.Failed); return Fail(library, cueName, AudioError.VoiceFailed, "Unity refused to start the voice: " + e); }
     }
     private static readonly PlayOptions DefaultOptions = new();
+
+    private static void Report(CueHandle cue, EmitterKind kind, Vector3 position, in PlayRequest request, long loop)
+    {
+        var place = kind switch { EmitterKind.TwoD => ForgeCore.ShownPlace.TwoD, EmitterKind.Attached => ForgeCore.ShownPlace.Attached, _ => ForgeCore.ShownPlace.World };
+        ForgeCore.Recording.Sound(new ForgeCore.ShownSound(cue.Seen, place, position, request.Variant, request.Pitch, request.Gain, request.IsSelf, loop));
+    }
+
     private static readonly Playback?[] BusPlays = new Playback?[VoicePolicy.LogicalCapacity];
     private static readonly BusMember[] BusMembers = new BusMember[VoicePolicy.LogicalCapacity];
     private static readonly int[] Victims = new int[VoicePolicy.LogicalCapacity];
@@ -480,7 +500,7 @@ internal static class Engine
         for (var i = 0; i < Logical.Length; i++)
         {
             var p = Logical[i]; if (p == null) continue;
-            if (p.Emitter.Kind == EmitterKind.Attached && !p.TargetLost && Emitter.Gone(p.Emitter.Target))
+            if (p.Emitter.Kind == EmitterKind.Attached && !p.TargetLost && ForgeCore.NativeObjects.Gone(p.Emitter.Target))
             { p.TargetLost = true; FadeOut(p, TargetLostFade, EndReason.TargetDestroyed); }
             if (p.Clip == null || p.Clip.WasCollected) { AudioLog.Report("clip-destroyed", AudioError.DecodeFailed, "Clip destroyed: " + Name(p)); End(p, EndReason.Failed); continue; }
             if (p.FadeEnd > 0 && now >= p.FadeEnd) { End(p, p.FadeReason); continue; }
@@ -576,9 +596,10 @@ internal static class Engine
     }
     internal static bool Control(AudioHandle handle, float value, ControlKind kind)
     {
-        var route = ControlRouting.Decide(AudioKit.Ready, Environment.CurrentManagedThreadId == AudioKit.MainThread);
-        if (route == ControlRoute.Drop) return false;
-        if (route == ControlRoute.Queue) { PendingControl.Enqueue((handle, value, kind)); return true; }
+        // On the main thread the request runs now. Off it (a finalizer, a callback thread) it is queued for the next driver update.
+        // After the kit shut down (plugin unload, game exit) its sounds are already gone, so the request is dropped without a warning.
+        if (!AudioKit.Ready) return false;
+        if (Environment.CurrentManagedThreadId != AudioKit.MainThread) { PendingControl.Enqueue((handle, value, kind)); return true; }
         if (!Finite(value, 0, kind == ControlKind.Gain ? 4 : 3600))
         {
             AudioLog.Report(AudioError.InvalidOptions, "AudioHandle." + kind + ": " + value + " is out of range (gain 0-4, fade 0-3600 s).");

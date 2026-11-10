@@ -2,7 +2,7 @@ using System.Linq;
 
 namespace ForgeAudio;
 
-/// <summary>How a <c>cues.json</c> setting is written.</summary>
+/// <summary>How a <c>cues.forge</c> setting is written.</summary>
 internal enum FieldKind
 {
     /// <summary>A whole number from <see cref="Field.Min"/> to <see cref="Field.Max"/>.</summary>
@@ -23,7 +23,7 @@ internal enum FieldKind
     Group,
 }
 
-/// <summary>One setting of <c>cues.json</c>: its bounds, default and meaning. The parser reads its bounds from these rows and the
+/// <summary>One setting of <c>cues.forge</c>: its bounds, default and meaning. The parser reads its bounds from these rows and the
 /// website manifest is written from them, so the two cannot differ.</summary>
 internal sealed record Field(string Name, FieldKind Kind, string Summary, double Min = 0, double Max = 0, object? Default = null,
     string[]? Values = null, string Unit = "", bool Required = false)
@@ -36,7 +36,7 @@ internal sealed record Field(string Name, FieldKind Kind, string Summary, double
     internal int MaxI => (int)Max;
 }
 
-/// <summary>The settings <c>cues.json</c> accepts, by the structure that holds them. Rows named <c>a.b</c> are settings of the object
+/// <summary>The settings <c>cues.forge</c> accepts, by the structure that holds them. Rows named <c>a.b</c> are settings of the object
 /// <c>a</c>.</summary>
 internal static class CueSchema
 {

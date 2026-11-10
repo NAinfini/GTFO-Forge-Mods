@@ -1,9 +1,9 @@
 {
   "kind": "forge-library-manifest",
-  "schemaVersion": 1,
+  "schemaVersion": "1.0.0",
   "library": "ForgeAudio",
   "packageName": "NAinfini-ForgeAudio",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "groups": [
     {
       "id": "categories",
@@ -76,7 +76,7 @@
     },
     {
       "id": "settings",
-      "title": "cues.json",
+      "title": "cues.forge",
       "entries": [
         {
           "id": "buses",

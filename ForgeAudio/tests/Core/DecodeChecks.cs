@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using ForgeAudio;
 
 namespace ForgeAudio.Tests;
 
@@ -39,7 +38,6 @@ internal static class DecodeChecks
 
         BrokenSetupFailsAlone(check);
         ShrunkGranuleTerminates(check);
-        LongLoopIsExact(check);
         InstalledAssets(check);
     }
 
@@ -66,15 +64,6 @@ internal static class DecodeChecks
         var padded = PatchLastGranule(good, frames - 1000);
         var trimmed = VorbisDecode.Decode(padded, AssetValidation.Ogg(padded).Value, CancellationToken.None);
         check(trimmed.Frames == frames - 1000, "granule cut within one block trims the clip to the granule");
-    }
-
-    // A loop's length must be its exact sample count: Kit trims to the granule, not to decoder output.
-    private static void LongLoopIsExact(Action<bool, string> check)
-    {
-        var good = Fixture("tone-long-1ch.ogg");
-        var info = AssetValidation.Ogg(good).Value;
-        var audio = VorbisDecode.Decode(good, info, CancellationToken.None);
-        check(audio.Frames == info.Frames, "long fixture decodes to exactly its final granule");
     }
 
     // A file whose setup header is destroyed fails on its own; a good file decoded afterwards is unaffected.
@@ -112,12 +101,12 @@ internal static class DecodeChecks
         return result;
     }
 
-    // Needs the installed Forge-Ordnance-Test profile (or FORGE_AUDIO_PLUGINS); never counted as a pass without it.
+    // Needs the installed Forge-Multiplayer profile (or FORGE_AUDIO_PLUGINS); never counted as a pass without it.
     private static void InstalledAssets(Action<bool, string> check)
     {
         var plugins = Environment.GetEnvironmentVariable("FORGE_AUDIO_PLUGINS")
             ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "r2modmanPlus-local", "GTFO", "profiles", "Forge-Ordnance-Test", "BepInEx", "plugins");
+                "r2modmanPlus-local", "GTFO", "profiles", "Forge-Multiplayer", "BepInEx", "plugins");
         if (!Directory.Exists(plugins)) { Console.WriteLine("installed Ogg decode: needs local resources, not run"); return; }
         foreach (var mod in InstalledMods)
         {

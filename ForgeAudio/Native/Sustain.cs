@@ -48,7 +48,7 @@ public sealed partial class AudioLibrary
     {
         if (owner == null) throw new ArgumentNullException(nameof(owner));
         var sustain = new AudioSustain(this, cue, owner, options, keepWhile);
-        if (Emitter.Gone(owner) || IsDisposed) { sustain.IsActive = false; return sustain; }
+        if (ForgeCore.NativeObjects.Gone(owner) || IsDisposed) { sustain.IsActive = false; return sustain; }
         sustain.Voice = Play(cue, owner, options).Handle;
         Sustains.Add(sustain);
         return sustain;
@@ -106,7 +106,7 @@ internal static class Sustains
     {
         var owner = sustain.Owner;
         // A destroyed owner (for example at level exit) keeps its wrapper; reading its game object would throw.
-        if (Emitter.Gone(owner) || !owner!.gameObject.activeInHierarchy) return true;
+        if (ForgeCore.NativeObjects.Gone(owner) || !owner!.gameObject.activeInHierarchy) return true;
         if (sustain.KeepWhile == null) return false;
         try { return !sustain.KeepWhile(); }
         catch (Exception error)

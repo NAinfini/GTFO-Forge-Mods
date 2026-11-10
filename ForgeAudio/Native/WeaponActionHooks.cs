@@ -1,7 +1,4 @@
 using System;
-using System.Reflection;
-using Gear;
-using HarmonyLib;
 
 namespace ForgeAudio;
 
@@ -9,8 +6,8 @@ namespace ForgeAudio;
 /// game's weapon sounds themselves come from the weapon's animation events and are not touched; each action here is one hook on
 /// the game's own native event, answered by one probe of the claim table on the weapon's native pointer, with no allocation, no
 /// string and no lookup by name while playing. The reload start and end hang on <c>ItemEquippable</c> (the one body every reload
-/// path reaches), the empty-magazine click on the empty-clip path of the automatic and the semi and burst archetypes; the start and
-/// the click are ForgeCore's patches, subscribed in <see cref="Subscribe"/>, and the end is the kit's own lazily installed patch.</summary>
+/// path reaches), the empty-magazine click on the empty-clip path of the automatic and the semi and burst archetypes; the start,
+/// the end and the click are ForgeCore's patches, subscribed in <see cref="Subscribe"/>.</summary>
 internal static class WeaponActions
 {
     internal static readonly ClaimBook<WeaponActionClaim> Book = new();
@@ -48,6 +45,7 @@ internal static class WeaponActions
     internal static void Subscribe()
     {
         ForgeCore.GameHooks.ReloadTriggered.Around<bool>(static item => Book.Count != 0 && item.IsReloading, ReloadTriggered);
+        ForgeCore.GameHooks.ReloadDone.After(static (item, ran) => { if (ran) Raise(item, WeaponAction.ReloadDone); });
         ForgeCore.GameHooks.AutoDryFired.After(static (archetype, _) => Raise(archetype.m_weapon, WeaponAction.DryFire));
         ForgeCore.GameHooks.SemiDryFired.After(static (archetype, _) => Raise(archetype.m_weapon, WeaponAction.DryFire));
     }
@@ -73,31 +71,3 @@ internal static class WeaponActions
         }
     }
 }
-
-
-/// <summary>The reload animation's completion callback, which clears the item's reloading flag (the compiler closure of
-/// <c>TryTriggerReloadAnimationSequence</c>; the game build's interop names it <c>_TryTriggerReloadAnimationSequence_b__145_0</c>).
-/// A build that renames it leaves the reload-done action off and logs the error once at start instead of breaking the kit.</summary>
-[HarmonyPatch]
-[LazyHook(HookGroup.Weapon)]
-internal static class WeaponReloadDone
-{
-    private const string Closure = "_TryTriggerReloadAnimationSequence_b__145_0";
-
-    [HarmonyPrepare]
-    private static bool Prepare()
-    {
-        if (AccessTools.Method(typeof(ItemEquippable), Closure) != null) return true;
-        AudioLog.Report(AudioError.EnvironmentUnavailable, "The reload-done weapon action is off: the game's reload completion callback " + Closure + " was not found.");
-        return false;
-    }
-
-    private static MethodBase TargetMethod() => AccessTools.Method(typeof(ItemEquippable), Closure);
-
-    [HarmonyPostfix]
-    private static void Postfix(ItemEquippable __instance, bool __runOriginal)
-    {
-        if (__runOriginal) WeaponActions.Raise(__instance, WeaponAction.ReloadDone);
-    }
-}
-

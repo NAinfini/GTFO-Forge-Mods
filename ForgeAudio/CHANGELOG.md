@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0
+
+Version number only: the first release was 0.1.0, and 1.0.0 is the version the Forge packages share from now on. Packages that depend on this library need 1.0.0 or later. Interface change: `VolumeControl` no longer carries English and Chinese labels (`English`, `Chinese`) and `AudioVolumes.HeadingEnglish` / `HeadingChinese` are gone; use `VolumeControl.TextKey` and `AudioVolumes.HeadingKey`, language keys that ForgeUI's language files hold.
+
 ## 0.1.0
 
 First release.
