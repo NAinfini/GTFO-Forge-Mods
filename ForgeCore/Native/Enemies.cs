@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Agents;
 using Enemies;
-using HarmonyLib;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using UnityEngine;
 
@@ -33,10 +32,13 @@ public sealed class SlowZoneLease : IDisposable
         internal int Pass;
     }
 
-    internal SlowZoneLease(Vector3 centre, float radius, float factor, float ends, string owner)
+    internal SlowZoneLease(Vector3 centre, float radius, float factor, float ends, string owner, Func<EnemyAgent, bool>? admit)
     {
-        Centre = centre; Radius = radius; Factor = factor; Ends = ends; Owner = owner;
+        Centre = centre; Radius = radius; Factor = factor; Ends = ends; Owner = owner; Admit = admit;
     }
+
+    /// <summary>The caller's extra test of an enemy inside the sphere (a wall between it and the centre); null: all of them.</summary>
+    internal Func<EnemyAgent, bool>? Admit { get; }
 
     public Vector3 Centre { get; }
     public float Radius { get; }
@@ -104,7 +106,7 @@ public static class Enemies
     /// <summary>Changes whenever an enemy takes or leaves a slot, so a reader can tell that its picture of <see cref="Live"/> is stale.</summary>
     public static int Version => _liveVersion;
 
-    /// <summary>Starts at 1 and goes up each time <paramref name="slot"/> is vacated: the same slot with the same generation is the same enemy.</summary>
+    /// <summary>Starts at 1 and goes up each time <paramref name="slot"/> is vacated or the level is cleared, never back to 1: the same slot with the same generation is the same enemy.</summary>
     public static int Generation(int slot) => (uint)slot < (uint)_slotCount ? _generations[slot] : 0;
 
     /// <summary>Every living enemy with a damageable limb inside the sphere, each once however many limbs are inside. Never
@@ -144,6 +146,27 @@ public static class Enemies
         return _found.AsSpan(0, count);
     }
 
+    /// <summary>Where a shot or blast looks at <paramref name="enemy"/>: the game's own aim target, else a metre above its feet.</summary>
+    public static Vector3 AimPoint(EnemyAgent enemy)
+    {
+        var aim = enemy.AimTarget;
+        return aim != null ? aim.position : enemy.Position + Vec.Up;
+    }
+
+    /// <summary>The living enemies of <see cref="Near"/> whose <see cref="AimPoint"/> <paramref name="position"/> can see
+    /// (<see cref="Level.HasSight"/>: no wall between). The span is valid until the next call.</summary>
+    public static ReadOnlySpan<EnemyAgent?> NearVisible(Vector3 position, float radius)
+    {
+        var count = Near(position, radius).Length;
+        var kept = 0;
+        for (var i = 0; i < count; i++)
+        {
+            var enemy = _found[i]!;
+            if (Level.HasSight(position, AimPoint(enemy))) _found[kept++] = enemy;
+        }
+        return _found.AsSpan(0, kept);
+    }
+
     /// <summary>The living enemies of <see cref="Near"/> nearest first, at most <paramref name="limit"/> of them (the nearest ones when
     /// more are in range; distance from <paramref name="position"/> to each enemy's position). The span is valid until the next call.</summary>
     public static ReadOnlySpan<EnemyAgent?> Nearest(Vector3 position, float radius, int limit)
@@ -157,7 +180,7 @@ public static class Enemies
         for (var i = 0; i < count; i++)
         {
             var enemy = _found[i]!;
-            var distance = (enemy.Position - position).sqrMagnitude;
+            var distance = Vec.SqrLength(enemy.Position - position);
             if (sorted == keep && (keep == 0 || distance >= _distances[keep - 1])) continue;
             var at = sorted < keep ? sorted++ : keep - 1;
             while (at > 0 && _distances[at - 1] > distance)
@@ -226,7 +249,7 @@ public static class Enemies
     {
         anim.speed = want;
         lease.ReadBack = Math.Abs(anim.speed - want) <= SlowBook<IntPtr>.Tolerance;
-        if (!lease.ReadBack) Plugin.Logger.ErrorOnce(lease.Owner + " set an enemy's animator speed to " + want + " but read " + anim.speed + " back; that enemy is not slowed.");
+        if (!lease.ReadBack) Plugin.Logger.ErrorOnce("core-set-enemys-animator-speed-but-read", lease.Owner + " set an enemy's animator speed to " + want + " but read " + anim.speed + " back; that enemy is not slowed.");
     }
 
     /// <summary>Slows every living enemy inside the sphere around <paramref name="centre"/> to <paramref name="factor"/> of its own speed
@@ -236,13 +259,14 @@ public static class Enemies
     /// owns its speed until it wears off. A lease the game ended (the enemy died or was reused) is taken afresh. The zone ends by itself
     /// after <paramref name="seconds"/> (<c>Time.time</c>), on <see cref="SlowZoneLease.Dispose"/> and at level cleanup, and every lease
     /// ends with it. <see cref="SlowZoneLease.Slowed"/> and <see cref="SlowZoneLease.Mismatches"/> report what was actually written and
-    /// read back. Call it on every peer that should see the enemies slowed: the speed is the animator's on that peer. Main thread only.</summary>
-    public static SlowZoneLease SlowZone(Vector3 centre, float radius, float factor, float seconds, string owner)
+    /// read back. Call it on every peer that should see the enemies slowed: the speed is the animator's on that peer. <paramref name="admit"/> is an
+    /// extra test of an enemy inside the sphere, run every pass: one it refuses counts as outside. Main thread only.</summary>
+    public static SlowZoneLease SlowZone(Vector3 centre, float radius, float factor, float seconds, string owner, Func<EnemyAgent, bool>? admit = null)
     {
         if (!(radius > 0f)) throw new ArgumentOutOfRangeException(nameof(radius));
         if (!(seconds > 0f)) throw new ArgumentOutOfRangeException(nameof(seconds));
         if (!(factor >= 0f)) throw new ArgumentOutOfRangeException(nameof(factor));
-        var zone = new SlowZoneLease(centre, radius, factor, Time.time + seconds, owner);
+        var zone = new SlowZoneLease(centre, radius, factor, Time.time + seconds, owner, admit);
         Zones.Add(zone);
         _nextZonePass = 0f;
         return zone;
@@ -265,6 +289,7 @@ public static class Enemies
                 if (anim == null || anim.WasCollected) continue;
                 var locomotion = enemy.Locomotion;
                 if (locomotion != null && locomotion.CurrentStateEnum == ES_StateEnum.StuckInGlue) continue;
+                if (zone.Admit != null && !zone.Admit(enemy)) continue;
                 var key = enemy.Pointer;
                 if (zone.Leases.TryGetValue(key, out var held))
                 {
@@ -297,17 +322,29 @@ public static class Enemies
         zone.Leases.Clear();
     }
     /// <summary>How alert <paramref name="enemy"/> is; <see cref="EnemyAlert.Off"/> for a dead enemy, one without an AI or one in the
-    /// game's <c>Off</c> mode.</summary>
-    public static EnemyAlert Alert(EnemyAgent enemy) => !enemy.Alive || enemy.AI == null ? EnemyAlert.Off : enemy.AI.Mode switch
+    /// game's <c>Off</c> mode. The AI mode is settled against the body's locomotion state (<see cref="EnemyAlerts.Settle"/>): a client's
+    /// copy of the mode lags behind a wake-up.</summary>
+    public static EnemyAlert Alert(EnemyAgent enemy)
+        => Alert(enemy.Alive, enemy.AI, enemy.Locomotion);
+
+    /// <summary><see cref="Alert(EnemyAgent)"/> from parts the caller already holds: a reader that samples many enemies every tick keeps
+    /// each enemy's <c>AI</c> and <c>Locomotion</c> (every property read makes a new interop wrapper) and says whether it is alive, so a
+    /// read allocates nothing. A null <paramref name="ai"/> or a dead enemy is <see cref="EnemyAlert.Off"/>.</summary>
+    public static EnemyAlert Alert(bool alive, EnemyAI? ai, EnemyLocomotion? locomotion)
     {
-        AgentMode.Off => EnemyAlert.Off,
-        AgentMode.Hibernate => EnemyAlert.Sleeping,
-        AgentMode.Agressive => EnemyAlert.Hunting,
-        _ => EnemyAlert.Awake,
-    };
+        if (!alive || ai == null) return EnemyAlert.Off;
+        var mode = ai.Mode switch
+        {
+            AgentMode.Off => EnemyAlert.Off,
+            AgentMode.Hibernate => EnemyAlert.Sleeping,
+            AgentMode.Agressive => EnemyAlert.Hunting,
+            _ => EnemyAlert.Awake,
+        };
+        return EnemyAlerts.Settle(mode, locomotion != null ? (int)locomotion.CurrentStateEnum : 0);
+    }
 
     /// <summary>Takes a slot for a spawned enemy. Whether it lives is not asked here: the game's alive flag may not be set yet when its
-    /// setup returns, so a spawn is registered whatever it reads then, and <see cref="Alert"/> says <see cref="EnemyAlert.Off"/> for one that is not alive.</summary>
+    /// setup returns, so a spawn is registered whatever it reads then, and <see cref="Alert(EnemyAgent)"/> says <see cref="EnemyAlert.Off"/> for one that is not alive.</summary>
     internal static void Register(EnemyAgent enemy)
     {
         if (enemy == null || SlotOf.ContainsKey(enemy.Pointer)) return;
@@ -321,7 +358,8 @@ public static class Enemies
                 Array.Resize(ref _live, _live.Length * 2);
                 Array.Resize(ref _generations, _live.Length);
             }
-            _generations[slot] = 1;
+            // Never back to 1 for a slot an earlier level used, or the same slot and generation would name another enemy.
+            _generations[slot]++;
         }
         _live[slot] = enemy;
         SlotOf.Add(enemy.Pointer, slot);
@@ -366,6 +404,7 @@ public static class Enemies
         Array.Clear(_found, 0, _found.Length);
         Array.Clear(_live, 0, _live.Length);
         _slotCount = _liveCount = 0;
+        _liveVersion++;
         _seeded = false;
         SlotOf.Clear();
         Vacant.Clear();
@@ -388,12 +427,12 @@ internal static class EnemyLifeHooks
         GameHooks.EnemySetup.Before(static enemy =>
         {
             try { Enemies.Forget(enemy); }
-            catch (Exception error) { Plugin.Logger.ErrorOnce("Forgetting a reused enemy's limbs failed: " + error); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("core-forgetting-reused-enemys-limbs-failed", "Forgetting a reused enemy's limbs failed: " + error); }
         });
         GameHooks.EnemySetup.After(static (enemy, _) =>
         {
             try { Enemies.Register(enemy); }
-            catch (Exception error) { Plugin.Logger.ErrorOnce("Registering a spawned enemy failed: " + error); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("core-registering-spawned-enemy-failed", "Registering a spawned enemy failed: " + error); }
         });
         GameHooks.EnemyDead.Before(static enemy => Gone(enemy));
         // An enemy the game removes without a death (a despawn, or its object destroyed) leaves the registry here, so no
@@ -405,6 +444,6 @@ internal static class EnemyLifeHooks
     private static void Gone(EnemyAgent enemy)
     {
         try { Enemies.Forget(enemy); Enemies.Unregister(enemy); }
-        catch (Exception error) { Plugin.Logger.ErrorOnce("Forgetting an enemy that left the level failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("core-forgetting-enemy-that-left-level-failed", "Forgetting an enemy that left the level failed: " + error); }
     }
 }

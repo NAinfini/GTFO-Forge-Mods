@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using GameData;
 using HarmonyLib;
 using BulletWeapon = Gear.BulletWeapon;
@@ -28,6 +29,23 @@ public static partial class Gear
         return factor;
     }
 
+    /// <summary>The block's own readable and writable properties, listed once (reflection is not repeated each time a copy is made). The
+    /// block's base class holds <c>persistentID</c>, which a declared-only listing misses; <see cref="CopyArchetype"/> sets it by hand.</summary>
+    private static readonly System.Reflection.PropertyInfo[] ArchetypeProperties = typeof(ArchetypeDataBlock)
+        .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly)
+        .Where(p => p.CanRead && p.CanWrite && p.GetIndexParameters().Length == 0).ToArray();
+
+    /// <summary>A copy of one weapon archetype block (every property, and its <c>persistentID</c>), for a gun or sentry that needs its own
+    /// numbers while the shared block keeps driving every stock gun. The copy is never registered in the game's data table. Reflection
+    /// copies every property, so build the copy once per gun and keep it, not once per shot.</summary>
+    public static ArchetypeDataBlock CopyArchetype(ArchetypeDataBlock source)
+    {
+        var copy = new ArchetypeDataBlock();
+        foreach (var property in ArchetypeProperties) property.SetValue(copy, property.GetValue(source));
+        copy.persistentID = source.persistentID;
+        return copy;
+    }
+
     /// <summary>A copy of <paramref name="source"/> whose view kick (power, so up and sideways alike), crosshair bloom, weapon kick and
     /// shake are scaled by <paramref name="multiplier"/>; the source is untouched. The axis ranges are the kick's direction pattern, not
     /// its strength, and stay.</summary>
@@ -54,6 +72,6 @@ internal static class GearReloadHooks
     {
         if (__instance == null) return;
         try { __result *= Gear.ReloadFactor(__instance, __result); }
-        catch (Exception error) { Plugin.Logger.ErrorOnce("A reload lease failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("core-reload-lease-failed", "A reload lease failed: " + error); }
     }
 }

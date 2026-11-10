@@ -5,7 +5,7 @@ namespace ForgeCore;
 /// <summary>The extent of one registered room volume in one dimension: a box in the room's own plan frame (X and Z measured from the
 /// room's origin, turned by its yaw) and a height range in world Y. A room turned off the grid keeps its true footprint, so a point
 /// 2 m past its doorway is not claimed by the room's axis-aligned bounds.</summary>
-public readonly struct VolumeBox
+internal readonly struct VolumeBox
 {
     /// <summary>An axis-aligned world box (no turn, origin at the world origin).</summary>
     public VolumeBox(int dimension, float minX, float minY, float minZ, float maxX, float maxY, float maxZ)
@@ -50,7 +50,7 @@ public readonly struct VolumeBox
 }
 /// <summary>Which of several room volumes that share a plan position a point belongs to. The game finds a volume by the grid cell alone
 /// and never looks at height, so rooms stacked above one another, or reaching into a neighbour's cell, are answered with the wrong volume.</summary>
-public static class VolumePick
+internal static class VolumePick
 {
     /// <summary>The index in <paramref name="boxes"/> of the volume that holds the point, or -1 when the game's own answer stands.
     /// A box that contains the point wins (the smallest when several do, the one nearest in height centre among equals); with no containing box, of two or more
@@ -81,7 +81,7 @@ public static class VolumePick
 
 /// <summary>The registered boxes of rooms whose volume may not exist yet: a box takes part in a choice only once its volume exists
 /// (asked on every choice until it does), so a room registered early is skipped, never refused, until the game has made its volume.</summary>
-public sealed class VolumeBoxes
+internal sealed class VolumeBoxes
 {
     private VolumeBox[] _real = [];
     private VolumeBox[] _live = [];
@@ -95,6 +95,14 @@ public sealed class VolumeBoxes
         _live = [.. _live, new VolumeBox(-1, 0, 0, 0, 0, 0, 0)];
         _ready = [.. _ready, false];
         return _real.Length - 1;
+    }
+
+    /// <summary>Replaces the box at <paramref name="index"/> (a room that moved after it was registered). A box already live is
+    /// replaced at once; one still waiting for its volume takes the new box when the volume exists.</summary>
+    public void Replace(int index, VolumeBox box)
+    {
+        _real[index] = box;
+        if (_ready[index]) _live[index] = box;
     }
 
     /// <summary>The index of the box that holds the point among those whose volume exists (<paramref name="exists"/> is asked of

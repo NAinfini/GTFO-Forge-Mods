@@ -5,7 +5,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>ForgeCore</AssemblyName>
-    <Version>0.1.0</Version>
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
@@ -30,7 +29,14 @@
     <Reference Include="0Harmony" HintPath="$(GTFOBepInExPath)/core/0Harmony.dll" Private="false" />
     <Reference Include="GTFO-API" HintPath="$(GTFOApiPath)" Private="false" />
     <Reference Include="Il2CppInterop.Runtime" HintPath="$(GTFOBepInExPath)/core/Il2CppInterop.Runtime.dll" Private="false" />
+    <!-- Hooks and HookBridge: run-time targets through the public Harmony API, and the by-reference bridge repair. -->
+    <Reference Include="Il2CppInterop.Common" HintPath="$(GTFOBepInExPath)/core/Il2CppInterop.Common.dll" Private="false" />
+    <Reference Include="Iced" HintPath="$(GTFOBepInExPath)/core/Iced.dll" Private="false" />
+    <Reference Include="Mono.Cecil" HintPath="$(GTFOBepInExPath)/core/Mono.Cecil.dll" Private="false" />
+    <Reference Include="MonoMod.Utils" HintPath="$(GTFOBepInExPath)/core/MonoMod.Utils.dll" Private="false" />
+    <Reference Include="MonoMod.RuntimeDetour" HintPath="$(GTFOBepInExPath)/core/MonoMod.RuntimeDetour.dll" Private="false" />
     <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" Private="false" />
+    <Reference Include="Il2CppSystem.Core" HintPath="$(GTFOBepInExPath)/interop/Il2CppSystem.Core.dll" Private="false" />
     <Reference Include="Modules-ASM" HintPath="$(GTFOBepInExPath)/interop/Modules-ASM.dll" Private="false" />
     <Reference Include="Plugins-ASM" HintPath="$(GTFOBepInExPath)/interop/Plugins-ASM.dll" Private="false" />
     <Reference Include="GameData-ASM" HintPath="$(GTFOBepInExPath)/interop/GameData-ASM.dll" Private="false" />
@@ -38,11 +44,13 @@
     <Reference Include="Shards-ASM" HintPath="$(GTFOBepInExPath)/interop/Shards-ASM.dll" Private="false" />
     <Reference Include="Utils-ASM" HintPath="$(GTFOBepInExPath)/interop/Utils-ASM.dll" Private="false" />
     <Reference Include="GlobalFramework-ASM" HintPath="$(GTFOBepInExPath)/interop/GlobalFramework-ASM.dll" Private="false" />
+    <Reference Include="CellSound-ASM" HintPath="$(GTFOBepInExPath)/interop/CellSound-ASM.dll" Private="false" />
     <Reference Include="UnityEngine.CoreModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.CoreModule.dll" Private="false" />
     <Reference Include="UnityEngine.PhysicsModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.PhysicsModule.dll" Private="false" />
     <Reference Include="UnityEngine.AnimationModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.AnimationModule.dll" Private="false" />
     <Reference Include="UnityEngine.Physics2DModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.Physics2DModule.dll" Private="false" />
     <Reference Include="UnityEngine.AIModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.AIModule.dll" Private="false" />
     <Reference Include="UnityEngine.AssetBundleModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.AssetBundleModule.dll" Private="false" />
+    <Reference Include="UnityEngine.ImageConversionModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.ImageConversionModule.dll" Private="false" />
   </ItemGroup>
 </Project>

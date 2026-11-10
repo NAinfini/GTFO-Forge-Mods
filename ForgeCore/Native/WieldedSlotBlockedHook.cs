@@ -1,6 +1,5 @@
 using System;
 using HarmonyLib;
-using Player;
 
 namespace ForgeCore;
 
@@ -39,7 +38,7 @@ public sealed class WieldedSlotGate
         foreach (var release in _releases)
         {
             try { if (release(inventory)) return true; }
-            catch (Exception error) { Plugin.Logger.ErrorOnce("A " + _module + " handler failed: " + error); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("core-wielded-slot-blocked-hook-handler-failed", "A " + _module + " handler failed: " + error); }
         }
         return false;
     }

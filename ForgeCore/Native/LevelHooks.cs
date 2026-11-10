@@ -1,7 +1,6 @@
 using System;
 using AIGraph;
 using GameData;
-using Enemies;
 using HarmonyLib;
 using LevelGeneration;
 using Player;
@@ -103,16 +102,31 @@ public sealed class ExpeditionFailedCheck
     public bool Result { get; set; }
 }
 
+/// <summary>The game's per-frame success decision (<c>WardenObjectiveManager.CheckExpeditionSuccess</c>, static, no argument).
+/// <see cref="Result"/> is what the game got, set for <c>After</c>; a <c>Skip</c> subscriber keeps the body from running and the game then
+/// reads false (not won). One instance serves every call (the method is not re-entered), so a subscriber must not keep it.</summary>
+public sealed class ExpeditionSuccessResult
+{
+    internal static readonly ExpeditionSuccessResult Shared = new();
+    public bool Result { get; internal set; }
+}
+
 public static partial class GameHooks
 {
-    // ---- Level generation and lifetime: cleanup, marker and prefab placement, survival waves, the end and the failure check of an expedition.
+    // ---- Level generation and lifetime: cleanup, marker and prefab placement, survival waves, the end and the success and failure checks of an expedition.
     public static readonly Bracket<NoCall> LevelCleanup = new("GameHooks.LevelCleanup", typeof(LevelCleanupHook));
     public static readonly Bracket<MarkerSpawn> MarkerSpawned = new("GameHooks.MarkerSpawned", typeof(MarkerSpawnedHook));
     public static readonly Bracket<PrefabBuild> PrefabBuilt = new("GameHooks.PrefabBuilt", typeof(PrefabBuiltHook));
     public static readonly Bracket<SurvivalWaveStart> SurvivalWaveStarted = new("GameHooks.SurvivalWaveStarted", typeof(SurvivalWaveStartedHook));
+    /// <summary><c>WorldEventManager.ExecuteEvent_Internal</c>: the game takes a level event (it runs after its delay); <see cref="WorldEventCall.Result"/> is whether it was accepted, read in <c>After</c>.</summary>
+    public static readonly Bracket<WorldEventCall> WorldEventExecuted = new("GameHooks.WorldEventExecuted", typeof(WorldEventExecutedHook));
     public static readonly Bracket<ExpeditionEndState> ExpeditionEnded = new("GameHooks.ExpeditionEnded", typeof(ExpeditionEndedHook));
     public static readonly Bracket<ExpeditionFailedCheck> ExpeditionFailedChecked = new("GameHooks.ExpeditionFailedChecked", typeof(ExpeditionFailedCheckedHook));
+    public static readonly Bracket<ExpeditionSuccessResult> ExpeditionSuccessCheck = new("GameHooks.ExpeditionSuccessCheck", typeof(ExpeditionSuccessCheckHook));
     public static readonly Bracket<SNet_Player> PlayerDespawned = new("GameHooks.PlayerDespawned", typeof(PlayerDespawnedHook));
+    /// <summary>A chained puzzle told to start or stop by the game's own logic (<c>ChainedPuzzleInstance.AttemptInteract</c>; on the host a security door's
+    /// state handler does this). A <c>Skip</c> subscriber keeps the puzzle, its alarm and its waves from running; the states that show it are not touched.</summary>
+    public static readonly Bracket<ChainedPuzzles.ChainedPuzzleInstance> ChainedPuzzleInteract = new("GameHooks.ChainedPuzzleInteract", typeof(ChainedPuzzleInteractHook));
 }
 
 [HarmonyPatch(typeof(Builder), nameof(Builder.OnLevelCleanup))]
@@ -153,6 +167,26 @@ internal static class PrefabBuiltHook
     private static void After(PrefabBuild __state, GameObject __result, bool __runOriginal) { __state.Built = __result; GameHooks.PrefabBuilt.RunAfter(__state, __runOriginal); }
     [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
     private static Exception? Faulted(Exception? __exception, PrefabBuild __state) { if (__exception != null) GameHooks.PrefabBuilt.RunFaulted(__state, __exception); return __exception; }
+}
+
+/// <summary>One call of <see cref="GameHooks.WorldEventExecuted"/>: the event, the duration the caller passed, and what the game answered.</summary>
+public sealed class WorldEventCall
+{
+    internal WorldEventCall(GameData.WardenObjectiveEventData data, float duration) { Data = data; Duration = duration; }
+    public GameData.WardenObjectiveEventData Data { get; }
+    public float Duration { get; }
+    public bool Result { get; internal set; }
+}
+
+[HarmonyPatch(typeof(WorldEventManager), "ExecuteEvent_Internal")]
+internal static class WorldEventExecutedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(GameData.WardenObjectiveEventData __0, float __1, out WorldEventCall __state) { __state = new WorldEventCall(__0, __1); GameHooks.WorldEventExecuted.RunBefore(__state); }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(WorldEventCall __state, bool __result, bool __runOriginal) { __state.Result = __result; GameHooks.WorldEventExecuted.RunAfter(__state, __runOriginal); }
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, WorldEventCall __state) { if (__exception != null) GameHooks.WorldEventExecuted.RunFaulted(__state, __exception); return __exception; }
 }
 
 // The overload that carries a position and returns the wave identity through `out ushort`; the other overload forwards to it. A by-ref
@@ -222,6 +256,48 @@ internal static class ExpeditionFailedCheckedHook
     }
     [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
     private static Exception? Faulted(Exception? __exception) { if (__exception != null) GameHooks.ExpeditionFailedChecked.RunFaulted(ExpeditionFailedCheck.Shared, __exception); return __exception; }
+}
+
+// Polled while the level runs, like the failure check: the shared call object keeps it allocation-free. A skipped call answers
+// false, so the game does not end the level as won.
+[HarmonyPatch(typeof(WardenObjectiveManager), nameof(WardenObjectiveManager.CheckExpeditionSuccess))]
+internal static class ExpeditionSuccessCheckHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static bool Before(ref bool __result)
+    {
+        var call = ExpeditionSuccessResult.Shared;
+        var skip = GameHooks.ExpeditionSuccessCheck.Skipped(call);
+        GameHooks.ExpeditionSuccessCheck.RunBefore(call);
+        if (!skip) return true;
+        __result = false;
+        return false;
+    }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(bool __result, bool __runOriginal)
+    {
+        var call = ExpeditionSuccessResult.Shared;
+        call.Result = __result;
+        GameHooks.ExpeditionSuccessCheck.RunAfter(call, __runOriginal);
+    }
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception) { if (__exception != null) GameHooks.ExpeditionSuccessCheck.RunFaulted(ExpeditionSuccessResult.Shared, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(ChainedPuzzles.ChainedPuzzleInstance), nameof(ChainedPuzzles.ChainedPuzzleInstance.AttemptInteract), new[] { typeof(ChainedPuzzles.eChainedPuzzleInteraction) })]
+internal static class ChainedPuzzleInteractHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static bool Before(ChainedPuzzles.ChainedPuzzleInstance __instance)
+    {
+        var skip = GameHooks.ChainedPuzzleInteract.Skipped(__instance);
+        GameHooks.ChainedPuzzleInteract.RunBefore(__instance);
+        return !skip;
+    }
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(ChainedPuzzles.ChainedPuzzleInstance __instance, bool __runOriginal) => GameHooks.ChainedPuzzleInteract.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(ChainedPuzzles.ChainedPuzzleInstance __instance, Exception? __exception) { if (__exception != null) GameHooks.ChainedPuzzleInteract.RunFaulted(__instance, __exception); return __exception; }
 }
 
 [HarmonyPatch(typeof(PlayerManager), nameof(PlayerManager.OnPlayerDespawned))]

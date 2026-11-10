@@ -48,11 +48,25 @@ public static partial class Gear
     /// the unit the sentry spends; returns the absolute ammunition passed to the game. Call only after <see cref="SentryAmmoReady"/>.</summary>
     public static (float Ammo, float Cap) SpawnSentry(string gearJson, ItemReplicationManager.delItemCallback onSpawned, Vector3 position,
         Quaternion rotation, AIG_CourseNode? node, PlayerAgent owner, float initialAmmo, float ammoCap)
+        => SpawnSentry(new GearIDRange(gearJson), onSpawned, position, rotation, node, owner, initialAmmo, ammoCap);
+
+    /// <summary><see cref="SpawnSentry(string, ItemReplicationManager.delItemCallback, Vector3, Quaternion, AIG_CourseNode?, PlayerAgent, float, float)"/>
+    /// for a gear the caller has already built from its JSON, for one that carries something of its own on it (its <c>PublicGearName</c>
+    /// marker, which the spawn replicates to every peer).</summary>
+    public static (float Ammo, float Cap) SpawnSentry(GearIDRange gear, ItemReplicationManager.delItemCallback onSpawned, Vector3 position,
+        Quaternion rotation, AIG_CourseNode? node, PlayerAgent owner, float initialAmmo, float ammoCap)
     {
         if (!TryClassPool(owner, out var pool)) throw new InvalidOperationException("The class-ammunition pool is not readable yet; ask SentryAmmoReady first.");
-        ItemReplicationManager.SpawnGear(new GearIDRange(gearJson), onSpawned, ItemMode.Instance, position, rotation, node, owner, initialAmmo * pool, ammoCap * pool);
+        ItemReplicationManager.SpawnGear(gear, onSpawned, ItemMode.Instance, position, rotation, node, owner, initialAmmo * pool, ammoCap * pool);
         return (initialAmmo * pool, ammoCap * pool);
     }
+
+    /// <summary><see cref="SpawnSentry(GearIDRange, ItemReplicationManager.delItemCallback, Vector3, Quaternion, AIG_CourseNode?, PlayerAgent, float, float)"/>
+    /// for a gear built from its JSON that carries <paramref name="publicGearName"/> as its marker, which the spawn replicates to
+    /// every peer and <see cref="KeepToolSlot"/> reads back.</summary>
+    public static (float Ammo, float Cap) SpawnSentry(string gearJson, string publicGearName, ItemReplicationManager.delItemCallback onSpawned,
+        Vector3 position, Quaternion rotation, AIG_CourseNode? node, PlayerAgent owner, float initialAmmo, float ammoCap)
+        => SpawnSentry(new GearIDRange(gearJson) { PublicGearName = publicGearName }, onSpawned, position, rotation, node, owner, initialAmmo, ammoCap);
 
     private static bool TryClassPool(PlayerAgent owner, out float pool)
     {
@@ -71,6 +85,23 @@ public static partial class Gear
     {
         var reading = GearEffectAssets.Prepare(gear);
         if (reading.Status == GearAssetStatus.Ready) PlayerBackpackManager.EquipLocalGear(gear);
+        return reading;
+    }
+
+    /// <summary>Sets what a round of the local player's <paramref name="type"/> costs and the size of its magazine, through the game's own
+    /// entry: the pool takes both from the game's gun when the item is made, so a gun lent with other numbers charges the game's price until
+    /// this is called. The game sets them again for the next gun in the slot. The reserve itself is <see cref="WriteLocalAmmo"/>'s.</summary>
+    public static void SetLocalAmmoType(AmmoType type, float costOfBullet, int magazine)
+    {
+        var storage = PlayerBackpackManager.LocalBackpack?.AmmoStorage ?? throw new InvalidOperationException("The local player has no ammunition storage.");
+        storage.SetupAmmoType(type, costOfBullet, magazine);
+    }
+
+    /// <summary><see cref="EquipLocal"/> for a bot, through the game's own bot equip. Host only.</summary>
+    public static GearAssetReading EquipBot(SNetwork.SNet_Player bot, GearIDRange gear)
+    {
+        var reading = GearEffectAssets.Prepare(gear);
+        if (reading.Status == GearAssetStatus.Ready) PlayerBackpackManager.EquipBotGear(bot, gear);
         return reading;
     }
 

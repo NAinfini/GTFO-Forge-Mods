@@ -12,9 +12,13 @@ public static class GearAssembly
 
     /// <summary>Runs <paramref name="moveNext"/> until the coroutine reports it is done. Returns the steps it took (0: it was already
     /// done), or -1 when it was still running after <see cref="MaxSteps"/>.</summary>
-    public static int Finish(Func<bool> moveNext)
+    public static int Finish(Func<bool> moveNext) => Run(moveNext, MaxSteps);
+
+    /// <summary>Runs <paramref name="moveNext"/> for at most <paramref name="maxSteps"/> steps (a part spawn each): the steps taken when
+    /// the coroutine reported it is done, or -1 when it is still running, to be continued by a later call.</summary>
+    public static int Run(Func<bool> moveNext, int maxSteps)
     {
-        for (var steps = 0; steps < MaxSteps; steps++)
+        for (var steps = 0; steps < maxSteps; steps++)
             if (!moveNext()) return steps;
         return -1;
     }

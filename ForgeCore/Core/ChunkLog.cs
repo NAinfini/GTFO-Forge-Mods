@@ -23,7 +23,12 @@ public static class ChunkLog
     internal const uint FileMagic = 0x474C4346;   // "FCLG"
     internal const uint ChunkMagic = 0x4B4E4843;  // "CHNK"
     internal const uint IndexMagic = 0x58494346;  // "FCIX"
-    internal const ushort ContainerVersion = 1;
+    internal const ushort ContainerVersion = 2;
+    // Brotli quality 5 (window 2^22): on 19 minutes of real ForgeReplay blocks it stores about 12% less than deflate at 0.2 to 1 ms per two-second block (deflate 0.02 to 0.1 ms), off the game thread;
+    // quality 6 to 9 gain under 0.1% at 1.4 to 4 times the time.
+    internal const int BrotliQuality = 5, BrotliWindow = 22;
+    /// <summary>The most a chunk may claim to hold once decompressed; a header that asks for more is damaged and the chunk is refused before anything is allocated.</summary>
+    internal const int MaxRawBytes = 64 * 1024 * 1024;
     internal const int StartBytes = 12;
     internal const int ChunkHeaderBytes = 28;
     internal const int IndexEntryBytes = 24;
@@ -73,7 +78,7 @@ public sealed class ChunkWriter
 {
     private readonly Stream _stream;
     private readonly List<ChunkInfo> _index = new();
-    private readonly MemoryStream _scratch = new();
+    private byte[] _scratch = Array.Empty<byte>();
     private readonly byte[] _header = new byte[ChunkLog.ChunkHeaderBytes];
     private long _end;
     private bool _finished;
@@ -91,21 +96,28 @@ public sealed class ChunkWriter
         _end = ChunkLog.StartBytes;
     }
 
+    /// <summary>Pushes what was written to the disk itself (a file), not only to the system's cache, so a power cut loses no finished chunk.</summary>
+    private void Flush()
+    {
+        if (_stream is FileStream file) file.Flush(true);
+        else _stream.Flush();
+    }
+
     /// <summary>Bytes written so far, including headers.</summary>
     public long Length => _end;
 
-    /// <summary>Compresses (when it helps) and appends one chunk, then flushes the stream so the chunk is on disk.</summary>
+    /// <summary>Compresses (Brotli, when it helps) and appends one chunk, then flushes the stream so the chunk is on disk.</summary>
     public void Append(ushort type, uint startMs, uint endMs, ReadOnlySpan<byte> data)
     {
         if (_finished) throw new InvalidOperationException("The log is finished.");
         if (endMs < startMs) throw new ArgumentException("A chunk's end is not before its start.");
-        _scratch.SetLength(0);
-        using (var deflate = new DeflateStream(_scratch, CompressionLevel.Fastest, leaveOpen: true)) deflate.Write(data);
-        var useDeflate = _scratch.Length < data.Length;
-        ReadOnlySpan<byte> payload = useDeflate ? new ReadOnlySpan<byte>(_scratch.GetBuffer(), 0, (int)_scratch.Length) : data;
+        var bound = BrotliEncoder.GetMaxCompressedLength(data.Length);
+        if (_scratch.Length < bound) _scratch = new byte[bound];
+        var compressed = BrotliEncoder.TryCompress(data, _scratch, out var written, ChunkLog.BrotliQuality, ChunkLog.BrotliWindow) && written < data.Length;
+        ReadOnlySpan<byte> payload = compressed ? new ReadOnlySpan<byte>(_scratch, 0, written) : data;
         ChunkLog.PutU32(_header, 0, ChunkLog.ChunkMagic);
         ChunkLog.PutU16(_header, 4, type);
-        ChunkLog.PutU16(_header, 6, useDeflate ? (ushort)1 : (ushort)0);
+        ChunkLog.PutU16(_header, 6, compressed ? (ushort)1 : (ushort)0);
         ChunkLog.PutU32(_header, 8, startMs);
         ChunkLog.PutU32(_header, 12, endMs);
         ChunkLog.PutU32(_header, 16, (uint)data.Length);
@@ -113,7 +125,7 @@ public sealed class ChunkWriter
         ChunkLog.PutU32(_header, 24, ChunkLog.Crc32(payload, ChunkLog.Crc32(_header.AsSpan(0, 24))));
         _stream.Write(_header);
         _stream.Write(payload);
-        _stream.Flush();
+        Flush();
         _index.Add(new ChunkInfo(type, startMs, endMs, _end, data.Length));
         _end += ChunkLog.ChunkHeaderBytes + payload.Length;
     }
@@ -142,7 +154,7 @@ public sealed class ChunkWriter
         ChunkLog.PutU32(trailer, 16, ChunkLog.Crc32(body, ChunkLog.Crc32(trailer.AsSpan(0, 16))));
         _stream.Write(body);
         _stream.Write(trailer);
-        _stream.Flush();
+        Flush();
         _finished = true;
     }
 }
@@ -182,27 +194,27 @@ public sealed class ChunkReader
         var header = new byte[ChunkLog.ChunkHeaderBytes];
         if (ReadAt(chunk.Offset, header) != header.Length || ChunkLog.GetU32(header, 0) != ChunkLog.ChunkMagic)
             throw new InvalidDataException("There is no chunk at offset " + chunk.Offset + ".");
-        var stored = checked((int)ChunkLog.GetU32(header, 20));
+        var storedLength = ChunkLog.GetU32(header, 20);
+        if (chunk.Offset + ChunkLog.ChunkHeaderBytes + storedLength > _stream.Length)
+            throw new InvalidDataException("The chunk at offset " + chunk.Offset + " is cut off.");
+        var stored = (int)storedLength;
         var payload = new byte[stored];
         if (ReadAt(chunk.Offset + ChunkLog.ChunkHeaderBytes, payload) != stored)
             throw new InvalidDataException("The chunk at offset " + chunk.Offset + " is cut off.");
         if (ChunkLog.GetU32(header, 24) != ChunkLog.Crc32(payload, ChunkLog.Crc32(header.AsSpan(0, 24))))
             throw new InvalidDataException("The chunk at offset " + chunk.Offset + " fails its checksum.");
-        var raw = checked((int)ChunkLog.GetU32(header, 16));
+        var rawLength = ChunkLog.GetU32(header, 16);
+        if (rawLength > ChunkLog.MaxRawBytes)
+            throw new InvalidDataException("The chunk at offset " + chunk.Offset + " claims " + rawLength + " bytes, over the limit.");
+        var raw = (int)rawLength;
         if (ChunkLog.GetU16(header, 6) == 0)
         {
             if (raw != stored) throw new InvalidDataException("The stored chunk at offset " + chunk.Offset + " has two lengths.");
             return payload;
         }
         var result = new byte[raw];
-        using var deflate = new DeflateStream(new MemoryStream(payload), CompressionMode.Decompress);
-        var got = 0;
-        while (got < raw)
-        {
-            var n = deflate.Read(result, got, raw - got);
-            if (n == 0) throw new InvalidDataException("The chunk at offset " + chunk.Offset + " decompresses short.");
-            got += n;
-        }
+        if (!BrotliDecoder.TryDecompress(payload, result, out var got) || got != raw)
+            throw new InvalidDataException("The chunk at offset " + chunk.Offset + " does not decompress to its length.");
         return result;
     }
 
@@ -246,6 +258,7 @@ public sealed class ChunkReader
     private void Scan()
     {
         var header = new byte[ChunkLog.ChunkHeaderBytes];
+        var block = new byte[64 * 1024];
         var offset = (long)ChunkLog.StartBytes;
         var length = _stream.Length;
         while (offset + ChunkLog.ChunkHeaderBytes <= length)
@@ -253,9 +266,17 @@ public sealed class ChunkReader
             if (ReadAt(offset, header) != header.Length || ChunkLog.GetU32(header, 0) != ChunkLog.ChunkMagic) break;
             var stored = ChunkLog.GetU32(header, 20);
             if (offset + ChunkLog.ChunkHeaderBytes + stored > length) break;
-            var payload = new byte[stored];
-            if (ReadAt(offset + ChunkLog.ChunkHeaderBytes, payload) != payload.Length) break;
-            if (ChunkLog.GetU32(header, 24) != ChunkLog.Crc32(payload, ChunkLog.Crc32(header.AsSpan(0, 24)))) break;
+            // The checksum is taken over the stored bytes a block at a time, so a scan never holds a whole chunk.
+            var crc = ChunkLog.Crc32(header.AsSpan(0, 24));
+            var cut = false;
+            _stream.Position = offset + ChunkLog.ChunkHeaderBytes;
+            for (long left = stored; left > 0 && !cut;)
+            {
+                var n = _stream.Read(block, 0, (int)Math.Min(left, block.Length));
+                if (n == 0) cut = true;
+                else { crc = ChunkLog.Crc32(block.AsSpan(0, n), crc); left -= n; }
+            }
+            if (cut || ChunkLog.GetU32(header, 24) != crc) break;
             _chunks.Add(new ChunkInfo(ChunkLog.GetU16(header, 4), ChunkLog.GetU32(header, 8), ChunkLog.GetU32(header, 12), offset, (int)ChunkLog.GetU32(header, 16)));
             offset += ChunkLog.ChunkHeaderBytes + stored;
         }

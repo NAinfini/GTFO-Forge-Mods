@@ -1,7 +1,6 @@
 using System;
 using Agents;
 using HarmonyLib;
-using Player;
 
 namespace ForgeCore;
 
@@ -39,6 +38,7 @@ public static class PlayerHits
     private static (string Owner, Func<Dam_PlayerDamageBase, pInfection, bool> Allow)[] _gates = [];
     private static (string Owner, IPlayerHitObserver Observer)? _hitObserver;
     private static (string Owner, IInfectionObserver Observer)? _infectionObserver;
+    private static (string Owner, Action<Dam_PlayerDamageBase, float, Agent?> Watcher)[] _watchers = [];
 
     /// <summary>Changes the damage of a hit before anything else reads it: <paramref name="redirect"/> gets the receiver, the damage and
     /// the attacker and answers the damage to apply (0 = none). Redirects run in registration order, before the observer.</summary>
@@ -56,11 +56,39 @@ public static class PlayerHits
         _gates = Replace(_gates, owner, allow);
     }
 
+    [ThreadStatic] private static int _authored;
+
+    /// <summary>True while an infection write a mod's own content asked for (<see cref="WriteAuthoredInfection"/>) is running, so a gate
+    /// can tell it from the game's own infection sources (an enemy, fog).</summary>
+    public static bool AuthoredInfection => _authored > 0;
+
+    /// <summary>Writes infection through the game's own entry on behalf of authored content: gates see
+    /// <see cref="AuthoredInfection"/> for exactly this call.</summary>
+    public static void WriteAuthoredInfection(Dam_PlayerDamageBase damage, pInfection data, bool sync, bool updatePageMap)
+    {
+        _authored++;
+        try { damage.ModifyInfection(data, sync, updatePageMap); }
+        finally { _authored--; }
+    }
+
     /// <summary>The one reader of hits (runs last, after every redirect, so it sees the damage the game will apply). A second owner is refused.</summary>
     public static void Observe(string owner, IPlayerHitObserver? observer)
     {
         Ensure();
         _hitObserver = Slot(_hitObserver, owner, observer);
+    }
+
+    /// <summary>Reads a hit without changing it: <paramref name="watcher"/> gets the receiver, the damage the game will apply and the attacker
+    /// (after every redirect and the observer). Any number of owners; it cannot change the hit, so they cannot conflict.</summary>
+    public static void Watch(string owner, Action<Dam_PlayerDamageBase, float, Agent?>? watcher)
+    {
+        Ensure();
+        _watchers = Replace(_watchers, owner, watcher);
+    }
+
+    internal static void RunWatchers(Dam_PlayerDamageBase receiver, float damage, Agent? source)
+    {
+        foreach (var (_, watcher) in _watchers) watcher(receiver, damage, source);
     }
 
     /// <summary>The one reader of infection writes. A second owner is refused.</summary>
@@ -114,7 +142,7 @@ internal static class PlayerHitHooks
     private static void Redirect(Dam_PlayerDamageBase __instance, ref float damage, Agent sourceAgent)
     {
         try { damage = PlayerHits.RedirectDamage(__instance, damage, sourceAgent); }
-        catch (Exception error) { Plugin.Logger.ErrorOnce("A player hit redirect failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("core-player-hit-redirect-failed", "A player hit redirect failed: " + error); }
     }
 
     [HarmonyPatch(typeof(Dam_PlayerDamageBase), "OnIncomingDamage")]
@@ -123,9 +151,13 @@ internal static class PlayerHitHooks
     {
         __state = default;
         var observer = PlayerHits.HitObserver;
-        if (observer == null) return;
-        try { __state = observer.Before(__instance, ref damage, sourceAgent); }
-        catch (Exception error) { Plugin.Logger.ErrorOnce("The player hit observer failed: " + error); }
+        if (observer != null)
+        {
+            try { __state = observer.Before(__instance, ref damage, sourceAgent); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("core-player-hit-observer-failed", "The player hit observer failed: " + error); }
+        }
+        try { PlayerHits.RunWatchers(__instance, damage, sourceAgent); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("core-player-hit-watcher-failed", "A player hit watcher failed: " + error); }
     }
 
     [HarmonyPatch(typeof(Dam_PlayerDamageBase), "OnIncomingDamage")]
@@ -135,7 +167,7 @@ internal static class PlayerHitHooks
         var observer = PlayerHits.HitObserver;
         if (observer == null) return;
         try { observer.After(__instance, sourceAgent, __state); }
-        catch (Exception error) { Plugin.Logger.ErrorOnce("The player hit observer failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("core-player-hit-observer-failed", "The player hit observer failed: " + error); }
     }
 
     [HarmonyPatch(typeof(Dam_PlayerDamageBase), "OnIncomingDamage")]
@@ -144,7 +176,7 @@ internal static class PlayerHitHooks
     {
         if (__exception == null) return null;
         try { PlayerHits.HitObserver?.Faulted(__state); }
-        catch (Exception error) { Plugin.Logger.ErrorOnce("The player hit observer failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("core-player-hit-observer-failed", "The player hit observer failed: " + error); }
         return __exception;
     }
 
@@ -161,7 +193,7 @@ internal static class PlayerHitHooks
         }
         catch (Exception error)
         {
-            Plugin.Logger.ErrorOnce("A player infection hook failed: " + error);
+            Plugin.Logger.ErrorOnce("core-player-infection-hook-failed", "A player infection hook failed: " + error);
             return true;
         }
     }
@@ -171,6 +203,6 @@ internal static class PlayerHitHooks
     private static void InfectionAfter(Dam_PlayerDamageBase __instance, pInfection data, float __state)
     {
         try { PlayerHits.InfectionObserver?.After(__instance, data, __state); }
-        catch (Exception error) { Plugin.Logger.ErrorOnce("The player infection observer failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("core-player-infection-observer-failed", "The player infection observer failed: " + error); }
     }
 }

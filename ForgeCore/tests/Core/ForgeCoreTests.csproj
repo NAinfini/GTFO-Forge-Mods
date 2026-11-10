@@ -19,9 +19,8 @@
     </AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
-    <!-- Core references no game or Unity assembly; Native/Colliders.cs, Enemies.cs, Level.cs, LevelNavigation.cs and Il2CppArrays.cs run against the doubles in EnemyDoubles.cs, and Combat.cs and CombatKills.cs against CombatDoubles.cs (CombatShot.cs needs Unity physics and is not compiled here). -->
-    <Compile Include="../../Core/*.cs" Link="Core/%(Filename)%(Extension)" />
-    <Compile Include="../../Native/Colliders.cs;../../Native/Enemies.cs;../../Native/Level.cs;../../Native/LevelNavigation.cs;../../Native/Il2CppArrays.cs;../../Native/Combat.cs;../../Native/GunPose.cs;../../Native/CombatDamage.cs;../../Native/EnemySpawn.cs;../../Native/CombatKills.cs;../../Native/Bracket.cs;../../Native/GameAssets.cs;../../../Testing/SourceDoubles/Game/AssetApiDouble.cs" Link="Native/%(Filename)%(Extension)" />
+    <!-- Core references no game or Unity assembly; -->
+    <Compile Include="../../Core/*.cs" Exclude="../../Core/CameraLeaseBook.cs;../../Core/Observers.cs" Link="Core/%(Filename)%(Extension)" />
     <Compile Include="*.cs" />
     <ProjectReference Include="../../../ForgeCore/Once/ForgeCore.Once.csproj" />
   </ItemGroup>

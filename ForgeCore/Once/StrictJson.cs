@@ -21,6 +21,18 @@ public class StrictJsonException : Exception
 /// reports the field as prefix + name. A missing field returns the fallback; with no fallback it is an error. No game or Unity type.</summary>
 public static class StrictJson
 {
+    /// <summary>The readable native name a package wrote for data block <paramref name="id"/> (the website's <c>nativeBlockName</c>:
+    /// <c>&lt;author&gt;_&lt;work&gt;_&lt;number&gt;</c>). The game publishes the block under it and finds it by number; a block without
+    /// one is refused, never renamed to its stable id.</summary>
+    public static string BlockName(System.Text.Json.Nodes.JsonObject data, string id)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        if (data["name"] is not System.Text.Json.Nodes.JsonValue value || !value.TryGetValue<string>(out var name) || string.IsNullOrWhiteSpace(name)
+            || name.Length > 256)
+            throw new System.IO.InvalidDataException("Block " + id + " has no readable name (1-256 characters).");
+        return name;
+    }
+
     /// <summary>Refuses a non-object, a member that is neither in <paramref name="known"/> nor in <paramref name="alsoAllowed"/>
     /// (such as <c>Type</c>), and a member written twice. <paramref name="owner"/> names what the object belongs to in the message.</summary>
     public static void OnlyKnown(JsonElement value, string prefix, string[] known, string[]? alsoAllowed = null, string? owner = null)
@@ -34,6 +46,16 @@ public static class StrictJson
                     "unknown field" + (owner == null ? "" : " for " + owner) + " (known: " + string.Join(", ", known) + ").");
             if (!seen.Add(member.Name)) throw new StrictJsonException(prefix + member.Name, "duplicate field.");
         }
+    }
+
+    /// <summary>The first member of the object <paramref name="value"/> that is not in <paramref name="known"/> or is written twice, null when
+    /// there is none. For a reader that keeps its own error codes and so cannot take <see cref="OnlyKnown"/>'s exception.</summary>
+    public static string? FirstUnknownOrRepeated(JsonElement value, string[] known)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var member in value.EnumerateObject())
+            if (Array.IndexOf(known, member.Name) < 0 || !seen.Add(member.Name)) return member.Name;
+        return null;
     }
 
     /// <summary>Refuses a member written twice anywhere inside <paramref name="value"/>, at any depth, naming it by path.</summary>
@@ -77,6 +99,15 @@ public static class StrictJson
         if (!Finite(found, out var number)) throw new StrictJsonException(prefix + field, "must be a finite number.");
         if (Math.Floor(number) != number) throw new StrictJsonException(prefix + field, "must be a whole number.");
         return InRange(number, prefix + field, min, max);
+    }
+
+    /// <summary>A string that is not empty or blank.</summary>
+    public static string String(JsonElement value, string prefix, string field, string? fallback)
+    {
+        if (!value.TryGetProperty(field, out var found)) return fallback ?? throw new StrictJsonException(prefix + field, "is required.");
+        if (found.ValueKind != JsonValueKind.String) throw new StrictJsonException(prefix + field, "must be a string.");
+        var text = found.GetString()!;
+        return string.IsNullOrWhiteSpace(text) ? throw new StrictJsonException(prefix + field, "must not be empty.") : text;
     }
 
     public static bool Bool(JsonElement value, string prefix, string field, bool? fallback)

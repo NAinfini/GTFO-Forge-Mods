@@ -27,8 +27,17 @@ public static partial class Level
     /// order the game happened to create things in.</summary>
     public static GenerationFingerprint? Fingerprint()
     {
+        GenerationFingerprint? result = null;
+        foreach (var _ in FingerprintSteps(found => result = found)) { }
+        return result;
+    }
+
+    /// <summary><see cref="Fingerprint"/> in steps for a caller that spreads the work over frames: each step is one native scan of the level (about 80 ms on a large level),
+    /// and the name it yields is the scan just done. Run the enumeration to its end, one <c>MoveNext</c> per frame; <paramref name="done"/> then gets the result (null when there is no built floor).</summary>
+    public static IEnumerable<string> FingerprintSteps(Action<GenerationFingerprint?> done)
+    {
         var floor = Builder.CurrentFloor;
-        if (floor == null) return null;
+        if (floor == null) { done(null); yield break; }
         var lines = new Dictionary<string, IReadOnlyList<string>>();
         var zones = new List<string>();
         var areas = new List<string>();
@@ -47,16 +56,25 @@ public static partial class Level
         }
         lines["zones"] = Sorted(zones);
         lines["areas"] = Sorted(areas);
-        lines["doors"] = Sorted(Describe<LG_SecurityDoor>("security").Concat(Describe<LG_WeakDoor>("weak")));
-        lines["terminals"] = Sorted(Describe<LG_ComputerTerminal>("terminal"));
-        lines["containers"] = Sorted(Describe<LG_ResourceContainer_Storage>("container"));
-        lines["generators"] = Sorted(Describe<LG_PowerGenerator_Core>("generator"));
-        lines["items"] = Sorted(Describe<ItemInLevel>("item"));
+        yield return "zones";
+        var security = Describe<LG_SecurityDoor>("security").ToList();
+        yield return "security-doors";
+        var weak = Describe<LG_WeakDoor>("weak").ToList();
+        yield return "weak-doors";
+        lines["doors"] = Sorted(security.Concat(weak));
+        lines["terminals"] = Sorted(Describe<LG_ComputerTerminal>("terminal").ToList());
+        yield return "terminals";
+        lines["containers"] = Sorted(Describe<LG_ResourceContainer_Storage>("container").ToList());
+        yield return "containers";
+        lines["generators"] = Sorted(Describe<LG_PowerGenerator_Core>("generator").ToList());
+        yield return "generators";
+        lines["items"] = Sorted(Describe<ItemInLevel>("item").ToList());
+        yield return "items";
 
         var native = Builder.CombinedCheckSum;
         var nativeChecksum = native != null ? native.Checksum : 0UL;
         var expeditionChecksum = 0U;
-        try { expeditionChecksum = Builder.LevelGenExpedition?.GetChecksum() ?? 0U; } catch (Exception error) { Plugin.Logger.ErrorOnce("Reading the expedition checksum failed; it counts as zero in the level fingerprint: " + error); }
+        try { expeditionChecksum = Builder.LevelGenExpedition?.GetChecksum() ?? 0U; } catch (Exception error) { Plugin.Logger.ErrorOnce("core-reading-expedition-checksum-failed-counts-as", "Reading the expedition checksum failed; it counts as zero in the level fingerprint: " + error); }
 
         var sections = new Dictionary<string, string>
         {
@@ -70,10 +88,14 @@ public static partial class Level
         }
         var whole = new ForgeCore.Fingerprint();
         foreach (var name in sections.Keys.OrderBy(k => k, StringComparer.Ordinal)) whole.Add(name, sections[name]);
-        return new GenerationFingerprint
+        done(new GenerationFingerprint
         {
-            Whole = whole.Hex(), Sections = sections, Lines = lines, NativeChecksum = nativeChecksum, ExpeditionChecksum = expeditionChecksum,
-        };
+            Whole = whole.Hex(),
+            Sections = sections,
+            Lines = lines,
+            NativeChecksum = nativeChecksum,
+            ExpeditionChecksum = expeditionChecksum,
+        });
     }
 
     private static IReadOnlyList<string> Sorted(IEnumerable<string> lines)

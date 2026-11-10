@@ -1,11 +1,13 @@
 using UnityEngine;
-using UnityEngine.AI;
 
 namespace ForgeCore;
 
 public static partial class Level
 {
-    private const float SampleReach = 0.6f, FloorProbe = 1.0f, MaxStep = 1.2f, CapsuleRadius = 0.3f, CapsuleLow = 0.45f, CapsuleHigh = 1.45f, SightHeight = 1.0f;
+    /// <summary>How far the game's navigation mesh may lie from a point that stands on the level's floor: the mesh floats a little above
+    /// the geometry it was baked from, so ground within this reach of a place counts as the place's ground.</summary>
+    public const float SampleReach = 0.6f;
+    private const float FloorProbe = 1.0f, MaxStep = 1.2f, CapsuleRadius = 0.3f, CapsuleLow = 0.45f, CapsuleHigh = 1.45f, SightHeight = 1.0f;
 
     /// <summary>A place a standing player can be put down around <paramref name="origin"/> (a suit, a pod, a lift) facing <paramref name="yaw"/>
     /// degrees: the first of the places at <paramref name="clearance"/> metres (straight behind first, then the back
@@ -23,12 +25,11 @@ public static partial class Level
         {
             StandSpots.Offset(tried, yaw, clearance, preferBehind, out var dx, out var dz);
             var wanted = origin + new Vector3(dx, 0f, dz);
-            if (!NavMesh.SamplePosition(wanted, out var nav, SampleReach, -1)) continue;
-            var ground = nav.position;
+            if (!TrySnap(wanted, SampleReach, out var ground)) continue;
             if (Mathf.Abs(ground.y - origin.y) > MaxStep) continue;
-            if (Physics.Raycast(ground + Vector3.up * FloorProbe, Vector3.down, out var floor, FloorProbe * 2f, mask, QueryTriggerInteraction.Ignore)) ground = floor.point;
-            if (Physics.CheckCapsule(ground + Vector3.up * CapsuleLow, ground + Vector3.up * CapsuleHigh, CapsuleRadius, mask, QueryTriggerInteraction.Ignore)) continue;
-            if (Physics.Linecast(origin + Vector3.up * SightHeight, ground + Vector3.up * SightHeight, mask, QueryTriggerInteraction.Ignore)) continue;
+            if (Physics.Raycast(ground + Vec.Up * FloorProbe, Vec.Down, out var floor, FloorProbe * 2f, mask, QueryTriggerInteraction.Ignore)) ground = floor.point;
+            if (Physics.CheckCapsule(ground + Vec.Up * CapsuleLow, ground + Vec.Up * CapsuleHigh, CapsuleRadius, mask, QueryTriggerInteraction.Ignore)) continue;
+            if (Physics.Linecast(origin + Vec.Up * SightHeight, ground + Vec.Up * SightHeight, mask, QueryTriggerInteraction.Ignore)) continue;
             spot = ground;
             return true;
         }

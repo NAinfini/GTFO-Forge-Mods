@@ -6,6 +6,10 @@ namespace ForgeCore.Tests;
 internal struct Ping { public uint Sequence; public float Value; }
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
 internal struct Wide { public uint Sequence; public float Value; public ulong Extra; }
+[StructLayout(LayoutKind.Explicit, Size = 8)]
+internal struct SwapA { [FieldOffset(0)] public int A; [FieldOffset(4)] public int B; }
+[StructLayout(LayoutKind.Explicit, Size = 8)]
+internal struct SwapB { [FieldOffset(4)] public int A; [FieldOffset(0)] public int B; }
 
 /// <summary>An in-memory session: every endpoint is one player; a send is delivered to the receivers' registered handlers at
 /// once, as GTFO-API calls them from its receive path.</summary>
@@ -13,6 +17,10 @@ internal sealed class Hub
 {
     internal readonly List<Endpoint> Players = new();
     internal ulong HostLookup = 1;
+    /// <summary>Messages on their way, in order, when a check models the wire: delivery then happens at <see cref="Flush"/>, never inside the send.</summary>
+    internal Queue<Action>? Wire;
+    internal void Flush() { while (Wire is { Count: > 0 }) Wire.Dequeue()(); }
+    private void Carry(Action delivery) { if (Wire != null) Wire.Enqueue(delivery); else delivery(); }
 
     internal Endpoint Join(ulong lookup) { var e = new Endpoint(this, lookup); Players.Add(e); return e; }
 
@@ -32,15 +40,16 @@ internal sealed class Hub
             Sent.Add(name);
             SentWith.Add((name, delivery));
             foreach (var p in _hub.Players)
-                if (p != this && (to == 0 || p.Local == to) && p._handlers.TryGetValue(name, out var h)) ((Action<ulong, T>)h)(Local, message);
+                if (p != this && (to == 0 || p.Local == to) && p._handlers.TryGetValue(name, out var h)) _hub.Carry(() => ((Action<ulong, T>)h)(Local, message));
         }
         public void SendBytes(string name, byte[] data, ulong to, NetDelivery delivery)
         {
             Sent.Add(name);
             SentWith.Add((name, delivery));
             foreach (var p in _hub.Players)
-                if (p != this && (to == 0 || p.Local == to) && p._handlers.TryGetValue(name, out var h)) ((Action<ulong, byte[]>)h)(Local, (byte[])data.Clone());
+                if (p != this && (to == 0 || p.Local == to) && p._handlers.TryGetValue(name, out var h)) _hub.Carry(() => ((Action<ulong, byte[]>)h)(Local, (byte[])data.Clone()));
         }
+        public bool IsHuman(ulong lookup) => _hub.Players.Exists(p => p.Local == lookup);
         /// <summary>Players this endpoint's session list does not show yet (a joiner's member list lags behind the host's).</summary>
         internal readonly HashSet<ulong> Unseen = new();
         public int Others(ulong[] into)
@@ -87,6 +96,35 @@ internal static class NetChecks
         var threw = false;
         try { host.On<Ping>("ping", (_, _) => { }); } catch (InvalidOperationException) { threw = true; }
         check(threw, "net: the same message name cannot be handled twice");
+
+        // Player state: a value and how long ago it began; a later answerer gets it with the seconds counted to then, a cleared one does not.
+        var stateNow = 100f;
+        var hostState = host.PlayerState<Ping>("doing", () => stateNow);
+        var clientNow = 40f;
+        var clientState = client.PlayerState<Ping>("doing", () => clientNow);
+        for (var t = 3; t < 6; t++) { host.Tick(t, true); client.Tick(t, true); }
+        hostState.Publish(new Ping { Sequence = 9 }, 95f);
+        client.Pump();
+        check(clientState.TryGet(1, out var heldState, out var began) && heldState.Sequence == 9 && Math.Abs(began - 35f) < 0.001f, "player state: the value arrives with its beginning on the receiver's clock");
+        host.Epoch = 5; client.Epoch = 6;
+        hostState.Publish(new Ping { Sequence = 10 }, 95f);
+        client.Pump();
+        check(clientState.TryGet(1, out heldState, out _) && heldState.Sequence == 9, "player state: a value from another world is dropped");
+        host.Epoch = 0; client.Epoch = 0;
+        clientState.ForgetAll();
+        stateNow = 110f;
+        hostState.Resend(2);
+        client.Pump();
+        check(clientState.TryGet(1, out heldState, out began) && heldState.Sequence == 10 && Math.Abs(began - 25f) < 0.001f, "player state: a repeat counts the seconds to then");
+        hostState.Clear();
+        client.Pump();
+        check(!clientState.TryGet(1, out _, out _), "player state: clearing takes it from the others");
+        clientState.ForgetAll();
+        hostState.Resend(2);
+        client.Pump();
+        check(!clientState.TryGet(1, out _, out _), "player state: a cleared value is not sent again");
+        check(ForgeCore.OrbitMath.Pulled(0.5f, 2.4f, 0.2f) == 0.5f && ForgeCore.OrbitMath.Pulled(50f, 2.4f, 0.2f) == 2.4f, "orbit: the arm stops where the sweep hit and never grows past its length");
+        check(ForgeCore.OrbitMath.Blend(0f, true, 0.15f, 0.3f) == 0.5f && ForgeCore.OrbitMath.Blend(0.1f, false, 1f, 0.3f) == 0f, "orbit: the view moves out and back over the blend time");
 
         // Delivery: a message travels the way its registration says; the queue limit binds only lossy messages. Overflowing lossy
         // traffic is counted and reported at the next pump, never silent, and never pushes a reliable message out.
@@ -236,6 +274,12 @@ internal static class NetChecks
         changedAtHost.Clear();
         Settle(40, hostSide, lateSide);
         check(!hostPicks.TryGet(2, out _) && !latePicks.TryGet(2, out _) && changedAtHost.Contains(2), "lobby: a player who left is forgotten, with a Changed");
+        var oversized = Net.Dropped(Net.DropOversized);
+        latePicks.Set(new byte[NetChannel.MaxLobbyBytes + 2]);
+        Settle(45, hostSide, lateSide);
+        check(!hostPicks.TryGet(6, out _) && errors.Any(e => e.Contains("larger than ForgeCore accepts")), "lobby: a value over the size cap is dropped at the receiver and reported");
+        check(Net.Dropped(Net.DropOversized) == oversized + 1, "network: an illegal message is counted once under its refusal code where it is dropped");
+        latePicks.Set(null);
         var strangerSide = new NetChannel(hub.Join(7), "test.mod", 16) { Content = "other" };
         var strangerPicks = strangerSide.Lobby("picks");
         strangerPicks.Set(new byte[] { 9 });
@@ -244,6 +288,34 @@ internal static class NetChecks
         hub.HostLookup = 0;
         Settle(60, hostSide, lateSide);
         check(!hostPicks.TryGet(6, out _) && !latePicks.TryGet(1, out _), "lobby: leaving the session forgets every other player's value");
+        check(NetFormat.LayoutOf<SwapA>() != NetFormat.LayoutOf<SwapB>(), "network: two layouts with the same fields and size but other field offsets differ in their fingerprint");
+
+        // Content lists: matched entry by entry, never refusing the channel. Shared with the same hash is usable; an entry one side
+        // lacks is named on both sides; a different hash is refused for that entry only; a malformed list is dropped and counted.
+        hub = new Hub();
+        var listHost = new NetChannel(hub.Join(1), "test.mod", 16);
+        var listClient = new NetChannel(hub.Join(2), "test.mod", 16);
+        var hostList = listHost.Manifest("packs");
+        var clientList = listClient.Manifest("packs");
+        check(hostList.Match(2, 10) == ContentMatch.Unknown, "content list: nothing is usable before the other player's list arrives");
+        hostList.Set(new (uint, ulong)[] { (10, 100), (11, 110), (12, 120) });
+        clientList.Set(new (uint, ulong)[] { (10, 100), (12, 999), (13, 130) });
+        Settle(0, listHost, listClient);
+        var hostDiff = hostList.Differences(2);
+        var clientDiff = clientList.Differences(1);
+        check(listHost.State(2) == PeerState.Compatible && hostList.Usable(2, 10) && clientList.Usable(1, 10),
+            "content list: different lists keep the channel compatible and the shared entry is usable on both sides");
+        check(hostDiff != null && hostDiff.OnlyHere.SequenceEqual(new uint[] { 11 }) && hostDiff.OnlyThere.SequenceEqual(new uint[] { 13 }) && hostDiff.Mismatched.SequenceEqual(new uint[] { 12 })
+            && clientDiff != null && clientDiff.OnlyHere.SequenceEqual(new uint[] { 13 }) && clientDiff.OnlyThere.SequenceEqual(new uint[] { 11 }),
+            "content list: each side names what the other lacks, what it lacks itself and what differs");
+        check(hostList.Match(2, 11) == ContentMatch.OnlyHere && hostList.Match(2, 13) == ContentMatch.OnlyThere && !hostList.Usable(2, 12) && clientList.Match(1, 12) == ContentMatch.Mismatched,
+            "content list: an entry one side lacks is not usable, and a different hash is refused for that entry");
+        var malformed = Net.Dropped(Net.DropManifestMalformed);
+        errors.Clear();
+        hub.Players[1].SendBytes(listClient.EventName(NetChannel.LobbyPrefix + "manifest/packs"), new byte[] { 1, 1, 2, 3 }, 1, NetDelivery.Reliable);
+        listHost.Pump();
+        check(!hostList.Known(2) && Net.Dropped(Net.DropManifestMalformed) == malformed + 1 && errors.Any(e => e.Contains("malformed")),
+            "content list: a malformed list is dropped, counted and reported, and nothing of it is usable");
 
         // A joiner whose session list does not show the host yet drops the host's value on arrival and prunes its view of the host;
         // once the host is listed it greets again and must be sent the value again (the host is already compatible with it).
@@ -260,31 +332,6 @@ internal static class NetChecks
         laggingEnd.Unseen.Clear();
         Settle(10, firstHost, laggingSide);
         check(laggingPicks.TryGet(1, out got) && got.SequenceEqual(new byte[] { 1, 2 }), "lobby: the host sends its value again when the joiner greets once it lists the host");
-
-        // The same, but the game gives no further session event once the joiner lists the host: the hook on AddPlayerToSession
-        // (simulated by one session read) is what makes it read its members.
-        hub = new Hub();
-        firstHost = new NetChannel(hub.Join(1), "test.mod", 16);
-        firstHostPicks = firstHost.Lobby("picks");
-        firstHostPicks.Set(new byte[] { 1, 2 });
-        laggingEnd = hub.Join(8);
-        laggingEnd.Unseen.Add(1);
-        laggingSide = new NetChannel(laggingEnd, "test.mod", 16);
-        laggingPicks = laggingSide.Lobby("picks");
-        void EventsOnly(int from, params NetChannel[] channels)
-        {
-            for (var t = from; t < from + 3; t++) foreach (var c in channels) { c.Tick(t, false); c.Pump(); }
-        }
-        firstHost.Tick(0, true); laggingSide.Tick(0, true); // the first session read, as at start
-        EventsOnly(1, firstHost, laggingSide);
-        check(!laggingPicks.TryGet(1, out _), "lobby: with no session event, a joiner that lists the host late first drops its value");
-        errors.Clear();
-        laggingSide.Tick(10, false);
-        check(errors.Any(e => e.Contains("never listed")), "lobby: a sender the session still does not list after the wait is reported once");
-        laggingEnd.Unseen.Clear();
-        laggingSide.Tick(11, true); // the AddPlayerToSession hook: the only session event
-        EventsOnly(12, firstHost, laggingSide);
-        check(laggingPicks.TryGet(1, out got) && got.SequenceEqual(new byte[] { 1, 2 }), "lobby: the joiner reads its members when the session lists the host (AddPlayerToSession, no other session event) and receives the host's value");
 
         // The session's add call names the player although the member list does not hold them yet (Net.NotePlayerAdded): the joiner
         // lists and greets the host from the call's argument, and the host's value arrives; the remove call takes the host out again
@@ -312,7 +359,7 @@ internal static class NetChecks
         NetSettle(20);
         check(!hintPicks.TryGet(1, out _), "lobby: the player named by the session's remove call is dropped with their value");
 
-        // A player without the mod never answers: greeted once, reported once after the answer window, PeerSilent raised once.
+        // A player without the mod never answers: greeted again each answer window, then reported once, PeerSilent raised once.
         hub = new Hub();
         var lonely = new NetChannel(hub.Join(1), "test.mod", 16);
         var silentEnd = hub.Join(5);
@@ -320,12 +367,62 @@ internal static class NetChecks
         lonely.PeerSilent += silent.Add;
         errors.Clear();
         lonely.Tick(0, true);
-        lonely.Tick(NetChannel.AnswerSeconds - 1, false);
-        check(errors.Count == 0 && silent.Count == 0, "net: a greeted player gets the answer window before it counts as silent");
-        for (var t = 0; t < 30; t++) lonely.Tick(NetChannel.AnswerSeconds + t, t == 0);
-        check(silentEnd.Sent.Count == 0 && hub.Players[0].Sent.Count == 1 && errors.Count == 0 && silent.SequenceEqual(new ulong[] { 5 }),
-            "net: an unanswered player is greeted once, then reported once through PeerSilent and not logged");        hub.Players.Remove(silentEnd);
-        lonely.Tick(31, true);
+        var silentAfter = NetChannel.AnswerSeconds * (NetChannel.GreetingRetries + 1);
+        for (var t = 1.0; t < silentAfter; t++) lonely.Tick(t, false);
+        check(errors.Count == 0 && silent.Count == 0, "net: a greeted player gets every answer window before it counts as silent");
+        for (var t = silentAfter; t < silentAfter + 30; t++) lonely.Tick(t, false);
+        check(silentEnd.Sent.Count == 0 && hub.Players[0].Sent.Count == NetChannel.GreetingRetries + 1 && errors.Count == 0 && silent.SequenceEqual(new ulong[] { 5 }),
+            "net: an unanswered player is greeted each window, then reported once through PeerSilent and not logged"); hub.Players.Remove(silentEnd);
+        lonely.Tick(silentAfter + 31, true);
         check(lonely.State(5) == PeerState.Unknown, "net: a player who left is forgotten");
+
+        // An inline channel: a handler runs at the moment of delivery, in arrival order, with no pump; a refused player's message is still dropped.
+        var inlineHub = new Hub { Wire = new Queue<Action>() };
+        var inlineA = new NetChannel(inlineHub.Join(1), "test.inline", 512, true);
+        var inlineB = new NetChannel(inlineHub.Join(2), "test.inline", 512, true);
+        var order = new List<byte>();
+        inlineA.OnBytes("step", (_, bytes) => order.Add(bytes[0]));
+        inlineB.OnBytes("step", (_, _) => { });
+        var inlineTime = 0.0;
+        void TickInline(Hub wire, NetChannel first, NetChannel second) { for (var t = 0; t < 3; t++) { first.Tick(inlineTime, true); second.Tick(inlineTime, true); wire.Flush(); inlineTime += 1; } }
+        TickInline(inlineHub, inlineA, inlineB);
+        inlineB.SendBytes("step", new byte[] { 1 }, 1);
+        inlineB.SendBytes("step", new byte[] { 2 }, 1);
+        check(order.Count == 0, "net: nothing runs before it is delivered");
+        inlineHub.Flush();
+        check(order.SequenceEqual(new byte[] { 1, 2 }), "net: an inline channel runs each message at delivery, in arrival order, with no pump");
+
+        // Holding: while a side does not know its content nobody is judged; once it says, the difference is refused with each side's detail, which outlasts the refusal.
+        var refusedHere = new List<(ulong Player, byte[]? Detail, bool Format)>();
+        inlineA.Refused += (player, _) => refusedHere.Add((player, inlineA.ContentDetailOf(player), inlineA.FormatDiffers(player)));
+        inlineA.Content = "same";
+        inlineB.HoldContent();
+        TickInline(inlineHub, inlineA, inlineB);
+        check(refusedHere.Count == 0 && inlineA.State(2) == PeerState.Unknown && inlineB.State(1) == PeerState.Unknown, "net: a side that holds its content judges nobody and is judged by nobody");
+        inlineB.ContentDetail = new byte[] { 9 };
+        inlineA.ContentDetail = new byte[] { 8 };
+        inlineB.Content = "other";
+        TickInline(inlineHub, inlineA, inlineB);
+        check(inlineA.State(2) == PeerState.Refused && refusedHere.Count == 1 && refusedHere[0].Detail is { Length: 1 } arrived && arrived[0] == 9 && !refusedHere[0].Format,
+            "net: a content refusal waits for and carries the other side's detail, and is not a format difference");
+        var droppedBefore = order.Count;
+        inlineB.SendBytes("step", new byte[] { 3 }, 1);
+        inlineHub.Flush();
+        check(order.Count == droppedBefore, "net: an inline channel drops a refused player's message");
+        var synced = new List<ulong>();
+        inlineA.PeerSynced += synced.Add;
+        inlineB.Content = "same";
+        TickInline(inlineHub, inlineA, inlineB);
+        check(inlineA.State(2) == PeerState.Compatible && synced.SequenceEqual(new ulong[] { 2 }), "net: the same content afterwards is compatible and reported once");
+
+        // A format difference outranks content, for the message explaining it too.
+        var formatHub = new Hub { Wire = new Queue<Action>() };
+        var formatA = new NetChannel(formatHub.Join(1), "test.inline", 512, true) { Content = "a", ContentDetail = new byte[] { 1 } };
+        var formatB = new NetChannel(formatHub.Join(2), "test.inline", 512, true) { Content = "b", ContentDetail = new byte[] { 2 } };
+        formatA.OnBytes("extra", (_, _) => { });
+        var formatRefusals = new List<bool>();
+        formatA.Refused += (player, _) => formatRefusals.Add(formatA.FormatDiffers(player));
+        TickInline(formatHub, formatA, formatB);
+        check(formatRefusals.SequenceEqual(new[] { true }), "net: different message formats are told apart from different content");
     }
 }

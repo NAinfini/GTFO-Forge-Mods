@@ -8,6 +8,46 @@ using System.Text.Json;
 
 namespace ForgeCore;
 
+/// <summary>The answer of <c>DataBlocks.Check</c> and <c>DataBlocks.AddAll</c>.</summary>
+public enum DataBlockResult
+{
+    /// <summary>The ID is free (<c>Check</c> only).</summary>
+    Free,
+    /// <summary>Added and read back.</summary>
+    Added,
+    /// <summary>This mod added the same block (same ID and name) before; nothing changed.</summary>
+    AlreadyAdded,
+    /// <summary>The ID or name belongs to the game or another mod (or this mod under another name); nothing changed.</summary>
+    Conflict,
+    /// <summary>Publishing or reading the block back failed; every block of the call was removed again.</summary>
+    ReadbackFailed,
+}
+
+/// <summary>Which mod added which data block: blocks are only added, never changed, and an ID taken by anyone else is refused. One
+/// ledger for the process, written by every successful publication of <see cref="NativeDataBlockTables"/>.</summary>
+internal sealed class DataBlockLedger
+{
+    internal static readonly DataBlockLedger Shared = new();
+
+    private readonly Dictionary<(string Table, uint Id), (string Mod, string Name)> _owners = new();
+
+    /// <summary>Whether <paramref name="modId"/> may add block <paramref name="id"/> named <paramref name="name"/> to
+    /// <paramref name="table"/>, given the name of the block the table already has under that ID (null: none).</summary>
+    internal DataBlockResult Decide(string table, uint id, string modId, string name, string? existingName)
+    {
+        if (id == 0) throw new ArgumentOutOfRangeException(nameof(id), "Data block ID 0 is never valid.");
+        if (string.IsNullOrEmpty(name)) throw new ArgumentException("Name the data block.", nameof(name));
+        if (existingName == null) return DataBlockResult.Free;
+        return _owners.TryGetValue((table, id), out var owner) && owner.Mod == modId && owner.Name == name && existingName == name
+            ? DataBlockResult.AlreadyAdded
+            : DataBlockResult.Conflict;
+    }
+
+    internal void Owns(string table, uint id, string modId, string name) => _owners[(table, id)] = (modId, name);
+
+    internal string? OwnerOf(string table, uint id) => _owners.TryGetValue((table, id), out var owner) ? owner.Mod : null;
+}
+
 /// <summary>One already-resolved native definition, registered through <see cref="NativeDataBlockTables.Register"/>.</summary>
 public readonly record struct NativeDataBlockRegistration(string Type, string Name, uint PersistentId, string Json,
     uint? SourceId = null);
@@ -56,6 +96,11 @@ public static partial class NativeDataBlockTables
                 throw new InvalidOperationException("Native source link differs: " + type + "/" + sourceId + "." + link.Key);
     }
 
+    /// <summary>Whether a Forge publication (<see cref="Register"/> or a code-built add) put row <paramref name="id"/> into the
+    /// <paramref name="type"/> table: a row is found by its number, and this tells a package's own row from a vanilla or foreign
+    /// one without relying on its name.</summary>
+    public static bool IsPublished(string type, uint id) => DataBlockLedger.Shared.OwnerOf(type + "DataBlock", id) != null;
+
     public static object RequireBlock(string type, uint id)
     {
         var reader = BlockReader(NativeType("GameData." + type + "DataBlock"));
@@ -69,7 +114,8 @@ public static partial class NativeDataBlockTables
     /// indexes and verifies the result. A failed publication removes only entries still identifiable as ours,
     /// in reverse order. Ambiguous ownership or unsafe index shifts preserve the shared data and latch unknown
     /// state rather than advertise a clean refusal.</summary>
-    public static void Register(IReadOnlyList<NativeDataBlockRegistration> definitions, bool strictFields = false)
+    public static void Register(IReadOnlyList<NativeDataBlockRegistration> definitions, bool strictFields = false,
+        string owner = "Forge content")
     {
         ArgumentNullException.ThrowIfNull(definitions);
         if (LastRollbackFailure is { } previous) throw new NativeDataBlockRollbackException(previous);
@@ -94,17 +140,90 @@ public static partial class NativeDataBlockTables
             if ((uint)Get(value, "persistentID")! != definition.PersistentId
                 || (string)Get(value, "name")! != definition.Name)
                 throw new InvalidOperationException("Native block identity changed during deserialization: " + definition.Name);
-            if ((bool)Call(Get(type, "s_blockByID")!, "ContainsKey", definition.PersistentId)!)
-            {
-                var occupied = Call(Get(type, "s_blockByID")!, "get_Item", definition.PersistentId)!;
-                throw new NativeDataBlockConflictException("Native ID collision: " + definition.Name + " and loaded:" + definition.Type + "/"
-                    + Get(occupied, "name") + " / " + definition.PersistentId);
-            }
-            if ((bool)Call(Get(type, "s_blockIDByName")!, "ContainsKey", definition.Name)!)
-                throw new NativeDataBlockConflictException("Native name collision: " + definition.Name + " / "
-                    + Call(Get(type, "s_blockIDByName")!, "get_Item", definition.Name));
+            // Register is never idempotent: a row any owner published before is a collision too.
+            if (Classify(type, owner, definition.PersistentId, definition.Name, out var reason) != DataBlockResult.Free)
+                throw new NativeDataBlockConflictException(reason);
             rows.Add(new Prepared(type, definition, value, strictFields ? document.RootElement.Clone() : null));
         }
+        Publish(rows, owner);
+    }
+
+    /// <summary>Adds blocks built in code (a donor <c>DataBlocks.Clone</c> with changed fields) through the same transaction as
+    /// <see cref="Register"/>: every block is checked before the first table changes, a failed publication is removed again. A block
+    /// <paramref name="owner"/> published before (same table, ID and name) is skipped; any other occupant of its ID or name is a
+    /// <see cref="NativeDataBlockConflictException"/> and nothing changes. Returns how many blocks were written.</summary>
+    internal static int Add(string owner, IReadOnlyList<object> blocks)
+    {
+        ArgumentNullException.ThrowIfNull(blocks);
+        if (LastRollbackFailure is { } previous) throw new NativeDataBlockRollbackException(previous);
+        var rows = new List<Prepared>();
+        var ids = new HashSet<(Type, uint)>(); var names = new HashSet<(Type, string)>();
+        foreach (var block in blocks)
+        {
+            var table = block.GetType();
+            uint id = (uint)Get(block, "persistentID")!; var name = (string?)Get(block, "name") ?? "";
+            if (id == 0 || name.Length == 0 || !ids.Add((table, id)) || !names.Add((table, name)))
+                throw new InvalidOperationException("Duplicate or invalid native block identity: " + name);
+            var decision = Classify(table, owner, id, name, out var reason);
+            if (decision == DataBlockResult.Conflict) throw new NativeDataBlockConflictException(reason);
+            if (decision == DataBlockResult.Free)
+                rows.Add(new Prepared(table, new NativeDataBlockRegistration(Label(table), name, id, ""), block, null));
+        }
+        if (rows.Count != 0) Publish(rows, owner);
+        return rows.Count;
+    }
+
+    private static string Label(Type table) => table.Name.EndsWith("DataBlock", StringComparison.Ordinal) ? table.Name[..^9] : table.Name;
+
+    /// <summary>The one occupancy check of every way into the tables. Free: the ID and name are unused (and, for an item, no prefab
+    /// table holds the ID). AlreadyAdded: <paramref name="owner"/> published this very block. Conflict: anything else, with the
+    /// occupant, and its owner when the ledger knows it, in <paramref name="reason"/>.</summary>
+    internal static DataBlockResult Classify(Type table, string owner, uint id, string name, out string reason)
+    {
+        reason = "";
+        var byId = Get(table, "s_blockByID")!; var byName = Get(table, "s_blockIDByName")!;
+        var occupant = Has(byId, id) ? (string?)Get(Call(byId, "get_Item", id)!, "name") ?? "" : null;
+        var decision = DataBlockLedger.Shared.Decide(table.Name, id, owner, name, occupant);
+        if (decision != DataBlockResult.Free)
+        {
+            var holder = DataBlockLedger.Shared.OwnerOf(table.Name, id);
+            reason = "Native ID collision: " + name + " and loaded:" + Label(table) + "/" + occupant + " / " + id
+                + (holder == null ? "" : " (added by " + holder + ")");
+            return decision;
+        }
+        if (Has(byName, name))
+        {
+            reason = "Native name collision: " + name + " / " + Call(byName, "get_Item", name);
+            return DataBlockResult.Conflict;
+        }
+        if (PrefabCollision(table, id) is { } mode)
+        {
+            reason = "Native item prefab collision: " + name + " / " + id + " in mode " + mode;
+            return DataBlockResult.Conflict;
+        }
+        return DataBlockResult.Free;
+    }
+
+    // The game builds its item prefab tables from the item blocks once; an item ID a built table already holds belongs to another
+    // block and would hand this item that block's prefabs. No such table (not built yet, or no such game class): nothing collides.
+    private static int? PrefabCollision(Type table, uint id)
+    {
+        if (table.Name != "ItemDataBlock" || FindNativeType("ItemSpawnManager") is not { } manager) return null;
+        var member = (object?)manager.GetProperty("m_loadedPrefabsPerItemMode", Members) ?? manager.GetField("m_loadedPrefabsPerItemMode", Members);
+        if (member == null || Get(manager, "m_loadedPrefabsPerItemMode") is not { } modes) return null;
+        int count = modes is Array array ? array.Length : (int)Get(modes, "Length")!;
+        for (int mode = 0; mode < count; mode++)
+        {
+            var prefabs = modes is Array plain ? plain.GetValue(mode) : Call(modes, "get_Item", mode);
+            if (prefabs != null && Has(prefabs, id)) return mode;
+        }
+        return null;
+    }
+
+    // Publishes every prepared row into the three native indexes, reads each back and, on any failure, removes only what is provably
+    // ours. Success records the rows in the ledger under <paramref name="owner"/>.
+    private static void Publish(List<Prepared> rows, string owner)
+    {
         try
         {
             foreach (var row in rows)
@@ -151,6 +270,8 @@ public static partial class NativeDataBlockTables
                 }
                 catch { row.ReadbackFailed = true; throw; }
             }
+            foreach (var row in rows) Published(row.Value);
+            foreach (var row in rows) DataBlockLedger.Shared.Owns(row.Table.Name, row.Definition.PersistentId, owner, row.Definition.Name);
         }
         catch (Exception original)
         {
@@ -230,6 +351,9 @@ public static partial class NativeDataBlockTables
             throw;
         }
     }
+
+    /// <summary>A game cache built from a table before this publication learns the new row (Native: Text).</summary>
+    static partial void Published(object block);
 
     private static bool Has(object map, object key) => (bool)Call(map, "ContainsKey", key)!;
     private static bool OwnsId(Prepared row) => Has(row.ById, row.Definition.PersistentId)
@@ -392,13 +516,13 @@ public static partial class NativeDataBlockTables
         BlockReaders.Add(type, reader);
         return reader;
     }
-    private static Type NativeType(string name)
+    private static Type NativeType(string name) => FindNativeType(name) ?? throw new InvalidOperationException("Native type unavailable: " + name);
+    private static Type? FindNativeType(string name)
     {
         if (NativeTypes.TryGetValue(name, out var cached)) return cached;
         var type = AppDomain.CurrentDomain.GetAssemblies()
-            .Select(assembly => assembly.GetType(name, false)).FirstOrDefault(type => type != null)
-            ?? throw new InvalidOperationException("Native type unavailable: " + name);
-        NativeTypes.Add(name, type);
+            .Select(assembly => assembly.GetType(name, false)).FirstOrDefault(type => type != null);
+        if (type != null) NativeTypes.Add(name, type);
         return type;
     }
     private static object? Get(object target, string name)
@@ -430,5 +554,44 @@ public static partial class NativeDataBlockTables
                 && candidate.IsGenericMethodDefinition).MakeGenericMethod(type));
         return method.Invoke(null, new[] { (object)json, Get(cellJson, "JSONSettings_GameData") })
             ?? throw new InvalidOperationException("Native block deserialization returned null.");
+    }
+    private static MethodInfo? _serializer;
+    /// <summary>The block as the game's own CellJSON writes it with its data-block settings (the inverse of <see cref="Deserialize"/>).
+    /// Private caches the game fills in are not written, but public state fields are: see <see cref="WithoutRuntimeState"/>.</summary>
+    internal static string Serialize(object block)
+    {
+        var cellJson = NativeType("CellJSON");
+        _serializer ??= cellJson.GetMethods(Members).Single(candidate => candidate.Name == "SerializeNoFormatting"
+            && !candidate.IsGenericMethodDefinition && candidate.GetParameters().Length == 2);
+        return _serializer.Invoke(null, new[] { block, Get(cellJson, "JSONSettings_GameData") }) as string
+            ?? throw new InvalidOperationException("Native block serialization returned null.");
+    }
+
+    /// <summary>Public fields of a block type's objects that the game itself writes while it plays and CellJSON still writes out, by block
+    /// type. MusicStateDataBlock: every timed music entry (MusicDataTimed in m_EventsOnTime, m_SwitchesOnTime and the Inactive lists)
+    /// carries the music machine's own timer, which MUS_Base.ResetTimedData and CheckTimedData set on every state change in a level, so
+    /// the block reads differently after each level although no file changed.</summary>
+    private static readonly Dictionary<string, HashSet<string>> RuntimeState = new(StringComparer.Ordinal)
+    {
+        ["MusicStateDataBlock"] = new(StringComparer.OrdinalIgnoreCase) { "active", "nextTrigger", "timeIsClockRelative" },
+    };
+
+    /// <summary>A block's serialized text (<see cref="Serialize"/>) without the state fields the game writes into a block of that type while
+    /// it plays (<see cref="RuntimeState"/>), at any depth; every other field, and the text of a type with no such fields, is left as is.</summary>
+    internal static string WithoutRuntimeState(string blockType, string json)
+    {
+        if (!RuntimeState.TryGetValue(blockType, out var names)) return json;
+        var root = System.Text.Json.Nodes.JsonNode.Parse(json);
+        Strip(root, names);
+        return root?.ToJsonString() ?? json;
+    }
+    private static void Strip(System.Text.Json.Nodes.JsonNode? node, HashSet<string> names)
+    {
+        if (node is System.Text.Json.Nodes.JsonObject obj)
+        {
+            foreach (var key in obj.Select(pair => pair.Key).Where(names.Contains).ToList()) obj.Remove(key);
+            foreach (var pair in obj) Strip(pair.Value, names);
+        }
+        else if (node is System.Text.Json.Nodes.JsonArray array) foreach (var item in array) Strip(item, names);
     }
 }

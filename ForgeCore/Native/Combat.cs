@@ -23,7 +23,7 @@ public static partial class Combat
     public static void Explode(Vector3 position, float radius, float damage, float force, int targetMask, bool applyForce,
         DamageUtil.ExplosionDamageType type, uint sourceId)
     {
-        DamageUtil.DoExplosionDamage_Capsule(position, Vector3.zero, radius, 0f, radius, 0f, damage, targetMask,
+        DamageUtil.DoExplosionDamage_Capsule(position, Vec.Zero, radius, 0f, radius, 0f, damage, targetMask,
             LayerManager.MASK_EXPLOSION_BLOCKERS, applyForce, force, null, type, sourceId);
     }
 
@@ -33,6 +33,12 @@ public static partial class Combat
     /// (and makes nothing) for a radius of 0 or less or without a course node.</summary>
     public static bool Noise(Vector3 position, float radius, AIG_CourseNode? node)
         => Noise(position, 0f, radius, 1f, node, NM_NoiseType.InstaDetect, true, false);
+
+    /// <summary><see cref="Noise(Vector3, float, AIG_CourseNode?)"/> at <paramref name="position"/> with the area that holds it found here
+    /// (<see cref="Level.CourseNodeAt"/>, one metre search, <paramref name="preferredDimension"/> tried first; -1: none preferred). Returns false
+    /// (and makes nothing) outside every area, where there is no enemy to alert, as well as for a radius of 0 or less.</summary>
+    public static bool Noise(Vector3 position, float radius, int preferredDimension = -1)
+        => radius > 0f && Level.CourseNodeAt(position, 1f, out var node, out _, preferredDimension) && Noise(position, radius, node);
 
     /// <summary>The game's one noise entry (<c>NoiseManager.MakeNoise</c>) with every field of the request given: no noise maker, a
     /// loudness band from <paramref name="radiusMin"/> to <paramref name="radiusMax"/>, how much the vertical distance counts
@@ -84,8 +90,8 @@ public static partial class Combat
 
     /// <summary>A melee hit through the enemy receiver's own request (<c>Dam_EnemyDamageBase.MeleeDamage</c>): <paramref name="damage"/>, the
     /// stagger multiplier the game applies on top of the hit, and no other multiplier (the sleeper, precision and the other two are 1), no
-    /// directional bonus, normal noise, gear category 0. The enemy settles it on the host; on a client the game forwards the request and the
-    /// host settles it, so the settlement read here is then the pre-reply value.</summary>
+    /// directional bonus, normal noise, gear category 0. The game applies it on this peer, on a client too (an enemy receiver's gates answer true on every machine), and
+    /// sends its own packet, so the settlement read here is this peer's; host-only submission is the caller's.</summary>
     public static DamageSettlement Melee(Dam_EnemyDamageBase receiver, float damage, Agent? source, Vector3 position, Vector3 direction, float staggerMultiplier)
     {
         if (receiver == null) throw new ArgumentNullException(nameof(receiver));

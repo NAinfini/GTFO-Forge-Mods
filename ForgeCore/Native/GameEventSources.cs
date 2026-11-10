@@ -34,6 +34,9 @@ internal static class GameEventSources
         // lists or drops one (the events above still cover a host change or session reset).
         GameHooks.SessionPlayerAdded.After(static (player, _) => Listed(player, true));
         GameHooks.SessionPlayerRemoved.After(static (player, _) => Listed(player, false));
+        // A new session's host is found after its join events, and a player alone gets no later event: read it here.
+        GameHooks.MasterFound.After(static (_, _) => ReadMaster());
+        GameHooks.MasterMigrationFound.After(static (_, _) => GameEvents.NoteMasterMigrated());
         LevelAPI.OnLevelCleanup += GameEvents.NoteLevelEnded;
         EventAPI.OnCheckpointReached += GameEvents.NoteCheckpointReached;
         EventAPI.OnCheckpointReloaded += Checkpoint.NoteReloaded;
@@ -43,19 +46,27 @@ internal static class GameEventSources
     /// <summary>The call's own player is handed to <see cref="Net"/>, so the list is right whatever <c>PlayersInSession</c> holds at that moment.</summary>
     private static void Listed(SNet_Player? player, bool added)
     {
+        if (player != null) Players.NoteSession(new SessionPlayer(player.Lookup, player.IsBot, player.IsLocal), added);
         if (player == null || player.IsBot || player.IsLocal) { Net.NoteSession(); return; }
         if (added) Net.NotePlayerAdded(player.Lookup);
         else Net.NotePlayerRemoved(player.Lookup);
     }
 
     private static void StateChanged(eGameStateName oldState, eGameStateName newState)
-        => GameEvents.NoteLobby(newState == eGameStateName.Lobby);
+    {
+        GameEvents.NoteLobby(newState == eGameStateName.Lobby);
+        GameEvents.NoteState();
+    }
 
     private static void ReadMaster()
     {
         Net.NoteSession();
-        try { GameEvents.NoteMaster(SNet.Master?.Lookup ?? 0); }
-        catch (Exception error) { Plugin.Logger.ErrorOnce("Reading the session host failed: " + error); }
+        try
+        {
+            var localChanged = Session.NoteLocal(SNet.LocalPlayer?.Lookup ?? 0);
+            GameEvents.NoteMaster(SNet.Master?.Lookup ?? 0, localChanged);
+        }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("core-reading-session-host-failed", "Reading the session host failed: " + error); }
     }
 }
 
@@ -88,7 +99,7 @@ internal static class ExpeditionSelectedHooks
     [HarmonyPriority(Priority.Last)]
     private static void Stored(pActiveExpedition __0)
     {
-        if (SNet.IsMaster) return;
+        if (Session.IsHost) return;
         GameEvents.NoteExpeditionSelected(__0.rundownType == eRundownKey.Local ? Globals.Global.RundownIdToLoad : null, (int)__0.tier, __0.expeditionIndex);
     }
 }

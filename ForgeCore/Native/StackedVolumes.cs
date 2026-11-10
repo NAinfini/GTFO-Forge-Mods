@@ -1,7 +1,6 @@
 using System;
 using AIGraph;
 using HarmonyLib;
-using LevelGeneration;
 using UnityEngine;
 
 namespace ForgeCore;
@@ -21,15 +20,19 @@ public static class StackedVolumes
 
     /// <summary>Registers <paramref name="room"/> as the owner of the box from <paramref name="localMin"/> to <paramref name="localMax"/>
     /// measured in the room's own frame (turned by its yaw, so a room off the grid keeps its true footprint) in <paramref name="dimension"/>,
-    /// and puts the lookup patch on (first call). The room's volume is read at lookup time: until the game has made it, the room takes
-    /// no part in a choice.</summary>
+    /// and puts the lookup patch on (first call). The box is taken at the room's pose of this call; a room moved or turned after it was
+    /// registered calls again, and the new box replaces the room's earlier one. The room's volume is read at lookup time: until the game
+    /// has made it, the room takes no part in a choice.</summary>
     public static void Register(eDimensionIndex dimension, Vector3 localMin, Vector3 localMax, LG_Geomorph room)
     {
         if (room == null) throw new ArgumentNullException(nameof(room));
         Patches.Ensure(Modules.StackedVolumes, typeof(GeomorphVolumeLookupHook));
         var pose = room.transform; var origin = pose.position;
-        _boxes.Add(new VolumeBox((int)dimension, origin.x, origin.z, pose.eulerAngles.y * Mathf.Deg2Rad,
-            localMin.x, origin.y + localMin.y, localMin.z, localMax.x, origin.y + localMax.y, localMax.z));
+        var box = new VolumeBox((int)dimension, origin.x, origin.z, pose.eulerAngles.y * Mathf.Deg2Rad,
+            localMin.x, origin.y + localMin.y, localMin.z, localMax.x, origin.y + localMax.y, localMax.z);
+        var index = Array.FindIndex(_rooms, registered => registered.Pointer == room.Pointer);
+        if (index >= 0) { _boxes.Replace(index, box); return; }
+        _boxes.Add(box);
         _rooms = [.. _rooms, room];
     }
 
@@ -67,16 +70,18 @@ public static class StackedVolumes
         return volume != null;
     }
 }
-/// <summary>The one patch on <c>AIG_GeomorphNodeVolume.TryGetGeomorphVolume</c>: after the game's body and every other postfix, a position
-/// inside a registered room's extent is answered with that room's volume (<see cref="StackedVolumes"/>).</summary>
+/// <summary>The one patch on <c>AIG_GeomorphNodeVolume.TryGetGeomorphVolume</c>: a position inside a registered room's extent is answered
+/// with that room's volume (<see cref="StackedVolumes"/>) and the game's body is skipped. It is a prefix because the game's own body
+/// logs "Borken cell ... grouping or root" for every cell it cannot match, and a postfix would only fix the answer after that log.</summary>
 internal static class GeomorphVolumeLookupHook
 {
     [HarmonyPatch(typeof(AIG_GeomorphNodeVolume), nameof(AIG_GeomorphNodeVolume.TryGetGeomorphVolume))]
-    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
-    private static void Postfix(eDimensionIndex dimensionIndex, Vector3 pos, ref AIG_GeomorphNodeVolume resultingGeoVolume, ref bool __result)
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static bool Prefix(eDimensionIndex dimensionIndex, Vector3 pos, ref AIG_GeomorphNodeVolume resultingGeoVolume, ref bool __result)
     {
-        if (!StackedVolumes.TryPick(dimensionIndex, pos, out var volume)) return;
+        if (!StackedVolumes.TryPick(dimensionIndex, pos, out var volume)) return true;
         resultingGeoVolume = volume!;
         __result = true;
+        return false;
     }
 }

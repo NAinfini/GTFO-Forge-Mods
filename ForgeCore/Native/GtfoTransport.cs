@@ -15,16 +15,20 @@ internal sealed class GtfoTransport : INetTransport
 
     public void RegisterBytes(string name, Action<ulong, byte[]> receive) => NetworkAPI.RegisterFreeSizedEvent(name, receive);
 
-    public void Send<T>(string name, T message, ulong to, NetDelivery delivery) where T : unmanaged
+    public unsafe void Send<T>(string name, T message, ulong to, NetDelivery delivery) where T : unmanaged
     {
         if (to == 0) NetworkAPI.InvokeEvent(name, message, Channel(delivery));
-        else NetworkAPI.InvokeEvent(name, message, Player(to), Channel(delivery));
+        else if (SNet.TryGetPlayer(to, out var player) && player != null) NetworkAPI.InvokeEvent(name, message, player, Channel(delivery));
+        else return;
+        Net.CountSent(sizeof(T), delivery);
     }
 
     public void SendBytes(string name, byte[] data, ulong to, NetDelivery delivery)
     {
         if (to == 0) NetworkAPI.InvokeFreeSizedEvent(name, data, Channel(delivery));
-        else NetworkAPI.InvokeFreeSizedEvent(name, data, Player(to), Channel(delivery));
+        else if (SNet.TryGetPlayer(to, out var player) && player != null) NetworkAPI.InvokeFreeSizedEvent(name, data, player, Channel(delivery));
+        else return;
+        Net.CountSent(data.Length, delivery);
     }
 
     public ulong Local => SNet.LocalPlayer?.Lookup ?? 0;
@@ -48,6 +52,5 @@ internal sealed class GtfoTransport : INetTransport
         return count;
     }
 
-    private static SNet_Player Player(ulong lookup)
-        => SNet.TryGetPlayer(lookup, out var player) && player != null ? player : throw new InvalidOperationException("Player " + lookup + " is not in the session.");
+    public bool IsHuman(ulong lookup) => SNet.TryGetPlayer(lookup, out var player) && player != null && !player.IsBot;
 }

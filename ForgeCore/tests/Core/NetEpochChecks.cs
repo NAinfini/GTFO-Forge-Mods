@@ -82,5 +82,93 @@ internal static class NetEpochChecks
         seenSynced.Clear();
         lateHost.Content = "changed"; lateClient.Content = "changed";
         for (var t = 61; t < 65; t++) { lateHost.Tick(t, false); lateClient.Tick(t, false); lateClient.Pump(); lateHost.Pump(); }
-        check(seenSynced.Count >= 1, "net sync: a content change syncs the player again");    }
+        check(seenSynced.Count >= 1, "net sync: a content change syncs the player again");
+        FollowWorldChecks(check);
+    }
+
+    /// <summary>The channel follows the game's world: the host mints an epoch when the world is ready, and a host change, migration,
+    /// checkpoint reload or level end drops it (a client takes the host's next one, never an older one).</summary>
+    private static void FollowWorldChecks(Action<bool, string> check)
+    {
+        GameEvents.Reset();
+        var inLevel = false;
+        var built = true;
+        Net.WorldProbe = () => inLevel;
+        var hub = new Hub();
+        var host = new NetChannel(hub.Join(1), "follow.mod", 4);
+        var client = new NetChannel(hub.Join(2), "follow.mod", 4);
+        var atHost = new List<uint>();
+        host.OnEpoch<Stamped>("stamped", (_, m) => atHost.Add(m.Value));
+        client.OnEpoch<Stamped>("stamped", (_, _) => { });
+        var slotNow = 10f;
+        var hostSlot = host.PlayerState<Stamped>("doing", () => slotNow);
+        var clientSlot = client.PlayerState<Stamped>("doing", () => slotNow);
+        host.FollowWorld(() => built); client.FollowWorld(() => built);
+        var resets = 0;
+        host.WorldReset += () => resets++;
+        double clock = 0;
+        void Spin()
+        {
+            for (var i = 0; i < 3; i++) { host.Pump(); client.Pump(); host.Tick(clock++, i == 0); client.Tick(clock++, i == 0); }
+        }
+        Spin();
+        check(host.Epoch == 0 && !host.Live && client.Epoch == 0, "net world: with no world ready nothing is minted and the channel is not live");
+        inLevel = true; Spin();
+        var first = host.Epoch;
+        check(first != 0 && host.Live && client.Live && client.Epoch == first, "net world: the host mints an epoch when the world is ready and the client adopts it");
+
+        client.ToHost("stamped", new Stamped { Epoch = first, Value = 1 });
+        GameEvents.NoteMaster(3);
+        var second = host.Epoch;
+        check(second > first && resets == 1 && client.Epoch == 0, "net world: a host change drops the world; the host mints a higher epoch at once, the client waits for it");
+        Spin();
+        client.ToHost("stamped", new Stamped { Epoch = first, Value = 2 });
+        client.ToHost("stamped", new Stamped { Epoch = second, Value = 3 });
+        host.Pump();
+        check(client.Epoch == second && atHost.SequenceEqual(new uint[] { 3 }), "net world: the client adopts the new epoch and a message of the old one is refused");
+
+        GameEvents.NoteMasterMigrated(); Spin();
+        var third = host.Epoch;
+        GameEvents.NoteCheckpointReloaded(); Spin();
+        check(third > second && host.Epoch > third && client.Epoch == host.Epoch, "net world: a migration and a checkpoint reload each start a higher epoch");
+
+        built = false; Spin();
+        check(!host.Live && host.Epoch != 0, "net world: when the mod's own readiness drops the channel is not live but the world stays");
+        built = true;
+        GameEvents.NoteLevelEnded();
+        check(host.Epoch == 0 && !host.Live && client.Epoch == 0, "net world: a level end drops the world");
+        Spin();
+        check(host.Epoch == 0, "net world: the world does not restart while the game still reports the ended level");
+        inLevel = false; Spin(); inLevel = true; Spin();
+        check(host.Epoch > third && client.Epoch == host.Epoch, "net world: once the game left and entered a level the world starts again with a higher epoch");
+
+        // A client whose checkpoint reload comes after it adopted the epoch the host minted for it is not stuck, and the old epoch stays refused.
+        var old = host.Epoch;
+        host.Restart(); Spin();
+        var minted = host.Epoch;
+        check(minted > old && client.Epoch == minted, "net world: the client adopted the epoch the host minted for a reload before its own reload event");
+        client.Restart(); Spin();
+        var seen = atHost.Count;
+        client.ToHost("stamped", new Stamped { Epoch = old, Value = 8 });
+        client.ToHost("stamped", new Stamped { Epoch = minted, Value = 9 });
+        host.Pump();
+        check(client.Epoch == minted && atHost.Skip(seen).SequenceEqual(new uint[] { 9 }),
+            "net world: a reload event after that adoption leaves the client on the host's epoch, and the older epoch stays refused");
+
+        // A peer between worlds (no epoch yet): a state an earlier world sent never shows, and the current world's waits for the epoch, because it is sent only once.
+        client.Restart();
+        host.Epoch = old; hostSlot.Publish(new Stamped { Value = 1 }, 7f); host.Epoch = minted;
+        client.Pump();
+        check(client.Epoch == 0 && !clientSlot.TryGet(1, out _, out _), "player state: with no epoch a stamped state does not show yet");
+        Spin();
+        check(client.Epoch == minted && !clientSlot.TryGet(1, out _, out _), "player state: a state of an earlier world that came between worlds is dropped");
+        client.Restart();
+        hostSlot.Publish(new Stamped { Value = 2 }, 7f);
+        client.Pump();
+        check(client.Epoch == 0 && !clientSlot.TryGet(1, out _, out _), "player state: the current world's state waits while this peer has no epoch");
+        slotNow = 20f; Spin();
+        check(clientSlot.TryGet(1, out var kept, out var keptStart) && kept.Value == 2 && Math.Abs(keptStart - 7f) < 0.001f, "player state: it goes in when the epoch is taken, as of when it arrived");
+        GameEvents.Reset();
+        Net.WorldProbe = static () => false;
+    }
 }

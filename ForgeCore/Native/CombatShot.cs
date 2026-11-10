@@ -1,5 +1,4 @@
 using System;
-using Agents;
 using Gear;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using Player;
@@ -40,7 +39,8 @@ public static partial class Combat
         {
             var camera = weapon.Owner.FPItemHolder.m_LookCamera;
             if (camera == null) throw new InvalidOperationException("The held gun has no camera.");
-            Trace(weapon, profile, camera.transform.position, camera.transform.forward);
+            var look = camera.transform;
+            Trace(weapon, profile, look.position, look.forward);
         }
 
         /// <summary>Traces from <paramref name="origin"/> along <paramref name="direction"/> to find what the aim lands on, then again from the
@@ -49,37 +49,34 @@ public static partial class Combat
         /// the camera and it.</summary>
         public void Trace(BulletWeapon weapon, in BulletProfile profile, Vector3 origin, Vector3 direction)
         {
-            var holder = weapon.Owner.FPItemHolder;
+            // The owner, holder, camera and muzzle are read once, and what Prepare writes into the hit data is kept here rather than
+            // read back: each of those is a native call (contract P8, hot-path getters).
+            var owner = weapon.Owner;
+            var holder = owner.FPItemHolder;
             var camera = holder.m_LookCamera;
             var muzzle = weapon.MuzzleAlign;
             if (camera == null || muzzle == null) throw new InvalidOperationException("The held gun has no camera or muzzle.");
             direction.Normalize();
-            Prepare(weapon.Owner, profile, origin, direction, profile.Range);
-            var aimed = Cast(origin, direction, profile.Range, weapon.Owner);
-            var target = aimed ? _hit.rayHit.point : origin + direction * profile.Range;
+            Prepare(owner, profile, origin, direction, profile.Range);
+            var target = Cast(origin, direction, profile.Range, owner, out var aimed) ? aimed.point : origin + direction * profile.Range;
 
-            var itemCamera = holder.m_ItemLayerCamera;
-            // A gun still coming up from idle has its muzzle at the hip: the shot and its effect begin where the raised muzzle will be.
-            var look = camera.transform;
-            var start = GunLowered(weapon.Owner) ? GunPose.RaisedMuzzle(look.position, look.right, look.up, look.forward)
-                : itemCamera == null ? muzzle.position
-                : camera.ViewportToWorldPoint(itemCamera.WorldToViewportPoint(muzzle.position));
-            var toMuzzle = start - origin;
-            if (toMuzzle.sqrMagnitude > 0.0001f && Physics.Raycast(origin, toMuzzle.normalized, out var obstruction,
-                    toMuzzle.magnitude, LayerManager.MASK_WORLD, QueryTriggerInteraction.Ignore))
-                start = obstruction.point - toMuzzle.normalized * 0.025f;
+            var start = ShownMuzzle(holder, camera, muzzle, origin);
 
             var toTarget = target - start;
             Start = start;
-            if (toTarget.sqrMagnitude < 0.0001f)
+            var squared = toTarget.x * toTarget.x + toTarget.y * toTarget.y + toTarget.z * toTarget.z;
+            if (squared < 0.0001f)
             {
                 End = start;
                 HasHit = false;
                 return;
             }
-            Prepare(weapon.Owner, profile, start, toTarget.normalized, MathF.Min(profile.Range, toTarget.magnitude + 0.025f));
-            HasHit = Cast(start, _hit.fireDir, _hit.maxRayDist, weapon.Owner);
-            End = HasHit ? _hit.rayHit.point : start + _hit.fireDir * _hit.maxRayDist;
+            var distance = MathF.Sqrt(squared);
+            var along = toTarget / distance;
+            var range = MathF.Min(profile.Range, distance + 0.025f);
+            Prepare(owner, profile, start, along, range);
+            HasHit = Cast(start, along, range, owner, out var hit);
+            End = HasHit ? hit.point : start + along * range;
         }
 
         /// <summary>Traces from <paramref name="start"/> along <paramref name="direction"/> for a shooter whose camera is not this peer's
@@ -88,15 +85,15 @@ public static partial class Combat
         {
             direction.Normalize();
             Prepare(owner, profile, start, direction, profile.Range);
-            HasHit = Cast(start, direction, profile.Range, owner);
+            HasHit = Cast(start, direction, profile.Range, owner, out var hit);
             Start = start;
-            End = HasHit ? _hit.rayHit.point : start + direction * profile.Range;
+            End = HasHit ? hit.point : start + direction * profile.Range;
         }
 
         // The nearest hit only. The shooter's own colliders are stepped over; the reported distance stays measured from the start.
-        private bool Cast(Vector3 start, Vector3 direction, float range, PlayerAgent owner)
+        private bool Cast(Vector3 start, Vector3 direction, float range, PlayerAgent owner, out RaycastHit hit)
         {
-            if (!ShooterRay(owner, start, direction, range, out var hit)) return false;
+            if (!ShooterRay(owner, start, direction, range, out hit)) return false;
             _hit.rayHit = hit;
             return true;
         }
@@ -107,13 +104,13 @@ public static partial class Combat
         public bool VisibleTarget(PlayerAgent owner, Vector3 start, Vector3 point, Collider target, out RaycastHit hit)
         {
             var offset = point - start;
-            if (offset.sqrMagnitude < 0.000001f) return RayTarget(start, point, target, out hit);
+            if (Vec.SqrLength(offset) < 0.000001f) return RayTarget(start, point, target, out hit);
             hit = default;
-            if (!Cast(start, offset.normalized, offset.magnitude + 0.025f, owner)) return false;
-            var actual = _hit.rayHit.collider.GetComponentInParent<IDamageable>();
+            if (!Cast(start, offset.normalized, Vec.Length(offset) + 0.025f, owner, out var found)) return false;
+            var actual = found.collider.GetComponentInParent<IDamageable>();
             var wanted = target.GetComponentInParent<IDamageable>();
             if (actual == null || wanted == null || ReceiverIdentity(actual) != ReceiverIdentity(wanted)) return false;
-            hit = _hit.rayHit;
+            hit = found;
             return true;
         }
 
@@ -124,10 +121,10 @@ public static partial class Combat
         public bool RayTarget(Vector3 origin, Vector3 point, Collider target, out RaycastHit hit)
         {
             var offset = point - origin;
-            if (offset.sqrMagnitude < 0.000001f) offset = target.bounds.center - origin;
-            var direction = offset.sqrMagnitude > 0.000001f ? offset.normalized : Vector3.up;
-            if ((target.ClosestPoint(origin) - origin).sqrMagnitude >= 0.00000001f)
-                return ReceiverRay(origin, direction, offset.magnitude + 0.025f, target, out hit);
+            if (Vec.SqrLength(offset) < 0.000001f) offset = target.bounds.center - origin;
+            var direction = Vec.SqrLength(offset) > 0.000001f ? offset.normalized : Vec.Up;
+            if (Vec.SqrLength(target.ClosestPoint(origin) - origin) >= 0.00000001f)
+                return ReceiverRay(origin, direction, Vec.Length(offset) + 0.025f, target, out hit);
 
             var reach = ReceiverBounds(target, origin, out _).size.magnitude + 0.05f;
             var forward = ReceiverRay(origin, direction, reach, target, out hit);
@@ -149,7 +146,7 @@ public static partial class Combat
             var along = Vector3.Dot(point - origin, direction);
             var start = point - direction * along;
             var bounds = ReceiverBounds(collider, start, out var inside);
-            var reach = inside ? bounds.size.magnitude + 0.05f : 0f;
+            var reach = inside ? Vec.Length(bounds.size) + 0.05f : 0f;
             var found = ReceiverRay(start - direction * reach, direction, MathF.Max(0f, along) + reach + 0.025f, collider, out hit);
             if (found) hit.distance = contact.distance;
             return found;
@@ -158,14 +155,14 @@ public static partial class Combat
         private static Bounds ReceiverBounds(Collider collider, Vector3 point, out bool inside)
         {
             var bounds = collider.bounds;
-            inside = (collider.ClosestPoint(point) - point).sqrMagnitude < 0.00000001f;
+            inside = Vec.SqrLength(collider.ClosestPoint(point) - point) < 0.00000001f;
             var limbs = collider.GetComponentInParent<IDamageable>()?.GetBaseDamagable()?.TryCast<Dam_EnemyDamageBase>()?.DamageLimbs;
             if (limbs != null)
                 for (var index = 0; index < limbs.Length; index++)
                     if (limbs[index]?.GetComponent<Collider>() is { } limb && limb.enabled && limb.gameObject.activeInHierarchy)
                     {
                         bounds.Encapsulate(limb.bounds);
-                        inside |= (limb.ClosestPoint(point) - point).sqrMagnitude < 0.00000001f;
+                        inside |= Vec.SqrLength(limb.ClosestPoint(point) - point) < 0.00000001f;
                     }
             return bounds;
         }
@@ -189,7 +186,7 @@ public static partial class Combat
                 if (exitsContainingColliders)
                 {
                     var centre = origin + direction * distance;
-                    if ((collider.ClosestPoint(centre) - centre).sqrMagnitude >= 0.00000001f) continue;
+                    if (Vec.SqrLength(collider.ClosestPoint(centre) - centre) >= 0.00000001f) continue;
                     candidate.distance = distance - candidate.distance;
                 }
                 if (candidate.distance >= nearest) continue;
@@ -222,7 +219,7 @@ public static partial class Combat
         /// <see cref="Apply()"/>.</summary>
         public void ResolveHit(PlayerAgent owner, in BulletProfile profile, Vector3 start, Vector3 direction, RaycastHit hit)
         {
-            if (!float.IsFinite(direction.sqrMagnitude) || direction.sqrMagnitude < 0.00000001f)
+            if (!float.IsFinite(Vec.SqrLength(direction)) || Vec.SqrLength(direction) < 0.00000001f)
                 throw new InvalidOperationException("The hit has no travel direction.");
             Prepare(owner, profile, start, direction.normalized, profile.Range);
             _hit.rayHit = hit;

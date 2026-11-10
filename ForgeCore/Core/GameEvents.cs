@@ -12,7 +12,7 @@ namespace ForgeCore;
 /// </summary>
 public static class GameEvents
 {
-    private static Action? _master, _language, _levelEnded, _checkpointReached, _checkpointReloaded, _localPlayerDown;
+    private static Action? _master, _migrated, _language, _levelEnded, _checkpointReached, _checkpointReloaded, _localPlayerDown, _state;
     private static Action<bool>? _lobby;
     private static Action<uint?, int, int>? _expeditionSelected;
 
@@ -27,6 +27,10 @@ public static class GameEvents
 
     /// <summary>Raised when the game enters (true) or leaves (false) its lobby state.</summary>
     public static event Action<bool>? LobbyChanged { add => _lobby += value; remove => _lobby -= value; }
+
+    /// <summary>Raised after the game changed state, also when the host creates a lobby (the game's own <c>GameStateManager.OnGameStateChanged</c>
+    /// delegate added from a mod misses that one). For a cache of something a scene owns; it says where the game is, not that a world was built.</summary>
+    public static event Action? StateChanged { add => _state += value; remove => _state -= value; }
 
     /// <summary>Raised after the expedition was chosen, on every player: on the host from <c>RundownManager.MasterSelectActiveExpedition</c>
     /// (after the game stored the choice), on a client from <c>RundownManager.SetActiveExpedition</c> (the game storing the host's choice,
@@ -44,6 +48,10 @@ public static class GameEvents
 
     /// <summary>Raised when <see cref="Master"/> changes: a session starts or ends, or the host migrates.</summary>
     public static event Action? MasterChanged { add => _master += value; remove => _master -= value; }
+
+    /// <summary>Raised when the game has chosen and recalled a replacement host after a migration, also when the same player stays host
+    /// (<see cref="MasterChanged"/> does not fire then).</summary>
+    public static event Action? MasterMigrated { add => _migrated += value; remove => _migrated -= value; }
 
     /// <summary>Goes up by one every time the game sets its text language (also when it sets the same one again). A reader that caches
     /// text compares this one number instead of reading the language. Counting starts when the first reader asks; 0 until a change.</summary>
@@ -76,13 +84,16 @@ public static class GameEvents
         remove => _localPlayerDown -= value;
     }
 
-    /// <summary>The game says the session may have changed: <paramref name="master"/> is the host it reads now.</summary>
-    internal static void NoteMaster(ulong master)
+    /// <summary>The game says the session may have changed: <paramref name="master"/> is the host it reads now.
+    /// <paramref name="localChanged"/>: this player's own lookup changed too, which can flip <see cref="Session.IsHost"/> with the same host.</summary>
+    internal static void NoteMaster(ulong master, bool localChanged = false)
     {
-        if (master == Master) return;
+        if (master == Master && (!localChanged || master == 0)) return;
         Master = master;
         Raise(_master, "master-changed");
     }
+
+    internal static void NoteMasterMigrated() => Raise(_migrated, "master-migrated");
 
     internal static void NoteLanguage()
     {
@@ -98,6 +109,8 @@ public static class GameEvents
     /// <summary>Records the lobby state without raising anything, for the state the game is already in when ForgeCore starts.</summary>
     internal static void SeedLobby(bool inLobby) => InLobby = inLobby;
 
+    internal static void NoteState() => Raise(_state, "state-changed");
+
     internal static void NoteLobby(bool inLobby)
     {
         if (inLobby == InLobby) return;
@@ -112,7 +125,7 @@ public static class GameEvents
         foreach (var handler in handlers.GetInvocationList())
         {
             try { ((Action<uint?, int, int>)handler).Invoke(rundownId, tier, index); }
-            catch (Exception error) { Log.For("ForgeCore").ErrorOnce("An expedition-selected handler failed: " + error); }
+            catch (Exception error) { Log.For("ForgeCore").ErrorOnce("core-expedition-selected-handler-failed", "An expedition-selected handler failed: " + error); }
         }
     }
 
@@ -122,7 +135,7 @@ public static class GameEvents
         foreach (var handler in handlers.GetInvocationList())
         {
             try { ((Action<bool>)handler).Invoke(value); }
-            catch (Exception error) { Log.For("ForgeCore").ErrorOnce("A " + key + " handler failed: " + error); }
+            catch (Exception error) { Log.For("ForgeCore").ErrorOnce("core-handler-failed", "A " + key + " handler failed: " + error); }
         }
     }
 
@@ -132,16 +145,17 @@ public static class GameEvents
         foreach (var handler in handlers.GetInvocationList())
         {
             try { ((Action)handler).Invoke(); }
-            catch (Exception error) { Log.For("ForgeCore").ErrorOnce("A " + key + " handler failed: " + error); }
+            catch (Exception error) { Log.For("ForgeCore").ErrorOnce("core-handler-failed", "A " + key + " handler failed: " + error); }
         }
     }
 
     /// <summary>Offline tests start from no session and no subscriber.</summary>
     internal static void Reset()
     {
-        _master = _language = _levelEnded = _checkpointReached = _checkpointReloaded = _localPlayerDown = null;
+        _master = _migrated = _language = _levelEnded = _checkpointReached = _checkpointReloaded = _localPlayerDown = _state = null;
         _lobby = null; _expeditionSelected = null;
         Master = 0; InLobby = false;
+        Session.Reset();
         _languageRevision = 0;
     }
 }

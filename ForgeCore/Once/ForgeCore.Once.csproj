@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <Import Project="../../Build/Common.props" />
   <PropertyGroup>
-    <Version>0.1.0</Version>
     <AssemblyName>ForgeCore.Once</AssemblyName>
     <RootNamespace>ForgeCore</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>

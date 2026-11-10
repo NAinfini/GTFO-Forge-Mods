@@ -1,6 +1,7 @@
 using System;
 using AIGraph;
 using Player;
+using SNetwork;
 using UnityEngine;
 
 namespace ForgeCore;
@@ -46,7 +47,7 @@ public static class Items
         foreach (var handler in handlers.GetInvocationList())
         {
             try { ((Action<pItemSpawnData, ItemReplicator>)handler)(data, replicator); }
-            catch (Exception error) { Plugin.Logger.ErrorOnce("An Items.Spawned handler failed: " + error); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("core-items-spawned-handler-failed", "An Items.Spawned handler failed: " + error); }
         }
     }
 
@@ -78,4 +79,9 @@ public static class Items
         refusal = spawned == null || spawned.WasCollected ? ItemSpawnRefusal.ResultUnavailable : ItemSpawnRefusal.None;
         return refusal == ItemSpawnRefusal.None ? spawned : null;
     }
+
+    /// <summary>Removes a spawned item the way the game does, <c>ItemReplicationManager.DeSpawn</c>: the host runs it and every peer
+    /// removes the instance. A void submission, not a readback; the caller checks the item is gone if it needs to know.
+    /// Host only; main thread only.</summary>
+    public static void Despawn(IReplicator replicator) => ItemReplicationManager.DeSpawn(replicator);
 }

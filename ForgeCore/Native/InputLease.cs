@@ -3,11 +3,15 @@ using Il2CppInterop.Runtime;
 
 namespace ForgeCore;
 
+/// <summary>The three world-interaction switches of the game (<c>PlayerInteraction</c>) an <see cref="InputLease"/> can hold off.</summary>
+public enum InteractionSwitch { CameraRay, SphereCheck, Ladder }
+
 /// <summary>A mod's hold on some of the game's input actions (movement axes, fire, weapon keys ...); it can also press buttons and\n/// drive one axis itself (<see cref="Press"/>, <see cref="SetAxis"/>). While held, the blocked
 /// actions read as not pressed (axes as 0, or as <see cref="Steer"/> values for the movement axes) everywhere the game reads
 /// them; everything else passes through. Leases stack: the blocked set is every held lease's together. When the last lease is
 /// released the game's input is put back exactly as it was. Leases are released automatically at level cleanup and when the local
-/// player goes down (<see cref="GameEvents.LocalPlayerDown"/>). The game's own answer stays readable through <see cref="Down"/>,
+/// player goes down (<see cref="GameEvents.LocalPlayerDown"/>). A blocked action passes while one of the game's menu screens has the focus:
+/// their cursor (<c>CM_PageBase.UpdateCursorPosition</c>) reads the look axes. The game's own answer stays readable through <see cref="Down"/>,
 /// <see cref="Held"/> and <see cref="Axis"/>. Main thread only.</summary>
 public sealed class InputLease : IDisposable
 {
@@ -38,6 +42,17 @@ public sealed class InputLease : IDisposable
         for (var i = 0; i < actions.Length; i++) values[i] = (int)actions[i];
         Book.Block(_entry, values);
         Apply();
+    }
+
+    /// <summary>Holds exactly <paramref name="switches"/> off for this lease (replacing what it held off before). The game's own value is
+    /// read when the first lease holds a switch and written back when the last one lets go, unless something else wrote the switch in
+    /// between: that latest write is what comes back, so a lease never undoes another system's change.</summary>
+    public void BlockInteractions(params InteractionSwitch[] switches)
+    {
+        Span<int> values = stackalloc int[switches.Length];
+        for (var i = 0; i < switches.Length; i++) values[i] = (int)switches[i];
+        Book.HoldOff(_entry, values);
+        SyncInteractions();
     }
 
     /// <summary>While the movement axes are blocked, the game reads these values for them instead of 0 (sideways and forward,
@@ -119,7 +134,8 @@ public sealed class InputLease : IDisposable
         _watchingDown = true;
     }
 
-    private static bool Blocks(InputAction action) => _wrapped && Book.Blocks((int)action);
+    private static bool Blocks(InputAction action)
+        => _wrapped && Book.Blocks((int)action) && FocusStateManager.CurrentState is not (eFocusState.MainMenu or eFocusState.Map or eFocusState.GlobalPopupMessage);
 
     /// <summary>Ends every lease whose guard says its owner is gone, before the query is answered.</summary>
     private static void Admit(string member)
@@ -134,16 +150,17 @@ public sealed class InputLease : IDisposable
             if (reason == null) continue;
             if (Book.Release(entry)) Apply();
             try { entry.Invalidated?.Invoke(reason + ";query=" + member); }
-            catch (Exception error) { Plugin.Logger.ErrorOnce("An input lease guard's end callback threw: " + error); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("core-input-lease-guards-end-callback-threw", "An input lease guard's end callback threw: " + error); }
         }
     }
 
     private static bool Pressed(InputAction action, string member, out bool value)
     {
         value = false;
-        if (!_wrapped || !Book.Presses((int)action)) return false;
+        var frame = UnityEngine.Time.frameCount;
+        if (!_wrapped || !Book.Presses((int)action, frame)) return false;
         Admit(member);
-        if (!Book.Presses((int)action)) return false;
+        if (!Book.Presses((int)action, frame)) return false;
         value = member switch
         {
             "GetButton" => Book.Held((int)action),
@@ -166,8 +183,66 @@ public sealed class InputLease : IDisposable
     private static float Steered(InputAction action)
         => action == InputAction.MoveHorizontal ? Book.Steered(true) : action == InputAction.MoveVertical ? Book.Steered(false) : 0f;
 
+    private static readonly bool[] Off = new bool[InputLeaseBook.Interactions], Intent = new bool[InputLeaseBook.Interactions];
+    private static bool _writing;
+
+    private static bool Read(int index) => index switch
+    {
+        0 => PlayerInteraction.CameraRayInteractionEnabled,
+        1 => PlayerInteraction.SphereCheckInteractionEnabled,
+        _ => PlayerInteraction.LadderInteractionEnabled
+    };
+
+    private static void Write(int index, bool value)
+    {
+        _writing = true;
+        try
+        {
+            switch (index)
+            {
+                case 0: PlayerInteraction.CameraRayInteractionEnabled = value; break;
+                case 1: PlayerInteraction.SphereCheckInteractionEnabled = value; break;
+                default: PlayerInteraction.LadderInteractionEnabled = value; break;
+            }
+        }
+        finally { _writing = false; }
+    }
+
+    /// <summary>Puts each interaction switch in the state the leases ask for: off while any lease holds it, back to the latest value
+    /// the game or another system gave it (<see cref="InteractionWritten"/>) once none does.</summary>
+    private static void SyncInteractions()
+    {
+        for (var index = 0; index < InputLeaseBook.Interactions; index++)
+        {
+            var wanted = Book.InteractionOff(index);
+            if (wanted == Off[index]) continue;
+            if (wanted)
+            {
+                Patches.Ensure(Modules.InteractionSwitches, typeof(InteractionSwitchHook));
+                Intent[index] = Read(index);
+                Off[index] = true;
+                Write(index, false);
+            }
+            else
+            {
+                Off[index] = false;
+                Write(index, Intent[index]);
+            }
+        }
+    }
+
+    /// <summary>A write to a switch from anywhere but this lease: while the switch is held off it is remembered as the value to restore and
+    /// the game keeps reading false.</summary>
+    internal static bool InteractionWritten(int index, bool value)
+    {
+        if (_writing || !Off[index]) return value;
+        Intent[index] = value;
+        return false;
+    }
+
     private static void Apply()
     {
+        SyncInteractions();
         if (Book.Engaged == _wrapped) return;
         if (Book.Engaged) Wrap();
         else Unwrap();
@@ -208,7 +283,7 @@ public sealed class InputLease : IDisposable
     {
         if (Same(current, owned)) set(original);
         else if (!Same(current, original))
-            Plugin.Logger.ErrorOnce("Input delegate " + name + " was wrapped over by another mod while input was leased; left as that mod set it (ForgeCore's wrapper now forwards everything).");
+            Plugin.Logger.ErrorOnce("core-input-delegate-wrapped-over-by-another", "Input delegate " + name + " was wrapped over by another mod while input was leased; left as that mod set it (ForgeCore's wrapper now forwards everything).");
     }
 
     private static bool Same(Il2CppSystem.Object? left, Il2CppSystem.Object? right)

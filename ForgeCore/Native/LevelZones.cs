@@ -21,7 +21,7 @@ public static partial class Level
                 if (index >= 0 && index < MaxDimensions) present |= 1UL << index;
             }
         SetDimensions(present);
-        if (present == 0) Plugin.Logger.Error("The built level lists no dimension (LG_Floor.m_dimensions); course node lookups find nothing in this level.");
+        if (present == 0) Plugin.Logger.Error("core-built-level-lists-no-dimension-lg", "The built level lists no dimension (LG_Floor.m_dimensions); course node lookups find nothing in this level.");
     }
 
     /// <summary>The zone a level event names with <c>DimensionIndex</c>, <c>Layer</c> and <c>LocalIndex</c> (the game's

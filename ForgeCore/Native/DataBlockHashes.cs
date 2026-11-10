@@ -6,7 +6,10 @@ using System.Reflection;
 namespace ForgeCore;
 
 /// <summary>Content hashes of the game data blocks the game has loaded, one per block type, read from memory: so a data block another mod
-/// changed shows up here, and two machines that loaded the same data give the same hashes. Main thread only; reading every type takes a
+/// changed shows up here, and two machines that loaded the same data give the same hashes. Each block is hashed as the game's own CellJSON
+/// writes it with its data-block settings, less the public state fields the game writes into a block while it plays
+/// (<see cref="NativeDataBlockTables.WithoutRuntimeState"/>), so only what a data block file can say counts; the private caches it fills in
+/// (an enemy population's resolved lists, for one) are not written by CellJSON at all. Main thread only; reading every type takes a
 /// moment, so do it once per level, not per frame.</summary>
 public static class DataBlockHashes
 {
@@ -27,15 +30,12 @@ public static class DataBlockHashes
                 var all = closed.GetMethod("GetAllBlocks", BindingFlags.Public | BindingFlags.Static)?.Invoke(null, null) as System.Collections.IEnumerable;
                 if (all == null) continue;
                 var entries = new List<(uint Id, string Hash)>();
-                var cut = false;
                 foreach (var block in all)
                 {
                     if (block == null) continue;
                     var id = block.GetType().GetProperty("persistentID")?.GetValue(block) is uint u ? u : 0u;
-                    entries.Add((id, ContentHash.Of(block, out var truncated)));
-                    cut |= truncated;
+                    entries.Add((id, new Fingerprint().Add("json", NativeDataBlockTables.WithoutRuntimeState(type.Name, NativeDataBlockTables.Serialize(block))).Hex()));
                 }
-                if (cut) { unreadable.Add(type.Name + " (too deep)"); continue; }
                 entries.Sort((x, y) => x.Id != y.Id ? x.Id.CompareTo(y.Id) : string.CompareOrdinal(x.Hash, y.Hash));
                 var fingerprint = new Fingerprint();
                 foreach (var (id, hash) in entries) fingerprint.Add(id.ToString(System.Globalization.CultureInfo.InvariantCulture), hash);

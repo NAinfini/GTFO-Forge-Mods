@@ -17,6 +17,75 @@ public static class Fnv
     /// <summary>Feeds one byte into a 64-bit hash that started at <see cref="Offset64"/>.</summary>
     public static ulong Mix64(ulong hash, byte value) => unchecked((hash ^ value) * Prime64);
 
+    /// <summary>Feeds the four bytes of <paramref name="value"/>, least significant first, into a 32-bit hash.</summary>
+    public static uint Mix32(uint hash, uint value)
+    {
+        for (var s = 0; s < 32; s += 8) hash = Mix32(hash, (byte)(value >> s));
+        return hash;
+    }
+
+    public static uint Mix32(uint hash, int value) => Mix32(hash, unchecked((uint)value));
+
+    /// <summary>Feeds the eight bytes of <paramref name="value"/>, least significant first, into a 32-bit hash.</summary>
+    public static uint Mix32(uint hash, ulong value)
+    {
+        for (var s = 0; s < 64; s += 8) hash = Mix32(hash, (byte)(value >> s));
+        return hash;
+    }
+
+    /// <summary>Feeds the eight bytes of <paramref name="value"/>, least significant first, into a 64-bit hash.</summary>
+    public static ulong Mix64(ulong hash, ulong value)
+    {
+        for (var s = 0; s < 64; s += 8) hash = Mix64(hash, (byte)(value >> s));
+        return hash;
+    }
+
+    public static ulong Mix64(ulong hash, long value) => Mix64(hash, unchecked((ulong)value));
+
+    /// <summary>Feeds the UTF-8 bytes of <paramref name="text"/> into a 32-bit hash without allocating; the result equals
+    /// <c>Hash32</c> of the text when <paramref name="hash"/> starts at <see cref="Offset32"/> (a lone surrogate is U+FFFD, as in
+    /// <see cref="Encoding.UTF8"/>).</summary>
+    public static uint MixUtf8(uint hash, string text)
+    {
+        Span<byte> buffer = stackalloc byte[4];
+        for (var i = 0; i < text.Length;)
+        {
+            var count = Utf8At(text, ref i, buffer);
+            for (var b = 0; b < count; b++) hash = Mix32(hash, buffer[b]);
+        }
+        return hash;
+    }
+
+    /// <summary>As <see cref="MixUtf8(uint, string)"/> for a 64-bit hash.</summary>
+    public static ulong MixUtf8(ulong hash, string text)
+    {
+        Span<byte> buffer = stackalloc byte[4];
+        for (var i = 0; i < text.Length;)
+        {
+            var count = Utf8At(text, ref i, buffer);
+            for (var b = 0; b < count; b++) hash = Mix64(hash, buffer[b]);
+        }
+        return hash;
+    }
+
+    private static int Utf8At(string text, ref int index, Span<byte> buffer)
+    {
+        int code = text[index++];
+        if (char.IsHighSurrogate((char)code) && index < text.Length && char.IsLowSurrogate(text[index]))
+            code = char.ConvertToUtf32((char)code, text[index++]);
+        else if (code is >= 0xD800 and <= 0xDFFF) code = 0xFFFD;
+        if (code < 0x80) { buffer[0] = (byte)code; return 1; }
+        if (code < 0x800) { buffer[0] = (byte)(0xC0 | code >> 6); buffer[1] = (byte)(0x80 | code & 0x3F); return 2; }
+        if (code < 0x10000)
+        {
+            buffer[0] = (byte)(0xE0 | code >> 12); buffer[1] = (byte)(0x80 | code >> 6 & 0x3F); buffer[2] = (byte)(0x80 | code & 0x3F);
+            return 3;
+        }
+        buffer[0] = (byte)(0xF0 | code >> 18); buffer[1] = (byte)(0x80 | code >> 12 & 0x3F);
+        buffer[2] = (byte)(0x80 | code >> 6 & 0x3F); buffer[3] = (byte)(0x80 | code & 0x3F);
+        return 4;
+    }
+
     public static uint Hash32(ReadOnlySpan<byte> bytes)
     {
         var hash = Offset32;

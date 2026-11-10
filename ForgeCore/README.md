@@ -8,7 +8,7 @@ Report bugs on [GitHub](https://github.com/NAinfini/GTFO-Forge-Mods/issues), or 
 
 ## Installation
 
-Install with r2modman or the Thunderstore Mod Manager. The only dependency is BepInExPack_GTFO.
+Install with r2modman or the Thunderstore Mod Manager. It also installs BepInExPack_GTFO and GTFO_API.
 
 ## For mod authors
 

@@ -22,6 +22,12 @@ public sealed class ModLog
 
     public void Error(string message) => Write(message);
 
+    /// <summary>An error with its registered diagnostic code (<c>catalog/authoring/diagnostic-codes.json</c>, named package-event): written as <c>code: detail</c>.</summary>
+    public void Error(string code, string detail) => Write(code + ": " + detail);
+
+    /// <summary><see cref="ErrorOnce(string)"/> for an error with its registered diagnostic code, written as <c>code: detail</c>.</summary>
+    public void ErrorOnce(string code, string detail) => ErrorOnce(code + ": " + detail);
+
     /// <summary>An error that can repeat: written the first time this exact <paramref name="message"/> occurs and never again, so a
     /// repeating failure stays visible once without flooding the log. Different failures from one place have different messages and
     /// are each written; put the exception (<c>error.ToString()</c>) in the message, not just its text.</summary>

@@ -22,7 +22,7 @@ internal static class SpecialSlotHooks
             __state = pool.AmmoInPack;
             pool.AmmoInPack = SpecialSlot.Local.Own!.Pool;
         }
-        catch (Exception error) { Plugin.Logger.ErrorOnce("Redirecting a special ammunition pickup failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("core-redirecting-special-ammunition-pickup-failed", "Redirecting a special ammunition pickup failed: " + error); }
     }
 
     [HarmonyPatch(typeof(PlayerAmmoStorage), nameof(PlayerAmmoStorage.PickupAmmo))]
@@ -39,7 +39,7 @@ internal static class SpecialSlotHooks
             __instance.UpdateSlotAmmoUI(InventorySlot.GearSpecial);
             PlayerBackpackManager.ForceLocalAmmoStorageUpdate();
         }
-        catch (Exception error) { Plugin.Logger.ErrorOnce("Restoring the slot's ammunition after a redirected pickup failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("core-restoring-slots-ammunition-after-redirected-pickup", "Restoring the slot's ammunition after a redirected pickup failed: " + error); }
     }
 
     /// <summary>An ammunition pack counts the own special weapon as needing rounds while it is away and its kept pool is not full (the
@@ -53,7 +53,7 @@ internal static class SpecialSlotHooks
             if (__result || !Redirects(__instance)) return;
             if (SpecialSlot.Local.Own!.Pool < __instance.SpecialAmmo.AmmoMaxCap) __result = true;
         }
-        catch (Exception error) { Plugin.Logger.ErrorOnce("Reading the own special weapon's need for ammunition failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("core-reading-own-special-weapons-need-ammunition", "Reading the own special weapon's need for ammunition failed: " + error); }
     }
 
     /// <summary>Whether a pickup into <paramref name="storage"/> goes to the own weapon's kept pool: only the local player's storage.</summary>

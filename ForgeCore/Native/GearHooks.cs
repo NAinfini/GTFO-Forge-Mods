@@ -48,12 +48,20 @@ public static partial class GameHooks
     public static readonly Bracket<BulletHitCall> BulletHit = new("GameHooks.BulletHit", typeof(BulletHitHook));
     public static readonly Bracket<BulletWeapon> BulletWeaponWielded = new("GameHooks.BulletWeaponWielded", typeof(BulletWeaponWieldedHook));
     public static readonly Bracket<BulletWeapon> BulletWeaponUnwielded = new("GameHooks.BulletWeaponUnwielded", typeof(BulletWeaponUnwieldedHook));
+    /// <summary><c>BulletWeapon.SetMagazineVisibile</c>: the game's reload shows or hides the gun's magazine.</summary>
+    public static readonly Bracket<(BulletWeapon Weapon, bool Visible)> MagazineVisibility = new("GameHooks.MagazineVisibility", typeof(MagazineVisibilityHook));
     public static readonly Bracket<BWA_Auto> AutoDryFired = new("GameHooks.AutoDryFired", typeof(AutoDryFiredHook));
     public static readonly Bracket<BWA_Semi> SemiDryFired = new("GameHooks.SemiDryFired", typeof(SemiDryFiredHook));
     public static readonly Bracket<GearPartHolder> GearPartsSpawned = new("GameHooks.GearPartsSpawned", typeof(GearPartsSpawnedHook));
     public static readonly Bracket<ItemEquippable> GearSpawnCompleted = new("GameHooks.GearSpawnCompleted", typeof(GearSpawnCompletedHook));
     public static readonly Bracket<ItemEquippable> ReloadTriggered = new("GameHooks.ReloadTriggered", typeof(ReloadTriggeredHook));
+    /// <summary>The reload animation's completion callback, which clears the item's <c>IsReloading</c> flag: the compiler closure of
+    /// <c>TryTriggerReloadAnimationSequence</c>, which the game build's interop names <c>_TryTriggerReloadAnimationSequence_b__145_0</c>.
+    /// A build that renames it fails the module's calls explicitly at the first subscription.</summary>
+    public static readonly Bracket<ItemEquippable> ReloadDone = new("GameHooks.ReloadDone", typeof(ReloadDoneHook));
     public static readonly Bracket<BackpackDeploy> BackpackDeployed = new("GameHooks.BackpackDeployed", typeof(BackpackDeployedHook));
+    /// <summary><c>ResourcePackFirstPerson.ApplyPack</c>: a resource pack (ammo, health, tool refill, disinfection) takes effect, which its timed hold reaches only when it completes.</summary>
+    public static readonly Bracket<ResourcePackFirstPerson> ResourcePackApplied = new("GameHooks.ResourcePackApplied", typeof(ResourcePackAppliedHook));
     public static readonly Bracket<(SentryGunInstance Sentry, pGearSpawnData Data)> SentrySpawned = new("GameHooks.SentrySpawned", typeof(SentrySpawnedHook));
 }
 
@@ -103,6 +111,17 @@ internal static class BulletWeaponWieldedHook
     private static void After(BulletWeapon __instance, bool __runOriginal) => GameHooks.BulletWeaponWielded.RunAfter(__instance, __runOriginal);
     [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
     private static Exception? Faulted(Exception? __exception, BulletWeapon __instance) { if (__exception != null) GameHooks.BulletWeaponWielded.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(BulletWeapon), nameof(BulletWeapon.SetMagazineVisibile))]
+internal static class MagazineVisibilityHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(BulletWeapon __instance, bool value) => GameHooks.MagazineVisibility.RunBefore((__instance, value));
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(BulletWeapon __instance, bool value, bool __runOriginal) => GameHooks.MagazineVisibility.RunAfter((__instance, value), __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, BulletWeapon __instance, bool value) { if (__exception != null) GameHooks.MagazineVisibility.RunFaulted((__instance, value), __exception); return __exception; }
 }
 
 [HarmonyPatch(typeof(BulletWeapon), nameof(BulletWeapon.OnUnWield))]
@@ -160,6 +179,17 @@ internal static class GearSpawnCompletedHook
     private static Exception? Faulted(Exception? __exception, ItemEquippable __instance) { if (__exception != null) GameHooks.GearSpawnCompleted.RunFaulted(__instance, __exception); return __exception; }
 }
 
+[HarmonyPatch(typeof(ResourcePackFirstPerson), nameof(ResourcePackFirstPerson.ApplyPack))]
+internal static class ResourcePackAppliedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(ResourcePackFirstPerson __instance) => GameHooks.ResourcePackApplied.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(ResourcePackFirstPerson __instance, bool __runOriginal) => GameHooks.ResourcePackApplied.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, ResourcePackFirstPerson __instance) { if (__exception != null) GameHooks.ResourcePackApplied.RunFaulted(__instance, __exception); return __exception; }
+}
+
 [HarmonyPatch(typeof(ItemEquippable), nameof(ItemEquippable.TryTriggerReloadAnimationSequence))]
 internal static class ReloadTriggeredHook
 {
@@ -169,6 +199,17 @@ internal static class ReloadTriggeredHook
     private static void After(ItemEquippable __instance, bool __runOriginal) => GameHooks.ReloadTriggered.RunAfter(__instance, __runOriginal);
     [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
     private static Exception? Faulted(Exception? __exception, ItemEquippable __instance) { if (__exception != null) GameHooks.ReloadTriggered.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(ItemEquippable), "_TryTriggerReloadAnimationSequence_b__145_0")]
+internal static class ReloadDoneHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(ItemEquippable __instance) => GameHooks.ReloadDone.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(ItemEquippable __instance, bool __runOriginal) => GameHooks.ReloadDone.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, ItemEquippable __instance) { if (__exception != null) GameHooks.ReloadDone.RunFaulted(__instance, __exception); return __exception; }
 }
 
 [HarmonyPatch(typeof(PlayerBackpack), nameof(PlayerBackpack.SetDeployed))]

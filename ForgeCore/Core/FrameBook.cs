@@ -4,14 +4,15 @@ using System.Collections.Generic;
 namespace ForgeCore;
 
 /// <summary>The per-frame callbacks mods registered through <c>Frame</c>, run in registration order. A callback that throws is
-/// reported once per mod and callback kind (<see cref="ModLog.ErrorOnce"/>) and never stops the others or later frames.</summary>
+/// reported once per mod and callback kind (<see cref="ModLog.ErrorOnce(string)"/>) and never stops the others or later frames.</summary>
 internal sealed class FrameBook
 {
-    private readonly struct Entry
+    private sealed class Entry
     {
         internal Entry(string modId, Action callback) { ModId = modId; Callback = callback; }
         internal readonly string ModId;
         internal readonly Action Callback;
+        internal bool Reported;
     }
 
     private readonly string _kind;
@@ -36,7 +37,13 @@ internal sealed class FrameBook
         {
             var entry = _entries[i];
             try { entry.Callback(); }
-            catch (Exception error) { Log.For(entry.ModId).ErrorOnce(entry.ModId + " " + _kind + " callback failed: " + error); }
+            catch (Exception error)
+            {
+                // Reported once per entry: a callback that fails every frame no longer builds the message every frame.
+                if (entry.Reported) continue;
+                entry.Reported = true;
+                Log.For(entry.ModId).ErrorOnce("core-callback-failed", entry.ModId + " " + _kind + " callback failed: " + error);
+            }
         }
     }
 }

@@ -73,6 +73,6 @@ internal static class PlayerNoiseHooks
             var measured = agentTarget!.m_distance;
             agentTarget.m_distance = measured / factor;
         }
-        catch (Exception error) { Plugin.Logger.ErrorOnce("Scaling a player's noise distance failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("core-scaling-players-noise-distance-failed", "Scaling a player's noise distance failed: " + error); }
     }
 }

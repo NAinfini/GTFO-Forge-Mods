@@ -37,7 +37,7 @@ public sealed class LocalItemGate
         foreach (var hide in _hides)
         {
             try { if (hide(slot)) return true; }
-            catch (Exception error) { Plugin.Logger.ErrorOnce("A " + _module + " handler failed: " + error); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("core-local-item-held-hook-handler-failed", "A " + _module + " handler failed: " + error); }
         }
         return false;
     }

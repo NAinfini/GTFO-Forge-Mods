@@ -56,7 +56,7 @@ public static class Settings
             entry.SettingChanged += (_, _) =>
             {
                 try { changed(entry.Value); }
-                catch (Exception error) { Log.For(modId).Error("Setting " + section + "/" + key + " change handler failed: " + error); }
+                catch (Exception error) { Log.For(modId).Error("core-setting-change-handler-failed", "Setting " + section + "/" + key + " change handler failed: " + error); }
             };
         return entry;
     }

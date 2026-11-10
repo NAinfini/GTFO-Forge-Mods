@@ -11,8 +11,17 @@ public static class Checkpoint
 {
     private static int _reloadedFrame = -1;
 
-    /// <summary>The game is reloading a checkpoint or its capture is still recalling the replicated state.</summary>
-    public static bool Recalling => CheckpointManager.IsReloadingCheckpoint || SNet.Capture?.IsRecalling == true;
+    /// <summary>The game is reloading a checkpoint or its capture is still recalling the replicated state. The reload is read from
+    /// the checkpoint manager's replicated state, not the static <c>CheckpointManager.IsReloadingCheckpoint</c>: a reload that never
+    /// completes leaves the static flag true across levels while the replicated state already reads isReloadingCheckpoint=false.</summary>
+    public static bool Recalling
+    {
+        get
+        {
+            var replicator = CheckpointManager.Current?.m_stateReplicator;
+            return replicator != null && replicator.State.isReloadingCheckpoint || SNet.Capture?.IsRecalling == true;
+        }
+    }
 
     /// <summary>No reload is in progress: a frame has passed since the last reload event and the game finished recalling.</summary>
     public static bool Settled => Time.frameCount > _reloadedFrame && !Recalling;

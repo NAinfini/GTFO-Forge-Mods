@@ -54,6 +54,11 @@ public static partial class GameHooks
     public static readonly Bracket<(EnemySync Sync, pEnemySpawnData Data)> EnemySyncSpawned = new("GameHooks.EnemySyncSpawned", typeof(EnemySyncSpawnedHook));
     public static readonly Bracket<EnemySync> EnemySyncDespawned = new("GameHooks.EnemySyncDespawned", typeof(EnemySyncDespawnedHook));
     public static readonly Bracket<EnemyDamageCall> EnemyDamageReceived = new("GameHooks.EnemyDamageReceived", typeof(EnemyDamageReceivedHook));
+    /// <summary><c>Dam_EnemyDamageLimb.DestroyLimb</c>, the limb break of a plain limb. A limb of the custom class overrides it: for one that
+    /// does not call the base body see <see cref="EnemyCustomLimbDestroyed"/>.</summary>
+    public static readonly Bracket<Dam_EnemyDamageLimb> EnemyLimbDestroyed = new("GameHooks.EnemyLimbDestroyed", typeof(EnemyLimbDestroyedHook));
+    /// <summary><c>Dam_EnemyDamageLimb_Custom.DestroyLimb</c>, the override of a custom limb (the same break through its own body).</summary>
+    public static readonly Bracket<Dam_EnemyDamageLimb_Custom> EnemyCustomLimbDestroyed = new("GameHooks.EnemyCustomLimbDestroyed", typeof(EnemyCustomLimbDestroyedHook));
 
     // ---- The local player's death (the local damage base overrides the receive, so this is the local player's death on every machine).
     public static readonly Bracket<Dam_PlayerDamageLocal> LocalPlayerDied = new("GameHooks.LocalPlayerDied", typeof(LocalPlayerDiedHook));
@@ -118,12 +123,11 @@ internal static class EnemyModeChangedHook
 internal static class EnemySyncSpawnedHook
 {
     [HarmonyPrefix, HarmonyPriority(Priority.First)]
-    private static void Before(EnemySync __instance, pEnemySpawnData spawnData, out (EnemySync, pEnemySpawnData) __state)
-    { __state = (__instance, spawnData); GameHooks.EnemySyncSpawned.RunBefore(__state); }
+    private static void Before(EnemySync __instance, pEnemySpawnData spawnData) => GameHooks.EnemySyncSpawned.RunBefore((__instance, spawnData));
     [HarmonyPostfix, HarmonyPriority(Priority.Last)]
-    private static void After((EnemySync Sync, pEnemySpawnData Data) __state, bool __runOriginal) => GameHooks.EnemySyncSpawned.RunAfter(__state, __runOriginal);
+    private static void After(EnemySync __instance, pEnemySpawnData spawnData, bool __runOriginal) => GameHooks.EnemySyncSpawned.RunAfter((__instance, spawnData), __runOriginal);
     [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
-    private static Exception? Faulted(Exception? __exception, (EnemySync Sync, pEnemySpawnData Data) __state) { if (__exception != null) GameHooks.EnemySyncSpawned.RunFaulted(__state, __exception); return __exception; }
+    private static Exception? Faulted(Exception? __exception, EnemySync __instance, pEnemySpawnData spawnData) { if (__exception != null) GameHooks.EnemySyncSpawned.RunFaulted((__instance, spawnData), __exception); return __exception; }
 }
 
 [HarmonyPatch(typeof(EnemySync), nameof(EnemySync.OnDespawn))]
@@ -163,4 +167,26 @@ internal static class LocalPlayerDiedHook
     private static void After(Dam_PlayerDamageLocal __instance, bool __runOriginal) => GameHooks.LocalPlayerDied.RunAfter(__instance, __runOriginal);
     [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
     private static Exception? Faulted(Exception? __exception, Dam_PlayerDamageLocal __instance) { if (__exception != null) GameHooks.LocalPlayerDied.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(Dam_EnemyDamageLimb), nameof(Dam_EnemyDamageLimb.DestroyLimb))]
+internal static class EnemyLimbDestroyedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(Dam_EnemyDamageLimb __instance) => GameHooks.EnemyLimbDestroyed.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(Dam_EnemyDamageLimb __instance, bool __runOriginal) => GameHooks.EnemyLimbDestroyed.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, Dam_EnemyDamageLimb __instance) { if (__exception != null) GameHooks.EnemyLimbDestroyed.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(Dam_EnemyDamageLimb_Custom), nameof(Dam_EnemyDamageLimb_Custom.DestroyLimb))]
+internal static class EnemyCustomLimbDestroyedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(Dam_EnemyDamageLimb_Custom __instance) => GameHooks.EnemyCustomLimbDestroyed.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(Dam_EnemyDamageLimb_Custom __instance, bool __runOriginal) => GameHooks.EnemyCustomLimbDestroyed.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, Dam_EnemyDamageLimb_Custom __instance) { if (__exception != null) GameHooks.EnemyCustomLimbDestroyed.RunFaulted(__instance, __exception); return __exception; }
 }

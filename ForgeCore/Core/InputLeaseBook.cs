@@ -17,6 +17,8 @@ public struct InputButtonState
 internal sealed class InputLeaseBook
 {
     internal const int Actions = 128;
+    /// <summary>The world-interaction switches a lease can hold off (<c>InputLease.BlockInteractions</c>).</summary>
+    internal const int Interactions = 3;
 
     internal sealed class Entry
     {
@@ -26,6 +28,7 @@ internal sealed class InputLeaseBook
         internal float Sideways, Forward;
         internal readonly InputButtonState[] Buttons = new InputButtonState[Actions];
         internal readonly bool[] Pressed = new bool[Actions];
+        internal readonly bool[] HeldOff = new bool[Interactions];
         internal int AxisAction = -1;
         internal float AxisValue;
         internal Func<string?>? Guard;
@@ -36,6 +39,7 @@ internal sealed class InputLeaseBook
     private readonly List<Entry> _held = new();
     private readonly bool[] _blocked = new bool[Actions];
     private readonly bool[] _pressed = new bool[Actions], _axes = new bool[Actions];
+    private readonly bool[] _interactionsOff = new bool[Interactions];
 
     internal int Count => _held.Count;
 
@@ -64,6 +68,22 @@ internal sealed class InputLeaseBook
         Recompute();
     }
 
+    /// <summary>Holds off exactly the world-interaction switches <paramref name="switches"/> for this lease (replacing what it held off before).</summary>
+    internal void HoldOff(Entry entry, ReadOnlySpan<int> switches)
+    {
+        if (!Holds(entry)) throw new InvalidOperationException("The input lease of " + entry.Owner + " was already released.");
+        Array.Clear(entry.HeldOff);
+        foreach (var index in switches)
+        {
+            if (index < 0 || index >= Interactions) throw new ArgumentOutOfRangeException(nameof(switches), "Interaction switch " + index + " is outside 0.." + (Interactions - 1) + ".");
+            entry.HeldOff[index] = true;
+        }
+        Recompute();
+    }
+
+    /// <summary>Some held lease holds this interaction switch off.</summary>
+    internal bool InteractionOff(int index) => _interactionsOff[index];
+
     internal void Steer(Entry entry, bool steers, float sideways, float forward)
     {
         if (!Holds(entry)) throw new InvalidOperationException("The input lease of " + entry.Owner + " was already released.");
@@ -80,7 +100,12 @@ internal sealed class InputLeaseBook
         entry.Pressed[action] = true;
         entry.Buttons[action] = new InputButtonState
         {
-            Held = true, DownPending = true, PressFrame = frame, ReleaseFrame = -1, DownQueryFrame = -1, UpQueryFrame = -1
+            Held = true,
+            DownPending = true,
+            PressFrame = frame,
+            ReleaseFrame = -1,
+            DownQueryFrame = -1,
+            UpQueryFrame = -1
         };
         Recompute();
     }
@@ -134,7 +159,21 @@ internal sealed class InputLeaseBook
         if (action <= 0 || action >= Actions) throw new ArgumentOutOfRangeException(nameof(action), "Input action " + action + " is outside 1.." + (Actions - 1) + ".");
     }
 
-    internal bool Presses(int action) => action >= 0 && action < Actions && _pressed[action];
+    /// <summary>Some lease answers <paramref name="action"/>. A button released more than a frame ago has had its release edge answered and
+    /// stops answering, so the player's own press of that key reads through again while the lease is still held.</summary>
+    internal bool Presses(int action, int frame)
+    {
+        if (action < 0 || action >= Actions || !_pressed[action]) return false;
+        var retired = false;
+        foreach (var entry in _held)
+        {
+            if (!entry.Pressed[action] || entry.Buttons[action].Held || frame <= entry.Buttons[action].ReleaseFrame + 1) continue;
+            entry.Pressed[action] = false;
+            retired = true;
+        }
+        if (retired) Recompute();
+        return _pressed[action];
+    }
     internal bool Drives(int action) => action >= 0 && action < Actions && _axes[action];
 
     internal bool Held(int action) => Newest(action)?.Buttons[action].Held ?? false;
@@ -205,9 +244,12 @@ internal sealed class InputLeaseBook
         Array.Clear(_blocked);
         Array.Clear(_pressed);
         Array.Clear(_axes);
+        Array.Clear(_interactionsOff);
         var any = false;
         foreach (var entry in _held)
         {
+            for (var i = 0; i < Interactions; i++)
+                if (entry.HeldOff[i]) _interactionsOff[i] = true;
             any |= entry.Steers;
             if (entry.AxisAction >= 0) { _axes[entry.AxisAction] = true; any = true; }
             for (var i = 0; i < Actions; i++)

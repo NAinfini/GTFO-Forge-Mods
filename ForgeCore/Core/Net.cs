@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 
 namespace ForgeCore;
 
@@ -47,6 +48,8 @@ internal interface INetTransport
     ulong Host { get; }
     /// <summary>The other human players in the session, written into <paramref name="into"/>; returns how many.</summary>
     int Others(ulong[] into);
+    /// <summary>True when <paramref name="lookup"/> is a human player this peer knows (the local player included), not a bot.</summary>
+    bool IsHuman(ulong lookup);
 }
 
 /// <summary>The handshake every channel sends under one name per mod, so two different builds still meet and refuse each other
@@ -55,10 +58,14 @@ internal interface INetTransport
 internal struct NetHello
 {
     internal ulong Format, Content;
-    internal byte Answer;
+    internal byte Flags;
 
-    internal static NetHello Of(ulong format, string content, bool answer)
-        => new() { Format = format, Content = Fnv.Hash64(content), Answer = answer ? (byte)1 : (byte)0 };
+    internal readonly bool Answer => (Flags & 1) != 0;
+    /// <summary>The sender's content is not known yet (<see cref="NetChannel.HoldContent"/>): nothing can be compared until it greets again.</summary>
+    internal readonly bool Held => (Flags & 2) != 0;
+
+    internal static NetHello Of(ulong format, string content, bool answer, bool held)
+        => new() { Format = format, Content = Fnv.Hash64(content), Flags = (byte)((answer ? 1 : 0) | (held ? 2 : 0)) };
 }
 
 /// <summary>The readiness message of <see cref="NetChannel.EnableReadiness"/>: the sender's world epoch and whether it is ready.</summary>
@@ -71,7 +78,7 @@ internal struct NetReady : INetEpoch
 }
 
 /// <summary>What a channel's registered messages look like on the wire, as plain text that is the same on every machine: the
-/// message name, how it travels and its field layout (each field's name and type in declaration order, nested structs expanded,
+/// message name, how it travels and its field layout (each field's name and type in declaration order, plus its offset in explicit-layout structs, nested structs expanded,
 /// fixed buffers with their length, plus the struct's byte size). The fingerprint is FNV-1a over that text, so any change to a
 /// name, a delivery or a layout changes it, and no number has to be bumped by hand.</summary>
 internal static class NetFormat
@@ -95,7 +102,9 @@ internal static class NetFormat
         {
             if (!first) text.Append(',');
             first = false;
-            text.Append(field.Name).Append(':');
+            text.Append(field.Name);
+            if (type.IsExplicitLayout) text.Append('@').Append(field.GetCustomAttribute<FieldOffsetAttribute>()?.Value ?? 0);
+            text.Append(':');
             var buffer = field.GetCustomAttribute<FixedBufferAttribute>();
             if (buffer != null) { Describe(buffer.ElementType, text); text.Append('[').Append(buffer.Length).Append(']'); }
             else Describe(field.FieldType, text);
@@ -120,19 +129,23 @@ internal static class NetFormat
         return Fnv.Hash64(text.ToString());
     }
 
-    internal static byte[] Write(List<Entry> entries)
+    /// <summary>The per-message list, then the channel's <see cref="NetChannel.ContentDetail"/> (empty when it has none).</summary>
+    internal static byte[] Write(List<Entry> entries, byte[]? detail)
     {
         using var stream = new MemoryStream();
         using (var writer = new BinaryWriter(stream, Encoding.UTF8, true))
         {
             writer.Write(entries.Count);
             foreach (var entry in entries) { writer.Write(entry.Name); writer.Write((byte)entry.Delivery); writer.Write(entry.Layout); }
+            writer.Write(detail?.Length ?? 0);
+            if (detail != null) writer.Write(detail);
         }
         return stream.ToArray();
     }
 
-    internal static List<Entry>? Read(byte[] data)
+    internal static List<Entry>? Read(byte[] data, out byte[] detail)
     {
+        detail = Array.Empty<byte>();
         try
         {
             using var reader = new BinaryReader(new MemoryStream(data), Encoding.UTF8);
@@ -140,7 +153,10 @@ internal static class NetFormat
             if (count < 0 || count > 4096) return null;
             var entries = new List<Entry>(count);
             for (var i = 0; i < count; i++) entries.Add(new Entry(reader.ReadString(), (NetDelivery)reader.ReadByte(), reader.ReadUInt64()));
-            return entries;
+            var length = reader.ReadInt32();
+            if (length < 0 || length > data.Length) return null;
+            detail = reader.ReadBytes(length);
+            return detail.Length == length ? entries : null;
         }
         catch (Exception) { return null; }
     }
@@ -164,7 +180,8 @@ internal static class NetFormat
     }
 }
 
-/// <summary>One mod's network channel. Message events are named <c>modId/name</c>. Every registered message adds its name, delivery
+/// <summary>One mod's network channel. Message events are named <c>modId/name</c>. A channel opened with <see cref="Net.OpenInline"/>
+/// runs handlers and the handshake as each message arrives instead of queueing them for <see cref="Pump"/>. Every registered message adds its name, delivery
 /// and field layout to the channel's format fingerprint (no protocol number is kept by hand); the handshake compares that
 /// fingerprint and the mod's content hash, and when they differ both sides refuse each other (<see cref="Refused"/>, and an error
 /// in the mod's log naming the messages that differ, from the format list the two sides then exchange). Received
@@ -176,20 +193,28 @@ public sealed class NetChannel
     /// <summary>How long a greeted player may stay silent before <see cref="PeerSilent"/> is raised.</summary>
     internal const double AnswerSeconds = 10.0;
 
+    /// <summary>How many more greetings an unanswered player gets, one per <see cref="AnswerSeconds"/>, before it counts as silent: a
+    /// joining player drops a greeting from a player it does not list yet, and loading can take longer than one window.</summary>
+    internal const int GreetingRetries = 2;
+
     private sealed class Peer
     {
         internal PeerState State;
         internal bool Greeted;
         internal double GreetedAt;
         internal bool ReportedSilent;
+        internal bool Answered;
+        internal int Retries;
         internal ulong RefusedFormat, RefusedContent;
         internal bool ContentDiffers, Reported;
         internal List<NetFormat.Entry>? There;
+        internal byte[]? ThereDetail;
     }
 
     private readonly INetTransport _transport;
     private readonly ModLog _log;
     private readonly int _capacity;
+    private readonly bool _inline;
     private readonly object _gate = new();
     private readonly Queue<(ulong Sender, Action Work, bool Lossy)> _inbox = new();
     private readonly Queue<(ulong Sender, NetHello Hello)> _hellos = new();
@@ -207,7 +232,7 @@ public sealed class NetChannel
     private bool _greetAgain, _announce;
     private string _content = "";
     private ulong _host, _local;
-    private int _dropped, _lossyQueued;
+    private int _dropped, _lossyQueued, _reliableDropped;
     /// <summary>Handshakes and format lists waiting for <see cref="Tick"/>; read without the lock so an idle frame takes none.</summary>
     private volatile int _control;
     private bool _readiness;
@@ -226,20 +251,50 @@ public sealed class NetChannel
         internal NetDelivery Delivery;
     }
 
-    internal NetChannel(INetTransport transport, string modId, int capacity)
+    internal NetChannel(INetTransport transport, string modId, int capacity, bool inline = false)
     {
+        _inline = inline;
         if (string.IsNullOrWhiteSpace(modId)) throw new ArgumentException("Name the mod (its plugin GUID).", nameof(modId));
         if (capacity <= 0) throw new ArgumentOutOfRangeException(nameof(capacity));
         _transport = transport;
         ModId = modId;
         _capacity = capacity;
         _log = Log.For(modId);
-        transport.Register<NetHello>(HelloName(modId), (sender, hello) => { lock (_gate) if (_hellos.Count < 64) { _hellos.Enqueue((sender, hello)); _control++; return; } ControlOverflow(); });
-        transport.RegisterBytes(FormatsName(modId), (sender, data) => { lock (_gate) if (_formats.Count < 64) { _formats.Enqueue((sender, data)); _control++; return; } ControlOverflow(); });
+        transport.Register<NetHello>(HelloName(modId), (sender, hello) =>
+        {
+            if (_inline) { Inline(() => Receive(sender, hello)); return; }
+            lock (_gate) if (_hellos.Count < 64) { _hellos.Enqueue((sender, hello)); _control++; return; }
+            ControlOverflow();
+        });
+        transport.RegisterBytes(FormatsName(modId), (sender, data) =>
+        {
+            if (data == null || data.Length > MaxFormatsBytes) { OversizedBytes(sender); return; }
+            if (_inline) { Inline(() => ReceiveFormats(sender, data)); return; }
+            lock (_gate) if (_formats.Count < 64) { _formats.Enqueue((sender, data)); _control++; return; }
+            ControlOverflow();
+        });
+    }
+
+    /// <summary>The largest free-sized body ForgeCore accepts from a player, checked where it arrives so a handler never sees more:
+    /// a format list (up to 4096 entries) and a lobby value. A larger or missing body is dropped and reported once per mod.</summary>
+    internal const int MaxFormatsBytes = 512 * 1024, MaxLobbyBytes = 64 * 1024;
+
+    /// <summary>Most reliable messages waiting for <see cref="Pump"/> at once. Reliable messages are never dropped for lack of room
+    /// in a normal frame, so this only stops a player that floods them; the excess is dropped and reported.</summary>
+    internal const int ReliableLimit = 8192;
+
+    private void OversizedBytes(ulong sender)
+    {
+        Net.Drop(Net.DropOversized);
+        _log.ErrorOnce(Net.DropOversized, "Player " + sender + " sent a " + ModId + " message that is missing or larger than ForgeCore accepts; it was dropped.");
     }
 
     /// <summary>A handshake or format list found its queue full (64) and was dropped; the sender's next greeting repeats it.</summary>
-    private void ControlOverflow() => _log.ErrorOnce("The handshake queue of " + ModId + " overflowed (64 waiting); a handshake message was dropped, so that player may stay unanswered.");
+    private void ControlOverflow()
+    {
+        Net.Drop(Net.DropControlOverflow);
+        _log.ErrorOnce(Net.DropControlOverflow, "The handshake queue of " + ModId + " overflowed (64 waiting); a handshake message was dropped, so that player may stay unanswered.");
+    }
 
     public string ModId { get; }
     /// <summary>The fingerprint of every registered message's name, delivery and field layout, in hex; what the handshake
@@ -247,21 +302,57 @@ public sealed class NetChannel
     public string Format => Fingerprint().ToString("x16", CultureInfo.InvariantCulture);
 
     /// <summary>An optional fingerprint of the content both sides must share besides the message formats (for example a hash of the
-    /// definitions); changing it asks every player again.</summary>
+    /// definitions); changing it asks every player again. Setting it ends <see cref="HoldContent"/>.</summary>
     public string Content
     {
         get => _content;
         set
         {
-            if (_content == (value ?? "")) return;
+            if (_content == (value ?? "") && !_held) return;
             _content = value ?? "";
+            _held = false;
             AskAgain();
         }
     }
 
+    /// <summary>This player does not know its content yet (its definitions are still loading, or it left the session's mod state):
+    /// until <see cref="Content"/> is set no player is judged either way, so nobody is refused for a difference that is only a
+    /// matter of time, and setting it asks every player again.</summary>
+    public void HoldContent()
+    {
+        if (_held) return;
+        _held = true;
+        AskAgain();
+    }
+    private bool _held;
+
+    /// <summary>What this player tells a player whose content differs, so each side can say what differs in its own words; sent once
+    /// per refusal with the format list and read with <see cref="ContentDetailOf"/>. With a detail set, <see cref="Refused"/> waits for
+    /// the other side's.</summary>
+    public byte[]? ContentDetail { get; set; }
+
+    /// <summary>The <see cref="ContentDetail"/> of a player this channel refused, or null while it has not arrived.</summary>
+    public byte[]? ContentDetailOf(ulong player) => _peers.TryGetValue(player, out var peer) ? peer.ThereDetail : null;
+
+    /// <summary>A refused player's message formats differ from this one's, which outranks any difference of content.</summary>
+    public bool FormatDiffers(ulong player) => _peers.TryGetValue(player, out var peer) && peer.State == PeerState.Refused && peer.RefusedFormat != Fingerprint();
+
+    /// <summary>Forgets every verdict and greets every player again at the next frame: this player restarted what it holds for the
+    /// session, so every player's copy is judged afresh and <see cref="PeerSynced"/> follows for each that matches.</summary>
     private void AskAgain()
     {
-        foreach (var peer in _peers.Values) { peer.State = PeerState.Unknown; peer.Greeted = false; peer.ReportedSilent = false; }
+        foreach (var peer in _peers.Values)
+        {
+            peer.State = PeerState.Unknown;
+            peer.Greeted = false;
+            peer.ReportedSilent = false;
+            peer.Answered = false;
+            peer.Retries = 0;
+            peer.RefusedFormat = peer.RefusedContent = 0;
+            peer.Reported = false;
+            peer.There = null;
+            peer.ThereDetail = null;
+        }
         _greetAgain = true;
     }
 
@@ -285,6 +376,15 @@ public sealed class NetChannel
 
     public bool IsHost => _transport.Host != 0 && _transport.Host == _transport.Local;
 
+    /// <summary>True when this peer is a client and <paramref name="sender"/> is the host: the check a handler of a host-to-client message
+    /// makes on the sender the network gives it (senders are not authenticated, so a client never acts on such a message from anyone else).
+    /// False on the host itself and when there is no host.</summary>
+    public bool FromHost(ulong sender) => !IsHost && _transport.Host != 0 && _transport.Host == sender;
+
+    /// <summary>True when <paramref name="lookup"/> is a human player this peer knows (the local player included), not a bot: the check
+    /// a handler of a player-to-host message makes before acting for that player.</summary>
+    public bool IsPlayer(ulong lookup) => _transport.IsHuman(lookup);
+
     public string EventName(string name) => ModId + "/" + name;
 
     internal static string HelloName(string modId) => "ForgeCore/handshake/" + modId;
@@ -301,6 +401,27 @@ public sealed class NetChannel
         if (handler == null) throw new ArgumentNullException(nameof(handler));
         var route = Claim(name, delivery, NetFormat.LayoutOf<T>());
         _transport.Register<T>(route.Event, (sender, message) => Enqueue(sender, () => handler(sender, message), delivery));
+    }
+
+    /// <summary>Handles a byte body of any length up to <paramref name="maxBytes"/> as message <paramref name="name"/>: for a body whose
+    /// length is part of its content. The format fingerprint covers its name and delivery, not what the bytes mean, so the mod puts
+    /// that in its <see cref="Content"/>. A larger or missing body is dropped where it arrives and reported once.</summary>
+    public void OnBytes(string name, Action<ulong, byte[]> handler, NetDelivery delivery = NetDelivery.Reliable, int maxBytes = MaxLobbyBytes)
+    {
+        if (handler == null) throw new ArgumentNullException(nameof(handler));
+        var route = Claim(name, delivery, NetFormat.BytesLayout);
+        _transport.RegisterBytes(route.Event, (sender, data) =>
+        {
+            if (data == null || data.Length > maxBytes) { OversizedBytes(sender); return; }
+            Enqueue(sender, () => handler(sender, data), delivery);
+        });
+    }
+
+    /// <summary>Sends byte message <paramref name="name"/> (registered with <see cref="OnBytes"/>) to <paramref name="to"/>, or to every other player when it is 0.</summary>
+    public void SendBytes(string name, byte[] data, ulong to = 0)
+    {
+        var route = RouteOf(name);
+        _transport.SendBytes(route.Event, data, to, route.Delivery);
     }
 
     /// <summary>As <see cref="On{T}(string, Action{ulong, T}, NetDelivery)"/> for a message stamped with its sender's
@@ -323,7 +444,8 @@ public sealed class NetChannel
         return true;
     }
 
-    public void ToHost<T>(string name, T message) where T : unmanaged    {
+    public void ToHost<T>(string name, T message) where T : unmanaged
+    {
         var route = RouteOf(name);
         _transport.Send(route.Event, message, _transport.Host != 0 ? _transport.Host : throw new InvalidOperationException("No host to send " + name + " to."), route.Delivery);
     }
@@ -349,12 +471,51 @@ public sealed class NetChannel
     {
         var route = Claim(LobbyPrefix + name, NetDelivery.Reliable, NetFormat.BytesLayout);
         var value = new NetLobbyValue(this, name, _log);
-        _transport.RegisterBytes(route.Event, (sender, data) => Enqueue(sender, () => value.Receive(sender, data), NetDelivery.Reliable));
+        _transport.RegisterBytes(route.Event, (sender, data) =>
+        {
+            if (data == null || data.Length > MaxLobbyBytes + 1) { OversizedBytes(sender); return; }
+            Enqueue(sender, () => value.Receive(sender, data), NetDelivery.Reliable);
+        });
         _lobby.Add(value);
         return value;
     }
 
+    /// <summary>A (content number, content hash) list per player for this mod under <paramref name="name"/>, matched entry by entry: see <see cref="NetManifest"/>.</summary>
+    public NetManifest Manifest(string name) => new(Lobby("manifest/" + name), ModId, _log);
+
     internal const string LobbyPrefix = "lobby/";
+    private const string StatePrefix = "state/";
+    private readonly List<IPlayerStateSlot> _states = new();
+
+    /// <summary>A value per player with the moment it began, for this mod under <paramref name="name"/>: see <see cref="PlayerStateSlot{T}"/>.</summary>
+    public PlayerStateSlot<T> PlayerState<T>(string name) where T : unmanaged => PlayerState<T>(name, Net.Clock);
+
+    internal PlayerStateSlot<T> PlayerState<T>(string name, Func<float> clock) where T : unmanaged
+    {
+        var route = Claim(StatePrefix + name, NetDelivery.Reliable, NetFormat.LayoutOf<T>());
+        var slot = new PlayerStateSlot<T>(this, route.Event, clock, _log);
+        _transport.RegisterBytes(route.Event, (sender, data) => Enqueue(sender, () => { if (IsMember(sender)) slot.Receive(sender, data); }, NetDelivery.Reliable));
+        _states.Add(slot);
+        PeerSynced += slot.Resend;
+        EpochChanged += slot.EpochTaken;
+        GameEvents.LevelEnded += slot.ForgetAll;
+        GameEvents.CheckpointReloaded += slot.ForgetAll;
+        return slot;
+    }
+
+    internal ulong LocalPlayer => _transport.Local;
+
+    /// <summary>To the players the session lists (<paramref name="to"/> 0) or one of them; nothing outside a session.</summary>
+    internal void SendState(string eventName, byte[] data, ulong to)
+    {
+        if (_transport.Host == 0) return;
+        if (to != 0)
+        {
+            if (IsMember(to)) _transport.SendBytes(eventName, data, to, NetDelivery.Reliable);
+            return;
+        }
+        for (var i = 0; i < _memberCount; i++) _transport.SendBytes(eventName, data, _members[i], NetDelivery.Reliable);
+    }
 
     /// <summary><paramref name="player"/> is another player of the current session (a value from someone who already left is stale).</summary>
     internal bool IsMember(ulong player)
@@ -377,7 +538,7 @@ public sealed class NetChannel
         if (double.IsNaN(_unlistedSince)) _unlistedSince = now;
         if (IsMember(_unlisted)) { _unlisted = 0; return; }
         if (now - _unlistedSince < RosterRetrySeconds) return;
-        _log.ErrorOnce("Player " + _unlisted + " sent " + ModId + " data but the session never listed them within " + RosterRetrySeconds + " s; their lobby values were dropped.");
+        _log.ErrorOnce("core-player-sent-data-but-session-never", "Player " + _unlisted + " sent " + ModId + " data but the session never listed them within " + RosterRetrySeconds + " s; their lobby values were dropped.");
         _unlisted = 0;
     }
 
@@ -400,9 +561,13 @@ public sealed class NetChannel
     /// arrived; the count is reported here.</summary>
     public void Pump()
     {
+        Settle();
+        DrainControl();
         int dropped;
-        lock (_gate) { dropped = _dropped; _dropped = 0; }
-        if (dropped != 0) _log.ErrorOnce("Lossy receive queue of " + ModId + " overflowed (capacity " + _capacity + "); " + dropped + " messages were dropped.");
+        int reliableDropped;
+        lock (_gate) { dropped = _dropped; _dropped = 0; reliableDropped = _reliableDropped; _reliableDropped = 0; }
+        if (reliableDropped != 0) _log.ErrorOnce("core-reliable-receive-queue-held-messages-more", "Reliable receive queue of " + ModId + " held " + ReliableLimit + " messages; " + reliableDropped + " more were dropped.");
+        if (dropped != 0) _log.ErrorOnce("core-lossy-receive-queue-overflowed-capacity-messages", "Lossy receive queue of " + ModId + " overflowed (capacity " + _capacity + "); " + dropped + " messages were dropped.");
         while (true)
         {
             (ulong Sender, Action Work, bool Lossy) entry;
@@ -412,9 +577,9 @@ public sealed class NetChannel
                 entry = _inbox.Dequeue();
                 if (entry.Lossy) _lossyQueued--;
             }
-            if (State(entry.Sender) == PeerState.Refused) continue;
+            if (State(entry.Sender) == PeerState.Refused) { Net.Drop(Net.DropPeerRefused); continue; }
             try { entry.Work(); }
-            catch (Exception error) { _log.ErrorOnce("A " + ModId + " message handler failed: " + error); }
+            catch (Exception error) { _log.ErrorOnce("core-message-handler-failed", "A " + ModId + " message handler failed: " + error); }
         }
     }
 
@@ -429,7 +594,8 @@ public sealed class NetChannel
     public bool Ready { get => _ready0; set { if (_ready0 == value) return; _ready0 = value; _announce = true; } }
     private bool _ready0;
 
-    /// <summary>Raised inside <see cref="Pump"/> on a client that adopted another <see cref="Epoch"/> from its host, after it did.</summary>
+    /// <summary>Raised on the main thread when this player's <see cref="Epoch"/> became a new world's: on a client that adopted the host's (inside
+    /// <see cref="Pump"/>), on the host that minted one in <see cref="FollowWorld"/>, after it did.</summary>
     public event Action? EpochChanged;
 
     /// <summary>Opts the channel into the readiness handshake: the host announces its <see cref="Epoch"/> and <see cref="Ready"/> state,
@@ -448,8 +614,8 @@ public sealed class NetChannel
     /// and, on the host, the readiness. It can fire more than once for one player, so what it sends must be safe to repeat.</summary>
     public event Action<ulong>? PeerSynced;
 
-    /// <summary>Raised once when a greeted player has not answered within <see cref="AnswerSeconds"/>: the mod or ForgeCore is not
-    /// installed there, or is an older version.</summary>
+    /// <summary>Raised once when a greeted player has answered none of its greetings (<see cref="GreetingRetries"/>, each given
+    /// <see cref="AnswerSeconds"/>): the mod or ForgeCore is not installed there, or is an older version.</summary>
     public event Action<ulong>? PeerSilent;
 
     /// <summary>The host announced that it is ready in the current world.</summary>
@@ -480,6 +646,85 @@ public sealed class NetChannel
         _ready.Clear();
     }
 
+    private Func<bool>? _built;
+    internal bool FollowsWorld => _built != null;
+    private bool _up, _ended;
+    private ulong _minted, _prevEpoch;
+
+    /// <summary>Raised when <see cref="FollowWorld"/> dropped the world (the host changed or migrated, a checkpoint was reloaded, the
+    /// level ended): everything the mod holds for that world is void. Raised on the main thread, from the game event itself.</summary>
+    public event Action? WorldReset;
+
+    /// <summary>The channel follows the game's world so the mod does not: the world is up once <see cref="Net.WorldReady"/> and
+    /// <paramref name="ready"/> (the mod's own "built" test, read every frame) hold, and it stays up until the host changes or
+    /// migrates, a checkpoint is reloaded or the level ends. While it is up the channel is <see cref="Live"/> as long as
+    /// <paramref name="ready"/> holds (the mod still sets <see cref="Ready"/>); the host mints a fresh <see cref="Epoch"/> when it
+    /// starts (raising <see cref="EpochChanged"/>), one above every epoch it minted before, and a client adopts it through <see cref="EnableReadiness"/> (called here).
+    /// Dropping the world is <see cref="ResetWorld"/>, a <see cref="Clear"/> of the queue and <see cref="WorldReset"/>; after a host
+    /// change or checkpoint reload a host still in a ready world mints again at once, so state sent from the game event is stamped
+    /// with the new epoch. Call it once, with the other registrations; a handler the mod subscribes to the same
+    /// <see cref="GameEvents"/> afterwards runs after the channel's.</summary>
+    public void FollowWorld(Func<bool> ready)
+    {
+        if (_built != null) throw new InvalidOperationException(ModId + " already follows the world.");
+        _built = ready;
+        EnableReadiness();
+        GameEvents.MasterChanged += Restart;
+        GameEvents.MasterMigrated += Restart;
+        GameEvents.CheckpointReloaded += Restart;
+        GameEvents.LevelEnded += EndWorld;
+    }
+
+    /// <summary>A host change, migration or checkpoint reload. A client's reload event can come after it already adopted the epoch
+    /// the host minted for the same reload, so the client refuses only what is at or below the epoch before the one it holds, then asks the
+    /// host for its current epoch (a host answers a readiness message of another epoch with its own); an epoch above that is taken, the
+    /// held one included, and an older one stays refused.</summary>
+    internal void Restart()
+    {
+        Drop(true);
+        Settle();
+        if (_up && !IsHost && Live) AskHost();
+    }
+
+    /// <summary>A level cleanup for a world this channel never started is the previous level's, not this one's: arming
+    /// the end here would only refuse the world about to start while the game reports the level it is already in.</summary>
+    private void EndWorld() { if (!_up) return; _ended = true; Drop(false); }
+
+    private void Drop(bool soft)
+    {
+        if (!_up) return;
+        var from = _epochFrom;
+        _up = false;
+        Live = false;
+        ResetWorld();
+        if (soft && from != 0) _highWater[from] = _prevEpoch;
+        Clear();
+        WorldReset?.Invoke();
+    }
+
+    /// <summary>A client that holds no epoch tells the host so; the host answers with its readiness.</summary>
+    private void AskHost() => TryToHost(ReadyEvent, new NetReady { Epoch = 0, Ready = Ready ? 1 : 0 });
+
+    /// <summary>Starts the world when the game and the mod are both ready; every frame from <see cref="Pump"/> and after a restart.</summary>
+    private void Settle()
+    {
+        if (_built == null) return;
+        if (_ended) { if (Net.WorldReady) return; _ended = false; }
+        if (_up) { Live = _built(); return; }
+        if (!Net.WorldReady || !_built()) return;
+        _up = true;
+        Live = true;
+        if (!IsHost)
+        {
+            // The host's announcement may have arrived before this side was live; ask once it can answer. A host that does
+            // not hold this player as compatible yet answers through PeerSynced instead.
+            if (State(_transport.Host) == PeerState.Compatible) AskHost();
+            return;
+        }
+        Epoch = _minted = Math.Max(_minted + 1, (ulong)DateTime.UtcNow.Ticks);
+        EpochChanged?.Invoke();
+    }
+
     private void OnReady(ulong sender, NetReady message)
     {
         // A player still joining or leaving, a client's message reaching another client, or a copy that is not this one is no handshake.
@@ -487,6 +732,7 @@ public sealed class NetChannel
         if (IsHost)
         {
             if (message.Epoch == _epoch) _ready[sender] = message.Ready != 0;
+            else if (_epoch != 0) SendReady(sender);
             return;
         }
         if (sender != _transport.Host) return;
@@ -495,6 +741,7 @@ public sealed class NetChannel
         if (message.Epoch == 0 || message.Epoch < highest || Epoch == 0 && message.Epoch == highest) return;
         if (_epoch != message.Epoch)
         {
+            _prevEpoch = Math.Max(_epoch, highest);
             _epoch = message.Epoch;
             _epochFrom = sender;
             _highWater[sender] = _epoch;
@@ -507,7 +754,7 @@ public sealed class NetChannel
     /// <summary>Drops every queued message (a level ended, the host changed).</summary>
     public void Clear()
     {
-        lock (_gate) { _inbox.Clear(); _dropped = 0; _lossyQueued = 0; }
+        lock (_gate) { _inbox.Clear(); _dropped = 0; _reliableDropped = 0; _lossyQueued = 0; }
     }
 
     /// <summary>Answers handshakes, greets players who have not answered yet and forgets players who left. ForgeCore runs this
@@ -523,8 +770,21 @@ public sealed class NetChannel
             _ready.Clear();
             _hostReady = false;
             foreach (var value in _lobby) value.ForgetAll();
+            foreach (var state in _states) state.ForgetOthers();
         }
         if (rosterChanged) { Array.Copy(members, _members, memberCount); _memberCount = memberCount; }
+        DrainControl();
+        if (_host == 0) return;
+        if (_unlisted != 0) CheckUnlisted(now);
+        if (rosterChanged || _greetAgain) Greet(now);
+        if (_announce) { _announce = false; SendReady(0); }
+        if (now >= _nextSilent) CheckSilent(now);
+    }
+
+    /// <summary>Handles the handshakes and format lists that arrived since the last frame. <see cref="Pump"/> runs it first too, so a
+    /// readiness message queued behind a handshake is never judged before that handshake was.</summary>
+    private void DrainControl()
+    {
         while (_control != 0)
         {
             (ulong Sender, NetHello Hello) entry;
@@ -547,11 +807,6 @@ public sealed class NetChannel
             }
             ReceiveFormats(entry.Sender, entry.Data);
         }
-        if (_host == 0) return;
-        if (_unlisted != 0) CheckUnlisted(now);
-        if (rosterChanged || _greetAgain) Greet(now);
-        if (_announce) { _announce = false; SendReady(0); }
-        if (now >= _nextSilent) CheckSilent(now);
     }
 
     /// <summary>The members changed (or the content did): forget players who left and greet every member not greeted yet.</summary>
@@ -565,6 +820,7 @@ public sealed class NetChannel
             _peers.Remove(lookup);
             _ready.Remove(lookup);
             foreach (var value in _lobby) value.Forget(lookup);
+            foreach (var state in _states) state.Forget(lookup);
         }
         _gone.Clear();
         for (var i = 0; i < _memberCount; i++)
@@ -575,7 +831,7 @@ public sealed class NetChannel
             peer.Greeted = true;
             peer.GreetedAt = now;
             _nextSilent = Math.Min(_nextSilent, now + AnswerSeconds);
-            _transport.Send(HelloName(ModId), NetHello.Of(Fingerprint(), _content, false), lookup, NetDelivery.Reliable);
+            _transport.Send(HelloName(ModId), NetHello.Of(Fingerprint(), _content, false, _held), lookup, NetDelivery.Reliable);
         }
     }
 
@@ -585,8 +841,16 @@ public sealed class NetChannel
         foreach (var pair in _peers)
         {
             var peer = pair.Value;
-            if (!peer.Greeted || peer.State != PeerState.Unknown || peer.ReportedSilent) continue;
+            if (!peer.Greeted || peer.State != PeerState.Unknown || peer.ReportedSilent || peer.Answered) continue;
             if (now - peer.GreetedAt < AnswerSeconds) { _nextSilent = Math.Min(_nextSilent, peer.GreetedAt + AnswerSeconds); continue; }
+            if (peer.Retries < GreetingRetries)
+            {
+                peer.Retries++;
+                peer.GreetedAt = now;
+                _nextSilent = Math.Min(_nextSilent, now + AnswerSeconds);
+                _transport.Send(HelloName(ModId), NetHello.Of(Fingerprint(), _content, false, _held), pair.Key, NetDelivery.Reliable);
+                continue;
+            }
             peer.ReportedSilent = true;
             _silent.Add(pair.Key);
         }
@@ -597,7 +861,7 @@ public sealed class NetChannel
     private void Raise(Action<ulong>? handlers, ulong player)
     {
         try { handlers?.Invoke(player); }
-        catch (Exception error) { _log.ErrorOnce("A " + ModId + " peer handler failed: " + error); }
+        catch (Exception error) { _log.ErrorOnce("core-peer-handler-failed", "A " + ModId + " peer handler failed: " + error); }
     }
     private void Receive(ulong sender, NetHello hello)
     {
@@ -606,16 +870,26 @@ public sealed class NetChannel
         // session does not list yet is not answered: once it lists them this side greets them and the answer follows.
         if (!IsMember(sender)) { NoteUnlisted(sender); return; }
         if (!_peers.TryGetValue(sender, out var peer)) _peers[sender] = peer = new Peer();
+        // Any greeting or answer proves the mod is there, whatever it decides next: a side that holds its content stays Unknown but is not silent.
+        peer.Answered = true;
         var formatMatches = hello.Format == Fingerprint();
         var contentMatches = hello.Content == Fnv.Hash64(_content);
         // Answer a greeting (refused or not) so the other side decides too; an answer is never answered, so they cannot loop.
-        if (hello.Answer == 0) _transport.Send(HelloName(ModId), NetHello.Of(Fingerprint(), _content, true), sender, NetDelivery.Reliable);
+        if (!hello.Answer) _transport.Send(HelloName(ModId), NetHello.Of(Fingerprint(), _content, true, _held), sender, NetDelivery.Reliable);
+        // Either side's content is still unknown: neither is judged. The side that holds greets again when it knows.
+        if (_held || hello.Held)
+        {
+            peer.State = PeerState.Unknown;
+            // The sender restarted what it holds (like AskAgain here): the verdict we remembered is void, so the next judgement sends the format list again.
+            if (hello.Held) { peer.RefusedFormat = peer.RefusedContent = 0; peer.Reported = false; peer.There = null; peer.ThereDetail = null; }
+            return;
+        }
         if (formatMatches && contentMatches)
         {
             // A greeting or a first answer means the sender holds no state of ours (it just joined, rebuilt its view of us, or the
             // content changed), and what we sent before may have been dropped because it did not list us as a member yet: send it
             // all again, however compatible we already were. Receivers ignore identical bytes, so a repeat changes nothing.
-            var sync = peer.State != PeerState.Compatible || hello.Answer == 0;
+            var sync = peer.State != PeerState.Compatible || !hello.Answer;
             peer.State = PeerState.Compatible;
             if (sync)
             {
@@ -630,47 +904,48 @@ public sealed class NetChannel
             _ready.Remove(sender);
             if (sender == _host) _hostReady = false;
             foreach (var value in _lobby) value.Forget(sender);
+            foreach (var state in _states) state.Forget(sender);
             if (peer.RefusedFormat != hello.Format || peer.RefusedContent != hello.Content)
             {
                 peer.RefusedFormat = hello.Format;
                 peer.RefusedContent = hello.Content;
                 peer.ContentDiffers = !contentMatches;
                 peer.Reported = false;
-                if (formatMatches) { peer.Reported = true; Refuse(sender, "same message formats but different content"); }
-                else
-                {
-                    _transport.SendBytes(FormatsName(ModId), NetFormat.Write(_entries), sender, NetDelivery.Reliable);
-                    ReportFormats(sender, peer);
-                }
+                peer.There = null;
+                peer.ThereDetail = null;
+                if (formatMatches && ContentDetail == null) { peer.Reported = true; Refuse(sender, "same message formats but different content"); }
+                else _transport.SendBytes(FormatsName(ModId), NetFormat.Write(_entries, ContentDetail), sender, NetDelivery.Reliable);
             }
         }
     }
 
     private void ReceiveFormats(ulong sender, byte[] data)
     {
-        var there = NetFormat.Read(data);
-        if (there == null) { _log.ErrorOnce("Player " + sender + " sent an unreadable " + ModId + " message format list."); return; }
+        var there = NetFormat.Read(data, out var detail);
+        if (there == null) { Net.Drop(Net.DropFormatsUnreadable); _log.ErrorOnce(Net.DropFormatsUnreadable, "Player " + sender + " sent an unreadable " + ModId + " message format list."); return; }
         if (!_peers.TryGetValue(sender, out var peer)) _peers[sender] = peer = new Peer();
         peer.There = there;
+        peer.ThereDetail = detail;
         peer.Reported = false;
         ReportFormats(sender, peer);
     }
 
-    /// <summary>Once a player is refused for its message formats and its per-message list is here (either may arrive first), name
-    /// the messages that differ, once.</summary>
+    /// <summary>Once a player is refused and its list is here (a list that came first waits for the refusal, and the refusal for the
+    /// list), say what differs, once: the messages by name, and the other side's detail is readable from then on.</summary>
     private void ReportFormats(ulong sender, Peer peer)
     {
-        if (peer.Reported || peer.State != PeerState.Refused || peer.There == null || peer.RefusedFormat == Fingerprint()) return;
+        if (peer.Reported || peer.State != PeerState.Refused || peer.There == null) return;
         peer.Reported = true;
+        if (peer.RefusedFormat == Fingerprint()) { Refuse(sender, "same message formats but different content"); return; }
         var differences = NetFormat.Differences(_entries, peer.There);
         Refuse(sender, "message formats differ (" + (differences.Length == 0 ? "no per-message difference found" : differences) + ")" + (peer.ContentDiffers ? " and content differs" : ""));
     }
 
     private void Refuse(ulong sender, string reason)
     {
-        _log.Error("Player " + sender + " refused for " + ModId + ": " + reason + ". Messages from that player are dropped.");
+        _log.Error("core-player-refused-messages-from-that-player", "Player " + sender + " refused for " + ModId + ": " + reason + ". Messages from that player are dropped.");
         try { Refused?.Invoke(sender, reason); }
-        catch (Exception error) { _log.Error("A " + ModId + " refusal handler failed: " + error); }
+        catch (Exception error) { _log.Error("core-refusal-handler-failed", "A " + ModId + " refusal handler failed: " + error); }
     }
 
     private Route Claim(string name, NetDelivery delivery, string layout)
@@ -690,8 +965,21 @@ public sealed class NetChannel
         => _routes.TryGetValue(name, out var route) ? route
             : throw new InvalidOperationException(ModId + " sends message " + name + " without handling it: register it with On or OnBytes first, which also fixes how it travels.");
 
+    /// <summary>Runs one arrived message now, on the thread and at the moment the game delivers it (an inline channel).</summary>
+    private void Inline(Action work)
+    {
+        try { work(); }
+        catch (Exception error) { _log.ErrorOnce("core-message-handler-failed", "A " + ModId + " message handler failed: " + error); }
+    }
+
     private void Enqueue(ulong sender, Action work, NetDelivery delivery)
     {
+        if (_inline)
+        {
+            if (State(sender) == PeerState.Refused) Net.Drop(Net.DropPeerRefused);
+            else Inline(work);
+            return;
+        }
         var lossy = delivery == NetDelivery.Lossy;
         lock (_gate)
         {
@@ -700,6 +988,7 @@ public sealed class NetChannel
                 if (_lossyQueued >= _capacity) { _dropped++; return; }
                 _lossyQueued++;
             }
+            else if (_inbox.Count - _lossyQueued >= ReliableLimit) { _reliableDropped++; Net.Drop(Net.DropReliableOverflow); return; }
             _inbox.Enqueue((sender, work, lossy));
         }
     }
@@ -770,7 +1059,8 @@ public sealed class NetLobbyValue
         if (!_channel.IsMember(sender)) { _channel.NoteUnlisted(sender); return; }
         if (framed == null || framed.Length == 0 || framed[0] > 1 || framed[0] == 0 && framed.Length != 1)
         {
-            _log.ErrorOnce("A malformed " + _channel.ModId + " lobby value '" + Name + "' from player " + sender + " was ignored.");
+            Net.Drop(Net.DropLobbyMalformed);
+            _log.ErrorOnce(Net.DropLobbyMalformed, "A malformed " + _channel.ModId + " lobby value '" + Name + "' from player " + sender + " was ignored.");
             return;
         }
         if (framed[0] == 0) { Forget(sender); return; }
@@ -797,9 +1087,13 @@ public sealed class NetLobbyValue
     private void Raise(ulong player)
     {
         try { Changed?.Invoke(player); }
-        catch (Exception error) { _log.ErrorOnce("A " + _channel.ModId + " lobby value '" + Name + "' handler failed: " + error); }
+        catch (Exception error) { _log.ErrorOnce("core-lobby-value-handler-failed", "A " + _channel.ModId + " lobby value '" + Name + "' handler failed: " + error); }
     }
 }
+
+/// <summary>Messages and payload bytes sent since the process started (<see cref="Net.Traffic"/>): all of them, and the
+/// <see cref="NetDelivery.Lossy"/> share.</summary>
+public readonly record struct NetTraffic(long Messages, long Bytes, long LossyMessages, long LossyBytes);
 
 /// <summary>Network channels, one per mod (see <see cref="NetChannel"/>). Built on GTFO-API's NetworkAPI.</summary>
 public static class Net
@@ -818,16 +1112,33 @@ public static class Net
     /// <summary>Set by ForgeCore's plugin (GTFO-API); offline tests build channels on their own hub.</summary>
     internal static INetTransport? Transport { get; set; }
 
+    /// <summary>The clock a <see cref="PlayerStateSlot{T}"/> counts on (the game's <c>Time.time</c>, set by ForgeCore's plugin).</summary>
+    internal static Func<float> Clock { get; set; } = static () => 0f;
+
+    /// <summary>The game's world test, set by ForgeCore's plugin; offline tests set their own.</summary>
+    internal static Func<bool> WorldProbe { get; set; } = static () => false;
+
+    /// <summary>The game is in a level with a host and no migration in progress: the moment a mod's world may start (see <see cref="NetChannel.FollowWorld"/>).</summary>
+    public static bool WorldReady => WorldProbe();
+
     /// <summary>Opens <paramref name="modId"/>'s channel; its message formats are fingerprinted as the mod registers them. A mod
     /// opens one channel; opening a second is refused. <paramref name="capacity"/> is how many received <see cref="NetDelivery.Lossy"/> messages may wait for
     /// <see cref="NetChannel.Pump"/>; <see cref="NetDelivery.Reliable"/> messages are not limited by it.</summary>
-    public static NetChannel Open(string modId, int capacity = 512)
+    public static NetChannel Open(string modId, int capacity = 512) => Add(modId, capacity, false);
+
+    /// <summary>Opens <paramref name="modId"/>'s channel with no receive queue: handlers and the handshake run as each message arrives, on
+    /// the thread and at the moment the game delivers it, so they keep their order against the game's own messages on the same
+    /// network channel. For a mod whose decisions depend on that order; such a handler must be safe inside the game's network
+    /// callback, and <see cref="NetChannel.Pump"/> has nothing to run.</summary>
+    public static NetChannel OpenInline(string modId) => Add(modId, 512, true);
+
+    private static NetChannel Add(string modId, int capacity, bool inline)
     {
         var transport = Transport ?? throw new InvalidOperationException("ForgeCore's network is not ready (GTFO-API missing?).");
         lock (Channels)
         {
             if (Channels.ContainsKey(modId)) throw new InvalidOperationException(modId + " already opened its channel.");
-            var channel = new NetChannel(transport, modId, capacity);
+            var channel = new NetChannel(transport, modId, capacity, inline);
             Channels.Add(modId, channel);
             var all = new NetChannel[_all.Length + 1];
             _all.CopyTo(all, 0);
@@ -837,6 +1148,46 @@ public static class Net
             return channel;
         }
     }
+
+    private static long _sentMessages, _sentBytes, _lossyMessages, _lossyBytes;
+
+    /// <summary>What every Forge package sent since the process started: each send the game accepted is one message (a send to every
+    /// player too), at its payload size without GTFO-API's event header. A reader takes two readings and divides by the time between
+    /// them for messages and bytes per second. Reading and counting allocate nothing.</summary>
+    public static NetTraffic Traffic => new(Interlocked.Read(ref _sentMessages), Interlocked.Read(ref _sentBytes),
+        Interlocked.Read(ref _lossyMessages), Interlocked.Read(ref _lossyBytes));
+
+    /// <summary>The transport counts one message it handed to the game.</summary>
+    internal static void CountSent(int bytes, NetDelivery delivery)
+    {
+        Interlocked.Increment(ref _sentMessages);
+        Interlocked.Add(ref _sentBytes, bytes);
+        if (delivery != NetDelivery.Lossy) return;
+        Interlocked.Increment(ref _lossyMessages);
+        Interlocked.Add(ref _lossyBytes, bytes);
+    }
+
+    private static readonly Dictionary<string, long> Drops = new(StringComparer.Ordinal);
+
+    /// <summary>Counts one received message dropped as illegal (malformed, oversized, flooding, from a refused or wrong sender, from
+    /// another world) under its refusal <paramref name="code"/>. Every Forge package counts its network drops here, so one place
+    /// answers how many of each kind arrived; the log still reports a kind once.</summary>
+    public static void Drop(string code)
+    {
+        lock (Drops) Drops[code] = Drops.TryGetValue(code, out var count) ? count + 1 : 1;
+    }
+
+    /// <summary>How many received messages were dropped under <paramref name="code"/> since the process started.</summary>
+    public static long Dropped(string code)
+    {
+        lock (Drops) return Drops.TryGetValue(code, out var count) ? count : 0;
+    }
+
+    // ForgeCore's own refusal codes for dropped messages.
+    internal const string DropOversized = "net-body-oversized", DropControlOverflow = "net-control-overflow",
+        DropReliableOverflow = "net-reliable-overflow", DropFormatsUnreadable = "net-formats-unreadable",
+        DropLobbyMalformed = "net-lobby-malformed", DropStateSize = "net-state-size", DropStateInvalid = "net-state-invalid", DropPeerRefused = "net-peer-refused",
+        DropManifestMalformed = "net-manifest-malformed";
 
     /// <summary>The game said the session may have changed (a player joined or left, the host changed, the session was reset): the
     /// next <see cref="Tick"/> reads the host, the local player and the members once for every channel.</summary>
@@ -904,7 +1255,7 @@ public static class Net
         foreach (var channel in all)
         {
             try { channel.Tick(now, changed, _rosterHost, _rosterLocal, Roster, _rosterCount); }
-            catch (Exception error) { Log.For(channel.ModId).ErrorOnce("ForgeCore handshake of " + channel.ModId + " failed: " + error); }
+            catch (Exception error) { Log.For(channel.ModId).ErrorOnce("core-handshake-failed", "ForgeCore handshake of " + channel.ModId + " failed: " + error); }
         }
     }
 }

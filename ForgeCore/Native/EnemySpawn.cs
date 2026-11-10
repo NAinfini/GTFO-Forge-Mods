@@ -7,7 +7,7 @@ namespace ForgeCore;
 
 /// <summary>Spawning an enemy through the game's own allocator (<c>EnemyAllocator.SpawnEnemy</c>): the game builds the enemy, sets it
 /// up, registers it for replication and starts it in the given mode. Main thread, host only (the game refuses on a client).</summary>
-public static class EnemySpawn
+public static partial class EnemySpawn
 {
     /// <summary>The game's allocator exists, so a request can be made.</summary>
     public static bool Ready => EnemyAllocator.Current is { WasCollected: false };

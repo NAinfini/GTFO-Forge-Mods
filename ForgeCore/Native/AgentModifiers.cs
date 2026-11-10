@@ -29,18 +29,34 @@ public sealed class ModifierTable
 /// after its own limits and the time stamp.</summary>
 public readonly record struct ModifierReading(float Original, float Cached, float TimeStamp);
 
-/// <summary>Agent attribute modifiers through the game's own synced entry, <c>AgentModifierManager.AddSyncedModifierValue</c> and
-/// <c>ClearSyncedModifierChange</c>, for players and enemies alike. A modification is a contribution to the agent's aggregate, so
+/// <summary>Agent attribute modifiers through the game's own entries, <c>AgentModifierManager.AddSyncedModifierValue</c> and
+/// <c>ClearSyncedModifierChange</c> (the local <c>AddModifierValue</c> and <c>ClearModifierChange</c> while the synced packet
+/// does not exist), for players and enemies alike. A modification is a contribution to the agent's aggregate, so
 /// it is read back after it is added and cleared by its id; this class only calls and reads, the caller decides amounts, caps and
 /// when to clear. Main thread only.</summary>
 public static class AgentModifiers
 {
+    /// <summary>Whether the game's modifier manager exists. Without it neither entry can work.</summary>
+    public static bool Ready => AgentModifierManager.Current != null;
+
+    /// <summary>The synced entry sends through a network packet the manager creates in its own setup; the game raises a null
+    /// reference when that packet is missing, which is what every call of the synced entry did in the hand-test logs. While the
+    /// packet is missing the game's local entry, the one its own boosters use on every machine, carries the modification instead.</summary>
+    private static bool Synced => AgentModifierManager.Current?.m_modificationPacket != null;
+
     /// <summary>Adds <paramref name="amount"/> to <paramref name="modifier"/> of <paramref name="agent"/> with no decay and returns
     /// the modification's id, or 0 when the game registered nothing (its ids ran out).</summary>
     public static uint Add(Agent agent, AgentModifier modifier, float amount)
     {
         if (agent == null) throw new ArgumentNullException(nameof(agent));
-        return AgentModifierManager.AddSyncedModifierValue(agent, modifier, amount, 0f);
+        var synced = Synced;
+        var id = synced
+            ? AgentModifierManager.AddSyncedModifierValue(agent, modifier, amount, 0f)
+            : AgentModifierManager.AddModifierValue(agent, modifier, amount, 0f);
+        Plugin.Diag.LogInfo("[diag1110] modifier.add entry=" + (synced ? "synced" : "local")
+            + " modifier=" + modifier + " amount=" + amount + " id=" + id + " held=" + (TableOf(agent)?.Holds(id) ?? false)
+            + " applied=" + AgentModifierManager.ApplyModifier(agent, modifier, 1f));
+        return id;
     }
 
     /// <summary>The agent's modifier table, or null when it has none yet.</summary>
@@ -56,13 +72,35 @@ public static class AgentModifiers
         if (!AgentModifierManager.TryGetModifierInstance(agent, out var table) || table == null || table.Pointer == IntPtr.Zero)
             return false;
         var values = table.m_idToModificationInstanceValue ?? throw new InvalidOperationException("The game's modifier table is unavailable.");
-        if (!values.TryGetValue(id, out var value)) return false;
+        // Not TryGetValue: the interop builds its `out` value with a pointer constructor this struct does not have
+        // (MissingMethodException); the indexer copies the struct out of the native slot.
+        if (!values.ContainsKey(id)) return false;
+        var value = values[id];
         if (value.Modifier != modifier || value.DeltaPerSec != 0f)
             throw new InvalidOperationException("The game's modifier entry " + id + " is not the contribution that was added.");
         reading = new ModifierReading(value.OriginalValue, value.CachedValue, value.TimeStamp);
         return true;
     }
 
-    /// <summary>Clears modification <paramref name="id"/> through the game's synced entry (peers clear it too).</summary>
-    public static void Clear(uint id) => AgentModifierManager.ClearSyncedModifierChange(id);
+    /// <summary>The sum of what the agent's table holds for <paramref name="modifier"/> among the modifications that do not decay (the
+    /// values the game cached after its own limits): the table's own total for one member, whoever added each entry. False when the
+    /// agent has no table yet, which a reader takes as zero. Throws when the table exists but cannot be read.</summary>
+    public static bool TryTotal(Agent agent, AgentModifier modifier, out float total)
+    {
+        total = 0f;
+        if (!AgentModifierManager.TryGetModifierInstance(agent, out var table) || table == null || table.Pointer == IntPtr.Zero)
+            return false;
+        var values = table.m_idToModificationInstanceValue ?? throw new InvalidOperationException("The game's modifier table is unavailable.");
+        foreach (var pair in values)
+            if (pair.Value is { } value && value.Modifier == modifier && value.DeltaPerSec == 0f) total += value.CachedValue;
+        return true;
+    }
+
+    /// <summary>Clears modification <paramref name="id"/> through the entry that added it: the synced one (peers clear it too) or
+    /// the local one.</summary>
+    public static void Clear(uint id)
+    {
+        if (Synced) AgentModifierManager.ClearSyncedModifierChange(id);
+        else AgentModifierManager.ClearModifierChange(id);
+    }
 }
