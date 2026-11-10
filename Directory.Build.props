@@ -2,11 +2,32 @@
   <Import Project="Build/GtfoApi.props" />
   <PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Supply chain (X7): a project that restores NuGet packages is pinned by a committed packages.lock.json, and every
+         restore refuses to change it. Locked test projects are built by Mods/verify.py, which sets
+         ForgeFrameworkAssembly and so turns the Framework project references into assembly references; their locks
+         record that graph. After changing a PackageReference or a project reference, rewrite the lock once with
+         `dotnet restore <project> -p:RestoreLockedMode=false -p:ForgeFrameworkAssembly=<built ForgeEngine.Framework.dll>`
+         plus GTFOBepInExPath and the force-evaluate option, and commit it. Projects with no package are not locked. -->
+    <RestorePackagesWithLockFile Condition="$([System.IO.File]::ReadAllText('$(MSBuildProjectFullPath)').Contains('&lt;PackageReference'))">true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(RestorePackagesWithLockFile)' == 'true' And '$(RestoreLockedMode)' == ''">true</RestoreLockedMode>
     <!-- Build-time media (sounds, effect bundles, icons) is local-only and never in Git. The root is FORGE_MODS_ROOT
-         and falls back to this checkout's own Mods folder. -->
+         (set it only to override); in a secondary worktree (its .git is a file) it falls back to the main
+         checkout's Mods, read from that file, and otherwise to this checkout's own Mods folder. -->
     <ForgeModsRoot Condition="'$(ForgeModsRoot)' == ''">$(FORGE_MODS_ROOT)</ForgeModsRoot>
+    <_ForgeGitFile>$(MSBuildThisFileDirectory)../.git</_ForgeGitFile>
+    <!-- The main checkout, for local-only inputs a secondary worktree does not copy (empty outside a worktree). -->
+    <ForgeMainCheckout Condition="$([System.IO.File]::Exists('$(_ForgeGitFile)'))">$([System.Text.RegularExpressions.Regex]::Replace($([System.IO.File]::ReadAllText('$(_ForgeGitFile)')), '(?s)^\s*gitdir:\s*(.*?)[\\/]\.git[\\/]worktrees[\\/].*$', '$1'))</ForgeMainCheckout>
+    <ForgeModsRoot Condition="'$(ForgeModsRoot)' == '' And '$(ForgeMainCheckout)' != ''">$(ForgeMainCheckout)/Mods/</ForgeModsRoot>
     <ForgeModsRoot Condition="'$(ForgeModsRoot)' == ''">$(MSBuildThisFileDirectory)</ForgeModsRoot>
     <ForgeModsRoot>$([MSBuild]::EnsureTrailingSlash('$(ForgeModsRoot)'))</ForgeModsRoot>
+  </PropertyGroup>
+  <!-- Package version: Release/release.json is the only table. A project listed in a row's identity.csprojs builds with that
+       row's version, so csproj files write no <Version>; projects outside the table (tests, tools) keep the SDK default. Source
+       constants that repeat a package version are tagged "// package-version: <package>" and written by
+       Tools/Forge/set-package-version.ts. -->
+  <PropertyGroup>
+    <ForgeTableVersion>$([System.Text.RegularExpressions.Regex]::Replace($([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)Release/release.json')), '(?s)^(?:.*?"version":\s*"([^"]+)",[^{}]*\{\s*"csprojs":\s*\[[^\]]*"$([System.Text.RegularExpressions.Regex]::Escape($([MSBuild]::MakeRelative('$(MSBuildThisFileDirectory)', '$(MSBuildProjectFullPath)').Replace('\', '/'))))".*|.*)$', '$1'))</ForgeTableVersion>
+    <Version Condition="'$(ForgeTableVersion)' != ''">$(ForgeTableVersion)</Version>
   </PropertyGroup>
   <!-- Dead-code rescan (Mods/Build/dead-code.globalconfig); off in normal builds. -->
   <PropertyGroup Condition="'$(ForgeDeadCodeScan)' == 'true'">

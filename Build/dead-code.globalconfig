@@ -2,7 +2,10 @@
 # with unresolved types Roslyn reports a needed using (IDE0005) or a member (IDE0051) as unused. Run it through
 # Mods/verify.py, which passes each project the same game, dump and QA BepInEx inputs, never through a bare build.
 # Applied only when a build passes -p:ForgeDeadCodeScan=true, so the
-# normal build keeps these rules silent. The scan command, run from the repository root:
+# normal build keeps these rules silent. IDE0005 is reported on build only when the project generates its documentation file, so a scan also
+# passes -p:GenerateDocumentationFile=true (and the environment variable of the same name, which reaches the API-fingerprint tool build)
+# and -p:TreatWarningsAsErrors=false. A source file is compiled by several projects (Core and Native, source-double tests): a using or
+# member is dead only when every project that compiles the file reports it. The scan command, run from the repository root:
 #   dotnet build Mods/Forge.Architecture.sln -c Release --artifacts-path artifacts/dotnet -p:GTFOBepInExPath=<profile>/BepInEx
 #     -p:ForgeDeadCodeScan=true -p:TreatWarningsAsErrors=false --no-incremental --disable-build-servers -m:1
 # The host, Native and test projects are scanned the same way with their own build inputs (-p:ForgeEngineAssembly,

@@ -68,7 +68,9 @@ function Test-Member($scope, $key, $member) {
         if (-not $base) { return $false }
         $scope = $base.Scope; $key = $base.Key
     }
-    # The chain leaves the set (BCL, Unity, game): not ours to judge.
+    # The chain leaves the set. A class that only derives from System.Object inherits nothing but Object's own members, so any
+    # other name it lacks is missing; a base from Unity or the game (or ValueType, Enum) could supply it: not ours to judge.
+    if ($key -eq 'System.Object') { return $member -in @('ToString', 'Equals', 'GetHashCode', 'GetType', 'Finalize', 'MemberwiseClone', 'ReferenceEquals') }
     return $true
 }
 

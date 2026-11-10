@@ -4,7 +4,6 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
-    <Version>1.0.0</Version>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 </Project>
