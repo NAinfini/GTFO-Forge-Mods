@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text.Json;
 
 namespace ForgeOrdnance;
@@ -29,8 +30,10 @@ public sealed record DropWhere(int Dimension, int Layer, int LocalIndex, DropPoi
            + (Point.IsWorld ? "position " + DeveloperDrops.Format(Point.X, Point.Y, Point.Z) : "area " + Point.Area + " offset " + DeveloperDrops.Format(Point.X, Point.Y, Point.Z));
 }
 
-/// <summary>One entry of a level's <c>Drops</c> (<c>Name</c> is unique within a level). <see cref="Where"/> is null only for an event drop that lands where its event says.</summary>
-public sealed record OrdnanceLevelDrop(string Name, string Ordnance, DropWhen When, OrdnanceArrivalMode Arrival, double Delay, float Yaw, DropWhere? Where);
+/// <summary>One entry of a level's <c>Drops</c> (<c>Name</c> is unique within a level). <see cref="Where"/> is null only for an event drop that lands where its event says.
+/// <see cref="Overrides"/> are numbers this one placement sets on what the payload type lets it (<see cref="OrdnanceOverrideField"/>); null sets none.</summary>
+public sealed record OrdnanceLevelDrop(string Name, string Ordnance, DropWhen When, OrdnanceArrivalMode Arrival, double Delay, float Yaw, DropWhere? Where,
+    IReadOnlyDictionary<string, double>? Overrides = null);
 
 /// <summary>What <see cref="DropPlacement.Resolve"/> needs from the level being played.</summary>
 internal interface IDropLevel
@@ -42,7 +45,7 @@ internal interface IDropLevel
     Vec3 AreaCentre(int dimension, int layer, int localIndex, int area);
 }
 
-/// <summary>The <c>Drops</c> lists of <c>Settings.json</c>: parsing, checking against the loaded call-ins, and the level event that fires them.</summary>
+/// <summary>The <c>Drops</c> lists of <c>Settings.forge</c>: parsing, checking against the loaded call-ins, and the level event that fires them.</summary>
 internal static class DeveloperDrops
 {
     /// <summary>The level event type (<c>WardenObjectiveEventData.Type</c>) that fires a developer drop; its
@@ -50,7 +53,7 @@ internal static class DeveloperDrops
     internal const int EventType = 75000;
     internal const double MaxDelay = 3600;
     private const int MaxLayer = 2;
-    private static readonly string[] EntryFields = { "Name", "Ordnance", "When", "Arrival", "Delay", "Yaw", "Where" };
+    private static readonly string[] EntryFields = { "Name", "Ordnance", "When", "Arrival", "Delay", "Yaw", "Where", "Overrides" };
     private static readonly string[] WhereFields = { "DimensionIndex", "Layer", "LocalIndex", "Position", "Area", "Offset" };
     private static readonly string[] VectorFields = { "x", "y", "z" };
 
@@ -58,6 +61,9 @@ internal static class DeveloperDrops
     /// again after a checkpoint reload or a host change is the same call on every peer, and never meets a number of
     /// <see cref="NextCall"/> (lower half).</summary>
     internal static uint LevelStartCall(string dropName) => ForgeCore.Fnv.Hash32("LevelStart:" + dropName) | 0x80000000u;
+
+    /// <summary>True for the call number of a level-start drop (upper half), false for a placement or event drop (<see cref="NextCall"/>).</summary>
+    internal static bool IsLevelStartCall(uint call) => (call & 0x80000000u) != 0;
 
     /// <summary>The first call number of a host: the clock, kept in the lower half.</summary>
     internal static uint SeedCalls(ulong clock) => (uint)(clock & 0x7FFFFFFF) | 1u;
@@ -121,18 +127,30 @@ internal static class DeveloperDrops
             && (arrivalElement.ValueKind != JsonValueKind.String || !ArrivalPlan.TryParse(arrivalElement.GetString(), out arrival)))
             errors.Add(at + " Arrival: must be \"Drop\" or \"Direct\".");
         var delay = 0.0;
-        if (entry.TryGetProperty("Delay", out var delayElement))
+        if (entry.TryGetProperty("Delay", out _))
         {
             if (when == DropWhen.Event) errors.Add(at + " Delay: an event drop waits for its event's own Delay; remove this field.");
-            else if (!Number(delayElement, 0, MaxDelay, out delay)) errors.Add(at + " Delay: must be seconds 0.." + MaxDelay + ".");
+            else delay = Read(entry, "Delay", 0, MaxDelay, at, errors);
         }
-        var yaw = 0.0;
-        if (entry.TryGetProperty("Yaw", out var yawElement) && !Number(yawElement, 0, 360, out yaw)) errors.Add(at + " Yaw: must be degrees 0..360.");
+        var yaw = Read(entry, "Yaw", 0, 360, at, errors);
         DropWhere? place = null;
         if (entry.TryGetProperty("Where", out var whereElement)) place = ParseWhere(whereElement, at + " Where", errors);
         else if (when == DropWhen.LevelStart) errors.Add(at + " Where: a level-start drop needs a place.");
+        var overrides = entry.TryGetProperty("Overrides", out var overridesElement) ? ParseOverrides(overridesElement, at + " Overrides", errors) : null;
         if (name == null || ordnance == null || whenText == null) return null;
-        return new OrdnanceLevelDrop(name, ordnance, when, arrival, delay, (float)yaw, place);
+        return new OrdnanceLevelDrop(name, ordnance, when, arrival, delay, (float)yaw, place, overrides);
+    }
+
+    private static Dictionary<string, double>? ParseOverrides(JsonElement element, string at, List<string> errors)
+    {
+        if (element.ValueKind != JsonValueKind.Object) { errors.Add(at + ": must be an object of field names and numbers."); return null; }
+        var values = new Dictionary<string, double>(StringComparer.Ordinal);
+        foreach (var member in element.EnumerateObject())
+        {
+            if (ForgeCore.StrictJson.Finite(member.Value, out var value)) values[member.Name] = value;
+            else errors.Add(at + "." + member.Name + ": must be a finite number.");
+        }
+        return values;
     }
 
     private static DropWhere? ParseWhere(JsonElement element, string at, List<string> errors)
@@ -143,7 +161,7 @@ internal static class DeveloperDrops
         var layer = Whole(element, "Layer", 0, MaxLayer, at, errors);
         var zone = Whole(element, "LocalIndex", 0, 255, at, errors);
         var hasPosition = element.TryGetProperty("Position", out var position);
-        var hasArea = element.TryGetProperty("Area", out var areaElement);
+        var hasArea = element.TryGetProperty("Area", out _);
         var hasOffset = element.TryGetProperty("Offset", out var offset);
         DropPoint? point = null;
         if (hasPosition == hasArea) errors.Add(at + ": give either Position (a world point) or Area (an area of the zone, with an optional Offset).");
@@ -154,9 +172,7 @@ internal static class DeveloperDrops
         }
         else
         {
-            var area = -1;
-            if (areaElement.ValueKind == JsonValueKind.Number && areaElement.TryGetInt32(out var value) && value >= 0) area = value;
-            else errors.Add(at + " Area: must be a whole number from 0 (the zone's first area).");
+            var area = StrictRead.Collect(() => (int)ForgeCore.StrictJson.Integer(element, "", "Area", null, 0, int.MaxValue), at, errors, -1);
             var shift = hasOffset ? Vector(offset, at + " Offset", errors) : new Vec3(0, 0, 0);
             if (area >= 0 && shift is { } s) point = new DropPoint(area, s.X, s.Y, s.Z);
         }
@@ -181,6 +197,7 @@ internal static class DeveloperDrops
             if (drop.When == DropWhen.Event ? drop.Delay != 0 : !double.IsFinite(drop.Delay) || drop.Delay < 0 || drop.Delay > MaxDelay)
                 errors.Add(at + " Delay: " + (drop.When == DropWhen.Event ? "an event drop waits for its event's own Delay; leave it 0." : "must be seconds 0.." + MaxDelay + "."));
             if (!float.IsFinite(drop.Yaw) || drop.Yaw < 0 || drop.Yaw > 360) errors.Add(at + " Yaw: must be degrees 0..360.");
+            if (drop.Overrides != null && drop.Overrides.Any(o => string.IsNullOrWhiteSpace(o.Key) || !double.IsFinite(o.Value))) errors.Add(at + " Overrides: names must be non-empty and values finite numbers.");
             if (drop.Where == null)
             {
                 if (drop.When == DropWhen.LevelStart) errors.Add(at + " Where: a level-start drop needs a place.");
@@ -195,7 +212,8 @@ internal static class DeveloperDrops
 
     /// <summary>The drops whose call-in is loaded and can arrive as asked; each one that cannot is reported and left out.
     /// <paramref name="supportsDirect"/> tells whether a payload type can arrive without its vehicle.</summary>
-    internal static IReadOnlyList<OrdnanceLevelDrop> Usable(IReadOnlyList<OrdnanceLevelDrop> drops, DefinitionSet set, Func<string, bool> supportsDirect, string where, List<string> errors)
+    internal static IReadOnlyList<OrdnanceLevelDrop> Usable(IReadOnlyList<OrdnanceLevelDrop> drops, DefinitionSet set, Func<string, bool> supportsDirect,
+        Func<OrdnanceDefinition, IReadOnlyDictionary<string, double>, string?> checkOverrides, string where, List<string> errors)
     {
         var usable = new List<OrdnanceLevelDrop>(drops.Count);
         foreach (var drop in drops)
@@ -208,6 +226,11 @@ internal static class DeveloperDrops
             if (drop.Arrival == OrdnanceArrivalMode.Direct && !supportsDirect(definition.PayloadType))
             {
                 errors.Add(where + " drop '" + drop.Name + "' Arrival: '" + drop.Ordnance + "' (payload " + definition.PayloadType + ") cannot arrive Direct; this drop is skipped.");
+                continue;
+            }
+            if (drop.Overrides is { Count: > 0 } && checkOverrides(definition, drop.Overrides) is { } bad)
+            {
+                errors.Add(where + " drop '" + drop.Name + "' Overrides." + bad + "; this drop is skipped.");
                 continue;
             }
             usable.Add(drop);
@@ -234,29 +257,16 @@ internal static class DeveloperDrops
             if (Array.IndexOf(known, member.Name) < 0) errors.Add(at + " " + member.Name + ": unknown field.");
     }
 
+    // The field readers are ForgeCore's StrictJson; a refusal is added to the list by entry and field, and the entry is left out.
     private static string? Text(JsonElement owner, string field, string at, List<string> errors)
-    {
-        if (owner.TryGetProperty(field, out var element) && element.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(element.GetString()))
-            return element.GetString()!;
-        errors.Add(at + " " + field + ": " + (owner.TryGetProperty(field, out _) ? "must be a non-empty string." : "is required."));
-        return null;
-    }
+        => StrictRead.Collect(() => ForgeCore.StrictJson.String(owner, "", field, null), at, errors, (string?)null);
 
     private static int Whole(JsonElement owner, string field, int min, int max, string at, List<string> errors)
-    {
-        if (!owner.TryGetProperty(field, out var element)) { errors.Add(at + " " + field + ": is required."); return -1; }
-        if (element.ValueKind == JsonValueKind.Number && element.TryGetInt32(out var value) && value >= min && value <= max) return value;
-        errors.Add(at + " " + field + ": must be a whole number " + min + ".." + max + ".");
-        return -1;
-    }
+        => StrictRead.Collect(() => (int)ForgeCore.StrictJson.Integer(owner, "", field, null, min, max), at, errors, -1);
 
-    private static bool Number(JsonElement element, double min, double max, out double value)
-    {
-        value = 0;
-        if (element.ValueKind != JsonValueKind.Number || !element.TryGetDouble(out var read) || !double.IsFinite(read) || read < min || read > max) return false;
-        value = read;
-        return true;
-    }
+    /// <summary>A number from <paramref name="min"/> to <paramref name="max"/>; 0 when the field is absent or refused (the refusal is added to the list).</summary>
+    private static double Read(JsonElement owner, string field, double min, double max, string at, List<string> errors)
+        => StrictRead.Collect(() => ForgeCore.StrictJson.Number(owner, "", field, 0, min, max), at, errors, 0d);
 
     private static Vec3? Vector(JsonElement element, string at, List<string> errors)
     {
@@ -265,9 +275,10 @@ internal static class DeveloperDrops
         var parts = new float[3];
         for (var i = 0; i < 3; i++)
         {
-            if (element.TryGetProperty(VectorFields[i], out var part) && part.ValueKind == JsonValueKind.Number && part.TryGetDouble(out var v) && double.IsFinite(v) && Math.Abs(v) <= 100000)
-                parts[i] = (float)v;
-            else { errors.Add(at + " " + VectorFields[i] + ": must be a finite number."); return null; }
+            var field = VectorFields[i];
+            var part = StrictRead.Collect(() => ForgeCore.StrictJson.Number(element, "", field, null, -100000, 100000), at, errors, double.NaN);
+            if (double.IsNaN(part)) return null;
+            parts[i] = (float)part;
         }
         return new Vec3(parts[0], parts[1], parts[2]);
     }

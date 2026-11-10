@@ -1,0 +1,24 @@
+ForgeOrdnance - notices and credits
+Copyright (c) 2026 NAinfini. Licensed under the MIT License (see LICENSE), except for the third-party material listed below,
+which keeps its own licence.
+
+This is an unofficial fan-made mod for GTFO. It is not made, endorsed or supported by 10 Chambers Collective.
+GTFO and its game data belong to their owners; no file taken from the game is included in this package.
+Models bundle (forge-ordnance.bundle): the summoning ball, the drop pod and the turret shell were generated for this project by its owner with Tripo (paid membership). Effect textures:
+- "Smoke Particles" and "Particle Pack" by Kenney (https://kenney.nl), CC0 1.0 (credit given anyway); repacked or converted to white-on-alpha.
+- "Free VFX image sequences and flipbooks" (Flame02) by Unity Technologies (Unity Labs), CC0 1.0.
+  https://unity.com/blog/engine-platform/free-vfx-image-sequences-flipbooks
+- "Particle Pack Starter Assets" (SmokePuff01) by Unity Technologies and "Free Quick Effects Vol 1" (Circle01_v1) by Gabriel Aguiar Prod, both free
+  Unity Asset Store packs used under the Asset Store EULA (commercial use allowed; embedded in this built product, not redistributed on their own).
+- The rock texture is drawn for this mod.
+Effects in forge-ordnance-fx.bundle are rebuilt from Unity Asset Store packs under the Asset Store EULA (commercial use allowed; shipped inside this built bundle, not redistributed on their own; Assets/Vfx/fx-licences.forge lists the packs).
+
+Sound effects (audio/*.ogg), converted to Ogg Vorbis from the recordings listed in audio/LICENSE.forge:
+- Sonniss GameAudioGDC sound effects (royalty-free; the Sonniss licence terms apply to the originals).
+- Boom Library sound effects, used under the author's licence from Boom Library.
+- "217459_4056007-hq.mp3" by JarredGibb, https://freesound.org/people/JarredGibb/sounds/217459/, CC0 1.0 (credit given anyway).
+- A few clips come from a sound collection the owner confirmed as open source; their original authors are not named in that collection
+  (audio/LICENSE.forge names the files).
+
+The package is compiled against BepInEx, HarmonyX, Il2CppInterop, GTFO-API and the game's interop assemblies, which the mod manager installs
+separately and which are not included here.

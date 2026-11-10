@@ -55,7 +55,7 @@ internal sealed class ItemPayload : IOrdnancePayload
             try { Place(ids, ratios, node, landing, podRotation, thrower, throwId, inPod); }
             catch (Exception error)
             {
-                Plugin.Error("Drop pod of throw " + throwId + " could not finish placing its pickups; any pickups already spawned remain available: " + error);
+                Plugin.Logger.ErrorOnce("Drop pod of throw " + throwId + " could not finish placing its pickups; any pickups already spawned remain available: " + error);
                 Deliveries.ReportFailure(thrower, throwId);
             }
         });
@@ -89,7 +89,7 @@ internal sealed class ItemPayload : IOrdnancePayload
             var sync = item.GetSyncComponent()?.TryCast<LG_PickupItem_Sync>();
             if (sync == null || sync.WasCollected)
             {
-                Plugin.Error("Drop pod of throw " + throwId + ": pickup " + ids[i] + " has no pickup state to place.");
+                Plugin.Logger.ErrorOnce("Drop pod of throw " + throwId + ": pickup " + ids[i] + " has no pickup state to place.");
                 problems++;
                 continue;
             }
@@ -102,14 +102,14 @@ internal sealed class ItemPayload : IOrdnancePayload
         if (!inPod)
         {
             if (unreadable != 0 || problems != 0)
-                Plugin.Error("Direct supply of call " + throwId + ": " + unreadable + " of its " + ids.Length + " requested pickups could not be read back and "
+                Plugin.Logger.ErrorOnce("Direct supply of call " + throwId + ": " + unreadable + " of its " + ids.Length + " requested pickups could not be read back and "
                     + problems + " were not placed as asked; any pickups that did spawn remain available.");
             return;
         }
         if (unreadable == 0 && problems == 0) Deliveries.Watch(thrower, throwId, placed);
         else
         {
-            Plugin.Error("Drop pod of throw " + throwId + ": " + unreadable + " of its " + ids.Length + " requested pickups could not be read back and "
+            Plugin.Logger.ErrorOnce("Drop pod of throw " + throwId + ": " + unreadable + " of its " + ids.Length + " requested pickups could not be read back and "
                 + problems + " were not placed as asked; any pickups that did spawn remain available and the untrackable pod will leave.");
             Deliveries.ReportFailure(thrower, throwId);
         }
@@ -123,8 +123,8 @@ internal sealed class ItemPayload : IOrdnancePayload
         var state = sync.GetCurrentState();
         var at = state.placement.position;
         if (state.status != ePickupItemStatus.PickedUp && (Math.Abs(state.custom.ammo - ammo) > 0.01f || (at - position).sqrMagnitude > 0.0025f))
-            Plugin.Error("Drop pod of throw " + throwId + ": pickup " + id + " in bay " + bay + " reads back amount " + state.custom.ammo + " (wanted " + ammo
-                + ") at " + Plugin.Pos(at) + " (wanted " + Plugin.Pos(position) + ").");
+            Plugin.Logger.ErrorOnce("Drop pod of throw " + throwId + ": pickup " + id + " in bay " + bay + " reads back amount " + state.custom.ammo + " (wanted " + ammo
+                + ") at " + ForgeCore.Log.Pos(at) + " (wanted " + ForgeCore.Log.Pos(position) + ").");
     }
 
     /// <summary>The pickup's native amount (<see cref="ItemList.AmmoPoints"/>): a consumable counts its uses, a resource pack points out of 100.</summary>

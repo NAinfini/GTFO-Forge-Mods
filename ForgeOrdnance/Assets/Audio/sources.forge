@@ -177,7 +177,7 @@
               "file": "音效/科幻能量/科幻飞船武器与机械界面设计音效/Door & Hatch/GL_FuturisticHatch_Opening_CT.wav",
               "sha256": "c318534a256fe22766723b5d623ea78960bf6f9eaad2878a73d8fa98d95acce0",
               "pack": "8600 高质量音效合集（GL_*_CT）",
-              "licence": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
               "title": "GL_FuturisticHatch_Opening_CT",
               "startSeconds": 0.005,
               "seconds": 0.975
@@ -238,7 +238,7 @@
               "file": "音效/科幻能量/科幻飞船武器与机械界面设计音效/Computer & Telemetry/GL_TelemetryCalibration_CT.wav",
               "sha256": "c66df36209a472e83bd27cafd8e7973588eaebb3129794d5b578b8470e37b620",
               "pack": "8600 高质量音效合集（GL_*_CT）",
-              "licence": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
               "title": "GL_TelemetryCalibration_CT",
               "startSeconds": 0.0,
               "seconds": 2.256
@@ -251,7 +251,7 @@
               "file": "音效/科幻能量/科幻飞船武器与机械界面设计音效/UI/GL_Open_posititive2_CT.wav",
               "sha256": "19237a3bd5cd212fe5add6f267d816e7454c56f3fa174c6b5d7ed6876229502d",
               "pack": "8600 高质量音效合集（GL_*_CT）",
-              "licence": "所有者确认为开源（来源合集：8600 高质量音效合集）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
               "title": "GL_Open_posititive2_CT",
               "startSeconds": 0.0,
               "seconds": 1.164
@@ -655,8 +655,17 @@
               "pack": "Boom Library - 056 未来科幻UI动态界面音效",
               "licence": "Boom Library",
               "title": "FX_Signal_Warning_Fast_01",
-              "startSeconds": 0.0,
+              "startSeconds": 0,
               "seconds": 0.323
+            },
+            {
+              "file": "音效/界面UI/056 未来科幻UI动态界面音效/Future Technology/FX_System_Start_Up.wav",
+              "sha256": "6a1af360944d15edcd77155f8ee82d080a15b2538b31aeaee39b182a4a495ed0",
+              "pack": "Boom Library - 056 未来科幻UI动态界面音效",
+              "licence": "Boom Library",
+              "title": "FX_System_Start_Up",
+              "startSeconds": 0.002,
+              "seconds": 0.6
             }
           ]
         }
@@ -1317,6 +1326,75 @@
               "title": "DBDS Glass & Stone Medium 01",
               "startSeconds": 19.045,
               "seconds": 2.9
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "turret.lid_blast",
+      "gain": 1.0,
+      "loop": false,
+      "pitchRange": [
+        0.98,
+        1.02
+      ],
+      "distance": {
+        "near": 4,
+        "far": 45
+      },
+      "priority": 170,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "bus": "drop-mech",
+      "maxSeconds": 2.4,
+      "exact": true,
+      "layers": [
+        {
+          "gainDb": -1.6,
+          "fadeOutMs": 100,
+          "sources": [
+            {
+              "file": "音效/科幻能量/110 冲击粒子能量爆炸科幻元素音效/Matter - Sci-Fi Elements/EXPLDsgn_EXPLOSION SMALL-Smash Transient_B00M_MATTER.wav",
+              "sha256": "147c66835ef08e40bf4c7f40028a42b671562901cfabe7ee1379d5d278facc95",
+              "pack": "Boom Library - 110 冲击粒子能量爆炸科幻元素音效",
+              "licence": "Boom Library",
+              "title": "EXPLDsgn_EXPLOSION SMALL-Smash Transient_B00M_MATTER",
+              "startSeconds": 0.342,
+              "seconds": 0.3
+            }
+          ]
+        },
+        {
+          "offsetMs": 80,
+          "gainDb": -2.2,
+          "fadeOutMs": 80,
+          "sources": [
+            {
+              "file": "音效/机械机器人/设计师机械伺服与金属拟音工具包/GL_Impact_Metal_Various2_CT.wav",
+              "sha256": "25e5f1de93e22ec49495145d8e2c05499977175c24e15040bbc1a8ab04bc2649",
+              "pack": "8600 高质量音效合集（GL_*_CT）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
+              "title": "GL_Impact_Metal_Various2_CT",
+              "startSeconds": 0,
+              "seconds": 0.25
+            }
+          ]
+        },
+        {
+          "offsetMs": 220,
+          "gainDb": -3.3,
+          "fadeOutMs": 80,
+          "sources": [
+            {
+              "file": "音效/机械机器人/设计师机械伺服与金属拟音工具包/GL_Impact_Metal_Various4_CT.wav",
+              "sha256": "370e79a9a406c5c5ec7999558e6cff5b77d988fd2794133283915bf737574a31",
+              "pack": "8600 高质量音效合集（GL_*_CT）",
+              "licence": "Sonniss royalty-free (GameAudioGDC 2026, per the owner; collection 8600 高质量音效合集)",
+              "title": "GL_Impact_Metal_Various4_CT",
+              "startSeconds": 0,
+              "seconds": 0.2
             }
           ]
         }

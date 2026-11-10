@@ -15,8 +15,7 @@ internal enum Rejection : byte
     TooFar = 4,
     InvalidLanding = 5,
     DefinitionMismatch = 6,
-    NotHost = 7,
-    Disabled = 8,
+    // 7 and 8 were never sent and are not used again: the numbers travel in RejectMessage.Reason.
     UnknownDefinition = 9,
     LoadoutInvalid = 10,
     LandingTimeout = 11,
@@ -52,22 +51,6 @@ internal static class Messages
     /// <summary>Bytes one <see cref="PayloadDataMessage"/> carries.</summary>
     public const int MaxPayloadData = 192;
 
-    public static string Describe(Rejection reason) => reason switch
-    {
-        Rejection.NotInLoadout => "not in your loadout",
-        Rejection.Cooldown => "still on cooldown",
-        Rejection.NoUses => "no uses left",
-        Rejection.TooFar => "landed too far away",
-        Rejection.InvalidLanding => "no reachable ground at the landing point",
-        Rejection.DefinitionMismatch => "your call-in files differ from the host's",
-        Rejection.NotHost => "only the host can do that",
-        Rejection.Disabled => "call-ins are disabled for you",
-        Rejection.UnknownDefinition => "unknown call-in",
-        Rejection.LoadoutInvalid => "the host refused your loadout",
-        Rejection.LandingTimeout => "the beacon never settled",
-        Rejection.CallMenuOff => "this level has no call-ins",
-        _ => "refused"
-    };
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
@@ -176,13 +159,13 @@ internal struct ArrivedMessage : INetEpoch
     public byte Arrival;
 }
 
-/// <summary>The host's word on a drop pod: <see cref="Emptied"/> when its last pickup has been taken.</summary>
+/// <summary>The host's word on an arrival: <see cref="Emptied"/> when a drop pod's last pickup has been taken; <see cref="Recalled"/> when a turret shell's sentry goes (out of ammunition or out of time).</summary>
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
 internal struct DeliveryMessage : INetEpoch
 {
     public ulong Epoch;
     ulong INetEpoch.Epoch { readonly get => Epoch; set => Epoch = value; }
-    public const byte Emptied = 1, Failed = 2;
+    public const byte Emptied = 1, Failed = 2, Recalled = 3;
     public ulong Thrower;
     public uint ThrowId;
     public byte State;
@@ -190,7 +173,7 @@ internal struct DeliveryMessage : INetEpoch
 
 /// <summary>Host to one late joiner: an arrival already in the level, so the joiner shows it in its current state.
 /// <see cref="Elapsed"/> is seconds since the arrival started on the host; <see cref="SinceEmptied"/> seconds since a pod was
-/// reported empty, or negative.</summary>
+/// reported empty or a shell recalled, or negative.</summary>
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
 internal struct DeliveryReplayMessage : INetEpoch
 {
@@ -205,8 +188,8 @@ internal struct DeliveryReplayMessage : INetEpoch
     public float Yaw;
     public float Elapsed;
     public float SinceEmptied;
+    /// <summary>The call-in's definition: its payload gives a pod's or shell's appearance, so a joiner draws what everyone else does.</summary>
     public uint DefinitionKey;
-    public uint LookKey;
 }
 
 /// <summary>Host to every peer: data a payload type sends about one call (see <c>OrdnanceApi.SendData</c>). <see cref="Type"/>
@@ -252,6 +235,8 @@ internal struct SlotMessage : INetEpoch
     /// <summary>Negative: the call-in has no use limit.</summary>
     public int UsesLeft;
     public float CooldownRemaining;
+    /// <summary>The uses the slot started with: a peer that sees the slot only now (it joined late) cannot tell them from the uses already spent.</summary>
+    public int InitialUses;
 }
 
 /// <summary>Host's recovery image: Begin, every Entry, then Commit on the reliable ordered channel.
@@ -293,6 +278,8 @@ internal struct ClaimMessage : INetEpoch
     public uint ThrowId;
     public uint Attempt;
     public byte Action;
+    /// <summary>Which weapon bay of the pod (0 for a claimable lying without a pod).</summary>
+    public byte Bay;
 }
 
 /// <summary>Host to every peer: <see cref="Reserved"/> while the claimant installs it, <see cref="Committed"/> when it is taken (with
@@ -309,4 +296,5 @@ internal struct ClaimStateMessage : INetEpoch
     public uint Attempt;
     public byte State;
     public Guid Token;
+    public byte Bay;
 }

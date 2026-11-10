@@ -21,6 +21,14 @@ internal static class SentryIdentity
         return Prefix + identity.ToString("x8", CultureInfo.InvariantCulture) + ":" + (pickable ? "P" : "U") + ":" + lookKey.ToString("x8", CultureInfo.InvariantCulture);
     }
 
+    /// <summary>The identity of the sentry a call stands: the same on every peer from the call alone (a hash below 2^32, never 0), so a shell and its
+    /// sentry, and the multipliers asked for, are tied by the call and not by where each stands.</summary>
+    internal static ulong For(ulong summoner, uint throwId)
+    {
+        var hash = ForgeCore.Fnv.Mix32(ForgeCore.Fnv.Mix32(ForgeCore.Fnv.Offset32, summoner), throwId);
+        return hash == 0 ? 1UL : hash;
+    }
+
     internal static bool TryMarker(string? marker, out ulong identity, out bool pickable) => TryMarker(marker, out identity, out pickable, out _);
 
     internal static bool TryMarker(string? marker, out ulong identity, out bool pickable, out uint lookKey)

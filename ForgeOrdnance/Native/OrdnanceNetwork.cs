@@ -1,7 +1,6 @@
 using System;
 using System.Globalization;
 using ForgeCore;
-using SNetwork;
 
 namespace ForgeOrdnance;
 
@@ -13,10 +12,11 @@ internal static class OrdnanceNetwork
 {
     private const int InboxCapacity = 512;
     private static NetChannel? _channel;
-    /// <summary>The host's recovery epoch: stamped into every level message, and a message from another one is dropped by ForgeCore.</summary>
-    internal static ulong Epoch { get => _channel?.Epoch ?? 0; set => Channel.Epoch = value; }
+    /// <summary>The world epoch, minted by the host and adopted by clients through ForgeCore (<see cref="NetChannel.FollowWorld"/>): stamped
+    /// into every level message, and a message from another one is dropped by ForgeCore. Zero until the world is up.</summary>
+    internal static ulong Epoch => _channel?.Epoch ?? 0;
 
-    private static NetChannel Channel => _channel ?? throw new InvalidOperationException("Ordnance's network channel is not open.");
+    internal static NetChannel Channel => _channel ?? throw new InvalidOperationException("Ordnance's network channel is not open.");
 
     /// <summary>Raised when ForgeCore refuses a player's copy of this mod (other message formats or other call-in files).</summary>
     internal static event Action<ulong>? Refused;
@@ -27,6 +27,8 @@ internal static class OrdnanceNetwork
         _channel = Net.Open(Plugin.Id, InboxCapacity);
         _channel.Refused += (player, _) => Refused?.Invoke(player);
         _channel.PeerSynced += session.PeerSynced;
+        _channel.EpochChanged += session.EpochChanged;
+        _channel.FollowWorld(() => session.InLevel);
         _channel.PeerSilent += session.PeerSilent;
         Register<HelloMessage>(Messages.HelloEvent, session.OnHello);
         Register<LoadoutMessage>(Messages.LoadoutEvent, session.OnLoadoutSubmitted);
@@ -73,7 +75,7 @@ internal static class OrdnanceNetwork
         Channel.TryToHost(name, message);
     }
 
-    internal static void To<T>(string name, T message, SNet_Player player) where T : unmanaged, INetEpoch { message.Epoch = Epoch; Channel.To(player.Lookup, name, message); }
+    internal static void To<T>(string name, T message, ulong player) where T : unmanaged, INetEpoch { message.Epoch = Epoch; Channel.To(player, name, message); }
 
     internal static void Broadcast<T>(string name, T message) where T : unmanaged, INetEpoch { message.Epoch = Epoch; Channel.Broadcast(name, message); }
 }

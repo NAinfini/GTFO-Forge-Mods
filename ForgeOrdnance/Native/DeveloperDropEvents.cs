@@ -26,7 +26,7 @@ internal static class DeveloperDropEvents
             var place = new DropWhere((int)e.DimensionIndex, (int)e.Layer, (int)e.LocalIndex, new DropPoint(-1, e.Position.x, e.Position.y, e.Position.z));
             Plugin.Session.FireEventDrop(e.WorldEventObjectFilter ?? "", place, wait);
         }
-        catch (Exception error) { Plugin.Error("Ordnance drop event failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Ordnance drop event failed: " + error); }
         return false;
     }
 }

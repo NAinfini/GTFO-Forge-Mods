@@ -33,7 +33,7 @@ The model bundle needs Blender and Unity 2019.4.21f1: `pwsh Mods/ForgeOrdnance/t
 
 `python Mods/ForgeOrdnance/tools/package_release.py` checks the manifest against Thunderstore's rules and writes `NAinfini-ForgeOrdnance-<version>.zip` to `artifacts/work/ordnance-release/`. It does not publish.
 
-The zip holds `manifest.json`, `icon.png`, `README.md`, `CHANGELOG.md`, `LICENSE`, `ForgeOrdnance.dll`, `lang/` (`en.json`, `zh.json`; the script refuses to build without both), `forge-ordnance.bundle`, `audio/` (Ogg files, `cues.json`, `License.txt`) and `models/License.txt`.
+The zip holds `manifest.json`, `icon.png`, `README.md`, `CHANGELOG.md`, `LICENSE`, `ForgeOrdnance.dll`, `lang/` (`en.forge`, `zh.forge`; the script refuses to build without both), `forge-ordnance.bundle`, `audio/` (Ogg files, `cues.forge`, `LICENSE.txt`) and `models/LICENSE.forge`.
 
 ## Writing a content pack
 
@@ -42,13 +42,13 @@ The one recipe for a mod that adds call-ins to this platform; the Arsenal, Frame
 1. **A plugin** that depends on `NAinfini.ForgeOrdnance` (and the libraries it uses) with `[BepInDependency]`. Everything below happens in its `Load`, which runs before definition files are read.
 2. **Models and effects.** Build one asset bundle and register it once: `ForgeVisual.Bundles.Register(modId, pack, path)` returns a handle whose models you pass to `OrdnanceTurrets.RegisterLook`, `OrdnancePodAppearance` and the like. Keep the bundle in your own package; do not copy it into Ordnance.
 3. **Definitions.** JSON files in a `ForgeOrdnance` folder inside your package (see [Writing call-ins](#writing-call-ins)); every `Id` carries your namespace (`author.name`). Payload types you add are registered with `OrdnanceApi.RegisterPayload("author.Type", ...)`, categories with `OrdnanceApi.RegisterCategory`.
-4. **Icons and texts.** Each definition's picker icon is a PNG beside its JSON file (`Icon`); ForgeUI draws it. Names and descriptions in other languages go in a `lang` folder beside the file (`en.json`, `zh.json`, keys `<Id>.Name` and `<Id>.Description`). Show names with `OrdnanceApi.DisplayName`.
+4. **Icons and texts.** Each definition's picker icon is a PNG beside its definition file (`.forge`, JSON inside) (`Icon`); ForgeUI draws it. Names and descriptions in other languages go in a `lang` folder beside the file (`en.forge`, `zh.forge`, keys `<Id>.Name` and `<Id>.Description`). Show names with `OrdnanceApi.DisplayName`.
 5. **Names you register** (looks, sounds, bundles) are `Pack:item`, the pack being your short prefix, so two packs never collide.
 6. **A definition only a level brings** (a suit standing at the start, a supply crate): write `"Callable": false` and leave out the player-facing fields (see [Developer drops](#developer-drops-for-level-authors)).
 
 ## Writing call-ins
 
-Put definition files in any folder named `ForgeOrdnance` under `BepInEx/plugins`, for example `BepInEx/plugins/MyCallIns/ForgeOrdnance/*.json`. For a custom rundown, use its MTFO custom folder: `<CustomPath>/ForgeOrdnance/*.json`. Each file is a JSON array of definitions. All files load together.
+Put definition files in any folder named `ForgeOrdnance` under `BepInEx/plugins`, for example `BepInEx/plugins/MyCallIns/ForgeOrdnance/*.forge`. For a custom rundown, use its MTFO custom folder: `<CustomPath>/ForgeOrdnance/*.forge`. Each `.forge` file holds a JSON array of definitions. All files load together.
 
 ```json
 [
@@ -91,7 +91,7 @@ Put definition files in any folder named `ForgeOrdnance` under `BepInEx/plugins`
 | `BeamColour` | Optional `"#RRGGBB"`. Defaults by category: Supply blue, Defensive light green, Weapon white, Offensive orange; a registered category brings its own colour. |
 | `Payload` | What arrives. `Type` picks the kind; the other fields belong to that kind. |
 
-To show names and descriptions in the player's language, put a `lang/` folder beside the definition files with one ForgeUI language file per language (`en.json`, `zh.json`, ...), keyed `<Id>.Name` and `<Id>.Description`:
+To show names and descriptions in the player's language, put a `lang/` folder beside the definition files with one ForgeUI language file per language (`en.forge`, `zh.forge`, ...), keyed `<Id>.Name` and `<Id>.Description`:
 
 ```json
 { "me.pack.resupply.Name": "补给", "me.pack.resupply.Description": "两个弹药包" }
@@ -113,7 +113,7 @@ Pickups of item data blocks, delivered in the drop pod. The pod has four bays, s
 
 ### Payload `Gear`
 
-A sentry gun from any `PlayerOfflineGearDataBlock`, delivered in a shell that falls open around it.
+A sentry gun from any `PlayerOfflineGearDataBlock`, delivered in a shell that bores into the ground; the base bores in until its top is level with the ground, throws its two lids (`lid_a`, `lid_b`) off to the sides with a puff of dust, the turret rises out of the opening barrel up, turns the barrel level, and only then does the game's sentry stand.
 
 | Field | Meaning |
 |---|---|
@@ -126,11 +126,11 @@ A sentry gun from any `PlayerOfflineGearDataBlock`, delivered in a shell that fa
 
 ### Keys
 
-The call key and the four code keys are ForgeUI key actions (`Native/OrdnanceKeys.cs`): `Summon` (`Mouse3`, hold, every context) and `CodeUp` / `CodeDown` / `CodeLeft` / `CodeRight` (arrow keys, context `ordnance-code`). The player changes them in the game's settings (Controls); they are saved in `NAinfini.ForgeUI.keys.cfg`. While a code is entered the movement keys are held off the game and read from the player's own game bindings (`UIKitKeys.GameKeyDown`), so they enter code steps as well.
+The call key and the four code keys are ForgeUI key actions (`Native/OrdnanceKeys.cs`): `Summon` (`Mouse3`, press, every context) and `CodeUp` / `CodeDown` / `CodeLeft` / `CodeRight` (arrow keys, context `ordnance-code`). The player changes them in the game's settings (Controls); they are saved in `NAinfini.ForgeUI.keys.cfg`. While a code is entered the movement keys are held off the game and read from the player's own game bindings (`UIKitKeys.GameKeyDown`), so they enter code steps as well.
 
-### Level rules: `Settings.json`
+### Level rules: `Settings.forge`
 
-Optional. Read only from `<CustomPath>/ForgeOrdnance/Settings.json`.
+Optional. Read only from `<CustomPath>/ForgeOrdnance/Settings.forge`.
 
 ```json
 {
@@ -149,15 +149,80 @@ Optional. Read only from `<CustomPath>/ForgeOrdnance/Settings.json`.
 | `Allowed` | Ids players may bring. Leave it out or use `null` for all. |
 | `CooldownMultiplier`, `UsesMultiplier` | Scale every cooldown and every call's uses. |
 | `MaxThrowDistance` | Metres from the throw origin to the beacon. |
-| `CallMenu` | `false` turns the players' call-ins off (see [Developer drops](#developer-drops-for-level-authors)). Default `true`. |
+| `LobbyPicker` | `false` turns the lobby choice off: no ORDNANCE button, no loadout row on the player bars, players' own picks are not used; `Loadouts` says who has what. Default `true`. See [Level control](#level-control-for-rundown-authors). |
+| `CallMenu` | `false` turns the in-level call-ins off: no call list, no call key, the host refuses throws. Default `true`. A file that writes only `CallMenu` (no `LobbyPicker` at the same place) turns both off, as it always did. |
+| `Loadouts` | The call-ins each player has while `LobbyPicker` is `false`, by player slot. See below. |
 | `Drops` | The level's developer drops (see below). Default none. |
 | `Levels` | Overrides any of the above for one level. Keys are the expedition's unique key (`RundownManager.ActiveExpeditionUniqueKey`, for example `Local_31_TierA_0`), not the display name such as `R1A1`; read it from that property in code, or from the log, where the host writes `Host level rules published for '<key>'`. A key that matches no level is not an error, so when the host enters a level and rules exist but none for it, one warning lists the level's actual key and the keys that matched nothing. A mod can set a level's rules from code too (see [Declaring a level from code](#declaring-a-level-from-code)). |
 
 The host sends its selected expedition's rules to the lobby picker. While waiting for them, the button shows `WAIT`. A level override replaces a field as a whole: a level with its own `Drops` uses only those, a level without uses the top-level `Drops`.
 
+### Level control for rundown authors
+
+Everything here is written by hand in the rundown's `ForgeOrdnance/Settings.forge` (globally or under `Levels.<key>`); the website does not write it. Two independent switches say what the players get:
+
+| `LobbyPicker` | `CallMenu` | Result |
+|---|---|---|
+| `true` | `true` | The default: players pick in the lobby and call in the level. |
+| `false` | `true` | No lobby choice; each player has the level's `Loadouts` and calls them in the level. |
+| `true` | `false` | Players may pick in the lobby but have no calls in the level (rarely wanted). |
+| `false` | `false` | No player call-ins at all; only drops. Written as `"CallMenu": false` alone, as before. |
+
+**Loadouts** (used only while `LobbyPicker` is `false`; with it `true` they are ignored, with one log line). Keys are the player's slot in the party, `"0"` to `"3"`, or `"All"` for every player not named; a slot's own list replaces `All` as a whole. A player nothing is written for has an empty list, which is not an error. The host gives them through the same path as a lobby pick (same checks, same sync to every player, resent to a player who joins later, uses and cooldowns kept, restored after a checkpoint reload or host change), so nothing else differs:
+
+```json
+{
+  "Levels": {
+    "Local_32_TierA_1": {
+      "LobbyPicker": false,
+      "CallMenu": true,
+      "Loadouts": {
+        "All": ["arsenal.supply.mixed", "arsenal.strike.gas"],
+        "0": ["arsenal.supply.mixed", "arsenal.strike.hunter", "arsenal.turret.watch"]
+      }
+    }
+  }
+}
+```
+
+**Overrides** are the numbers one drop changes: `"Overrides": { "AmmoRatio": 0.5, "Magazine": 3 }` in a `Drops` entry (or `OrdnanceApi.Place(..., overrides)`). The framework only checks that the payload type declares each field and that the value is in range, then hands the numbers to the payload (`OrdnanceExecution.Overrides`, host); the payload applies them and syncs them with its own state, so every player and a late joiner sees them. A drop that writes a field its payload does not declare is skipped with an error. Declared fields:
+
+| Payload | Field | Range |
+|---|---|---|
+| `arsenal.HeavyWeapon` | `AmmoRatio` | 0 to 1, reserve as a share of the special slot's full reserve |
+| `arsenal.HeavyWeapon` | `Magazine` | whole, 1 to 1000, rounds loaded |
+| `arsenal.HeavyWeapon` | `AmmoCost` | 0.01 to 1000, reserve one shot spends (the block's CostOfBullet); the rounds given are the reserve share divided by it, plus the magazine |
+| `frames.Exosuit` | `Armor` | 1 to the model's own `Armor` |
+| `frames.Exosuit` | `Magazine` | whole, 1 to the model's own `Magazine` |
+| `frames.Exosuit` | `Reserve` | whole, 0 to 100000 |
+| `Item`, `Gear`, `arsenal.Strike`, others | none | declare yours with `IOrdnancePayload.OverrideFields` and `CheckOverrides` |
+
+A suit that already exists (restored from a checkpoint, mirrored by a new host) keeps its own numbers; a level-start drop places a missing one again with its `Overrides`. A heavy weapon's rack is rebuilt from the same drop, so the values hold.
+
+**Triggering by event.** Every call-in type (supply pods, sentries, heavy weapons, exosuits, third-party types and every strike) can be fired by the level event type `75000` of an `Event` drop. A strike with `"Arrival": "Direct"` (or `Drop`: a developer drop has no beacon, so the two are the same) starts at the written point once, through the same scheduler and arrival entry. Hand-edit the exported level data to add the event.
+
+A complete example with all three parts, for a level that has no call menu, an event strike, a pre-placed suit and a heavy weapon:
+
+```json
+{
+  "LobbyPicker": false,
+  "CallMenu": false,
+  "Drops": [
+    { "Name": "start-suit", "Ordnance": "nainfini.frames.tank", "When": "LevelStart", "Arrival": "Direct",
+      "Where": { "DimensionIndex": 0, "Layer": 0, "LocalIndex": 0, "Area": 0 }, "Overrides": { "Armor": 60, "Magazine": 40, "Reserve": 200 } },
+    { "Name": "start-rifle", "Ordnance": "arsenal.weapon.recoilless", "When": "LevelStart", "Arrival": "Direct",
+      "Where": { "DimensionIndex": 0, "Layer": 0, "LocalIndex": 0, "Area": 0, "Offset": { "x": 2, "y": 0, "z": 0 } }, "Overrides": { "AmmoRatio": 0.4, "Magazine": 2, "AmmoCost": 1.5 } },
+    { "Name": "gate-strike", "Ordnance": "arsenal.strike.creeping", "When": "Event", "Arrival": "Direct",
+      "Where": { "DimensionIndex": 0, "Layer": 0, "LocalIndex": 2, "Position": { "x": 12.5, "y": -3.0, "z": 40.0 } } }
+  ]
+}
+```
+
+with the event in a door's `EventsOnOpenDoor`: `{ "Type": 75000, "Trigger": 0, "Delay": 0.0, "WorldEventObjectFilter": "gate-strike" }`. Placing from code is `OrdnanceApi.Place` with `overrides`; checking before placing is `OrdnanceApi.CheckOverrides(definition, overrides)`. The `OrdnanceLevelRules` of `DeclareLevel` has `LobbyPicker`, `CallMenu`, `Loadouts` and `Drops` too.
+
 ### Developer drops (for level authors)
 
-A rundown can place any registered call-in itself, with no beacon and no player involved: at level start, or when a level event fires. The drops live in the same `Settings.json`, so they ship with the rundown; players need nothing in their own config. A drop uses no loadout slot, cooldown or use and ignores `Allowed`. The host places it; every player sees the same arrival, and players who join later see it in its current state.
+A rundown can place any registered call-in itself, with no beacon and no player involved: at level start, or when a level event fires. The drops live in the same `Settings.forge`, so they ship with the rundown; players need nothing in their own config. A drop uses no loadout slot, cooldown or use and ignores `Allowed`. The host places it; every player sees the same arrival, and players who join later see it in its current state.
 
 **A drop at level start.** It arrives `Delay` seconds after the level starts (when the game enters the level, as the elevator lands).
 
@@ -218,19 +283,19 @@ An event drop may leave out `Where`; it then lands where its event says: the eve
 
 The event only drops: its `WardenIntel`, `SoundID` and the other fields of a vanilla event do nothing on type `75000`; put them on an event of their own.
 
-**Drop or direct.** `Arrival` picks how the call-in arrives. `Drop` (the default) arrives the way a player's call does: the drop pod falls and opens, the turret shell falls open, the exosuit falls through the ceiling; the contents come when the vehicle opens. `Direct` leaves the vehicle out: the contents are there at once. `Drop` is the default because a drop is seen and heard, so players notice an event drop; use `Direct` to set a level up quietly, for example a suit standing ready at the start.
+**Drop or direct.** `Arrival` picks how the call-in arrives. `Drop` (the default) arrives the way a player's call does: the drop pod falls and opens, the turret shell bores in, the exosuit falls through the ceiling; the contents come when the vehicle opens. `Direct` leaves the vehicle out: the contents are there at once. `Drop` is the default because a drop is seen and heard, so players notice an event drop; use `Direct` to set a level up quietly, for example a suit standing ready at the start.
 
 | Payload | `Drop` | `Direct` |
 |---|---|---|
 | `Item` (supply pods) | Pod falls, opens; pickups inside | Pickups on the ground around the point |
-| `Gear` (turrets) | Shell falls and opens; turret stands up | Turret stands at the point |
+| `Gear` (turrets) | Shell bores in and throws its lids off; the turret rises out of it and turns its barrel level | Turret stands at the point |
 | `arsenal.HeavyWeapon` | Pod with the weapon racked | Weapon on the ground, ready to take |
 | `frames.Exosuit` | Suit falls and lands | Suit stands empty, ready to board |
-| `arsenal.Strike` | Shells fall and strike | Not supported: a strike has no vehicle to leave out (the drop is refused at load) |
+| `arsenal.Strike` | Shells fall and strike | The same as `Drop`: a developer drop has no beacon, so the strike starts at the written point |
 
 A drop's turret takes its ammunition from the host's class tool pool, as the host owns it.
 
-**Turning the call menu off.** With `"CallMenu": false` the players have no call-ins in that level: no call list or cooldowns on the HUD, the call key does nothing, the lobby hides the ORDNANCE button and the picks row, and the host refuses any throw. Developer drops still arrive. Use it for a level that only wants the drops:
+**Turning the call menu off.** With `"CallMenu": false` the players have no call-ins in that level: no call list or cooldowns on the HUD, the call key does nothing, and the host refuses any throw (and, written alone, the lobby hides the ORDNANCE button and picks row too: see `LobbyPicker`). Developer drops still arrive. Use it for a level that only wants the drops:
 
 ```json
 { "Levels": { "Local_32_TierA_1": { "CallMenu": false, "Drops": [ { "Name": "start-suit", "Ordnance": "nainfini.frames.tank", "When": "LevelStart", "Arrival": "Direct", "Where": { "DimensionIndex": 0, "Layer": 0, "LocalIndex": 0, "Area": 0 } } ] } } }
@@ -243,6 +308,7 @@ Put `"CallMenu": false` at the top level instead to turn the call-ins off in eve
 | Field | Meaning |
 |---|---|
 | `Name` | Required. Unique in its list. Events name the drop by it; the log names it in every line. |
+| `Overrides` | Optional numbers for this one placement, `{ "Field": number }`. Only the fields the call-in's payload type declares (see **Overrides** under [Level control for rundown authors](#level-control-for-rundown-authors)). |
 | `Ordnance` | Required. The `Id` of any loaded call-in definition (this package's, Arsenal's, Frames' or your own). |
 | `When` | Required. `LevelStart` or `Event`. |
 | `Arrival` | `Drop` (default) or `Direct`. |
@@ -261,17 +327,19 @@ The point is yours: nothing checks that it is open floor, out of a wall or under
 
 | Log line | When | Meaning |
 |---|---|---|
-| `Settings.json ... Drops[i] <field>: ...` | Load | A drop entry is malformed (missing field, unknown field, a value out of range, both or neither of `Position` and `Area`, a `Delay` on an event drop, a duplicate `Name`). The whole `Settings.json` is then ignored, as for any invalid field, and default rules apply. |
+| `Settings.forge ... Drops[i] <field>: ...` | Load | A drop entry is malformed (missing field, unknown field, a value out of range, both or neither of `Position` and `Area`, a `Delay` on an event drop, a duplicate `Name`). The whole `Settings.forge` is then ignored, as for any invalid field, and default rules apply. |
 | `... drop '<name>' Ordnance: '<id>' is not a loaded call-in; this drop is skipped.` | Load | No definition has that `Id` (its package is not installed, or the id is misspelt). The other drops load. |
-| `... drop '<name>' Arrival: '<id>' (payload <type>) cannot arrive Direct; this drop is skipped.` | Load | The call-in's payload has no direct arrival (`arsenal.Strike`, or an add-on payload without `SupportsDirect`). |
+| `... drop '<name>' Arrival: '<id>' (payload <type>) cannot arrive Direct; this drop is skipped.` | Load | The call-in's payload has no direct arrival (an add-on payload without `SupportsDirect`; every built-in type and Arsenal and Frames have one). |
+| `... drop '<name>' Overrides.<Field>: ...; this drop is skipped.` | Load | The field is not one the payload type declares, the value is outside its range or not whole, or the payload refuses it (for example an `Armor` above the model's own). The other drops load. |
+| `... Loadouts.<slot>[i]: '<id>' is not a loaded call-in; left out.` / `... : <reason> Left out.` | Load | The Id is not loaded, or the entry fails the lobby loadout checks (not callable, not in `Allowed`, listed twice, past `LoadoutSize`, its code begins another's). The rest of the list stays. |
+| `... Loadouts: ignored while LobbyPicker is true ...` / `... have no effect while CallMenu is false ...` | Load | The loadouts would not be used with those two switches. |
+| `Loadout from <player> ignored: this level has LobbyPicker off ...` | Level | A modified client submitted its own picks; the host keeps the level's `Loadouts`. |
 | `Developer drop '<name>' (...) not placed at <place>: dimension <n> does not exist in this level.` | Firing | The level has no such dimension. |
 | `... not placed at <place>: there is no zone <z> in layer <l> of dimension <d>.` | Firing | No zone with that `Layer` and `LocalIndex` in that dimension. |
 | `... not placed at <place>: zone <z> (...) has <n> area(s); Area <a> does not exist.` | Firing | `Area` is past the zone's last area. |
 | `... not placed at <place>: the point (x, y, z) is not inside any area of dimension <d> (no course node within 2 m).` | Firing | The point is outside the level's areas in that dimension (an event drop without `Where` and an event without `Position` lands at 0, 0, 0). |
-| `Ordnance drop event (type 75000) names drop '<name>' in WorldEventObjectFilter, but level '<key>' has no event drop of that name in Settings.json; nothing is dropped.` | Firing | The event names no `Event` drop of this level (misspelt name, the drop is in another level's list, or it is a `LevelStart` drop). |
+| `Ordnance drop event (type 75000) names drop '<name>' in WorldEventObjectFilter, but level '<key>' has no event drop of that name in Settings.forge; nothing is dropped.` | Firing | The event names no `Event` drop of this level (misspelt name, the drop is in another level's list, or it is a `LevelStart` drop). |
 | `Developer drop '<id>' (call <n>) failed on arrival: ...` | Arrival | The payload itself failed (for example a pickup prefab missing); its message says why. |
-
-A successful drop logs `Developer drop '<name>' ... scheduled as call <n>` when it is accepted and `Developer drop '<id>' (call <n>) arrives (Drop|Direct)` when it arrives.
 
 **Callable: false.** A definition written with `"Callable": false` is for levels only: players never see it in the picker or a loadout (the host refuses it in one), and only `Drops` and `OrdnanceApi.Place` can bring it. It then has only `Id`, `Payload` and the optional `Name`, `Icon` and `Description`; `Category`, `Code`, `Cooldown`, `Uses`, `CallInDelay`, `Stats` and `BeamColour` must be left out, and giving one rejects that entry with an error naming the field. Use it for a suit or a supply that a level places at its start. Because they exist only to be placed, `PickedParameters` always lists their parameters (for their payload type) in every level, so a `Place` call finds its assets prepared.
 
@@ -279,7 +347,7 @@ A successful drop logs `Developer drop '<name>' ... scheduled as call <n>` when 
 [ { "Id": "me.pack.start-suit", "Callable": false, "Payload": { "Type": "frames.Exosuit", "Model": "Frames:frame-m15", "Armor": 100, "DamageReduction": 0.25 } } ]
 ```
 
-**Placing from code.** `OrdnanceApi.Place(ordnanceId, position, yaw, arrival, out reason, dimension = -1)` brings a call-in in now, through the same delivery as a `Drops` entry (one scheduler, every player sees it, late joiners see its current state). It is host work: test `SNet.IsMaster` first; a client gets `false` and a `reason` without a log line, any other refusal (not in a level, unknown id, `Direct` for a payload without it, a point inside no area) is `false`, a `reason` and one error in the log, written on every call (not throttled). Pass `dimension` to require the point to be in that dimension; the default takes whichever contains it.
+**Placing from code.** `OrdnanceApi.Place(ordnanceId, position, yaw, arrival, out reason, dimension = -1, overrides = null)` (`overrides`: see [Overrides](#overrides)) brings a call-in in now, through the same delivery as a `Drops` entry (one scheduler, every player sees it, late joiners see its current state). It is host work: test `SNet.IsMaster` first; a client gets `false` and a `reason` without a log line, any other refusal (not in a level, unknown id, `Direct` for a payload without it, a point inside no area) is `false`, a `reason` and one error in the log, written on every call (not throttled). Pass `dimension` to require the point to be in that dimension; the default takes whichever contains it.
 
 ```csharp
 if (SNet.IsMaster && !OrdnanceApi.Place("me.pack.start-suit", spawnPoint, 180f, OrdnanceArrivalMode.Direct, out var why))
@@ -288,7 +356,7 @@ if (SNet.IsMaster && !OrdnanceApi.Place("me.pack.start-suit", spawnPoint, 180f, 
 
 ### Declaring a level from code
 
-`OrdnanceApi.DeclareLevel(levelKey, rules)` gives a level the rules `Settings.json` `Levels.<key>` would, without any file: turn the call menu off and place a suit at level start from your own plugin. Call it from `Load`. `rules` is an `OrdnanceLevelRules` (`LoadoutSize`, `Allowed`, `CooldownMultiplier`, `UsesMultiplier`, `MaxThrowDistance`, `CallMenu`, `Drops` of `OrdnanceLevelDrop`, `DropWhere`, `DropPoint`, `DropWhen`); it is the level's whole rule set, with defaults for what you leave out (nothing is inherited from the file's top level), and is checked like the file. It is merged with `Settings.json` into one effective setting that also passes the drops check. A key already declared by another call is refused with one error; a key `Settings.json` also sets is reported at load and the file wins.
+`OrdnanceApi.DeclareLevel(levelKey, rules)` gives a level the rules `Settings.forge` `Levels.<key>` would, without any file: turn the call menu off and place a suit at level start from your own plugin. Call it from `Load`. `rules` is an `OrdnanceLevelRules` (`LoadoutSize`, `Allowed`, `CooldownMultiplier`, `UsesMultiplier`, `MaxThrowDistance`, `CallMenu`, `Drops` of `OrdnanceLevelDrop`, `DropWhere`, `DropPoint`, `DropWhen`); it is the level's whole rule set, with defaults for what you leave out (nothing is inherited from the file's top level), and is checked like the file. It is merged with `Settings.forge` into one effective setting that also passes the drops check. A key already declared by another call is refused with one error; a key `Settings.forge` also sets is reported at load and the file wins.
 
 ```csharp
 OrdnanceApi.DeclareLevel("Local_32_TierA_1", new OrdnanceLevelRules
@@ -301,15 +369,17 @@ OrdnanceApi.DeclareLevel("Local_32_TierA_1", new OrdnanceLevelRules
 
 ### After a checkpoint reload or a host change
 
-Both void the drops still waiting and every call in flight. The host then places **every** `LevelStart` drop again at once (`Delay` ignored), whether it had arrived or not: a suit that was standing is standing again (a suit someone had boarded is not boarded; that state is lost). A level-start drop has a fixed call number made from its `Name`, so every player sees the same call; two names that would share a number are refused when `Settings.json` is read. `Event` drops and what `Place` placed are not placed again; an event that fires again places its drop again.
+Both void the drops still waiting and every call in flight. The host then places **every** `LevelStart` drop again at once (`Delay` ignored), whether it had arrived or not: a suit that was standing is standing again (a suit someone had boarded is not boarded; that state is lost). A level-start drop has a fixed call number made from its `Name`, so every player sees the same call; two names that would share a number are refused when `Settings.forge` is read. `Event` drops and what `Place` placed are not placed again; an event that fires again places its drop again.
+
+A host change does not roll the world back, so sentries and pods already standing stay. A sentry's identity is made from its call (`SentryIdentity.For(summoner, throwId)`, the same on every peer), and every peer records the strengths its `Gear` payload applied; the new host takes the running sentries over by identity, applies those strengths again, and recalls or retires them on their own timers. A checkpoint reload instead clears sentry state with the rest, because the level replays its drops under the same call numbers. The `SlotMessage` carries each slot's starting use count (`InitialUses`), so a new host caps a `RefundCall` at the same number the old host did.
 
 ## Extension API
 
-The public API is in the `ForgeOrdnance` namespace. It ships with the package (version 1.0.0). Everything not listed below is internal and may change in any release.
+The public API is in the `ForgeOrdnance` namespace. It ships with the package (version 1.0.1). Everything not listed below is internal and may change in any release.
 
 | Type | Use |
 |---|---|
-| `OrdnanceApi` | `RegisterPayload`, `RegisterCategory`, `DefinitionsLoaded`, `DefinitionsReady` (event, raised once on the main thread after the definition files are read), `IsPeerCompatible`, `SendData`, `SendState`, `ClearState`, `BlockCalls`, `CallsBlocked`, `PickedParameters`, `DisplayName`, `DeclareLevel`, `Place`, `TryGetDefinition(uint key)` and `TryGetDefinition(string id)` (the loaded definition; `OrdnanceDefinition.Key` is the value the network and saves carry; false before definitions load; every peer loads the same set, so clients and late joiners find it too), and `Definitions` (every loaded definition, ordered by `Id`, the same on every peer). |
+| `OrdnanceApi` | `RegisterPayload`, `RegisterCategory`, `DefinitionsLoaded`, `DefinitionsReady` (event, raised once on the main thread after the definition files are read), `IsPeerCompatible`, `SendData`, `SendState`, `ClearState`, `RefundCall` (host: a call that found nothing to do gives its use back and keeps a short cooldown), `PostNotice` (a line on this player's call-in list), `BlockCalls`, `CallsBlocked`, `PickedParameters`, `DisplayName`, `DeclareLevel`, `Place`, `TryGetDefinition(uint key)` and `TryGetDefinition(string id)` (the loaded definition; `OrdnanceDefinition.Key` is the value the network and saves carry; false before definitions load; every peer loads the same set, so clients and late joiners find it too), and `Definitions` (every loaded definition, ordered by `Id`, the same on every peer). |
 | `OrdnanceLevelRules`, `OrdnanceLevelDrop`, `DropWhere`, `DropPoint`, `DropWhen` | The rules of a level and its drops, for `DeclareLevel`. |
 | `IOrdnancePayload`, `IOrdnancePayloadParser`, `PayloadParameterException` | A new call-in kind. |
 | `OrdnanceExecution`, `OrdnancePresentation`, `OrdnancePayloadData`, `OrdnanceDefinition`, `OrdnanceStat`, `OrdnanceCategory`, `Direction`, `OrdnanceArrivalMode` | Read-only data given to your callbacks (`OrdnanceCategory` is a string id). |
@@ -319,9 +389,9 @@ The public API is in the `ForgeOrdnance` namespace. It ships with the package (v
 | `OrdnanceTurrets`, `TurretLookSpec` | Register turret looks and listen to turret moments. |
 | `OrdnancePodAppearance`, `OrdnancePodDoor`, `OrdnancePodSocket`, `OrdnancePodBay` | A custom pod look (its model is a ForgeVisual `ModelHandle`). `OrdnancePodBay.Fit(look, frontToForward, out scale, out lean)` scales, lays flat or stands up any look to the bay's size and parents it to the bay anchor. |
 | `OrdnanceCallBlock` | Hold the call key off, for example while piloting; `Dispose` releases it. |
-| `OrdnanceArrivalSounds`, `OrdnanceArrivalSound` | The drop pod's fall, touchdown and rubble sounds, for a payload with its own arrival that falls the same way (`Play(sound, transform, dimension)`: `Incoming` when the fall starts, `Impact` and `Debris` on touchdown). |
+| `OrdnanceArrivalSounds`, `OrdnanceArrivalSound` | The drop pod's fall, touchdown and rubble sounds, for a payload with its own arrival that falls the same way (`Play(sound, transform, dimension)`: `Incoming` when the fall starts, `Impact` and `Debris` on touchdown, `Open` and `Leave` as outer plates open and close). |
 
-The public surface carries no separate API version: it is the package version (1.0.0). An add-on that uses something missing fails to load. Register your payload types from `Load`:
+The public surface carries no separate API version: it is the package version (1.0.1). An add-on that uses something missing fails to load. Register your payload types from `Load`:
 
 ```csharp
 OrdnanceApi.RegisterPayload("author.MyType", new MyPayload());   // returns false (and logs) when refused
@@ -335,6 +405,7 @@ public sealed class MyPayload : IOrdnancePayload
     public bool HasOwnArrival => false;                                 // true skips the generic arrival shake
     public bool SupportsDirect => false;                                // true: honours a direct arrival (no vehicle)
     public void OnData(OrdnancePayloadData data) { }                    // optional, every peer: data the host sent
+    public byte[] RefreshState(ulong summoner, uint throwId, byte tag, byte[] data) => data; // optional, host: rebuild a kept state just before a late joiner gets it
 }
 ```
 
@@ -342,12 +413,12 @@ Registration is refused for a type name without an author namespace (`author.Typ
 
 - **`Parse`** gets the whole `Payload` object. It runs at game-data initialization, so it may read data blocks. Reject unknown fields yourself. The returned object becomes `OrdnanceDefinition.Parameters`.
 - **`Execute`** runs on the host only. It gets the definition, parameters, landing position (a throw's snapped to the navigation mesh, a developer drop's exact), rotation, course node, summoner and `Arrival`. A developer drop has `SummonerLookup` 0 and no `Summoner`. An exception is logged and the call is lost with its use spent.
-- **Presentation callbacks** run on every peer. `OnBeaconLanded` gets the delay until arrival. The beacon beam and countdown label are always shown; the label is ForgeUI's countdown world marker (`AddCountdownMarker`).
-- **Per-call data.** `OrdnanceApi.SendData(payloadType, summonerLookup, throwId, tag, bytes)` (host only, at most 192 bytes) reaches `OnData` on every peer. `SendState` also keeps the message, and the host replays it to players who join later with `Replayed == true`. `ClearState` forgets a finished call. The host keeps at most 256 states; a full store makes `SendState` return false, so refuse or undo the world change.
+- **Presentation callbacks** run on every peer. `OnBeaconLanded` gets the delay until arrival. The beacon's pillar (the slot `beacon.pillar`: a held line in the beam colour from the landing point up to the ceiling found by `ForgeCore.Level.LiftUnderRoof`, at most 20 m, fading out in the air where there is none) and countdown label are always shown; the label is ForgeUI's countdown world marker (`AddCountdownMarker`).
+- **Per-call data.** `OrdnanceApi.SendData(payloadType, summonerLookup, throwId, tag, bytes)` (host only, at most 192 bytes) reaches `OnData` on every peer. `SendState` also keeps the message, and the host replays it to players who join later with `Replayed == true`. `ClearState` forgets a finished call. The host keeps at most 256 states; a full store makes `SendState` return false, so refuse or undo the world change. A state that holds times relative to when it was sent (seconds left) overrides `RefreshState`, which the host calls on each kept state just before replaying it, so the late joiner's clocks run from the record as it is now, not from when the state was kept. `OrdnanceApi.WorldEpoch` is the world epoch Ordnance follows (0 while no world is up): an add-on that sends its own request messages stamps them with it and drops any other value on arrival, as Ordnance's own messages are.
 - **Lobby picks.** `OrdnanceApi.PickedParameters(payloadType, into)` fills `into` with the parameters of every call-in of that payload type that can arrive in the selected level, each once: the players' synced lobby picks (none when the level has `CallMenu` off) the level's developer drops, and every `Callable: false` definition of that type (read only; empty when there is none), so a payload can prepare its assets before the level.
-- **Arrival mode.** `OrdnanceExecution.Arrival` and `OrdnancePresentation.Arrival` are `OrdnanceArrivalMode.Drop` or `Direct`. Player calls always drop; a level's developer drop may ask for `Direct`, and only payloads that return `SupportsDirect => true` get it (others are refused when the definitions load). A direct arrival is the same arrival with the vehicle stage left out: `OrdnanceDelivery.StartPod` / `StartShell` return null for it and `PodContentsDelay(arrival)` / `ShellContentsDelay(arrival)` are 0, so a payload written against them handles both; a payload with its own fall (an exosuit) leaves the fall out itself.
+- **Arrival mode.** `OrdnanceExecution.Arrival` and `OrdnancePresentation.Arrival` are `OrdnanceArrivalMode.Drop` or `Direct`. Player calls always drop; a level's developer drop may ask for `Direct`, and only payloads that return `SupportsDirect => true` get it (others are refused when the definitions load). A direct arrival is the same arrival with the vehicle stage left out: `OrdnanceDelivery.StartPod` / `StartShell` return null for it and `PodContentsDelay(arrival)` / `ShellRiseDelay(arrival, burrow)` / `ShellReadyDelay(arrival, burrow)` are 0, so a payload written against them handles both; a payload with its own fall (an exosuit) leaves the fall out itself.
 - **Blocking the call key.** `OrdnanceApi.BlockCalls(reason)` returns an `OrdnanceCallBlock`. While any block exists (`OrdnanceApi.CallsBlocked`), a call key press is ignored and a call in progress is cancelled. `Dispose` the block when its reason ends; calling it twice is safe, and calls work again when no block is left.
-- **Lending a gun into the special slot.** The special weapon slot lease is ForgeCore's `Gear.SpecialSlot` (2.0 moved it out of this API): one arbiter for every mod that lends a gun into the slot, with the own weapon's kept stock, the special ammunition redirect and checkpoints. See ForgeCore's `DEVELOPERS.md`.
+- **Lending a gun into the special slot.** The special weapon slot lease is ForgeCore's `Gear.SpecialSlot` (not part of this API): one arbiter for every mod that lends a gun into the slot, with the own weapon's kept stock, the special ammunition redirect and checkpoints. See ForgeCore's `DEVELOPERS.md`.
 - **Compatibility.** Gate your own network handlers with `OrdnanceApi.IsPeerCompatible(lookup)`. Send your own messages on your own ForgeCore channel (`Net.Open` with your plugin GUID). Check senders in your handlers.
 
 ### Reusing the drop pod and turret shell
@@ -371,8 +442,10 @@ public void Execute(OrdnanceExecution e)                 // host
 
 - `StartPod` and `StartShell` return a handle with `Root`, `HasLanded`, `IsOpen` and the events `Landed`, `Opened` and `Left`. The pod also has `Anchor(0..3)`, `WeaponAnchor`, `Bay(0..3)` and `WeaponBay`. Objects parented to an anchor fall, open and sink with the pod.
 - The pod has four pickup bays (0 and 1 on the +X side, 2 and 3 on the -X side) and two weapon bays. A weapon bay is 0.78 x 1.23 x 0.32 m, enough for a 1.13 m weapon standing upright.
-- `PodContentsDelay(arrival)` and `ShellContentsDelay(arrival)` give the host's timing for when the pod's weapon racks show their contents and the shell's petals are open (0 for a direct arrival). The built-in `Item` payload does not wait for it: it spawns its pickups right after touchdown (2.0 s) and the platform keeps them shut away (not drawn, not takeable) until the doors start to open at 5.0 s.
-- A pod stays until the host says it is empty. `HostWatchPickups(summoner, throwId, ItemInLevel[])` does that for pickups. `HostReportPodEmpty(summoner, throwId)` declares it now. The empty pod then stays 15 s and sinks. A shell sinks 6 s after opening.
+- **Burrow timeline (`BurrowSpec`, all data).** From touchdown: the base bores in over `BurrowSeconds` until its top is level with the ground, waits `HoldSeconds`, then its two lids (the base model's nodes `lid_a` and `lid_b`; a base without them skips this step with no error) are thrown outward in an arc (`LidSpeed` m/s out, `LidLift` m/s up, `LidSpin` degrees/s of tumble, via ForgeVisual `Thrown`), lie `LidRestSeconds` and vanish, with a puff of dust. `LidClearSeconds` after the throw the upper part, wholly inside the base and barrel up, rises `RiseHeight` over `RiseSeconds`; a gun then turns level over `TurnSeconds`, and the host stands the game's sentry at that moment. At the end the barrel turns up, the upper part sinks back, and the base sinks away over `LeaveSeconds`. Every pose is a function of the arrival's shared time, so a late joiner sees the current one. A device sets the same fields in its definition (`BurrowSpec.Fields`, `BurrowSpec.Parse`).
+- The turret shell is one burrow for every turret and standing device (the base is shared; only the upper part differs). A device that goes in and comes up while it works sets `OrdnanceShellAppearance.Dive` (seconds since the device was ready, to 0 standing or 1 down; it must depend on the seconds alone): the upper part then sinks back into the open base (the base stays), `RiseHeight` down at 1. `BurrowSpec.BaseScale` sizes the base to the upper part. Return an `OrdnanceShellAppearance(burrow, lifetime)` from your payload's `GetShellAppearance(definition)` (every peer, late joiners too, build it from the definition alone) and call `StartShell(presentation)`; Forge draws the rest from the arrival's shared timeline. `BurrowSpec` holds the numbers, all data: `BurrowSeconds` (the drill boring in after the 1.1 s fall, 0.6), `RiseHeight` (how deep the stack sinks so that the upper part is below the ground: its full height, barrel up), `RiseSeconds` (both rising until the base top is level with the ground) and `TurnSeconds` (a gun's barrel from straight up to level, 0 for a head with no gun). The two models are the base and the upper part: the upper part is `Head` (a ForgeVisual model with its origin on the centre of the base's top face, scaled `HeadScale`, front turned by `HeadFront`); a gun names its barrel part in `Gun`, and that part is what turns. `ShellRiseDelay` / `ShellReadyDelay` give the host's moments (the stack starts to rise; it has risen and turned level, when the host stands a sentry and a device starts its work); `OrdnanceShell.HeadRise` (0 to 1) and `Head` follow it each frame. The base model (`Ordnance:turret-shell`) has the nodes `body` (the drill and rim; the rim's top comes to rest 1 cm above the ground), `well` (a dark disc under the rim that reads as the bore once the lids are gone) and `lid_a`, `lid_b`; origin on its vertical axis. The upper part is on it from the fall on, barrel straight up. After `Lifetime` the barrel turns up and both sink out of sight (`Lifetime` 0: they stay until the level ends).
+- `PodContentsDelay(arrival)` and `ShellReadyDelay(arrival, burrow)` give the host's timing for when the pod's weapon racks show their contents and the shell's head is ready (0 for a direct arrival). The built-in `Item` payload does not wait for it: it spawns its pickups right after touchdown (2.0 s) and the platform keeps them shut away (not drawn, not takeable) until the doors start to open at 5.0 s.
+- A pod stays until the host says it is empty. `HostWatchPickups(summoner, throwId, ItemInLevel[])` does that for pickups. `HostReportPodEmpty(summoner, throwId)` declares it now. The empty pod then stays 15 s and sinks.
 - `HostAfter(seconds, action)` is dropped when calls in flight are voided (level exit, checkpoint reload, host change).
 
 ### Claiming from a pod
@@ -396,7 +469,7 @@ Camera shake is ForgeVisual's `CameraShake.Shake(at, ShakeSpec)` for every packa
 
 ### Turret looks
 
-Register looks from `Load`, before definitions are read: `OrdnanceTurrets.RegisterLook("Pack:item", modelHandle, new TurretLookSpec { WorldScale = 1.24f })`. The model is a ForgeVisual `ModelHandle` from your own bundle with the parts `base`, `yaw`, `head` and `muzzle`. A `Gear` definition with `"Look": "Pack:item"` gets that look on every peer, late joiners included; the look id travels in the sentry's marker. `OrdnanceTurrets.Deployed(lookId, shell)`, `Online(lookId, sentry, at)` and `Expiring(lookId, sentry, position)` fire on every peer for sentries wearing a registered look, so you can add your own sounds. `TryLook(sentry, out lookId)` tells which look a sentry wears.
+Register looks from `Load`, before definitions are read: `OrdnanceTurrets.RegisterLook("Pack:item", modelHandle, new TurretLookSpec { WorldScale = 1.24f, Burrow = new BurrowSpec { RiseHeight = 1.5f, TurnSeconds = 0.8f } })`. The model is a ForgeVisual `ModelHandle` from your own bundle with the parts `base`, `yaw`, `head` and `muzzle`, flat under the prefab, and optionally a `barrel` under `head` with its origin on the bore axis (it slides back and spins on its own; without it the whole head recoils); `BurrowSpec.BaseScale` and `RiseHeight` fit the drop base to it. `TurretLookSpec.Motion` (`TurretMotionSpec`) sets the idle scan, the kick of a shot, `BarrelRecoil` and `BarrelSpin`. A turret with `Pickable` false ends when it is out of ammunition, by the same path as `Lifetime`: the host decides, the turret stows into its shell, the shell sinks and the sentry is removed, so an empty turret cannot be refilled (a part-used one still takes ammunition packs as the game does). The look is drawn to the game's aim on every peer (a client reads the sentry's synced target direction), and the game's muzzle point stays on the look's muzzle along the barrels, so shots leave the barrel that is drawn. A `Gear` definition with `"Look": "Pack:item"` gets that look on every peer, late joiners included; the look id travels in the sentry's marker. `OrdnanceTurrets.Deployed(lookId, shell)`, `Online(lookId, sentry, at)` and `Expiring(lookId, sentry, position)` fire on every peer for sentries wearing a registered look, so you can add your own sounds. `TryLook(sentry, out lookId)` tells which look a sentry wears. `Deployed` fires when the base has bored in and the stack starts to rise. The look is a drawn copy standing on the base; the game's sentry is stood by the host only when the barrel has turned level (so it neither aims nor fires before), and its own look takes over from the copy.
 
 ### Custom pod looks
 
@@ -412,10 +485,10 @@ The model's origin is on the ground, its units are metres, and its scale is one.
 
 ### Art and sound
 
-- Build your bundle with this package's pipeline: `tools/export_blender.py` per model and `OrdnanceBundleBuild.cs` in Unity 2019.4.21f1. Copy `build_assets.ps1` and change the inputs and the bundle name (`FORGE_ORDNANCE_BUNDLE`).
+- Build your bundle with this package's pipeline: `tools/export_blender.py` per model (it keeps the node hierarchy) and `OrdnanceBundleBuild.cs` in Unity 2019.4.21f1. Copy `build_assets.ps1` and change the inputs and the bundle name (`FORGE_ORDNANCE_BUNDLE`). `tools/tripo_masters.py` makes the low-poly masters of this package and Arsenal from the repaired high-poly models; a model that has not arrived is skipped and the build keeps its older one.
 - Register the bundle with ForgeVisual (the bundle format is unchanged): `Bundles.Register(modId, pack, path)` from your plugin's `Load`, then `Models.Get("Pack:prefab")`; `model.Spawn(position, rotation, parent)` makes an instance with the game's gear shader once a level has been built, and `bundle.TryTexture(name)` returns a standalone texture from the bundle's `textures/` folder. Ordnance's own bundle is the pack `Ordnance`. Particles you bake into a bundle go to `ParticlePool` (an active prefab of looping world-space systems with emission off, `maxParticles` equal to the capacity you pass to `Channel`).
 - Metallic textures use R for metallic and G for smoothness. The shader has no detail map, so bake surface detail into the textures.
-- Sound goes through ForgeAudio, not Ordnance. Put Ogg files and `cues.json` in an `audio` folder next to your DLL and call `AudioKit.Load`. Ordnance's own cues are in `audio/cues.json`.
+- Sound goes through ForgeAudio, not Ordnance. Put Ogg files and `cues.forge` in an `audio` folder next to your DLL and call `AudioKit.Load`. Ordnance's own cues are in `audio/cues.forge`.
 
 ## Network
 
@@ -425,4 +498,8 @@ Add-ons open their own ForgeCore channel for their own messages; its format fing
 
 ## Logging
 
-Logging goes through ForgeCore's `ModLog` and only errors are written (`Plugin.Error`). The mod calls `ForgeCore.Log` for positions and numbers.
+Logging goes through ForgeCore's `ModLog` and only errors are written (`Plugin.Logger.Error`). The mod calls `ForgeCore.Log` for positions and numbers.
+
+## Scripted entry
+
+OrdnanceControl (Native/OrdnanceControl.cs, public static, one answer line each): List(), Place(id, x, y, z, yaw, arrival) and PlaceAhead(id, metres, arrival) over OrdnanceApi.Place (host only).

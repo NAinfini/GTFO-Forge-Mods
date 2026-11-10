@@ -1,5 +1,5 @@
 #Requires -Version 7
-# Builds forge-ordnance.bundle: the summoning ball (M01), the one drop pod (M02, the hexagonal pod, for supplies and heavy weapons), and the turret shell (M19, six petals). Sources are only read; everything is written under -Build.
+# Builds forge-ordnance.bundle: the summoning ball, the one drop pod (supplies and heavy weapons) and the turret base, from their masters under <Assets>/masters (made by tripo_masters.py). Sources are only read; everything is written under -Build.
 # Run from the repository root:
 #   pwsh Mods/ForgeOrdnance/tools/build_assets.ps1 [-Install <BepInEx plugins folder of a test profile>]
 param(
@@ -7,8 +7,8 @@ param(
     [string]$Build = 'artifacts/work/ordnance-build',
     [string]$Unity = 'C:\Program Files\Unity\Hub\Editor\2019.4.21f1\Editor\Unity.exe',
     [string]$Blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe',
-    [string]$UnityLabs = '<VFX library>\unity-labs-vfx-cc0',
-    [string]$AssetStore = '<VFX library>\asset-store',
+    [string]$UnityLabs = 'F:\Unity\特效\unity-labs-vfx-cc0',
+    [string]$AssetStore = 'F:\Unity\特效\asset-store',
     [string]$Install = ''
 )
 $ErrorActionPreference = 'Stop'
@@ -17,9 +17,12 @@ $tools = $PSScriptRoot
 $Assets = [IO.Path]::GetFullPath($Assets)
 $Build = [IO.Path]::GetFullPath($Build)
 $log = Join-Path $Build 'unity-build.log'
-# Any failed build attempt must invalidate the previous receipt so package_release.py cannot reuse an old bundle.
-if (Test-Path -LiteralPath $log) { Remove-Item -LiteralPath $log }
-$models = @('M01/M01.blend', 'M02/M02_pod.blend', 'M19/M19.blend') | ForEach-Object { "$Assets/models/$_" }
+# Any failed build attempt must invalidate the previous receipt so package_release.py cannot reuse an old bundle: it reads the copies kept in the package, so those go too (the bundle file stays; without its receipt and log it is refused).
+$kept = Join-Path $PSScriptRoot '../Assets/Models'
+foreach ($stale in @($log, (Join-Path $kept 'forge-ordnance.manifest.json'), (Join-Path $kept 'unity-build.log'))) {
+    if (Test-Path -LiteralPath $stale) { Remove-Item -LiteralPath $stale }
+}
+$models = @('beacon', 'drop-pod', 'turret-shell') | ForEach-Object { "$Assets/masters/$_/$_.blend" }
 $effects = @('vfx-mist', 'vfx-spark', 'vfx-flare')
 $textures = $effects | ForEach-Object { "$Assets/vfx/$_.png" }
 foreach ($path in @($Unity, $Blender) + $models + $textures) {
@@ -40,23 +43,14 @@ if ($LASTEXITCODE -ne 0) { throw 'Drawing the vfx-rock atlas failed.' }
 & python "$tools/whiten_vfx.py" "$Assets/vfx/vfx-flare.png" (Join-Path $stage 'textures/vfx-flare.png')
 if ($LASTEXITCODE -ne 0) { throw 'Whitening vfx-flare failed.' }
 
-function Export([string]$blend, [string]$prefab, [string]$require, [string[]]$extra = @()) {
-    $path = if ([IO.Path]::IsPathRooted($blend)) { $blend } else { "$Assets/models/$blend" }
-    & $Blender --background --factory-startup $path --python-exit-code 1 --python "$tools/export_blender.py" -- --prefab $prefab --out "$stage/models/$prefab" --require $require @extra
-    if ($LASTEXITCODE -ne 0) { throw "Export of $prefab ($blend) failed." }
+function Export([string]$prefab, [string]$require, [string[]]$extra = @()) {
+    & $Blender --background --factory-startup "$Assets/masters/$prefab/$prefab.blend" --python-exit-code 1 --python "$tools/export_blender.py" -- --prefab $prefab --out "$stage/models/$prefab" --require $require @extra
+    if ($LASTEXITCODE -ne 0) { throw "Export of $prefab failed." }
 }
-# The ball is a first person held item seen up close, so its maps stay 2048 (made by make_ball.py); its amber ring glows (OrdnanceAssets: beacon).
-Export 'M01/M01.blend' 'beacon' 'M01' @('--max-texture', '2048', '--glow', 'M01_mat=1.6,0.9,0.18')
-# The one pod: make_hexpod.py turns the Meshy hex pod into the game pod (thick hatches, shelves, anchors, scaled to just hold a
-# 1.13 m gun) and check_hexpod.py refuses it unless every hatch clears the hull over its whole swing. It and the shell are seen
-# from inside once open, so both get inner faces (--double-sided).
-$pod = Join-Path $Build 'M02_hex.blend'
-& $Blender --background --factory-startup "$Assets/models/M02/M02_pod.blend" --python-exit-code 1 --python "$tools/make_hexpod.py" -- $pod
-if ($LASTEXITCODE -ne 0) { throw 'make_hexpod.py failed.' }
-& $Blender --background --factory-startup $pod --python-exit-code 1 --python "$tools/check_hexpod.py"
-if ($LASTEXITCODE -ne 0) { throw 'The drop pod failed check_hexpod.py.' }
-Export $pod 'drop-pod' 'body,cradle,door_1,door_2,door_3,door_4,interior,shelf_1,shelf_2,weapon_anchor_1,weapon_anchor_2,pickup_anchor_1,pickup_anchor_2,pickup_anchor_3,pickup_anchor_4' @('--max-texture', '1024', '--max-albedo', '2048', '--double-sided')
-Export 'M19/M19.blend' 'turret-shell' 'shell_1,shell_2,shell_3,shell_4,shell_5,shell_6' @('--max-texture', '1024', '--double-sided')
+# The ball is a first person held item seen up close; its amber band glows (OrdnanceAssets: beacon).
+Export 'beacon' '' @('--glow', 'beacon=1.6,0.9,0.18')
+Export 'drop-pod' 'body,cradle,door_1,door_2,door_3,door_4,interior,shelf_1,shelf_2,weapon_anchor_1,weapon_anchor_2,pickup_anchor_1,pickup_anchor_2,pickup_anchor_3,pickup_anchor_4'
+Export 'turret-shell' 'body,well,lid_a,lid_b'
 $project = Join-Path $Build 'unity'
 if (!(Test-Path -LiteralPath (Join-Path $project 'ProjectSettings'))) {
     $createLog = Join-Path $Build 'unity-create.log'
@@ -80,7 +74,6 @@ $hash = (Get-FileHash -LiteralPath $bundle -Algorithm SHA256).Hash.ToLowerInvari
 if (!(Select-String -LiteralPath $log -Pattern "ORDNANCE_BUNDLE_VERIFIED forge-ordnance.bundle $length bytes $hash" -SimpleMatch -Quiet)) { throw "This run did not verify the bundle; see $log" }
 Write-Host "Built and verified $bundle ($length bytes, $hash)."
 # The package keeps the verified bundle, its Unity receipt and build log in its own Assets/Models, where package_release.py reads them (the build folder is disposable).
-$kept = Join-Path $PSScriptRoot '../Assets/Models'
 New-Item -ItemType Directory -Force $kept | Out-Null
 foreach ($file in @($bundle, (Join-Path $out 'forge-ordnance.manifest.json'), $log)) { Copy-Item -LiteralPath $file -Destination $kept -Force }
 

@@ -4,7 +4,7 @@ using ForgeVisual;
 using UnityEngine;
 
 namespace ForgeOrdnance;
-/// <summary>forge-ordnance.bundle next to the plugin, registered with ForgeVisual as the pack <c>Ordnance</c>: the summoning ball, drop pod, turret shell and the effect prefabs. Registered once when the first level is built and kept for the session. When the file is missing or broken
+/// <summary>forge-ordnance.bundle next to the plugin, registered with ForgeVisual as the pack <c>Ordnance</c>: the summoning ball, drop pod, turret shell and the effect prefabs. Registered when a level has been built and kept for the session; a level whose load failed tries again at the next level. When the file is missing or broken
 /// the ball keeps the glow stick look, deliveries fall back to the game's items on the ground and sentries keep the game's
 /// look, and the log says why.</summary>
 internal static class OrdnanceAssets
@@ -16,8 +16,6 @@ internal static class OrdnanceAssets
     internal const string ShellPrefab = "turret-shell";
     internal const string BeaconPrefab = "beacon";
 
-    private static bool _tried;
-
     internal static BundleHandle? Bundle { get; private set; }
     internal static ModelHandle? Pod { get; private set; }
     /// <summary>The one drop pod's art description: four hinged doors, two weapon bays and four pickup bays.
@@ -25,7 +23,7 @@ internal static class OrdnanceAssets
     internal static OrdnancePodAppearance? PodAppearance { get; private set; }
 
     /// <summary>Usable room of the pod's bays, in metres: x across, y height, z depth from the middle divider to the closed
-    /// doors. Measured on the hexagonal pod (tools/make_hexpod.py): a weapon bay stands a 1.13 m long gun upright; each pickup
+    /// doors. Measured on the pod: a weapon bay stands a 1.13 m long gun upright; each pickup
     /// bay is one tier of a bay, the upper tier standing on the shelf (<see cref="ShelfPrefabs"/>).</summary>
     internal static readonly Vector3 WeaponBayRoom = new(0.78f, 1.23f, 0.32f);
     internal static readonly Vector3 FloorTierRoom = new(0.78f, 0.59f, 0.32f);
@@ -53,25 +51,24 @@ internal static class OrdnanceAssets
     internal static ModelHandle? Shell { get; private set; }
     internal static ModelHandle? Beacon { get; private set; }
 
-    /// <summary>Once per session, when a level has been built.</summary>
+    /// <summary>When a level has been built, until one load succeeds.</summary>
     internal static void Load()
     {
-        if (_tried) return;
-        _tried = true;
+        if (Bundle != null) return;
         try { LoadChecked(); }
         catch (Exception error)
         {
             Bundle = null;
             Pod = Shell = Beacon = null;
             PodAppearance = null;
-            Plugin.Error("Forge Ordnance art could not be loaded; the ball keeps the glow stick look, supplies and turrets arrive without the drop pod and shell: " + error);
+            Plugin.Logger.ErrorOnce("Forge Ordnance art could not be loaded; the ball keeps the glow stick look, supplies and turrets arrive without the drop pod and shell: " + error);
         }
     }
 
     private static void LoadChecked()
     {
-        var folder = System.IO.Path.GetDirectoryName(typeof(OrdnanceAssets).Assembly.Location) ?? throw new InvalidOperationException("The plugin folder is unknown.");
-        var bundle = Bundles.Register(Plugin.Id, Pack, System.IO.Path.Combine(folder, BundleFile))
+        // A level whose load failed after the pack was registered finds it registered: the pack is taken, not registered twice.
+        var bundle = (Bundles.TryGet(Pack, out var registered) ? registered : Bundles.Register(Plugin.Id, Pack, BundleFile))
             ?? throw new InvalidOperationException("ForgeVisual did not register " + BundleFile + " (its error is in the log)");
         var pod = Model(bundle, PodPrefab);
         var shell = Model(bundle, ShellPrefab);
@@ -81,9 +78,9 @@ internal static class OrdnanceAssets
         Beacon = bundle.TryModel(BeaconPrefab, out var beacon) ? beacon : null;
         PodAppearance = BuildPodAppearance(pod);
         try { PodImpactEffects.Load(bundle); }
-        catch (Exception error) { Plugin.Error("Pod impact particles could not be prepared: " + error); }
-        try { OrdnanceFx.Load(bundle); }
-        catch (Exception error) { Plugin.Error("Call-in effect particles could not be prepared: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Pod impact particles could not be prepared: " + error); }
+        try { OrdnanceFxSlots.Load(); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("ordnance-effects-prepare-failed", "library effects could not be prepared, they draw nothing: " + error); }
     }
 
     private static ModelHandle Model(BundleHandle bundle, string prefab)

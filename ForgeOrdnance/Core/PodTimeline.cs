@@ -5,7 +5,7 @@ namespace ForgeOrdnance;
 /// the doors open, so the pickups have long been replicated to every peer when the doors show them.</summary>
 internal static class PodTimeline
 {
-    internal const float FallSeconds = 1.6f;
+    internal const float FallSeconds = 1.1f;
     internal const float SinkSeconds = 0.3f;
     /// <summary>The pod settles (rubble, dust and the impact's tail) before the doors start to open.</summary>
     internal const float PodOpenAfterImpact = 3.4f;

@@ -1,0 +1,151 @@
+{
+ "Slots": {
+  "beacon.impact": {
+   "Item": "Recipe_ord_beacon_impact_a31796_ba1fce",
+   "Scale": 1,
+   "AxisUp": true,
+   "Light": {
+    "Colour": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "Range": 4,
+    "Peak": 3,
+    "Life": 0.3
+   }
+  },
+  "beacon.pillar": {
+   "Item": "Recipe_ord_beacon_pillar_3545ae_29725f",
+   "Line": true,
+   "Hold": 0.15,
+   "Scale": 1,
+   "LaserHead": "head",
+   "LaserBodies": [
+    "core",
+    "core cross",
+    "glow",
+    "glow cross"
+   ],
+   "Size": 10,
+   "EndFade": 4,
+   "Linger": 0.25
+  },
+  "beacon.ribbon": {
+   "None": true
+  },
+  "hand.pulse": {
+   "Item": "Recipe_ord_hand_pulse_bb1c84",
+   "Scale": 1
+  },
+  "mech.servo.sparks": {
+   "Item": "Recipe_ord_servo_sparks_2aafc5",
+   "Scale": 1,
+   "AxisUp": true
+  },
+  "pod.fall": {
+   "AlwaysDraw": true,
+   "Item": "Recipe_ord_pod_fall_d0b023",
+   "Hold": 0.15,
+   "Scale": 1,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.6275,
+     0.251
+    ],
+    "Range": 7,
+    "Peak": 3,
+    "Life": 0,
+    "Flicker": 0.2
+   }
+  },
+  "pod.glow": {
+   "Item": "Recipe_ord_pod_glow_1f5e1b",
+   "Scale": 1,
+   "AxisUp": true,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.6902,
+     0.3765
+    ],
+    "Range": 5,
+    "Peak": 4,
+    "Life": 0.6
+   }
+  },
+  "pod.gravel": {
+   "Item": "Recipe_ord_pod_gravel_1a0850",
+   "Scale": 1,
+   "AxisUp": true
+  },
+  "pod.land": {
+   "AlwaysDraw": true,
+   "Item": "Recipe_ord_pod_land_7edac7",
+   "Scale": 1,
+   "AxisUp": true,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.8471,
+     0.6588
+    ],
+    "Range": 6,
+    "Peak": 3,
+    "Life": 0.25
+   }
+  },
+  "pod.leave": {
+   "Item": "Recipe_ord_pod_land_7edac7_8e3ea8",
+   "Scale": 0.8,
+   "AxisUp": true
+  },
+  "pod.vent": {
+   "Item": "Recipe_ord_pod_vent_a5e9b8",
+   "Scale": 1,
+   "AxisUp": true
+  },
+  "sentry.expired": {
+   "Item": "Recipe_ord_sentry_expired_2f9f11",
+   "Scale": 1,
+   "AxisUp": true,
+   "Light": {
+    "Colour": [
+     0.749,
+     0.8941,
+     1.0
+    ],
+    "Range": 4,
+    "Peak": 3,
+    "Life": 0.25,
+    "Flicker": 0.6
+   }
+  },
+  "sentry.online": {
+   "Item": "Recipe_ord_sentry_online_f5a493_f04384",
+   "Scale": 1,
+   "AxisUp": true,
+   "Light": {
+    "Colour": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "Range": 3,
+    "Peak": 2.5,
+    "Life": 0.3
+   }
+  },
+  "shell.unfold": {
+   "Item": "Recipe_ord_pod_land_7edac7_9285ac",
+   "Scale": 0.55,
+   "AxisUp": true
+  },
+  "turret.rise": {
+   "Item": "Recipe_ord_pod_land_7edac7_12376d",
+   "Scale": 0.45,
+   "AxisUp": true
+  }
+ }
+}

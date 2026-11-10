@@ -30,7 +30,7 @@ internal static class PodImpactEffects
     internal static void Play(Vector3 ground, Vector3 podSize)
     {
         if (_dust == null || _debris == null || !OrdnanceFx.Room(_dust, DustCount) || !OrdnanceFx.Room(_debris, DebrisCount)) return;
-        var scale = Math.Clamp(Math.Max(podSize.x, podSize.z), .3f, 6f);
+        var scale = OrdnanceFx.ScaleOf(podSize);
         Emit(_dust, ground, scale, DustCount, .25f, 2.4f, 1.5f, .5f, new Color(.52f, .46f, .37f, .42f));
         Emit(_debris, ground, scale, DebrisCount, 2.2f, 3.2f, .75f, .14f, new Color(.36f, .32f, .26f, .7f));
     }
@@ -46,18 +46,5 @@ internal static class PodImpactEffects
                 (radial * speed + Vector3.up * up) * scale, size * scale * UnityEngine.Random.Range(.8f, 1.2f),
                 lifetime * UnityEngine.Random.Range(.8f, 1.15f), colour);
         }
-    }
-
-    /// <summary>The size of a spawned instance (prefab assets do not report renderer bounds reliably).</summary>
-    internal static Vector3 ModelSize(GameObject instance)
-    {
-        var bounds = new Bounds();
-        var first = true;
-        foreach (var renderer in instance.GetComponentsInChildren<Renderer>(true))
-        {
-            if (first) { bounds = renderer.bounds; first = false; }
-            else bounds.Encapsulate(renderer.bounds);
-        }
-        return bounds.size;
     }
 }

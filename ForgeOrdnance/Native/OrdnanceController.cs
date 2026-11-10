@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using GTFO.API;
 using Player;
 using ForgeUI;
 using ForgeVisual;
@@ -74,7 +73,7 @@ internal sealed class OrdnanceController
         // and apply it only after native recall has finished; post-checkpoint inventory must never replace it.
         ForgeCore.GameEvents.CheckpointReached += CheckpointReached;
         ForgeCore.GameEvents.CheckpointReloaded += CheckpointReloaded;
-        LevelAPI.OnLevelCleanup += DiscardInput;
+        ForgeCore.GameEvents.LevelEnded += DiscardInput;
         BeaconItem.Spawned += BallSpawned;
         BeaconItem.ThrowCallback = CaptureThrow;
     }
@@ -117,8 +116,8 @@ internal sealed class OrdnanceController
         }
         catch (Exception error)
         {
-            Plugin.Error("Ordnance update failed; input hold released: " + error);
-            try { EndInput(true); } catch (Exception inner) { Plugin.Error("Releasing input after a failure also failed: " + inner); }
+            Plugin.Logger.ErrorOnce("Ordnance update failed; input hold released: " + error);
+            try { EndInput(true); } catch (Exception inner) { Plugin.Logger.ErrorOnce("Releasing input after a failure also failed: " + inner); }
         }
     }
 
@@ -127,7 +126,7 @@ internal sealed class OrdnanceController
     /// <summary>The local player while able to act (in first person and alive), else null.</summary>
     private static PlayerAgent? LiveAgent()
     {
-        var agent = PlayerManager.GetLocalPlayerAgent();
+        var agent = ForgeCore.Players.Local;
         return FocusStateManager.CurrentState == eFocusState.FPS && agent != null && agent.Alive ? agent : null;
     }
 
@@ -154,10 +153,10 @@ internal sealed class OrdnanceController
                 break;
             case Phase.Command:
                 agent = LiveAgent();
-                if (agent == null) { Cancel("left FPS or went down while entering the code"); return; }
-                if (OrdnanceApi.CallsBlocked) { Cancel("calls blocked by " + OrdnanceApi.BlockReasons()); return; }
-                if (!key.Held) { Cancel("call key released before the code was complete (" + _typed.Count + " step(s) entered)"); return; }
-                if (!BallInHand(agent, true)) { Cancel("the ball left the consumable slot or did not reach the hand"); return; }
+                if (agent == null) { Cancel(); return; }
+                if (OrdnanceApi.CallsBlocked) { Cancel(); return; }
+                if (!key.Held) { Cancel(); return; }
+                if (!BallInHand(agent, true)) { Cancel(); return; }
                 if (ReadDirection() is { } step) Typed(step);
                 break;
             case Phase.Holding:
@@ -166,12 +165,12 @@ internal sealed class OrdnanceController
                 if (BallConsumed()) { Thrown(); return; }
                 if (ThrowWatch.Attempted && _awaitUntil == float.MaxValue) _awaitUntil = Time.time + SpawnSeconds;
                 agent = LiveAgent();
-                if (agent == null) { Cancel("left FPS or went down while holding the ball"); return; }
-                if (OrdnanceApi.CallsBlocked) { Cancel("calls blocked by " + OrdnanceApi.BlockReasons()); return; }
+                if (agent == null) { Cancel(); return; }
+                if (OrdnanceApi.CallsBlocked) { Cancel(); return; }
                 ThrowWatch.Tick(agent);
-                if (key.Pressed) { Cancel("call key pressed again while holding the ball"); return; }
-                if (SwitchPressed()) { Cancel("weapon switch pressed while holding the ball"); return; }
-                if (!BallInHand(agent, false)) { Cancel("the ball is no longer wielded"); return; }
+                if (key.Pressed) { Cancel(); return; }
+                if (SwitchPressed()) { Cancel(); return; }
+                if (!BallInHand(agent, false)) { Cancel(); return; }
                 break;
             case Phase.Restoring:
                 TickRestoring();
@@ -179,7 +178,7 @@ internal sealed class OrdnanceController
         }
     }
 
-    private void Cancel(string reason)
+    private void Cancel()
     {
         OrdnanceCues.Local(OrdnanceSound.CallCancel);
         EndInput(true);
@@ -273,7 +272,7 @@ internal sealed class OrdnanceController
     /// has been empty for a full frame, so the game's own steps are finished, then puts the saved state back.</summary>
     private void TickRestoring()
     {
-        var agent = PlayerManager.GetLocalPlayerAgent();
+        var agent = ForgeCore.Players.Local;
         if (agent == null || agent.WasCollected || !agent.Alive) return;
         if (!BallInSlot())
         {
@@ -281,7 +280,7 @@ internal sealed class OrdnanceController
             if (Time.frameCount <= _emptyFrame) return;
         }
         else if (Time.time < _restoreDeadline) return;
-        else if (_restoreDeadline > 0f) Plugin.Error("The summoning ball was still in the consumable slot " + ClearSeconds + " s after the throw; it is cleared by force.");
+        else if (_restoreDeadline > 0f) Plugin.Logger.ErrorOnce("The summoning ball was still in the consumable slot " + ClearSeconds + " s after the throw; it is cleared by force.");
         Restore();
         if (_carrying) return;
         _phase = Phase.Idle;
@@ -374,7 +373,7 @@ internal sealed class OrdnanceController
     private bool BeginCarry(PlayerAgent agent)
     {
         var backpack = PlayerBackpackManager.LocalBackpack;
-        if (backpack == null || agent.Inventory == null) { Plugin.Error("The local backpack is not available for a call-in."); return false; }
+        if (backpack == null || agent.Inventory == null) { Plugin.Logger.ErrorOnce("The local backpack is not available for a call-in."); return false; }
         var wielded = agent.Inventory.WieldedSlot;
         if (wielded is InventorySlot.InLevelCarry or InventorySlot.ConsumableHeavy or InventorySlot.Pickup)
         {
@@ -403,7 +402,7 @@ internal sealed class OrdnanceController
         }
         catch (Exception error)
         {
-            Plugin.Error("Readying the summoning ball failed; the inventory is put back: " + error);
+            Plugin.Logger.ErrorOnce("Readying the summoning ball failed; the inventory is put back: " + error);
             Notify(OrdnanceText.T("notice.ballFailed"));
             EndInput(true);
             return false;
@@ -425,7 +424,7 @@ internal sealed class OrdnanceController
         if (_ballWielded) return false;
         if (Time.time - _carryStart > WieldSeconds)
         {
-            Plugin.Error("The summoning ball did not reach the hand within " + WieldSeconds + " s; the inventory is put back.");
+            Plugin.Logger.ErrorOnce("The summoning ball did not reach the hand within " + WieldSeconds + " s; the inventory is put back.");
             Notify(OrdnanceText.T("notice.ballFailed"));
             return false;
         }
@@ -439,7 +438,7 @@ internal sealed class OrdnanceController
     {
         if (!_carrying) return;
         if (_checkpointRestoring && !ForgeCore.Checkpoint.Settled) return;
-        var agent = PlayerManager.GetLocalPlayerAgent();
+        var agent = ForgeCore.Players.Local;
         var backpack = PlayerBackpackManager.LocalBackpack;
         if (agent == null || agent.WasCollected || !agent.Alive || backpack == null || agent.Inventory == null) return;
         try
@@ -456,7 +455,7 @@ internal sealed class OrdnanceController
                 agent.Sync.WantsToWieldSlot(_savedSlot);
             _carrying = _checkpointRestoring = false;
         }
-        catch (Exception error) { Plugin.Error("Putting the inventory back after a call-in failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Putting the inventory back after a call-in failed: " + error); }
     }
 
     // ---- thrown balls and beacons --------------------------------------------------------------------------
@@ -470,7 +469,7 @@ internal sealed class OrdnanceController
         {
             if (token != _throwToken || _awaiting == null)
             {
-                Plugin.Error("A summoning ball spawn arrived after its call expired; it is ignored.");
+                Plugin.Logger.ErrorOnce("A summoning ball spawn arrived after its call expired; it is ignored.");
                 return;
             }
             _matchedBall = item.TryCast<Item>() ?? throw new InvalidOperationException("The ball callback did not return an item.");
@@ -485,7 +484,7 @@ internal sealed class OrdnanceController
         var definition = _awaiting;
         if (definition == null)
         {
-            Plugin.Error("A summoning ball of yours appeared with no call-in locked in; it is ignored.");
+            Plugin.Logger.ErrorOnce("A summoning ball of yours appeared with no call-in locked in; it is ignored.");
             return;
         }
         _awaiting = null;
@@ -499,7 +498,7 @@ internal sealed class OrdnanceController
     private void TickAwaiting()
     {
         if (_awaiting == null || Time.time <= _awaitUntil) return;
-        Plugin.Error("The thrown summoning ball for '" + _awaiting.Id + "' never appeared; the call is lost.");
+        Plugin.Logger.ErrorOnce("The thrown summoning ball for '" + _awaiting.Id + "' never appeared; the call is lost.");
         Notify(OrdnanceText.T("notice.noBeacon"));
         _awaiting = null;
         _throwToken++; _matchedBall = null;
@@ -572,7 +571,7 @@ internal sealed class OrdnanceController
         }
     }
 
-    private void ClearPresentation()
+    private void ClearPresentation(bool hostChange = false)
     {
         // A host change keeps restoration pending if downed. Checkpoint recovery keeps only its checkpoint-time snapshot;
         // the restoration barrier prevents writing over native recall while it runs.
@@ -581,8 +580,10 @@ internal sealed class OrdnanceController
         _thrown.Clear();
         foreach (var beacon in _beacons) beacon.Destroy();
         _beacons.Clear();
-        Deliveries.Clear();
-        OrdnanceClaims.Clear();
+        // The world did not roll back at a host change: a pod still holding something to claim stays, and its new host opens it again.
+        if (hostChange) { Deliveries.HostChanged(); OrdnanceClaims.HostChanged(); }
+        // A checkpoint reload replays the level's own drops under the same call numbers, so a sentry's identity and timer of the old world must not meet the replayed one.
+        else { Deliveries.Clear(); OrdnanceClaims.Clear(); GearPayload.Clear(); }
     }
 
     // ---- notices -------------------------------------------------------------------------------------------

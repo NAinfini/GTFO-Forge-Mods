@@ -10,7 +10,7 @@ Every cue lists its ``layers``; each layer has the ``sources`` that form its var
 AudioKit cue settings that AudioKit applies when it loads the folder.
 
 Output follows the AudioKit folder convention: ``<cue>.ogg`` for a one-layer, one-source cue, ``<cue>-01.ogg``... for a one-layer
-cue with variants, ``<cue>-l<layer>-01.ogg``... for a cue with several layers, and ``cues.json`` (``{"buses": ..., "cues": ...}``)
+cue with variants, ``<cue>-l<layer>-01.ogg``... for a cue with several layers, and ``cues.forge`` (``{"buses": ..., "cues": ...}``)
 with every cue's layers and settings.  Stale ``.ogg`` files in the output folder are removed.
 """
 from __future__ import annotations
@@ -44,7 +44,7 @@ def sha256(path: Path) -> str:
 
 
 def render_rules(cue: dict[str, object]) -> dict[str, object]:
-    """The cue_render rules of one sources.json cue."""
+    """The cue_render rules of one sources.forge cue."""
     rules: dict[str, object] = {"loop": bool(cue.get("loop"))}
     for key in ("leadIn", "exact"):
         if key in cue:
@@ -112,15 +112,15 @@ def validate_document(document: dict[str, object]) -> None:
 
 # ForgeAudio's global categories: every bus names one, and a bus ducks categories.
 CATEGORIES = ("ui", "weapon", "explosion", "debris", "ambience", "voice", "vehicle", "device", "music")
-# sources.json cue fields that are AudioKit cue settings, with their cues.json names.
+# sources.forge cue fields that are AudioKit cue settings, with their cues.forge names.
 SETTINGS = ("gain", "loop", "priority", "maxVoices", "maxPerEmitter", "minInterval", "environment", "maxSeconds", "bus")
-# A layer's own AudioKit settings (sources.json ``layers`` entries, beside the layer's ``sources``).
+# A layer's own AudioKit settings (sources.forge ``layers`` entries, beside the layer's ``sources``).
 LAYER_SETTINGS = ("offsetMs", "gain", "gainDb", "range", "fadeInMs", "fadeOutMs", "pitch", "distance", "lowpassHz")
 PLACE = {"2d": "2d", "3d": "auto"}
 
 
 def cue_settings(cue: dict[str, object], clips: list[list[str]]) -> dict[str, object]:
-    """The cues.json entry for one sources.json cue; ``clips`` lists the staged clip files of each of its layers."""
+    """The cues.forge entry for one sources.forge cue; ``clips`` lists the staged clip files of each of its layers."""
     settings: dict[str, object] = {}
     for key in SETTINGS:
         if key in cue:
@@ -222,7 +222,7 @@ def stage(sources_path: Path, library_root: Path, output_root: Path, quality: fl
         if stale.name not in written:
             stale.unlink()
     settings = {cue["id"]: cue_settings(cue, clips_of[cue["id"]]) for cue in document["cues"]}
-    settings_path = output_root / "cues.json"
+    settings_path = output_root / "cues.forge"
     write_json(settings_path, {"buses": document.get("buses", {}), "cues": settings})
     return {"settings": str(settings_path), "cues": len(settings), "clips": receipts}
 
@@ -230,7 +230,7 @@ def stage(sources_path: Path, library_root: Path, output_root: Path, quality: fl
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sources", type=Path, required=True)
-    parser.add_argument("--library", type=Path, default=Path(r"<sound library>"))
+    parser.add_argument("--library", type=Path, default=Path(r"F:\音效库"))
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--quality", type=float, default=4.0)
     args = parser.parse_args()

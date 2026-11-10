@@ -88,14 +88,14 @@ public sealed class OrdnanceDrop
         if (t < 1f)
         {
             try { _style.OnFall?.Invoke(t); }
-            catch (Exception error) { Plugin.Error("A drop's fall callback failed: " + error); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("A drop's fall callback failed: " + error); }
             return;
         }
         Landed = Done = true;
         if (_quiet) return;
         OrdnanceArrival.Impact(_body, _landing, _style.Impact);
         try { _style.OnLanded?.Invoke(); }
-        catch (Exception error) { Plugin.Error("A drop's landing callback failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("A drop's landing callback failed: " + error); }
     }
 }
 
@@ -145,7 +145,7 @@ public static class OrdnanceArrival
         {
             var drop = Drops[i];
             try { drop.Tick(); }
-            catch (Exception error) { Plugin.Error("A drop failed and was removed: " + error); drop.Cancel(); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("A drop failed and was removed: " + error); drop.Cancel(); }
             if (drop.Done) Drops.RemoveAt(i);
         }
     }

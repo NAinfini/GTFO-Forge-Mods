@@ -40,10 +40,12 @@ public readonly struct ClaimVerdict
 /// <see cref="Installed"/> or <see cref="Failed"/>.</summary>
 public sealed class ClaimInstall
 {
-    internal ClaimInstall(ulong summoner, uint throwId, uint attempt) { Summoner = summoner; ThrowId = throwId; Attempt = attempt; }
+    internal ClaimInstall(ulong summoner, uint throwId, uint attempt, int bay = 0) { Summoner = summoner; ThrowId = throwId; Attempt = attempt; Bay = bay; }
 
     public ulong Summoner { get; }
     public uint ThrowId { get; }
+    /// <summary>The pod's weapon bay of the claimed thing.</summary>
+    public int Bay { get; }
     /// <summary>This player's sequence number of the claim.</summary>
     public uint Attempt { get; }
 
@@ -118,6 +120,10 @@ public sealed class OrdnanceClaimable
     public bool IsOpen => Open;
     /// <summary>True once someone took it.</summary>
     public bool IsTaken => Taken;
+    /// <summary>True while players can aim at it and the host takes requests for it: its pod has been open for <see cref="DeliveryTiming.ItemsAfterOpen"/>
+    /// (the moment <see cref="OrdnancePod.AddClaimable"/> documents as the host's opening), it is not taken and not withdrawn. A host that takes over after a host
+    /// change calls <see cref="OrdnanceDelivery.HostOpenClaim"/> for the claimables that are ready.</summary>
+    public bool IsReady => Ready(Time.time);
 
     /// <summary>Takes it out of play now on this peer (it can no longer be aimed at or claimed, and <see cref="ClaimableSpec.Removed"/> runs), for
     /// example when its owner finds it cannot be kept. A pod's departure and a taking do this by themselves.</summary>
@@ -127,8 +133,12 @@ public sealed class OrdnanceClaimable
     internal OrdnancePod? Pod { get; }
     internal int Bay { get; }
     internal Vector3 Fallback { get; }
+    /// <summary>When it can be aimed at and requested: a pod's claimable <see cref="DeliveryTiming.ItemsAfterOpen"/> after its doors began to open (when the host
+    /// opens it), one without a pod at its own open time.</summary>
     internal float OpenAt;
     internal bool Open, Taken, Gone;
+    /// <summary>True while it can be taken now: open (its pod has opened), not taken, not withdrawn.</summary>
+    internal bool Ready(float now) => !Gone && !Taken && (Pod == null || Open) && now >= OpenAt;
     internal ulong PendingPlayer;
     internal uint Attempt;
     internal float Expires;
@@ -143,6 +153,8 @@ public sealed class OrdnanceClaimable
 internal static class OrdnanceClaims
 {
     private const float ReachMetres = 2.4f;
+    /// <summary>How much farther the host lets a claimant stand than the claimant's own reach: the host sees the claimant's eye a network delay late.</summary>
+    private const float ReachLag = 0.6f;
     private const float AimDot = 0.92f;
     /// <summary>How long the claimant has to install and report; the reservation lapses after this and a little more.</summary>
     private const float InstallSeconds = 8f;
@@ -168,54 +180,89 @@ internal static class OrdnanceClaims
             claimable.OpenAt = Time.time + Math.Max(0f, openAfter);
             return claimable;
         }
-        if (pod.IsOpen) Opened(claimable);
-        else pod.Opened += () => Opened(claimable);
+        if (pod.IsOpen) Opened(claimable, 0f);
+        else pod.Opened += () => Opened(claimable, DeliveryTiming.ItemsAfterOpen);
         pod.Left += () => Remove(claimable);
         return claimable;
     }
 
-    private static void Opened(OrdnanceClaimable claimable)
+    private static void Opened(OrdnanceClaimable claimable, float after)
     {
         if (claimable.Gone || claimable.Open) return;
         claimable.Open = true;
+        claimable.OpenAt = Time.time + after;
         Run(claimable.Spec.Opened, "opened");
     }
 
     internal static void Remove(OrdnanceClaimable claimable)
     {
         if (claimable.Gone) return;
-        if (SNet.IsMaster && claimable.PendingPlayer != 0) Cancel(claimable, claimable.PendingPlayer, claimable.Attempt);
+        if (ForgeCore.Session.IsHost && claimable.PendingPlayer != 0) Cancel(claimable, claimable.PendingPlayer, claimable.Attempt);
         claimable.Gone = true;
-        Book.Close(claimable.Summoner, claimable.ThrowId);
+        Book.Close(claimable.Summoner, claimable.ThrowId, claimable.Bay);
         All.Remove(claimable);
         Run(claimable.Spec.Removed, "removed");
     }
 
-    private static OrdnanceClaimable? Find(ulong summoner, uint throwId)
+    private static OrdnanceClaimable? Find(ulong summoner, uint throwId, int bay)
     {
-        foreach (var c in All) if (c.Summoner == summoner && c.ThrowId == throwId) return c;
+        foreach (var c in All) if (c.Summoner == summoner && c.ThrowId == throwId && c.Bay == bay) return c;
         return null;
     }
 
     /// <summary>Host: the claim can be requested from now on.</summary>
-    internal static void HostOpen(ulong summoner, uint throwId) => Book.Open(summoner, throwId);
+    internal static void HostOpen(ulong summoner, uint throwId, int bay = 0) => Book.Open(summoner, throwId, bay);
 
-    /// <summary>Everything in flight is dropped: level exit, checkpoint reload and host change void every delivery.</summary>
+    /// <summary>Everything in flight is dropped: level exit and checkpoint reload void every delivery. Each claimable still standing is told
+    /// (<see cref="ClaimableSpec.Removed"/>), and an install in progress is told it is cancelled.</summary>
     internal static void Clear()
     {
+        var standing = All.ToArray();
         All.Clear();
+        Book.Clear();
+        Prompt?.Hide();
+        var ours = _ours;
+        _ours = null;
+        _requestedAt = -10f;
+        foreach (var c in standing)
+        {
+            if (c.Gone) continue;
+            c.Gone = true;
+            if (ours != null && ours.Summoner == c.Summoner && ours.ThrowId == c.ThrowId && ours.Bay == c.Bay) Run(c.Spec.Cancelled, ours, "cancelled");
+            Run(c.Spec.Removed, "removed");
+        }
+    }
+
+    /// <summary>A host change: the claimables still lying there stay, with every reservation void (the new host's book starts empty and
+    /// the claiming package opens what is open again, <see cref="OrdnanceClaimable.Ready"/>).</summary>
+    internal static void HostChanged()
+    {
         Book.Clear();
         Prompt?.Hide();
         _ours = null;
         _requestedAt = -10f;
+        foreach (var c in All)
+        {
+            c.PendingPlayer = 0;
+            c.Attempt = 0;
+            c.Installed = false;
+        }
+    }
+
+    /// <summary>True while an untaken claimable of this call lies in a pod.</summary>
+    internal static bool HoldsPod(ulong summoner, uint throwId)
+    {
+        foreach (var c in All)
+            if (!c.Gone && !c.Taken && c.Pod != null && c.Summoner == summoner && c.ThrowId == throwId) return true;
+        return false;
     }
 
     // ---- the host -----------------------------------------------------------------------------------------------
 
     internal static void OnRequest(ulong sender, ClaimMessage m)
     {
-        if (!SNet.IsMaster) return;
-        var c = Find(m.Thrower, m.ThrowId);
+        if (!ForgeCore.Session.IsHost) return;
+        var c = Find(m.Thrower, m.ThrowId, m.Bay);
         if (c == null || c.Taken) return;
         switch (m.Action)
         {
@@ -223,7 +270,7 @@ internal static class OrdnanceClaims
                 Cancel(c, sender, m.Attempt);
                 return;
             case ClaimMessage.Installed:
-                if (Book.Matches(m.Thrower, m.ThrowId, sender, m.Attempt)) c.Installed = true;
+                if (Book.Matches(m.Thrower, m.ThrowId, m.Bay, sender, m.Attempt)) c.Installed = true;
                 CheckInstall(c);
                 return;
             case ClaimMessage.Request:
@@ -235,17 +282,15 @@ internal static class OrdnanceClaims
     private static void Reserve(OrdnanceClaimable c, ulong player, uint attempt)
     {
         var agent = ForgeCore.Level.PlayerByLookup(player);
-        if (agent == null || !agent.Alive || !((agent.EyePosition - c.Position).sqrMagnitude <= ReachMetres * ReachMetres)
-            || !Book.TryClaim(c.Summoner, c.ThrowId, player, attempt))
-        {
-            return;
-        }
+        if (agent == null || !agent.Alive || !((agent.EyePosition - c.Position).sqrMagnitude <= (ReachMetres + ReachLag) * (ReachMetres + ReachLag))
+            || !Book.TryClaim(c.Summoner, c.ThrowId, c.Bay, player, attempt)) return;
         string? refusal = null;
         try { refusal = c.Spec.HostCheck?.Invoke(agent); }
         catch (Exception error) { refusal = "its check failed: " + error; }
         if (refusal != null)
         {
-            Book.Cancel(c.Summoner, c.ThrowId, player, attempt);
+            Plugin.Logger.Error("A claim was refused: " + refusal);
+            Cancel(c, player, attempt);
             return;
         }
         c.PendingPlayer = player;
@@ -266,24 +311,25 @@ internal static class OrdnanceClaims
         try { verdict = c.Spec.HostVerify(agent); }
         catch (Exception error)
         {
-            Plugin.Error("Verifying a claim failed: " + error);
+            Plugin.Logger.ErrorOnce("Verifying a claim failed: " + error);
             Cancel(c, player, attempt);
             return;
         }
         if (verdict.Kind == 0) return;
         if (verdict.Kind == 1)
         {
+            Plugin.Logger.Error("A claim was refused after it was installed: " + verdict.Reason);
             Cancel(c, player, attempt);
             return;
         }
-        if (!Book.Confirm(c.Summoner, c.ThrowId, player, attempt)) return;
+        if (!Book.Confirm(c.Summoner, c.ThrowId, c.Bay, player, attempt)) return;
         c.PendingPlayer = 0;
         Announce(c, ClaimStateMessage.Committed, player, attempt, verdict.Token);
     }
 
     private static void Cancel(OrdnanceClaimable c, ulong player, uint attempt)
     {
-        if (!Book.Cancel(c.Summoner, c.ThrowId, player, attempt)) return;
+        if (!Book.Cancel(c.Summoner, c.ThrowId, c.Bay, player, attempt)) return;
         c.PendingPlayer = 0;
         c.Installed = false;
         Announce(c, ClaimStateMessage.Cancelled, player, attempt, Guid.Empty);
@@ -292,7 +338,7 @@ internal static class OrdnanceClaims
     /// <summary>Tells every peer, and applies it here (the host is a peer too).</summary>
     private static void Announce(OrdnanceClaimable c, byte state, ulong player, uint attempt, Guid token)
     {
-        var message = new ClaimStateMessage { Thrower = c.Summoner, ThrowId = c.ThrowId, Player = player, Attempt = attempt, State = state, Token = token };
+        var message = new ClaimStateMessage { Thrower = c.Summoner, ThrowId = c.ThrowId, Player = player, Attempt = attempt, State = state, Token = token, Bay = (byte)c.Bay };
         OrdnanceNetwork.Broadcast(Messages.ClaimStateEvent, message);
         OnState(message);
     }
@@ -301,7 +347,7 @@ internal static class OrdnanceClaims
 
     internal static void OnState(ClaimStateMessage m)
     {
-        var c = Find(m.Thrower, m.ThrowId);
+        var c = Find(m.Thrower, m.ThrowId, m.Bay);
         var ours = _ours != null && SNet.LocalPlayer?.Lookup == m.Player && _ours.Summoner == m.Thrower && _ours.ThrowId == m.ThrowId && _ours.Attempt == m.Attempt;
         switch (m.State)
         {
@@ -313,7 +359,7 @@ internal static class OrdnanceClaims
                 try { c.Spec.Install(_ours!); }
                 catch (Exception error)
                 {
-                    Plugin.Error("Installing a claim failed: " + error);
+                    Plugin.Logger.ErrorOnce("Installing a claim failed: " + error);
                     _ours!.Failed();
                 }
                 return;
@@ -328,7 +374,7 @@ internal static class OrdnanceClaims
                 if (c.Spec.Committed is { } committed)
                 {
                     try { committed(new ClaimResult(m.Player, m.Attempt, m.Token, ours)); }
-                    catch (Exception error) { Plugin.Error("A claim's committed handler failed: " + error); }
+                    catch (Exception error) { Plugin.Logger.ErrorOnce("A claim's committed handler failed: " + error); }
                 }
                 if (c.Pod == null) Remove(c);
                 return;
@@ -340,14 +386,14 @@ internal static class OrdnanceClaims
     internal static void Report(ClaimInstall claim, byte action)
     {
         if (SNet.LocalPlayer == null) return;
-        var message = new ClaimMessage { Thrower = claim.Summoner, ThrowId = claim.ThrowId, Attempt = claim.Attempt, Action = action };
-        if (SNet.IsMaster) OnRequest(SNet.LocalPlayer.Lookup, message);
+        var message = new ClaimMessage { Thrower = claim.Summoner, ThrowId = claim.ThrowId, Attempt = claim.Attempt, Action = action, Bay = (byte)claim.Bay };
+        if (ForgeCore.Session.IsHost) OnRequest(SNet.LocalPlayer.Lookup, message);
         else if (SNet.Master != null) OrdnanceNetwork.ToHost(Messages.ClaimEvent, message);
     }
 
     internal static void Tick(float now)
     {
-        if (SNet.IsMaster)
+        if (ForgeCore.Session.IsHost)
         {
             for (var i = All.Count - 1; i >= 0; i--)
             {
@@ -359,20 +405,19 @@ internal static class OrdnanceClaims
         }
         if (All.Count == 0 && !(Prompt?.IsShown ?? false)) return;
         try { Aim(now); }
-        catch (Exception error) { Plugin.Error("The claim prompt failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("The claim prompt failed: " + error); }
     }
 
     private static void Aim(float now)
     {
-        var agent = PlayerManager.GetLocalPlayerAgent();
+        var agent = ForgeCore.Players.Local;
         OrdnanceClaimable? aimed = null;
         if (agent != null && !agent.WasCollected && agent.Alive && FocusStateManager.CurrentState == eFocusState.FPS && All.Count != 0)
         {
             var eye = agent.FPSCamera.transform;
             foreach (var c in All)
             {
-                if (c.Taken || c.PendingPlayer != 0) continue;
-                if (!c.Open && (c.Pod != null || now < c.OpenAt)) continue;
+                if (c.PendingPlayer != 0 || !c.Ready(now)) continue;
                 var offset = c.Position - eye.position;
                 if (offset.sqrMagnitude > ReachMetres * ReachMetres) continue;
                 if (Vector3.Dot(eye.forward, offset.normalized) < AimDot) continue;
@@ -391,9 +436,9 @@ internal static class OrdnanceClaims
         if (!prompt.Claimable || now - _requestedAt < RequestCooldown || !InputMapper.GetButtonDown.Invoke(InputAction.Use, eFocusState.FPS)) return;
         _requestedAt = now;
         if (++_nextAttempt == 0) ++_nextAttempt;
-        _ours = new ClaimInstall(aimed.Summoner, aimed.ThrowId, _nextAttempt);
-        var message = new ClaimMessage { Thrower = aimed.Summoner, ThrowId = aimed.ThrowId, Attempt = _nextAttempt, Action = ClaimMessage.Request };
-        if (SNet.IsMaster) OnRequest(SNet.LocalPlayer.Lookup, message);
+        _ours = new ClaimInstall(aimed.Summoner, aimed.ThrowId, _nextAttempt, aimed.Bay);
+        var message = new ClaimMessage { Thrower = aimed.Summoner, ThrowId = aimed.ThrowId, Attempt = _nextAttempt, Action = ClaimMessage.Request, Bay = (byte)aimed.Bay };
+        if (ForgeCore.Session.IsHost) OnRequest(SNet.LocalPlayer.Lookup, message);
         else OrdnanceNetwork.ToHost(Messages.ClaimEvent, message);
     }
 
@@ -403,13 +448,13 @@ internal static class OrdnanceClaims
     {
         if (handler == null) return;
         try { handler(); }
-        catch (Exception error) { Plugin.Error("A claim's " + what + " handler failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("A claim's " + what + " handler failed: " + error); }
     }
 
     private static void Run(Action<ClaimInstall>? handler, ClaimInstall claim, string what)
     {
         if (handler == null) return;
         try { handler(claim); }
-        catch (Exception error) { Plugin.Error("A claim's " + what + " handler failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("A claim's " + what + " handler failed: " + error); }
     }
 }

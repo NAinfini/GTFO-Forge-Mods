@@ -127,8 +127,7 @@ internal sealed class OrdnanceHud
         if (_items.TryGetValue(definition, out var item)) return item;
         var code = new ArrowDirection[definition.Code.Count];
         for (var i = 0; i < code.Length; i++) code[i] = Arrow(definition.Code[i]);
-        var rgb = definition.CategoryBeamRgb;
-        item = new CommandItem(OrdnanceContent.Name(definition), code, new Color(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f, 1f));
+        item = new CommandItem(OrdnanceContent.Name(definition), code, ForgeCore.Colours.FromRgb(definition.CategoryBeamRgb));
         _items.Add(definition, item);
         return item;
     }

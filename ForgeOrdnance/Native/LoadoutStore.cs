@@ -16,10 +16,10 @@ internal static class LoadoutStore
     internal static void Load()
     {
         var read = ForgeCore.Store.Read<LoadoutSave>(Plugin.Id);
-        if (read.Status == ForgeCore.StoreStatus.Corrupt) Plugin.Report("Saved loadout " + read.Detail + "; starting empty.");
+        if (read.Status == ForgeCore.StoreStatus.Corrupt) Plugin.Logger.Error("Saved loadout " + read.Detail + "; starting empty.");
         var errors = new List<string>();
         _slots = read.Status == ForgeCore.StoreStatus.Read ? LoadoutFile.Clean(read.Value!.Slots, errors) : Array.Empty<string?>();
-        foreach (var error in errors) Plugin.Report("Saved loadout " + read.Detail + ": " + error);
+        foreach (var error in errors) Plugin.Logger.Error("Saved loadout " + read.Detail + ": " + error);
     }
 
     /// <summary>The definition in slot <paramref name="index"/>, or null when empty or not loaded.</summary>
@@ -59,11 +59,8 @@ internal static class LoadoutStore
         for (var i = 0; i < Math.Min(rules.LoadoutSize, _slots.Length); i++)
         {
             if (_slots[i] is not { } id) continue;
-            if (!OrdnanceContent.Set.TryGetById(id, out var definition))
-            {
-                Plugin.Report("Saved loadout slot " + (i + 1) + " names '" + id + "', which is not a loaded call-in definition; it is left out.");
-                continue;
-            }
+            // An Id no loaded definition carries belongs to another rundown's call-ins: normal, kept in the file, empty here (no log).
+            if (!OrdnanceContent.Set.TryGetById(id, out var definition)) continue;
             if (definition.Callable && rules.IsAllowed(definition.Id)) keys.Add(definition.Key);
         }
         return keys;

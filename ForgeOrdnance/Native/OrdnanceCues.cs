@@ -5,7 +5,7 @@ namespace ForgeOrdnance;
 
 /// <summary>Ordnance's sounds: the <c>audio</c> folder next to the DLL, loaded once through ForgeAudio. This class only
 /// decides when and where a sound plays; the cue settings (gain, range, limits, each sound's minimum gap, its group and ducking) live in
-/// <c>audio/cues.json</c>, and AudioKit logs every cue that cannot load or play by name. Dimension of a sound at a point or on an
+/// <c>audio/cues.forge</c>, and AudioKit logs every cue that cannot load or play by name. Dimension of a sound at a point or on an
 /// object is AudioKit's to resolve; looping sounds on objects are AudioKit sustains.</summary>
 internal static class OrdnanceCues
 {
@@ -17,7 +17,7 @@ internal static class OrdnanceCues
     {
         "ui.key_up", "ui.key_down", "ui.key_left", "ui.key_right", "ui.key_wrong", "ui.code_complete", "ui.call_open", "ui.call_cancel",
         "ui.denied", "ui.click", "ui.slot_select", "ui.pick_confirm", "ui.pick_clear", "beacon.throw", "beacon.land", "beacon.tick",
-        "drop.unlatch", "drop.leave", "drop.debris",
+        "drop.unlatch", "drop.leave", "drop.debris", "turret.lid_blast",
     };
 
     internal static void Load()
@@ -25,9 +25,9 @@ internal static class OrdnanceCues
         _sounds ??= AudioKit.Load(Plugin.Id);
     }
 
-    internal static void Attach(string cue, GameObject owner, int? dimension = null)
+    internal static void Attach(string cue, GameObject owner, int? dimension = null, float start = 0f)
     {
-        _sounds?.Play(cue, owner, dimension == null ? null : new PlayOptions { Dimension = dimension });
+        _sounds?.Play(cue, owner, dimension == null && start <= 0f ? null : new PlayOptions { Dimension = dimension, StartSeconds = start });
     }
 
     internal static void At(string cue, Vector3 position) => _sounds?.Play(cue, position);

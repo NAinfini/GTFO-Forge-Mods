@@ -10,12 +10,12 @@ namespace ForgeOrdnance;
 
 /// <summary>The definitions and level rules. Definitions come from every <c>ForgeOrdnance</c> folder under <c>BepInEx/plugins</c>
 /// (content mods and loose files) and from the active rundown's <c>CustomPath/ForgeOrdnance</c>; the level rules
-/// (<c>Settings.json</c>) come only from the rundown. A definition folder may hold a <c>lang</c> folder of language files whose
+/// (<c>Settings.forge</c>) come only from the rundown. A definition folder may hold a <c>lang</c> folder of language files whose
 /// <c>&lt;Id&gt;.Name</c> and <c>&lt;Id&gt;.Description</c> texts are shown instead of the file's <c>Name</c> and <c>Description</c>.</summary>
 internal static class OrdnanceContent
 {
     internal const string FolderName = "ForgeOrdnance";
-    internal const string SettingsFile = "Settings.json";
+    internal const string SettingsFile = "Settings.forge";
     internal const string LanguageFolder = "lang";
 
     internal static DefinitionSet Set { get; private set; } = DefinitionSet.Empty;
@@ -58,7 +58,7 @@ internal static class OrdnanceContent
             var languageFolder = Path.Combine(folder, LanguageFolder);
             var folderTexts = Directory.Exists(languageFolder) ? UIKit.Texts(languageFolder) : null;
             string[] files;
-            try { files = Directory.GetFiles(folder, "*.json"); }
+            try { files = Directory.GetFiles(folder, "*.forge"); }
             catch (Exception error) { errors.Add(Shown(folder) + ": could not enumerate definition files: " + error); continue; }
             foreach (var path in files.OrderBy(p => Path.GetFileName(p), StringComparer.Ordinal))
             {
@@ -113,15 +113,15 @@ internal static class OrdnanceContent
                 var settingsErrors = new List<string>();
                 var parsed = OrdnanceSettings.Parse(File.ReadAllText(settingsPath), settingsErrors);
                 errors.AddRange(settingsErrors.Select(error => Shown(settingsPath) + ": " + error));
-                if (parsed == null) errors.Add(Shown(settingsPath) + ": ignored because of the errors above; default rules apply.");
+                if (parsed == null) errors.Add(Shown(settingsPath) + ": ignored; default rules apply.");
                 else fileSettings = parsed;
             }
             catch (Exception error) { errors.Add(Shown(settingsPath) + ": could not be read: " + error + "; default rules apply."); }
         }
         // The file's rules and the levels plugins declared become one effective setting, checked the same way.
-        Settings = fileSettings.WithDeclared(OrdnanceApi.DeclaredLevels, errors).WithUsableDrops(Set, OrdnanceApi.SupportsDirect, errors);
+        Settings = fileSettings.WithDeclared(OrdnanceApi.DeclaredLevels, errors).WithUsable(Set, OrdnanceApi.SupportsDirect, OrdnanceApi.CheckOverrides, errors);
         foreach (var id in Settings.UnknownAllowed(Set)) errors.Add("Level rules Allowed: '" + id + "' is not a loaded definition.");
-        foreach (var error in errors) Plugin.Report(error);
+        foreach (var error in errors) Plugin.Logger.Error(error);
         LobbyRules.Invalidate();
         OrdnanceApi.RaiseDefinitionsReady();
     }
@@ -145,7 +145,6 @@ internal static class OrdnanceContent
     /// <summary>The expedition selected by the local game, or null before one is available.</summary>
     internal static string? SelectedLevelKey()
     {
-        try { return RundownManager.ActiveExpeditionUniqueKey; }
-        catch (Exception) { return null; }
+        return ForgeCore.Level.ActiveKey;
     }
 }

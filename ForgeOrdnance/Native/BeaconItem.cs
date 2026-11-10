@@ -3,7 +3,6 @@ using ForgeCore;
 using GameData;
 using HarmonyLib;
 using Player;
-using SNetwork;
 using UnityEngine;
 
 namespace ForgeOrdnance;
@@ -22,7 +21,7 @@ internal readonly record struct BeaconSpawn(Item Item, ulong Owner, Vector3 Posi
 /// </summary>
 internal static class BeaconItem
 {
-    /// <summary>Fixed 16-bit wire id, reserved only after checking the block and all loaded item prefab tables.</summary>
+    /// <summary>Fixed 16-bit wire id; <c>DataBlocks.Add</c> refuses it when the block table or a built item prefab table holds it.</summary>
     internal const uint BlockId = Messages.BeaconItemId;
     internal const string BlockName = "FORGE_ORDNANCE_Beacon";
     private const uint GlowStickId = 114;
@@ -42,12 +41,12 @@ internal static class BeaconItem
     {
         if (data.itemID_gearCRC != BlockId) return;
         var observed = ThrowCallback?.Invoke();
-        if (observed == null) { Plugin.Error("A summoning ball throw had no active local call to bind."); return; }
+        if (observed == null) { Plugin.Logger.ErrorOnce("A summoning ball throw had no active local call to bind."); return; }
         var original = callback;
         callback = new Action<ISyncedItem, PlayerAgent>((item, owner) =>
         {
             try { observed(item, owner); }
-            catch (Exception error) { Plugin.Error("Identifying a thrown summoning ball failed: " + error); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("Identifying a thrown summoning ball failed: " + error); }
             if (original != null) original.Invoke(item, owner);
         });
     }
@@ -67,14 +66,6 @@ internal static class BeaconItem
             }
             if (existing != null)
                 throw new InvalidOperationException("item id " + BlockId + " is already used by '" + existing.name + "'");
-            var tables = ItemSpawnManager.m_loadedPrefabsPerItemMode;
-            if (tables != null)
-                for (var mode = 0; mode < tables.Length; mode++)
-                {
-                    var table = tables[mode];
-                    if (table != null && table.ContainsKey(BlockId))
-                        throw new InvalidOperationException("item prefab id " + BlockId + " is already registered in mode " + mode);
-                }
             var source = ItemDataBlock.GetBlock(GlowStickId);
             if (source == null) throw new InvalidOperationException("the glow stick item block " + GlowStickId + " does not exist");
             var block = DataBlocks.Clone(source, BlockName, BlockId);
@@ -92,7 +83,7 @@ internal static class BeaconItem
         {
             Ready = false;
             Failure = "the summoning ball item could not be registered (" + error + ")";
-            Plugin.Error("Forge Ordnance: " + Failure + "; call-ins are disabled.");
+            Plugin.Logger.ErrorOnce("Forge Ordnance: " + Failure + "; call-ins are disabled.");
         }
     }
 
@@ -100,7 +91,7 @@ internal static class BeaconItem
     {
         if (spawnData.itemData.itemID_gearCRC != BlockId) return;
         var item = replicator?.Item;
-        if (replicator == null || item == null || item.WasCollected) { Plugin.Error("A summoning ball spawned without an item instance."); return; }
+        if (replicator == null || item == null || item.WasCollected) { Plugin.Logger.ErrorOnce("A summoning ball spawned without an item instance."); return; }
         ulong owner = 0UL;
         if (spawnData.owner.TryGetPlayer(out var player) && player != null) owner = player.Lookup;
         var id = new SNetwork.SNetStructs.pReplicator();
@@ -116,7 +107,7 @@ internal static class BeaconSpawnHook
     internal static void OnSpawned(pItemSpawnData spawnData, ItemReplicator replicator)
     {
         try { BeaconItem.NotifySpawn(spawnData, replicator); }
-        catch (Exception error) { Plugin.Error("Summoning ball spawn hook failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Summoning ball spawn hook failed: " + error); }
     }
 }
 

@@ -29,14 +29,34 @@ public interface IOrdnancePayload : IOrdnancePayloadParser
     /// error, when the definitions load.</summary>
     bool SupportsDirect => false;
 
+    /// <summary>The numbers a placement may set for this payload type (<c>Overrides</c> of a level drop, <see cref="OrdnanceApi.Place"/>): name,
+    /// range, whole or not. The framework refuses anything else with an error before the call is scheduled and hands the accepted values to
+    /// <see cref="OrdnanceExecution.Overrides"/> on the host; the payload applies them and sends what the other peers need through its own
+    /// per-call state (<see cref="OrdnanceApi.SendState"/>). Empty (the default): this type takes no overrides.</summary>
+    IReadOnlyList<OrdnanceOverrideField> OverrideFields => Array.Empty<OrdnanceOverrideField>();
+
+    /// <summary>The check only this payload can make on accepted <paramref name="overrides"/> against the definition's parsed
+    /// <paramref name="parameters"/> (a value above what the definition allows): a reason, or null when they are fine. Runs when the
+    /// settings load and again in <see cref="OrdnanceApi.Place"/>.</summary>
+    string? CheckOverrides(object parameters, IReadOnlyDictionary<string, double> overrides) => null;
+
     /// <summary>Custom pod art for this definition, or null for the built-in pod. Called by StartPod and late-join
     /// replay. Return the same cached appearance on every peer; load its bundle before arrivals can be received.</summary>
     OrdnancePodAppearance? GetPodAppearance(OrdnanceDefinition definition) => null;
+
+    /// <summary>The turret shell's burrow, head and lifetime for this definition, which <see cref="OrdnanceDelivery.StartShell"/> and
+    /// late-join replay use. Null gives the plain shell: it bores in, throws its lids and sinks away again, nothing rises. Return the same on every peer.</summary>
+    OrdnanceShellAppearance? GetShellAppearance(OrdnanceDefinition definition) => null;
 
     /// <summary>Runs on every peer (the host included) for data the host sent with <see cref="OrdnanceApi.SendData"/> for a call
     /// of this payload type. Recovery epochs reject earlier-level/recovery traffic; within the current epoch check
     /// <see cref="OrdnanceDelivery.FindPod"/> or your own state before updating a finished call.</summary>
     void OnData(OrdnancePayloadData data) { }
+
+    /// <summary>Host: called for each kept <see cref="OrdnanceApi.SendState"/> state just before it is replayed to a player who joins
+    /// later; returns the bytes to replay. A state that holds times relative to when it was sent (seconds left) must be rebuilt from the
+    /// payload's current record here, or the late joiner starts those clocks over. The default replays <paramref name="data"/> as kept.</summary>
+    byte[] RefreshState(ulong summonerLookup, uint throwId, byte tag, byte[] data) => data;
 }
 
 /// <summary>What <see cref="IOrdnancePayload.OnData"/> receives.</summary>
@@ -64,7 +84,7 @@ public sealed class OrdnanceCallBlock : IDisposable
 {
     internal OrdnanceCallBlock(string reason) => Reason = reason;
 
-    /// <summary>Shown in the log when the call key is pressed while blocked.</summary>
+    /// <summary>Who holds the block and why, for whoever reads the code or a dump; a press while blocked is ignored without a log line.</summary>
     public string Reason { get; }
     public bool Active => OrdnanceApi.Blocks.Contains(this);
 
@@ -76,10 +96,15 @@ public sealed class OrdnanceCallBlock : IDisposable
 public sealed class OrdnanceExecution
 {
     internal OrdnanceExecution(OrdnanceDefinition definition, Vector3 position, Quaternion rotation, AIG_CourseNode node, PlayerAgent? summoner, ulong summonerLookup, uint throwId,
-        OrdnanceArrivalMode arrival)
+        OrdnanceArrivalMode arrival, IReadOnlyDictionary<string, double>? overrides = null)
     {
         Definition = definition; Position = position; Rotation = rotation; CourseNode = node; Summoner = summoner; SummonerLookup = summonerLookup; ThrowId = throwId; Arrival = arrival;
+        Overrides = overrides ?? OverrideCheck.None;
     }
+
+    /// <summary>The numbers this placement set (<see cref="IOrdnancePayload.OverrideFields"/>), already checked; empty for a player's call and for a drop that sets none.
+    /// Host only: other peers get what they need from the payload's own state.</summary>
+    public IReadOnlyDictionary<string, double> Overrides { get; }
 
     public OrdnanceDefinition Definition { get; }
     /// <summary>What <see cref="IOrdnancePayloadParser.Parse"/> returned for this definition.</summary>
@@ -146,7 +171,7 @@ public static class OrdnanceApi
         foreach (Action handler in PickedParametersChanged.GetInvocationList())
         {
             try { handler(); }
-            catch (Exception error) { Plugin.Error("A PickedParametersChanged handler failed: " + error); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("A PickedParametersChanged handler failed: " + error); }
         }
     }
 
@@ -186,7 +211,7 @@ public static class OrdnanceApi
         foreach (Action handler in DefinitionsReady.GetInvocationList())
         {
             try { handler(); }
-            catch (Exception error) { Plugin.Error("A DefinitionsReady handler failed: " + error); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("A DefinitionsReady handler failed: " + error); }
         }
     }
 
@@ -216,7 +241,7 @@ public static class OrdnanceApi
         else if (ByKey.ContainsKey(ForgeCore.Fnv.Hash32(type))) refusal = "the name has the same network hash as another registered type; choose another name";
         if (refusal != null)
         {
-            Plugin.Report("Payload type '" + type + "' from '" + owner + "' refused: " + refusal + ".");
+            Plugin.Logger.Error("Payload type '" + type + "' from '" + owner + "' refused: " + refusal + ".");
             return false;
         }
         Registry.Register(type, payload);
@@ -241,7 +266,7 @@ public static class OrdnanceApi
         }
         catch (Exception error) when (error is ArgumentException or InvalidOperationException)
         {
-            Plugin.Report("Category '" + id + "' refused: " + error.Message.TrimEnd('.') + ".");
+            Plugin.Logger.Error("Category '" + id + "' refused: " + error.Message.TrimEnd('.') + ".");
             return false;
         }
         return true;
@@ -257,13 +282,13 @@ public static class OrdnanceApi
     private static bool Send(string payloadType, ulong summonerLookup, uint throwId, byte tag, byte[] data, bool retain)
     {
         if (data == null) throw new ArgumentNullException(nameof(data));
-        if (!SNetwork.SNet.IsMaster) throw new InvalidOperationException("SendData is host only.");
+        if (!ForgeCore.Session.IsHost) throw new InvalidOperationException("SendData is host only.");
         if (!Payloads.TryGetValue(payloadType, out var payload)) throw new ArgumentException("Payload type '" + payloadType + "' is not registered.", nameof(payloadType));
         var message = PayloadDataMessage.From(summonerLookup, throwId, ForgeCore.Fnv.Hash32(payloadType), tag, data);
         var kept = !retain || Retained.Set(message);
         if (!kept)
         {
-            Plugin.Error("Payload '" + payloadType + "' state for throw " + throwId + " refused: the host already keeps " + RetainedData.Capacity + " states; clear finished calls with ClearState. Nothing was dispatched.");
+            Plugin.Logger.ErrorOnce("Payload '" + payloadType + "' state for throw " + throwId + " refused: the host already keeps " + RetainedData.Capacity + " states; clear finished calls with ClearState. Nothing was dispatched.");
             return false;
         }
         OrdnanceNetwork.Broadcast(Messages.PayloadDataEvent, message);
@@ -286,12 +311,28 @@ public static class OrdnanceApi
     /// players who join afterwards see nothing of it.</summary>
     public static void ClearState(string payloadType, ulong summonerLookup, uint throwId)
     {
-        if (!SNetwork.SNet.IsMaster) throw new InvalidOperationException("ClearState is host only.");
+        if (!ForgeCore.Session.IsHost) throw new InvalidOperationException("ClearState is host only.");
         Retained.Clear(ForgeCore.Fnv.Hash32(payloadType), summonerLookup, throwId);
     }
 
+    /// <summary>Host only: a call that found nothing to do gives its use back and keeps only <paramref name="cooldownSeconds"/> of its cooldown (never more than it had);
+    /// every peer's list shows the change.</summary>
+    public static void RefundCall(ulong summonerLookup, OrdnanceDefinition definition, double cooldownSeconds)
+    {
+        if (definition == null) throw new ArgumentNullException(nameof(definition));
+        if (!ForgeCore.Session.IsHost) throw new InvalidOperationException("RefundCall is host only.");
+        Plugin.Session.RefundCall(summonerLookup, definition.Key, cooldownSeconds);
+    }
+
+    /// <summary>Shows <paramref name="text"/> to this player on the call-in list, with the list's notice sound.</summary>
+    public static void PostNotice(string text) => Plugin.Session.PostNotice(text);
+
     /// <summary>The most states <see cref="SendState"/> keeps at once on the host.</summary>
     public const int MaxKeptStates = RetainedData.Capacity;
+
+    /// <summary>The world epoch ForgeOrdnance follows (the host mints one for each level start, checkpoint reload and host change; clients adopt it);
+    /// 0 while no world is up. An add-on stamps its own request messages with it and drops those of another value, as ForgeOrdnance's own messages are.</summary>
+    public static ulong WorldEpoch => OrdnanceNetwork.Epoch;
 
     /// <summary>The name of <paramref name="definition"/> in the player's current language: its folder's <c>&lt;Id&gt;.Name</c> text, else
     /// the file's <c>Name</c>. Use it wherever you show a call-in (a HUD line, a prompt); do not read <see cref="OrdnanceDefinition.Name"/>.</summary>
@@ -301,20 +342,23 @@ public static class OrdnanceApi
     internal static readonly Dictionary<string, OrdnanceLevelRules> DeclaredLevels = new(StringComparer.Ordinal);
 
     /// <summary>Gives the level whose expedition key is <paramref name="levelKey"/> its ordnance rules from code, as an add-on's own
-    /// level would write them in <c>Settings.json</c> <c>Levels.&lt;key&gt;</c> (turn the call menu off, drop a call-in at level start).
-    /// Call it from your plugin's <c>Load</c>, before definition files are read; it is merged with <c>Settings.json</c> into one effective
+    /// level would write them in <c>Settings.forge</c> <c>Levels.&lt;key&gt;</c> (turn the call menu off, drop a call-in at level start).
+    /// Call it from your plugin's <c>Load</c>, before definition files are read; it is merged with <c>Settings.forge</c> into one effective
     /// setting and checked the same way. <paramref name="rules"/> is the whole rule set of the level (fields you leave out have
     /// their defaults; nothing is inherited from the file's global rules). Returns false, with one error in the log, when
     /// the rules are invalid, the key is already declared by another call, or definitions are already loaded. A key that
-    /// <c>Settings.json</c> also sets is reported when definitions load and the file wins.</summary>
+    /// <c>Settings.forge</c> also sets is reported when definitions load and the file wins.</summary>
     public static bool DeclareLevel(string levelKey, OrdnanceLevelRules rules)
     {
         if (rules == null) throw new ArgumentNullException(nameof(rules));
         // A copy, lists included: what the caller changes afterwards must not change the level (drops are immutable records).
-        rules = new OrdnanceLevelRules
+        rules = rules with
         {
-            LoadoutSize = rules.LoadoutSize, Allowed = rules.Allowed == null ? null : System.Linq.Enumerable.ToArray(rules.Allowed), CooldownMultiplier = rules.CooldownMultiplier, UsesMultiplier = rules.UsesMultiplier,
-            MaxThrowDistance = rules.MaxThrowDistance, CallMenu = rules.CallMenu, Drops = System.Linq.Enumerable.ToArray(rules.Drops ?? Array.Empty<OrdnanceLevelDrop>())
+            Allowed = rules.Allowed == null ? null : System.Linq.Enumerable.ToArray(rules.Allowed),
+            // A drop's Overrides dictionary is the caller's too: the scheduler keeps what was checked here, not the caller's later edits.
+            Drops = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(rules.Drops ?? Array.Empty<OrdnanceLevelDrop>(),
+                drop => drop.Overrides == null ? drop : drop with { Overrides = new Dictionary<string, double>(drop.Overrides, StringComparer.Ordinal) })),
+            Loadouts = System.Linq.Enumerable.ToDictionary(rules.Loadouts ?? AuthoredLoadouts.None, e => e.Key, e => (IReadOnlyList<string>)System.Linq.Enumerable.ToArray(e.Value), StringComparer.Ordinal)
         };
         var errors = new List<string>();
         var where = "DeclareLevel " + levelKey;
@@ -322,7 +366,7 @@ public static class OrdnanceApi
         else if (string.IsNullOrWhiteSpace(levelKey)) errors.Add("DeclareLevel: the level key must not be empty.");
         else if (DeclaredLevels.ContainsKey(levelKey)) errors.Add(where + ": this level is already declared.");
         else OrdnanceSettings.Check(rules, where, errors);
-        foreach (var error in errors) Plugin.Report(error);
+        foreach (var error in errors) Plugin.Logger.Error(error);
         if (errors.Count != 0) return false;
         DeclaredLevels.Add(levelKey, rules);
         return true;
@@ -332,18 +376,32 @@ public static class OrdnanceApi
     /// <paramref name="yaw"/> degrees, as <paramref name="arrival"/> (<see cref="OrdnanceArrivalMode.Direct"/> needs a payload with
     /// <see cref="IOrdnancePayload.SupportsDirect"/>). It goes through the same delivery as the level's <c>Drops</c>, so every player
     /// sees it. Pass <paramref name="dimension"/> to require the point to be in that dimension; the default takes whichever contains
-    /// it. A client gets false and a <paramref name="reason"/> without a log line (test <c>SNet.IsMaster</c> first); any other refusal
-    /// is false, a reason and one error in the log. What it places is not placed again after a checkpoint reload or a host change.</summary>
-    public static bool Place(string ordnanceId, Vector3 position, float yaw, OrdnanceArrivalMode arrival, out string reason, int dimension = -1)
-        => Plugin.Session.Place(ordnanceId, position, yaw, arrival, dimension, out reason);
+    /// it. A client gets false and a <paramref name="reason"/> without a log line (test <c>ForgeCore.Session.IsHost</c> first); any other refusal
+    /// is false, a reason and one error in the log. What it places is not placed again after a checkpoint reload or a host change.
+    /// <paramref name="overrides"/> sets numbers on this one placement: only the fields the payload type declares
+    /// (<see cref="IOrdnancePayload.OverrideFields"/>: a heavy weapon's <c>AmmoRatio</c>, an exosuit's <c>Armor</c>), inside their ranges; anything else
+    /// refuses the call with a reason naming the field.</summary>
+    public static bool Place(string ordnanceId, Vector3 position, float yaw, OrdnanceArrivalMode arrival, out string reason, int dimension = -1,
+        IReadOnlyDictionary<string, double>? overrides = null)
+        => Plugin.Session.Place(ordnanceId, position, yaw, arrival, dimension, overrides, out reason);
+
+    /// <summary>The problem with <paramref name="overrides"/> for <paramref name="definition"/>'s payload type (a field it does not declare,
+    /// a value out of range, a payload-specific refusal), or null when they are acceptable. The same check settings loading and <see cref="Place"/> make.</summary>
+    public static string? CheckOverrides(OrdnanceDefinition definition, IReadOnlyDictionary<string, double> overrides)
+    {
+        if (definition == null) throw new ArgumentNullException(nameof(definition));
+        if (overrides == null) throw new ArgumentNullException(nameof(overrides));
+        if (!Payloads.TryGetValue(definition.PayloadType, out var payload)) return "payload type " + definition.PayloadType + " is not registered";
+        return OverrideCheck.Check(payload.OverrideFields, overrides, definition.PayloadType) ?? payload.CheckOverrides(definition.Parameters, overrides);
+    }
 
     /// <summary>Holds the local player's call key off until the returned block is disposed, e.g. while piloting an exosuit: a
-    /// press is ignored (logged with <paramref name="reason"/>), and a code being entered or a ball being held is cancelled with
+    /// press is ignored (silently: a blocked key is no error; <paramref name="reason"/> names the holder), and a code being entered or a ball being held is cancelled with
     /// the inventory put back. Blocks from several plugins add up; calls work again when none is left. Blocks outlive levels,
     /// so dispose yours when its reason ends. Main thread only.</summary>
     public static OrdnanceCallBlock BlockCalls(string reason)
     {
-        if (string.IsNullOrWhiteSpace(reason)) throw new ArgumentException("Give a reason for the log.", nameof(reason));
+        if (string.IsNullOrWhiteSpace(reason)) throw new ArgumentException("Give a reason: who blocks the calls.", nameof(reason));
         var block = new OrdnanceCallBlock(reason);
         Blocks.Add(block);
         return block;
@@ -355,13 +413,6 @@ public static class OrdnanceApi
     internal static readonly HashSet<OrdnanceCallBlock> Blocks = new();
     internal static readonly RetainedData Retained = new();
 
-    internal static string BlockReasons()
-    {
-        var reasons = new List<string>();
-        foreach (var block in Blocks) reasons.Add(block.Reason);
-        return string.Join(", ", reasons);
-    }
-
     internal static bool TryGetPayload(string type, out IOrdnancePayload payload) => Payloads.TryGetValue(type, out payload!);
 
     internal static bool TryGetPayload(uint key, out IOrdnancePayload payload) => ByKey.TryGetValue(key, out payload!);
@@ -371,6 +422,6 @@ public static class OrdnanceApi
     internal static void Deliver(IOrdnancePayload payload, string what, OrdnancePayloadData data)
     {
         try { payload.OnData(data); }
-        catch (Exception error) { Plugin.Error("Payload '" + what + "' OnData (tag " + data.Tag + ") failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Payload '" + what + "' OnData (tag " + data.Tag + ") failed: " + error); }
     }
 }

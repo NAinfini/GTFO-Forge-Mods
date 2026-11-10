@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using HarmonyLib;
 using LevelGeneration;
 using UnityEngine;
 
@@ -20,7 +19,7 @@ internal static class SupplyHold
         internal ulong Thrower;
         internal uint ThrowId;
         internal Interact_Timed[] Interacts = Array.Empty<Interact_Timed>();
-        internal Renderer[] Renderers = Array.Empty<Renderer>();
+        internal readonly List<Renderer> Renderers = new();
         internal Light[] Lights = Array.Empty<Light>();
     }
 
@@ -38,15 +37,13 @@ internal static class SupplyHold
         var interacts = new List<Interact_Timed>();
         foreach (var interact in root.GetComponentsInChildren<Interact_Timed>(true)) interacts.Add(interact);
         held.Interacts = interacts.ToArray();
-        var renderers = new List<Renderer>();
-        foreach (var renderer in root.GetComponentsInChildren<Renderer>(true)) if (renderer.enabled) renderers.Add(renderer);
-        held.Renderers = renderers.ToArray();
         var lights = new List<Light>();
         foreach (var light in root.GetComponentsInChildren<Light>(true)) if (light.enabled) lights.Add(light);
         held.Lights = lights.ToArray();
         All.Add(held);
         foreach (var interact in held.Interacts) ForgeCore.HoldPoint.Disable(interact);
-        ShutVisuals(held);
+        ForgeVisual.Models.HideRenderers(root.transform, null, held.Renderers);
+        ShutLights(held);
         pod.Opened += () => Release(held);
         pod.Left += () => Release(held);
     }
@@ -54,30 +51,30 @@ internal static class SupplyHold
     /// <summary>True while a pickup is shut away, which is the only time <see cref="Tick"/> has work.</summary>
     internal static bool Any => All.Count != 0;
 
-    /// <summary>The game can switch a renderer or a light on again (placing, culling) and has no event for it, so each frame a
-    /// held pickup is found drawn it is switched off again. The interaction needs no such frame work.</summary>
+    /// <summary>The game can switch a light on again (placing, culling) and has no event for it, so each frame a held pickup's light
+    /// is found on it is switched off again. Its renderers are forced off once and the game never writes that flag; the interaction
+    /// needs no frame work either.</summary>
     internal static void Tick()
     {
         for (var i = All.Count - 1; i >= 0; i--)
         {
             var held = All[i];
             if (held.Root == null || held.Root.WasCollected) { All.RemoveAt(i); continue; }
-            ShutVisuals(held);
+            ShutLights(held);
         }
     }
 
     internal static void Clear() => All.Clear();
 
-    private static void ShutVisuals(Held held)
+    private static void ShutLights(Held held)
     {
-        foreach (var renderer in held.Renderers) if (renderer != null && !renderer.WasCollected && renderer.enabled) renderer.enabled = false;
         foreach (var light in held.Lights) if (light != null && !light.WasCollected && light.enabled) light.enabled = false;
     }
 
     private static void Release(Held held)
     {
         if (!All.Remove(held)) return;
-        foreach (var renderer in held.Renderers) if (renderer != null && !renderer.WasCollected) renderer.enabled = true;
+        ForgeVisual.Models.ShowRenderers(held.Renderers);
         foreach (var light in held.Lights) if (light != null && !light.WasCollected) light.enabled = true;
         foreach (var interact in held.Interacts)
             if (interact != null && !interact.WasCollected) ForgeCore.HoldPoint.Enable(interact);
@@ -96,6 +93,6 @@ internal static class SupplyHoldPatch
             if (!Deliveries.TryShutPodAt(newState.placement.position, out var thrower, out var throwId)) return;
             SupplyHold.Hold(item.gameObject, thrower, throwId);
         }
-        catch (Exception error) { Plugin.Error("Holding a supply pickup until its pod opens failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Holding a supply pickup until its pod opens failed: " + error); }
     }
 }

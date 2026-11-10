@@ -14,9 +14,9 @@ Forge Ordnance is the framework and ships no call-ins of its own. Install a cont
 
    ![The ORDNANCE button under APPAREL](https://raw.githubusercontent.com/NAinfini/GTFO-Forge-Mods/main/ForgeOrdnance/docs/images/lobby-button.jpg)
 
-   ![Picking turrets](https://raw.githubusercontent.com/NAinfini/GTFO-Forge-Mods/main/ForgeOrdnance/docs/images/picker.jpg)
+   ![Picking call-ins](https://raw.githubusercontent.com/NAinfini/GTFO-Forge-Mods/main/ForgeOrdnance/docs/images/picker.jpg)
 
-   ![Picking weapons](https://raw.githubusercontent.com/NAinfini/GTFO-Forge-Mods/main/ForgeOrdnance/docs/images/picker-weapons.jpg)
+   ![Picking weapons and exosuits](https://raw.githubusercontent.com/NAinfini/GTFO-Forge-Mods/main/ForgeOrdnance/docs/images/picker-weapons.jpg)
 
 2. **Hold the call key** (rear mouse side button by default). The call-in list on the right of the screen shows every code. Your weapon is put away and the beacon appears in your hand. While you hold the key, movement, firing and weapon switching are off.
 3. **Enter a code** with your movement keys or the arrow keys. Steps you have entered light up, call-ins that no longer match fade out, and call-ins on cooldown show a bar. A wrong step clears the code. Let go early and the beacon disappears.
@@ -28,9 +28,7 @@ Forge Ordnance is the framework and ships no call-ins of its own. Install a cont
 
    ![Beams marking incoming call-ins](https://raw.githubusercontent.com/NAinfini/GTFO-Forge-Mods/main/ForgeOrdnance/docs/images/arrival-beams.jpg)
 
-Supplies come down in a drop pod that opens its doors; take the packs from inside. Turrets arrive in a shell that falls open around them. The screen shakes if you are close.
-
-![A drop pod landing](https://raw.githubusercontent.com/NAinfini/GTFO-Forge-Mods/main/ForgeOrdnance/docs/images/supply-pod-landing.jpg)
+Supplies come down in a drop pod that opens its doors; take the packs from inside. Turrets arrive drill first, bore into the ground and rise up, level with the floor. The screen shakes if you are close.
 
 ## Rules
 
@@ -56,12 +54,12 @@ Everyone in the lobby needs the same Forge Ordnance version and the same call-in
 
 ## Installation
 
-Install with r2modman or the Thunderstore Mod Manager. It also installs BepInExPack_GTFO, MTFO, ForgeCore, ForgeUI, ForgeAudio and ForgeVisual. MTFO marks the game as modded, which turns off achievements and public matchmaking.
+Install with r2modman or the Thunderstore Mod Manager. It also installs BepInExPack_GTFO, GTFO_API, MTFO, ForgeCore, ForgeUI, ForgeAudio and ForgeVisual. MTFO marks the game as modded, which turns off achievements and public matchmaking.
 
 ## For rundown and mod makers
 
-Writing your own call-ins, placing drop pods or turrets from a rundown, and the extension API are in the [developer guide](https://github.com/NAinfini/GTFO-Forge-Mods/blob/main/ForgeOrdnance/DEVELOPERS.md).
+Writing your own call-ins, or placing drop pods or turrets from a rundown, is in the [developer guide](https://github.com/NAinfini/GTFO-Forge-Mods/blob/main/ForgeOrdnance/DEVELOPERS.md).
 
 ## License
 
-Code: [MIT](https://github.com/NAinfini/GTFO-Forge-Mods/blob/main/ForgeOrdnance/LICENSE). Models and sounds keep their own licenses, listed in the `License.txt` files shipped in the package: effect textures are CC0 or free Unity Asset Store packs (commercial use allowed), sounds come from the author's licensed Sonniss GDC 2026 and Boom Library collections.
+Code: [MIT](https://github.com/NAinfini/GTFO-Forge-Mods/blob/main/ForgeOrdnance/LICENSE). Models and sounds keep their own licenses, listed in the `LICENSE.txt` files shipped in the package: effect textures are CC0 or free Unity Asset Store packs (commercial use allowed), the effect bundle is rebuilt from Asset Store packs listed in `fx-licences.forge`, sounds come from the author's licensed Sonniss GameAudioGDC 2026 and Boom Library collections.

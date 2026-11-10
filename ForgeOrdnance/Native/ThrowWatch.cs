@@ -2,7 +2,6 @@ using System;
 using Gear;
 using HarmonyLib;
 using Player;
-using UnityEngine;
 
 namespace ForgeOrdnance;
 
@@ -20,7 +19,7 @@ internal static class ThrowWatch
 
     internal static void ThrowStarted(ThrowingWeapon weapon)
     {
-        if (!_active || Attempted || !IsBall(weapon) || weapon.Owner == null || weapon.Owner != PlayerManager.GetLocalPlayerAgent()) return;
+        if (!_active || Attempted || !IsBall(weapon) || weapon.Owner == null || weapon.Owner != ForgeCore.Players.Local) return;
         Attempted = true;
         OrdnanceCues.Local(OrdnanceSound.BeaconThrow);
     }
@@ -59,6 +58,6 @@ internal static class BallThrowHook
                 ThrowWatch.ThrowStarted(__instance);
             }
         }
-        catch (Exception error) { Plugin.Error("Ball throw hook failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Ball throw hook failed: " + error); }
     }
 }

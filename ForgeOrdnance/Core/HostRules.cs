@@ -10,7 +10,7 @@ namespace ForgeOrdnance;
 internal sealed class HostRulesSnapshot
 {
     internal HostRulesSnapshot(string levelKey, ulong definitionHash, int loadoutSize, uint[]? allowedKeys,
-        double cooldownMultiplier, double usesMultiplier, double maxThrowDistance, bool callMenu)
+        double cooldownMultiplier, double usesMultiplier, double maxThrowDistance, bool callMenu, bool lobbyPicker = true)
     {
         LevelKey = levelKey;
         DefinitionHash = definitionHash;
@@ -20,6 +20,7 @@ internal sealed class HostRulesSnapshot
         UsesMultiplier = usesMultiplier;
         MaxThrowDistance = maxThrowDistance;
         CallMenu = callMenu;
+        LobbyPicker = lobbyPicker;
     }
 
     internal string LevelKey { get; }
@@ -32,6 +33,8 @@ internal sealed class HostRulesSnapshot
     internal double MaxThrowDistance { get; }
     /// <summary>False when the level's developer turned the players' call-ins off (<see cref="OrdnanceLevelRules.CallMenu"/>).</summary>
     internal bool CallMenu { get; }
+    /// <summary>False when the level's developer turned the lobby choice off (<see cref="OrdnanceLevelRules.LobbyPicker"/>).</summary>
+    internal bool LobbyPicker { get; }
 
     internal static HostRulesSnapshot From(string? levelKey, DefinitionSet set, OrdnanceLevelRules rules)
     {
@@ -43,7 +46,7 @@ internal sealed class HostRulesSnapshot
                 .Where(key => key.HasValue).Select(key => key!.Value).Distinct().OrderBy(key => key).ToArray();
         }
         return new HostRulesSnapshot(levelKey ?? "", set.Hash, rules.LoadoutSize, allowed,
-            rules.CooldownMultiplier, rules.UsesMultiplier, rules.MaxThrowDistance, rules.CallMenu);
+            rules.CooldownMultiplier, rules.UsesMultiplier, rules.MaxThrowDistance, rules.CallMenu, rules.LobbyPicker);
     }
 
     internal OrdnanceLevelRules ToSettings(DefinitionSet set)
@@ -63,7 +66,8 @@ internal sealed class HostRulesSnapshot
             CooldownMultiplier = CooldownMultiplier,
             UsesMultiplier = UsesMultiplier,
             MaxThrowDistance = MaxThrowDistance,
-            CallMenu = CallMenu
+            CallMenu = CallMenu,
+            LobbyPicker = LobbyPicker
         };
     }
 }
@@ -95,6 +99,7 @@ internal static class HostRulesWire
             writer.Write(rules.UsesMultiplier);
             writer.Write(rules.MaxThrowDistance);
             writer.Write(rules.CallMenu);
+            writer.Write(rules.LobbyPicker);
             writer.Write((short)(rules.AllowedKeys?.Length ?? -1));
             if (rules.AllowedKeys != null) foreach (var key in rules.AllowedKeys) writer.Write(key);
         }
@@ -106,7 +111,7 @@ internal static class HostRulesWire
     internal static bool TryDecode(byte[] bytes, out HostRulesSnapshot? rules)
     {
         rules = null;
-        if (bytes == null || bytes.Length > MaxPayloadBytes || bytes.Length < 42) return false;
+        if (bytes == null || bytes.Length > MaxPayloadBytes || bytes.Length < 43) return false;
         try
         {
             using var stream = new MemoryStream(bytes, false);
@@ -123,9 +128,10 @@ internal static class HostRulesWire
             var uses = reader.ReadDouble();
             var distance = reader.ReadDouble();
             var menu = reader.ReadByte();
+            var picker = reader.ReadByte();
             var count = reader.ReadInt16();
             if (size is < 1 or > Messages.MaxLoadout || !Finite(cooldown, 0, 10) || !Finite(uses, 0, 10)
-                || !Finite(distance, 5, 500) || menu > 1 || count < -1 || count > MaxAllowedKeys) return false;
+                || !Finite(distance, 5, 500) || menu > 1 || picker > 1 || count < -1 || count > MaxAllowedKeys) return false;
             uint[]? allowed = null;
             if (count >= 0)
             {
@@ -139,7 +145,7 @@ internal static class HostRulesWire
                 }
             }
             if (stream.Position != stream.Length) return false;
-            rules = new HostRulesSnapshot(level, hash, size, allowed, cooldown, uses, distance, menu == 1);
+            rules = new HostRulesSnapshot(level, hash, size, allowed, cooldown, uses, distance, menu == 1, picker == 1);
             return true;
         }
         catch (Exception error) when (error is EndOfStreamException or DecoderFallbackException or IOException) { return false; }

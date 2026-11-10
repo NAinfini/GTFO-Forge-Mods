@@ -15,6 +15,6 @@ internal static class SupplyPickupSound
             if (!Deliveries.IsSupplyPosition(position)) return;
             OrdnanceCues.At("supply.pickup", position);
         }
-        catch (Exception error) { Plugin.Error("Supply pickup sound failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Supply pickup sound failed: " + error); }
     }
 }

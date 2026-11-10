@@ -30,12 +30,12 @@ internal sealed class OrdnanceLoadout : PickerSource
     {
         LobbyRules.Changed += Instance.RulesChanged;
         UIKit.Mod(Plugin.Id).AddLobbyButton("Loadout", UIText.Key("lobby.button"), bar => Instance.Toggle(bar), Note,
-            bar => bar.m_player != null && bar.m_player.IsLocal && !CallMenuOff);
+            bar => bar.m_player != null && bar.m_player.IsLocal && !PickerOff);
     }
 
-    /// <summary>The selected level's rules turned the players' call-ins off: there is nothing to pick, so the ORDNANCE button and the
-    /// lobby row are not shown at all.</summary>
-    internal static bool CallMenuOff => LobbyRules.TryCurrent(out var rules, out _) && !rules.CallMenu;
+    /// <summary>The selected level's rules turned the lobby choice off (<c>LobbyPicker</c>): picks would not be used, so the ORDNANCE button
+    /// and the lobby row are not shown at all.</summary>
+    internal static bool PickerOff => LobbyRules.TryCurrent(out var rules, out _) && !rules.LobbyPicker;
 
     private static string Note()
     {
@@ -48,10 +48,7 @@ internal sealed class OrdnanceLoadout : PickerSource
         OrdnanceCues.Local(OrdnanceSound.Click);
         if (!UIKit.IsShowing(this))
         {
-            if (!LobbyRules.TryCurrent(out var rules, out _))
-            {
-                return;
-            }
+            if (!LobbyRules.TryCurrent(out var rules, out _)) return;
             Load(rules);
         }
         UIKit.TogglePicker(bar, this);
@@ -79,7 +76,7 @@ internal sealed class OrdnanceLoadout : PickerSource
     private void RulesChanged()
     {
         if (!UIKit.IsShowing(this)) return;
-        if (!LobbyRules.TryCurrent(out var rules, out _) || !rules.CallMenu) { UIKit.ClosePicker(); return; }
+        if (!LobbyRules.TryCurrent(out var rules, out _) || !rules.LobbyPicker) { UIKit.ClosePicker(); return; }
         Load(rules);
         UIKit.RefreshPicker();
     }
@@ -121,11 +118,7 @@ internal sealed class OrdnanceLoadout : PickerSource
 
     /// <summary>A category's colour (its default beam colour): the category mark and text on a row, a slot's edge, the glow behind the
     /// large picture. Pictures keep their own colours.</summary>
-    private static Color Accent(OrdnanceDefinition definition)
-    {
-        var rgb = definition.CategoryBeamRgb;
-        return new Color(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f, 1f);
-    }
+    private static Color Accent(OrdnanceDefinition definition) => ForgeCore.Colours.FromRgb(definition.CategoryBeamRgb);
 
     public override PickerCard SlotCard(int slot, bool chosen)
     {

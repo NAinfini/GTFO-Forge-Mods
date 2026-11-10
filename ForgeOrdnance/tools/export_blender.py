@@ -4,7 +4,8 @@ Run inside Blender:
   blender --background --factory-startup <file.blend> --python export_blender.py -- --prefab drop-pod --out <stage>/models/drop-pod
        [--require body,door_1,...] [--max-texture 2048] [--max-albedo 2048] [--glow M01_mat=1,0.6,0.12] [--double-sided]
 
-Every mesh and empty object at the top level becomes one child of the prefab, keeping its name and transform. Coordinates
+Every mesh and empty object becomes one node of the prefab, keeping its name, its local transform and its parent (a top-level one is a child of
+the prefab; names are unique in the file). Coordinates
 change from Blender (right handed, Z up) to Unity (left handed, Y up) by swapping Y and Z; triangle winding is reversed to
 match. --double-sided adds an inner copy of every triangle (reversed winding, flipped normal) for shells seen from inside.
 Each mesh is split into one submesh per material slot. A material whose Principled BSDF reads image textures writes
@@ -22,6 +23,7 @@ import sys
 
 import bpy
 import numpy as np
+from mathutils import Matrix
 
 
 def arguments():
@@ -244,9 +246,9 @@ def main():
     for obj in sorted(bpy.context.scene.objects, key=lambda o: o.name):
         if obj.type not in ("MESH", "EMPTY"):
             continue
-        if obj.parent is not None:
-            raise SystemExit("Object " + obj.name + " has a parent; the stage format keeps one level under the prefab.")
-        entry = {"name": obj.name, "position": unity_vector(obj.location),
+        if obj.parent is not None and obj.matrix_parent_inverse != Matrix.Identity(4):
+            raise SystemExit("Object " + obj.name + " has a parent inverse; the stage format keeps plain local transforms.")
+        entry = {"name": obj.name, "parent": obj.parent.name if obj.parent is not None else "", "position": unity_vector(obj.location),
                  "rotation": unity_quaternion(obj.matrix_basis.to_quaternion()), "scale": unity_vector(obj.scale)}
         if obj.type == "MESH":
             file = obj.name + ".mesh"

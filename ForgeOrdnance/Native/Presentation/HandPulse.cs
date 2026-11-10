@@ -1,5 +1,4 @@
 using ForgeVisual;
-using Player;
 using UnityEngine;
 
 namespace ForgeOrdnance;
@@ -17,7 +16,7 @@ internal static class HandPulse
     /// <summary>The local camera, or null outside a level.</summary>
     private static Transform? Eye()
     {
-        var agent = PlayerManager.GetLocalPlayerAgent();
+        var agent = ForgeCore.Players.Local;
         if (agent != null && !agent.WasCollected && agent.FPSCamera != null) return agent.FPSCamera.transform;
         var cam = Camera.main;
         return cam != null ? cam.transform : null;
@@ -34,6 +33,7 @@ internal static class HandPulse
             _spot = GlowSpot.Create(eye, Hand);
             _on = eye;
         }
-        _spot?.Pulse(Color.Lerp(OrdnanceBeacon.Rgb(beamRgb), Color.white, 0.35f), Seconds, StartSize, EndSize, Alpha);
+        if (OrdnanceFxSlots.HandPulse is { } pulse) Fx.Play(pulse, eye.position + eye.forward * 0.6f, eye.forward);
+        _spot?.Pulse(Color.Lerp(ForgeCore.Colours.FromRgb(beamRgb), Color.white, 0.35f), Seconds, StartSize, EndSize, Alpha);
     }
 }

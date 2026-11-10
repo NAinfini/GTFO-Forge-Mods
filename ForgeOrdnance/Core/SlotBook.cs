@@ -62,10 +62,11 @@ internal sealed class SlotBook
     }
 
     /// <summary>Mirror side: a slot as the host reports it.</summary>
-    public void Apply(ulong player, uint key, int uses, double cooldownRemaining, double now)
+    public void Apply(ulong player, uint key, int uses, int initialUses, double cooldownRemaining, double now)
     {
         var state = State(player);
-        if (!state.Slots.TryGetValue(key, out var slot)) state.Slots[key] = slot = new Slot { InitialUses = uses };
+        if (!state.Slots.TryGetValue(key, out var slot)) state.Slots[key] = slot = new Slot();
+        slot.InitialUses = initialUses;
         slot.Uses = uses;
         slot.CooldownEnd = now + Math.Max(0, cooldownRemaining);
     }
@@ -89,6 +90,14 @@ internal sealed class SlotBook
         slot.CooldownEnd = now + cooldownSeconds;
     }
 
+    /// <summary>Undoes a <see cref="Consume"/> whose call found nothing to do: the use comes back and at most <paramref name="cooldownSeconds"/> of the cooldown stay.</summary>
+    public void Refund(ulong player, uint key, double now, double cooldownSeconds)
+    {
+        if (!_players.TryGetValue(player, out var state) || !state.Slots.TryGetValue(key, out var slot)) return;
+        if (slot.Uses >= 0 && slot.Uses < slot.InitialUses) slot.Uses++;
+        slot.CooldownEnd = Math.Min(slot.CooldownEnd, now + cooldownSeconds);
+    }
+
     /// <summary>Remaining uses (negative: unlimited) and cooldown of one slot.</summary>
     public bool TryGet(ulong player, uint key, double now, out int uses, out double cooldownRemaining)
     {
@@ -99,7 +108,9 @@ internal sealed class SlotBook
         return true;
     }
 
-    public void RemovePlayer(ulong player) { if (_players.Remove(player)) LoadoutVersion++; }
+    /// <summary>The uses a slot started with (what <see cref="Refund"/> may restore to); 0 for a slot not known.</summary>
+    public int InitialOf(ulong player, uint key) => _players.TryGetValue(player, out var state) && state.Slots.TryGetValue(key, out var slot) ? slot.InitialUses : 0;
+
     public void Clear() { _players.Clear(); LoadoutVersion++; }
 
     /// <summary>Remaining cooldowns are stored relative to <paramref name="now"/>, so a restore on a later clock keeps them.</summary>
@@ -158,9 +169,10 @@ internal sealed class SlotSnapshot
 
 /// <summary>A call the host accepted and has not yet delivered: a player's throw (it has a beacon, its landing is snapped onto the
 /// navigation mesh and it faces away from the thrower), or a developer drop (<see cref="Developer"/>: thrower 0, the exact point,
-/// facing <see cref="Yaw"/>, no beacon, arriving as <see cref="Arrival"/>).</summary>
+/// facing <see cref="Yaw"/>, no beacon, arriving as <see cref="Arrival"/>, with its <see cref="Overrides"/>).</summary>
 internal readonly record struct PendingSummon(ulong Thrower, uint ThrowId, uint Key, float X, float Y, float Z, double ArriveAt,
-    bool Developer = false, OrdnanceArrivalMode Arrival = OrdnanceArrivalMode.Drop, float Yaw = 0f, int Dimension = -1);
+    bool Developer = false, OrdnanceArrivalMode Arrival = OrdnanceArrivalMode.Drop, float Yaw = 0f, int Dimension = -1,
+    IReadOnlyDictionary<string, double>? Overrides = null);
 
 /// <summary>Accepted calls waiting for their arrival time. Checkpoint recovery and a host change void them.</summary>
 internal sealed class SummonScheduler

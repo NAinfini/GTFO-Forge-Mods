@@ -394,7 +394,8 @@
       "layers": [
         {
           "clips": [
-            "ui.call_open-01.ogg"
+            "ui.call_open-01.ogg",
+            "ui.call_open-02.ogg"
           ],
           "gainDb": 2.8,
           "fadeOutMs": 32
@@ -766,6 +767,49 @@
           "gainDb": 1.4,
           "fadeInMs": 4,
           "fadeOutMs": 725
+        }
+      ]
+    },
+    "turret.lid_blast": {
+      "gain": 1.0,
+      "loop": false,
+      "priority": 170,
+      "maxVoices": 8,
+      "maxPerEmitter": 1,
+      "environment": true,
+      "maxSeconds": 2.4,
+      "bus": "drop-mech",
+      "pitch": [
+        0.98,
+        1.02
+      ],
+      "space": {
+        "near": 4,
+        "far": 45
+      },
+      "layers": [
+        {
+          "clips": [
+            "turret.lid_blast-l1-01.ogg"
+          ],
+          "gainDb": -1.6,
+          "fadeOutMs": 100
+        },
+        {
+          "clips": [
+            "turret.lid_blast-l2-01.ogg"
+          ],
+          "offsetMs": 80,
+          "gainDb": -2.2,
+          "fadeOutMs": 80
+        },
+        {
+          "clips": [
+            "turret.lid_blast-l3-01.ogg"
+          ],
+          "offsetMs": 220,
+          "gainDb": -3.3,
+          "fadeOutMs": 80
         }
       ]
     }

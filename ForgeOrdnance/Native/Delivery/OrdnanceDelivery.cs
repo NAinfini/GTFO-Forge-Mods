@@ -1,6 +1,5 @@
 using System;
 using LevelGeneration;
-using SNetwork;
 using UnityEngine;
 
 namespace ForgeOrdnance;
@@ -18,8 +17,14 @@ public static class OrdnanceDelivery
     /// <summary>Seconds from arrival until the pod's doors stand open (when the host places pod contents); 0 for a direct arrival.</summary>
     public static float PodContentsDelay(OrdnanceArrivalMode arrival) => ArrivalPlan.ContentsAfter(arrival, DeliveryTiming.ContentsOpenDelay);
 
-    /// <summary>Seconds from arrival until the shell's petals are open (when the host stands the shell's contents); 0 for a direct arrival.</summary>
-    public static float ShellContentsDelay(OrdnanceArrivalMode arrival) => ArrivalPlan.ContentsAfter(arrival, DeliveryTiming.SentrySpawnDelay);
+    /// <summary>Seconds from arrival until the turret shell has bored in, thrown its lids and its upper part starts to rise out of it (<see cref="BurrowSpec"/>); 0 for a direct arrival.</summary>
+    public static float ShellRiseDelay(OrdnanceArrivalMode arrival, BurrowSpec burrow)
+        => ArrivalPlan.ContentsAfter(arrival, DeliveryTiming.HeadRiseDelay(burrow));
+
+    /// <summary>Seconds from arrival until the shell's upper part has risen and (a gun) turned its barrel level: when the host stands a turret's
+    /// sentry and a device starts to work; 0 for a direct arrival. The head stows <see cref="BurrowSpec.HeadSeconds"/> after its work ends.</summary>
+    public static float ShellReadyDelay(OrdnanceArrivalMode arrival, BurrowSpec burrow)
+        => ArrivalPlan.ContentsAfter(arrival, DeliveryTiming.HeadRiseDelay(burrow) + burrow.HeadSeconds);
 
     /// <summary>Pickup anchors in a pod.</summary>
     public static int PodAnchorCount => ItemList.MaxPickups;
@@ -60,7 +65,8 @@ public static class OrdnanceDelivery
     /// <summary>Every peer: plays a drop pod for this arrival. Null for a direct arrival, and (one log line) when the art bundle did not load.</summary>
     public static OrdnancePod? StartPod(OrdnancePresentation arrival) => Deliveries.StartPod(arrival);
 
-    /// <summary>Every peer: plays a turret shell for this arrival. Null for a direct arrival, and (one log line) when the art bundle did not load.</summary>
+    /// <summary>Every peer: plays a turret shell for this arrival: it falls, bores in, throws its two lids off and the upper part and burrow its payload's
+    /// <see cref="IOrdnancePayload.GetShellAppearance"/> names rise out of the opening. Null for a direct arrival, and (one log line) when the art bundle did not load.</summary>
     public static OrdnanceShell? StartShell(OrdnancePresentation arrival) => Deliveries.StartShell(arrival);
 
     /// <summary>The pod still in the level for a call, e.g. from <see cref="IOrdnancePayload.OnData"/>. Replayed pods already
@@ -98,20 +104,20 @@ public static class OrdnanceDelivery
 
     /// <summary>Every peer: registers a claimable that lies where there is no drop pod (a direct arrival, or the art bundle did not load): it can be claimed at
     /// <paramref name="position"/> from <paramref name="openAfter"/> seconds on, and is removed once taken. See <see cref="OrdnancePod.AddClaimable"/>.</summary>
-    public static OrdnanceClaimable AddClaimable(ulong summonerLookup, uint throwId, Vector3 position, float openAfter, ClaimableSpec spec)
-        => OrdnanceClaims.Add(summonerLookup, throwId, spec, null, 0, position, openAfter);
+    public static OrdnanceClaimable AddClaimable(ulong summonerLookup, uint throwId, Vector3 position, float openAfter, ClaimableSpec spec, int bay = 0)
+        => OrdnanceClaims.Add(summonerLookup, throwId, spec, null, bay, position, openAfter);
 
     /// <summary>Host: from now on the claimable of this call can be requested (call it when the thing is really there to take, for
     /// example once its kept state is sent). Requests before are refused.</summary>
-    public static void HostOpenClaim(ulong summonerLookup, uint throwId)
+    public static void HostOpenClaim(ulong summonerLookup, uint throwId, int bay = 0)
     {
         RequireHost(nameof(HostOpenClaim));
-        OrdnanceClaims.HostOpen(summonerLookup, throwId);
+        OrdnanceClaims.HostOpen(summonerLookup, throwId, bay);
     }
 
     private static void RequireHost(string what)
     {
-        if (!SNet.IsMaster) throw new InvalidOperationException(what + " is host only.");
+        if (!ForgeCore.Session.IsHost) throw new InvalidOperationException(what + " is host only.");
     }
 }
 
@@ -228,7 +234,8 @@ public sealed class OrdnancePod
 
     /// <summary>Every peer: registers a claimable thing lying in this pod's weapon bay <paramref name="bay"/> (see <see cref="WeaponBayCount"/>):
     /// a player can aim at it, ask the host for it with the use key, install it and take it, all through <paramref name="spec"/>. It
-    /// opens when the pod opens (at once when it is already open) and goes when the pod leaves.</summary>
+    /// shows when the pod opens (<see cref="ClaimableSpec.Opened"/>), can be aimed at and requested from <see cref="OrdnanceClaimable.IsReady"/> on (the moment
+    /// <see cref="OrdnanceDelivery.PodContentsDelay"/> names, when the host opens it with <see cref="OrdnanceDelivery.HostOpenClaim"/>; at once when the pod is already open), and goes when the pod leaves.</summary>
     public OrdnanceClaimable AddClaimable(int bay, ClaimableSpec spec)
         => OrdnanceClaims.Add(SummonerLookup, ThrowId, spec, this, bay, default, 0f);
 
@@ -244,7 +251,8 @@ public sealed class OrdnancePod
     internal Action? OnLeft => Left;
 }
 
-/// <summary>One turret shell in the level (every peer). Its petals open, then it sinks away a few seconds later.</summary>
+/// <summary>One turret shell in the level (every peer): the base bores in until its top is level with the ground, throws its lids off, and the upper part inside it
+/// rises out of the opening and, after the lifetime, sinks back; the base sinks away last.</summary>
 public sealed class OrdnanceShell
 {
     private readonly TurretShell _shell;
@@ -253,11 +261,18 @@ public sealed class OrdnanceShell
 
     public ulong SummonerLookup => _shell.Thrower;
     public uint ThrowId => _shell.ThrowId;
+    /// <summary>The base; null once it has gone.</summary>
     public GameObject? Root => _shell.Root;
+    /// <summary>The upper part the shell draws (<see cref="OrdnanceShellAppearance.Head"/>); null for a shell with none or once it has gone.</summary>
+    public GameObject? Head => _shell.HeadObject;
+    /// <summary>How far the upper part has risen, 0 (inside the base) to 1 (standing), for a caller that fades a light with it.</summary>
+    public float HeadRise => _shell.Rise;
     public bool HasLanded => _shell.HasLanded;
+    /// <summary>The upper part has started to rise out of the opened base.</summary>
     public bool IsOpen => _shell.IsOpen;
 
     public event Action? Landed;
+    /// <summary>The upper part starts to rise out of the opened base.</summary>
     public event Action? Opened;
     public event Action? Left;
 

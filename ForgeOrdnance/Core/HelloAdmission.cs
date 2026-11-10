@@ -10,7 +10,7 @@ internal sealed class HelloAdmission
     private readonly HashSet<(ulong Player, ulong Greeting)> _completed = new();
     internal HelloDecision Evaluate(ulong player, ulong greeting, ulong receivedEpoch, ulong currentEpoch)
     {
-        if (greeting == 0) return HelloDecision.Ignore;
+        if (greeting == 0 || currentEpoch == 0) return HelloDecision.Ignore;
         if (receivedEpoch == 0) return HelloDecision.Challenge;
         if (receivedEpoch != currentEpoch || !_completed.Add((player, greeting))) return HelloDecision.Ignore;
         return HelloDecision.Accept;

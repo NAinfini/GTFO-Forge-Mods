@@ -1,5 +1,4 @@
 using System;
-using SNetwork;
 using UnityEngine;
 
 namespace ForgeOrdnance;
@@ -12,20 +11,16 @@ internal static class OrdnanceImpactNoise
     /// Returns whether the game was asked to make it; an unresolvable course node or a failing call is logged, never thrown.</summary>
     internal static bool Make(Vector3 ground, float radius)
     {
-        if (radius <= 0f || !SNet.IsMaster) return false;
-        if (!ForgeCore.Level.CourseNodeAt(ground, 1f, out var node, out _) || node == null)
-        {
-            Plugin.Error("A touchdown's noise could not resolve a course node at " + ForgeCore.Log.Pos(ground) + ".");
-            return false;
-        }
+        if (radius <= 0f || !ForgeCore.Session.IsHost) return false;
         try
         {
-            var made = ForgeCore.Combat.Noise(ground, radius, node);
-            return made;
+            if (ForgeCore.Combat.Noise(ground, radius)) return true;
+            Plugin.Logger.ErrorOnce("A touchdown's noise could not resolve a course node at " + ForgeCore.Log.Pos(ground) + ".");
+            return false;
         }
         catch (Exception error)
         {
-            Plugin.Error("A touchdown's noise failed: " + error);
+            Plugin.Logger.ErrorOnce("A touchdown's noise failed: " + error);
             return false;
         }
     }

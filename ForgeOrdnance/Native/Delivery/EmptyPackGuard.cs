@@ -17,9 +17,9 @@ internal static class EmptyPackGuard
             if (item.gameObject.GetComponentInChildren<Gear.ResourcePackPickup>(true) == null) return;
             // Kept on purpose, known and not to be fixed: calling a supply drop spawns its packs afterwards, and the state read at that moment is 0 points
             // (before already PlacedInLevel with 0), so this line appears for each pack of a call-in.
-            Plugin.Error("A resource pack was put in the level with " + state.custom.ammo + " ammo points (before: " + before.status + " with " + before.custom.ammo
-                + "; recall " + recall + ") at " + Plugin.Pos(state.placement.position) + ".");
+            Plugin.Logger.ErrorOnce("A resource pack was put in the level with " + state.custom.ammo + " ammo points (before: " + before.status + " with " + before.custom.ammo
+                + "; recall " + recall + ") at " + ForgeCore.Log.Pos(state.placement.position) + ".");
         }
-        catch (Exception error) { Plugin.Error("Checking a placed resource pack failed: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Checking a placed resource pack failed: " + error); }
     }
 }

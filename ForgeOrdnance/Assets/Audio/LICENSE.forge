@@ -1,14 +1,14 @@
-The converted Ogg Vorbis files are derived from the exact owner-selected recordings in sources.json.
+The converted Ogg Vorbis files are derived from the exact owner-selected recordings in sources.forge.
 The original recordings are not included in Git or the release package.
 
 Sonniss GameAudioGDC 2026 bundle (royalty-free, commercial use allowed; the owner's licensed copy, and the original bundle licence remains authoritative):
 
-- ui.key_up - Rescopic Sound - User Interaction - UIClick_Select Middle 29_RSCPC_USIN.wav - Sonniss GDC 2026 royalty-free
-- ui.key_right - Rescopic Sound - User Interaction - UIClick_Select Middle 29_RSCPC_USIN.wav - Sonniss GDC 2026 royalty-free
-- ui.key_left - Rescopic Sound - User Interaction - UIClick_Select Middle 29_RSCPC_USIN.wav - Sonniss GDC 2026 royalty-free
-- ui.key_down - Rescopic Sound - User Interaction - UIClick_Select Middle 29_RSCPC_USIN.wav - Sonniss GDC 2026 royalty-free
-- beacon.tick - 奇幻游戏第二套音效 - UIAlert_Collect Scifi Futuristic Electronic Bass Burst Sweep Heavy 04_ESM_FG2.wav - Sonniss GDC 2026 royalty-free
-- ui.slot_select - Rescopic Sound - User Interaction - UIClick_Select Middle 29_RSCPC_USIN.wav - Sonniss GDC 2026 royalty-free
+- ui.key_up - Rescopic Sound - User Interaction - UIClick_Select Middle 29_RSCPC_USIN.wav - Sonniss GameAudioGDC 2026 royalty-free
+- ui.key_right - Rescopic Sound - User Interaction - UIClick_Select Middle 29_RSCPC_USIN.wav - Sonniss GameAudioGDC 2026 royalty-free
+- ui.key_left - Rescopic Sound - User Interaction - UIClick_Select Middle 29_RSCPC_USIN.wav - Sonniss GameAudioGDC 2026 royalty-free
+- ui.key_down - Rescopic Sound - User Interaction - UIClick_Select Middle 29_RSCPC_USIN.wav - Sonniss GameAudioGDC 2026 royalty-free
+- beacon.tick - 奇幻游戏第二套音效 - UIAlert_Collect Scifi Futuristic Electronic Bass Burst Sweep Heavy 04_ESM_FG2.wav - Sonniss GameAudioGDC 2026 royalty-free
+- ui.slot_select - Rescopic Sound - User Interaction - UIClick_Select Middle 29_RSCPC_USIN.wav - Sonniss GameAudioGDC 2026 royalty-free
 
 Boom Library (the owner's licensed sound library, cleared for use in released mods):
 
@@ -59,16 +59,22 @@ Boom Library (the owner's licensed sound library, cleared for use in released mo
 - drop.debris - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBCK Rock Bricks Roll Long.wav
 - drop.debris - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBDS Rocks Small 02.wav
 - drop.debris - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBDS Glass & Stone Medium 01.wav
+- turret.lid_blast - Boom Library - 110 冲击粒子能量爆炸科幻元素音效 - EXPLDsgn_EXPLOSION SMALL-Smash Transient_B00M_MATTER.wav
 
 Public domain (CC0 1.0, no attribution required), recorded for provenance:
 
 - beacon.land - "217459_4056007-hq.mp3" by JarredGibb (https://freesound.org/people/JarredGibb/sounds/217459/)
 
-Owner-confirmed open source (8600 high-quality sound collection):
+Sonniss (GameAudioGDC 2026), per the owner (collection: 8600 high-quality sound collection):
 
-- drop.open - GL_FuturisticHatch_Opening_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
-- beacon.activate - GL_TelemetryCalibration_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
-- beacon.activate - GL_Open_posititive2_CT.wav (所有者确认为开源（来源合集：8600 高质量音效合集）)
+- drop.open - GL_FuturisticHatch_Opening_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- beacon.activate - GL_TelemetryCalibration_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- beacon.activate - GL_Open_posititive2_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- turret.lid_blast - GL_Impact_Metal_Various2_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- turret.lid_blast - GL_Impact_Metal_Various4_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+
+Owner-confirmed open collection, original authors not named:
+
 - ui.click - 按钮与蜂鸣等科技界面音效 - Button36.Wav (所有者确认为国内开源合集，原作者未署名)
 
-Pack, source file, source SHA-256 and processing section of every clip are recorded in sources.json.
+Pack, source file, source SHA-256 and processing section of every clip are recorded in sources.forge.

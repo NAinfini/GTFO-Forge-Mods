@@ -4,22 +4,14 @@ using ForgeCore;
 
 namespace ForgeOrdnance;
 
-/// <summary>A payload's JSON object read through ForgeCore's <see cref="StrictJson"/> (a bad value throws a
-/// <see cref="StrictJsonException"/> naming the field), plus the readings only call-ins have.</summary>
+/// <summary>The readings only call-in payloads have; every other value is read with ForgeCore's <see cref="StrictJson"/> (prefix "":
+/// a bad value throws a <see cref="StrictJsonException"/> naming the field).</summary>
 internal static class PayloadReader
 {
     private static readonly string[] TypeField = { "Type" };
 
     /// <summary>Refuses a member that is not <c>Type</c> or in <paramref name="known"/>.</summary>
     internal static void OnlyKnown(JsonElement payload, params string[] known) => StrictJson.OnlyKnown(payload, "", known, TypeField);
-
-    internal static double Number(JsonElement payload, string field, double fallback, double min, double max)
-        => StrictJson.Number(payload, "", field, fallback, min, max);
-
-    internal static bool Bool(JsonElement payload, string field, bool fallback) => StrictJson.Bool(payload, "", field, fallback);
-
-    /// <summary>A DataBlock reference: a persistentID (number) or a block name (string). Exactly one of the two forms.</summary>
-    internal static (uint? Id, string? Name) Reference(JsonElement payload, string field) => StrictJson.Reference(payload, "", field);
 
     /// <summary>Checks an item data-block ID before it enters the game's 16-bit replicated prefab field.</summary>
     internal static uint ReplicatedPrefabId(uint id, string field)

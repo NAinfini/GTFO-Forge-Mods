@@ -16,7 +16,7 @@ using UnityEngine.Rendering;
 /// name, e.g. forge-ordnance.bundle; add-on packages pass their own). The manifest beside it is <name>.manifest.json.</summary>
 public static class OrdnanceBundleBuild
 {
-    [Serializable] public sealed class StageObject { public string name, mesh; public float[] position, rotation, scale; public int triangles; public int[] submeshTriangles; public string[] surfaces; }
+    [Serializable] public sealed class StageObject { public string name, parent, mesh; public float[] position, rotation, scale; public int triangles; public int[] submeshTriangles; public string[] surfaces; }
     [Serializable] public sealed class StageSurface { public string name, albedo, metallic, normal; public float[] color, emission; public float metallicValue, smoothness; }
     [Serializable] public sealed class StageModel { public int format; public string prefab, source; public StageObject[] objects; public StageSurface[] surfaces; }
 
@@ -74,8 +74,12 @@ public static class OrdnanceBundleBuild
                 if (emissive && !File.Exists(Path.Combine(folder, stem + "-emission.png"))) Flat(Path.Combine(folder, stem + "-emission.png"), Color.white);
                 profileSurfaces.Add(new ProfileSurface
                 {
-                    key = key, albedo = Stem(s.albedo), metallic = Stem(s.metallic), normal = string.IsNullOrEmpty(s.normal) ? "" : Stem(s.normal),
-                    emission = emissive ? stem + "-emission" : "", emissionColor = emissive ? s.emission : new float[] { 0, 0, 0 }
+                    key = key,
+                    albedo = Stem(s.albedo),
+                    metallic = Stem(s.metallic),
+                    normal = string.IsNullOrEmpty(s.normal) ? "" : Stem(s.normal),
+                    emission = emissive ? stem + "-emission" : "",
+                    emissionColor = emissive ? s.emission : new float[] { 0, 0, 0 }
                 });
             }
         }
@@ -99,14 +103,15 @@ public static class OrdnanceBundleBuild
             var anchors = new List<string>();
             try
             {
+                var nodes = model.objects.ToDictionary(o => o.name, o => new GameObject(o.name));
                 foreach (var o in model.objects)
                 {
-                    var child = new GameObject(o.name);
-                    child.transform.SetParent(root.transform, false);
+                    var child = nodes[o.name];
+                    child.transform.SetParent(string.IsNullOrEmpty(o.parent) ? root.transform : nodes[o.parent].transform, false);
                     child.transform.localPosition = Vector(o.position);
                     child.transform.localRotation = new Quaternion(o.rotation[0], o.rotation[1], o.rotation[2], o.rotation[3]);
                     child.transform.localScale = Vector(o.scale);
-                    if (string.IsNullOrEmpty(o.mesh)) { anchors.Add(o.name); continue; }
+                    if (string.IsNullOrEmpty(o.mesh)) { anchors.Add(PathOf(o, model)); continue; }
                     var mesh = ReadMesh(Path.Combine(folder, o.mesh), o);
                     mesh.name = model.prefab + "-" + o.name;
                     var winding = WindingFraction(mesh);
@@ -115,7 +120,7 @@ public static class OrdnanceBundleBuild
                     AssetDatabase.CreateAsset(mesh, Generated + "/" + mesh.name + ".asset");
                     child.AddComponent<MeshFilter>().sharedMesh = mesh;
                     child.AddComponent<MeshRenderer>().sharedMaterials = new Material[0];
-                    renderers.Add(new ProfileRenderer { name = o.name, surfaces = o.surfaces.Select(s => model.prefab + "/" + s).ToArray() });
+                    renderers.Add(new ProfileRenderer { name = PathOf(o, model), surfaces = o.surfaces.Select(s => model.prefab + "/" + s).ToArray() });
                 }
                 var prefabPath = Generated + "/" + model.prefab + ".prefab";
                 PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
@@ -137,7 +142,10 @@ public static class OrdnanceBundleBuild
         if (BundleName == "forge-ordnance.bundle") { BuildPodImpact(assets, profilePrefabs); BuildFxSlot(assets, profilePrefabs); }
         var profile = new Profile
         {
-            format = 1, prefabs = profilePrefabs.ToArray(), surfaces = profileSurfaces.ToArray(), textures = standalone.ToArray()
+            format = 1,
+            prefabs = profilePrefabs.ToArray(),
+            surfaces = profileSurfaces.ToArray(),
+            textures = standalone.ToArray()
         };
         File.WriteAllText(Path.Combine(project, Generated, "ordnance-profile.json"), JsonUtility.ToJson(profile, true));
         AssetDatabase.Refresh();
@@ -161,6 +169,10 @@ public static class OrdnanceBundleBuild
             JsonUtility.ToJson(new Manifest { unity = Application.unityVersion, bundle = BundleName, sha256 = hash, bytes = length, profile = profile }, true));
         Debug.Log("ORDNANCE_BUNDLE_VERIFIED " + BundleName + " " + length + " bytes " + hash);
     }
+
+    /// <summary>The node's path under the prefab, what Transform.Find takes.</summary>
+    static string PathOf(StageObject o, StageModel model)
+        => string.IsNullOrEmpty(o.parent) ? o.name : PathOf(model.objects.First(p => p.name == o.parent), model) + "/" + o.name;
 
     static string Required(string variable)
     {

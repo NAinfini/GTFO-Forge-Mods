@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using ForgeVisual;
-using HarmonyLib;
-using Player;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -25,22 +23,13 @@ internal static class BeaconLook
     internal const float WorldHeight = 0.11f;
     internal const float HandWorldHeight = 0.072f;
     private const float HandHold = 0.5f;
-    /// <summary>The hand bones are parented a few frames after the spawn; look for them this long, then report.</summary>
-    private const float GripSeconds = 4f;
     private const float RescanSeconds = 1.5f;
     private static readonly Color Amber = new(1f, 0.58f, 0.12f, 1f);
-    /// <summary>The amber ribbon a thrown ball drags behind it: 20 world-space points, one every 1/60 s (about a third of a second of flight),
-    /// fading from the ball to nothing. It follows the world item the game replicates, so every peer draws its own from what it already sees,
-    /// and it collapses to nothing a moment after the ball stops.</summary>
-    private static readonly TrailStyle Ribbon = new()
-    {
-        RibbonPoints = 20, RibbonStep = 1f / 60f, RibbonWidth = 0.09f, RibbonBlend = FxBlend.Alpha,
-        RibbonHead = new Color(1f, 0.7f, 0.25f, 0.9f), RibbonTail = new Color(1f, 0.5f, 0.1f, 0f),
-    };
     private static readonly List<Entry> Entries = new();
 
     private sealed class Entry
     {
+        internal readonly int RibbonKey = Fx.NewKey();
         internal Item Item = null!;
         internal ItemMode Mode;
         internal Renderer? Source;
@@ -48,32 +37,15 @@ internal static class BeaconLook
         internal readonly List<IntPtr> Handled = new();
         internal float RescanUntil;
         internal float NextScan;
-        /// <summary>The thrown ball (world item) drags an amber ribbon; the held copies do not.</summary>
-        internal Trail? Trail;
-        /// <summary>First person only: set until the hand's bones have been found and the ball sits on the real grip point.</summary>
-        internal Grip? Grip;
-    }
-
-    private sealed class Grip
-    {
-        internal Transform Holder = null!, Look = null!;
-        internal Vector3 Axis, Center;
-        /// <summary>Stick length and the ball's height, in the holder's units; the ball's half height in world metres.</summary>
-        internal float Length, Along, Radius;
-        internal float Until;
     }
 
     /// <summary>Every peer, from the game's item spawn: dresses one ball instance.</summary>
     internal static void Apply(Item item, ItemMode mode)
     {
         var model = OrdnanceAssets.Beacon;
-        if (model == null)
-        {
-            return;
-        }
+        if (model == null) return;
         var entry = new Entry { Item = item, Mode = mode, RescanUntil = Time.time + RescanSeconds };
         Entries.Add(entry);
-        if (mode == ItemMode.Instance) entry.Trail = Trails.Rent(item.transform.position, Ribbon);
         Dress(entry, model);
     }
 
@@ -99,7 +71,7 @@ internal static class BeaconLook
         if (entry.Source == null && anchor != null)
         {
             entry.Source = anchor;
-            entry.Ours = Mount(anchor, anchorScale, model, entry.Mode, out entry.Grip);
+            entry.Ours = Mount(anchor, anchorScale, model, entry.Mode);
         }
         if (entry.Mode == ItemMode.Instance)
         {
@@ -133,9 +105,8 @@ internal static class BeaconLook
 
     /// <summary>M01 in the anchor mesh's frame: its up axis along the stick's long axis (the end that points up now), centred on
     /// the stick's centre, at its real world size whatever scale the stick's hierarchy has.</summary>
-    private static MeshRenderer[] Mount(Renderer anchor, Vector3 anchorScale, ModelHandle model, ItemMode mode, out Grip? grip)
+    private static MeshRenderer[] Mount(Renderer anchor, Vector3 anchorScale, ModelHandle model, ItemMode mode)
     {
-        grip = null;
         var mesh = MeshOf(anchor)!;
         var t = anchor.transform;
         var holder = new GameObject("ForgeOrdnance.BeaconLook");
@@ -166,12 +137,10 @@ internal static class BeaconLook
         var scale = along > 1e-4f ? worldHeight / ModelHeight / along : 1f;
         look.transform.localScale = Vector3.one * scale;
         // In the hand the stick's centre is inside the fist: the ball sits on the stick's upper end, its centre HandHold radii under
-        // the tip, so it shows outside the fingers (SettleGrip only logs where it ended up).
+        // the tip, so it shows outside the fingers.
         var radius = worldHeight * 0.5f;
         var lift = hand && along > 1e-4f ? Math.Max(0f, length * 0.5f - HandHold * radius / along) : 0f;
         look.transform.localPosition = bounds.center + axis * lift;
-        if (hand && along > 1e-4f)
-            grip = new Grip { Holder = holder.transform, Look = look.transform, Axis = axis, Center = bounds.center, Length = length, Along = along, Radius = radius, Until = Time.time + GripSeconds };
         Models.SetLayer(holder.transform, anchor.gameObject.layer);
         var ours = look.GetComponentsInChildren<MeshRenderer>(true);
         foreach (var r in ours) r.enabled = anchor.enabled;
@@ -186,14 +155,13 @@ internal static class BeaconLook
         for (var i = Entries.Count - 1; i >= 0; i--)
         {
             var e = Entries[i];
-            if (e.Item == null || e.Item.WasCollected) { e.Trail?.End(); Entries.RemoveAt(i); continue; }
-            e.Trail?.Move(e.Item.transform.position, 0f);
+            if (e.Item == null || e.Item.WasCollected) { Entries.RemoveAt(i); continue; }
+            if (e.Mode == ItemMode.Instance && OrdnanceFxSlots.Ribbon is { } ribbon) Fx.Hold(ribbon, e.RibbonKey, e.Item.transform.position, Vector3.up, float.NaN, Color.white);
             if (now < e.RescanUntil && now >= e.NextScan && OrdnanceAssets.Beacon != null)
             {
                 e.NextScan = now + 0.25f;
                 Dress(e, OrdnanceAssets.Beacon);
             }
-            if (e.Grip != null) SettleGrip(e, now);
             if (e.Source == null || e.Source.WasCollected) continue;
             var shown = e.Source.enabled;
             foreach (var r in e.Ours)
@@ -201,64 +169,7 @@ internal static class BeaconLook
         }
     }
 
-    private static string Chain(Transform item)
-    {
-        var names = new List<string>();
-        for (var p = item; p != null && names.Count < 16; p = p.parent) names.Add(p.name);
-        return string.Join(" < ", names);
-    }
 
-    private static bool IsFinger(string n) => n.Contains("finger") || n.Contains("thumb") || n.Contains("index") || n.Contains("middle") || n.Contains("pinky");
-
-    /// <summary>Bones of the first person arm (names with hand, palm, wrist, finger, thumb, index, middle or pinky) under the item's
-    /// root (the camera holder) and under the local player; the arm skeleton is not an ancestor of the item.</summary>
-    private static List<Transform> FindBones(Transform item)
-    {
-        var roots = new List<Transform> { item.root };
-        var player = PlayerManager.GetLocalPlayerAgent();
-        if (player != null && player.transform.root.Pointer != item.root.Pointer) roots.Add(player.transform.root);
-        var found = new List<Transform>();
-        var stack = new Stack<Transform>(roots);
-        while (stack.Count > 0)
-        {
-            var t = stack.Pop();
-            var n = t.name.ToLowerInvariant();
-            if (IsFinger(n) || (n.Contains("hand") && !n.Contains("handle")) || n.Contains("palm") || n.Contains("wrist")) found.Add(t);
-            for (var i = 0; i < t.childCount; i++) stack.Push(t.GetChild(i));
-        }
-        return found;
-    }
-
-    /// <summary>First person: the ball already sits on the stick's upper end (centre half a radius under the tip), where it shows
-    /// outside the fingers. Once the arm's bones are found, log their names and how far the ball centre is from the nearest finger
-    /// bone and from the camera.</summary>
-    private static void SettleGrip(Entry e, float now)
-    {
-        var g = e.Grip!;
-        if (g.Look == null || g.Look.WasCollected) { e.Grip = null; return; }
-        var bones = FindBones(e.Item.transform);
-        var fingers = bones.FindAll(b => IsFinger(b.name.ToLowerInvariant()));
-        if (fingers.Count == 0)
-        {
-            if (now < g.Until) return;
-            e.Grip = null;
-            var roots = new List<string>();
-            for (var i = 0; i < e.Item.transform.root.childCount && i < 12; i++) roots.Add(e.Item.transform.root.GetChild(i).name);
-            Plugin.Error("Summoning ball in hand: no finger bone found under the item's root or the local player after " + GripSeconds + " s. Item chain: " + Chain(e.Item.transform)
-                + "; children of its root: " + string.Join(", ", roots) + ".");
-            return;
-        }
-        e.Grip = null;
-        var centre = g.Look.position;
-        Transform nearest = fingers[0];
-        foreach (var f in fingers) if ((f.position - centre).sqrMagnitude < (nearest.position - centre).sqrMagnitude) nearest = f;
-        var names = new List<string>();
-        foreach (var b in bones) if (names.Count < 24) names.Add(b.name);
-        var camera = Camera.main;
-        var text = "Summoning ball in hand: " + bones.Count + " arm bone(s) [" + string.Join(", ", names) + "]; ball centre " + Math.Round(Vector3.Distance(centre, nearest.position), 3)
-            + " m from the nearest finger bone '" + nearest.name + "'";
-        if (camera != null) text += ", " + ForgeCore.Log.Pos(camera.transform.InverseTransformPoint(centre)) + " in the camera frame (x right, y up, z forward, m)";
-    }
     internal static void Clear()
     {
         Entries.Clear();
@@ -275,6 +186,6 @@ internal static class BeaconLookHook
         if (call.Id != BeaconItem.BlockId || call.Item is not { } item) return;
         var mode = call.Mode;
         try { BeaconLook.Apply(item, mode); }
-        catch (Exception error) { Plugin.Error("Dressing the summoning ball (" + mode + ") failed; it keeps the glow stick look: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Dressing the summoning ball (" + mode + ") failed; it keeps the glow stick look: " + error); }
     }
 }

@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using HarmonyLib;
+using Enemies;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -8,20 +8,28 @@ namespace ForgeOrdnance;
 
 /// <summary>
 /// The turret looks packages register with <see cref="OrdnanceTurrets.RegisterLook"/>, on every sentry whose call-in names one (the
-/// look key travels in the sentry's marker), on every peer. The game's sentry keeps working (detection,
-/// aiming, firing, hits, ammo, muzzle flash, tracers, particles, audio and the scanner fan); only its body meshes are hidden.
-/// <para>The game assembles a sentry's parts after <c>OnGearSpawnComplete</c>, so a sentry is only registered there and polled
-/// until its rig is really present: the rotation Animator, <c>a_yaw</c> and <c>a_pitch</c> under it, the firing part's muzzle
-/// and body meshes under <c>a_pitch</c>. The look stands on the ground on the yaw axis, facing where the sentry faces now: its
-/// <c>base</c> stays still with the sentry, its <c>yaw</c> part is parented under the live <c>a_yaw</c> (the game's animation
-/// turns it), and its <c>head</c> (barrels, model −Z, along the native muzzle's forward) hangs on a pitch holder under
-/// <c>a_yaw</c> at the head's own pivot, which takes <c>a_pitch</c>'s turn every frame, so the head pitches about its own
-/// hinge even where that is not the native pivot. If the native nodes are destroyed while the sentry lives, the look is
-/// mounted again on the new ones.</para>
+/// look key travels in the sentry's marker), on every peer. The game's sentry keeps working (detection, firing, hits, ammo, muzzle
+/// flash, tracers, particles, audio and the scanner fan); only its body meshes are hidden.
+/// <para>The game assembles a sentry's parts after <c>OnGearSpawnComplete</c>, so a sentry is only registered there and polled until its
+/// rig is really present. The look stands on the ground on the yaw axis, facing where the sentry faces. Its <c>base</c> stays still. Its
+/// <c>yaw</c> and <c>head</c> are drawn to the game's aim, not carried by the game's nodes: the heading slews to where <c>a_yaw</c> points
+/// (the game turns at some 950° a second, too fast to see as a turn) and adds the idle scan, and the head pitches about its own hinge until
+/// its barrels point at the target. The game's muzzle point follows the look's muzzle every frame and points along the barrels, or at the
+/// target once the barrels are within <see cref="LockDegrees"/> of it, so shots, flash and tracers always leave the barrel that is
+/// drawn. If the native nodes are destroyed while the sentry lives, the look is mounted again on the new ones.</para>
+/// <para>All of it reads what the game already keeps on every peer: the host its own detection, a client the sentry's synced target
+/// direction. The scan phase is each peer's own; it is shown only with no target, when nothing depends on it.</para>
 /// </summary>
 internal static class TurretLooks
 {
-    private const float MaxMuzzleGap = 0.02f;
+    /// <summary>Within this of the target the shot goes exactly to it; further off it goes along the barrels, as the game's own sentry fires while it turns.</summary>
+    private const float LockDegrees = 8f;
+    /// <summary>Degrees a second the drawn gun turns and pitches at a target, and while it scans or settles.</summary>
+    private const float TurnDegrees = 360f, ScanTurnDegrees = 90f, PitchDegrees = 240f, RestPitchDegrees = 60f;
+    /// <summary>The pitch the gun can draw: up (negative) and down of level. The game's own aim stops at 15° up and 65° down.</summary>
+    private const float MaxUp = -40f, MaxDown = 65f;
+    /// <summary>Seconds the scan takes to fade out on a target and back in after.</summary>
+    private const float ScanFadeOut = 0.2f, ScanFadeIn = 1.5f;
 
     /// <summary><c>a_yaw</c>'s rest local rotation (−90° about X, from <c>Turret_Base_1</c>): its parent's forward at rest is the
     /// sentry's facing.</summary>
@@ -44,14 +52,25 @@ internal static class TurretLooks
     {
         internal SentryGunInstance Sentry = null!;
         internal string Prefab = "";
-        internal Transform Yaw = null!, Pitch = null!, Turn = null!, Holder = null!, Head = null!;
+        internal Transform Yaw = null!, Turn = null!, Holder = null!, Head = null!;
+        internal Transform? Barrel, ShellEject;
         internal GameObject Root = null!;
-        internal Quaternion YawAtMount, PitchAtMount, PitchToHolder;
-        internal bool MovedLogged;
+        internal TurretMotionSpec Motion = null!;
+        internal SentryGunInstance_Firing_Bullets Firing = null!;
         internal Transform ModelMuzzle = null!, NativeMuzzle = null!;
         internal SentryGunInstance_Detection? Detection;
-        internal bool DetectionResolved;
-        internal Quaternion NativeMuzzleRest;
+        internal SentryGunInstance_Sync? Sync;
+        /// <summary>The sentry's up and the mount's facing, the same in <c>a_yaw</c>'s frame, and the moving parts' world pose at that facing.</summary>
+        internal Vector3 Up, Facing, YawForward, HolderOffset, HeadBack, HeadRest, BarrelBack, BarrelAxis, BarrelRest;
+        internal Quaternion TurnRest, HolderRest, BarrelRestRotation;
+        /// <summary>What is drawn now: the heading with the scan in it, the pitch (positive is down), the scan's strength and clock.</summary>
+        internal Vector3 Heading;
+        internal float Elevation, ScanWeight, ScanClock;
+        /// <summary>What a shot left: metres the head and the barrel are back, degrees the gun is tipped up, the barrel's spin in degrees and degrees a second.</summary>
+        internal float Recoil, BarrelSlide, Tip, Spin, SpinSpeed;
+        /// <summary>The body aim point of the current target, found once per target.</summary>
+        internal IntPtr TargetPointer;
+        internal Transform? Body;
         internal float RescanUntil, NextRescan;
         internal int Mount;
     }
@@ -64,13 +83,6 @@ internal static class TurretLooks
         Waiting.Add(new Pending { Sentry = sentry, Since = Time.time, NextPoll = Time.time });
     }
 
-    private static Transform? Find(Transform root, string name)
-    {
-        if (root.name == name) return root;
-        for (var i = 0; i < root.childCount; i++)
-            if (Find(root.GetChild(i), name) is { } found) return found;
-        return null;
-    }
 
     private sealed class Rig
     {
@@ -85,62 +97,46 @@ internal static class TurretLooks
         missing = "";
         var animator = sentry.m_rotationAnimator;
         if (animator == null || animator.WasCollected) { missing = "rotation animator"; return null; }
-        var yaw = Find(animator.transform, "a_yaw");
-        var pitch = yaw != null ? Find(yaw, "a_pitch") : null;
+        var yaw = ForgeVisual.Models.Find(animator.transform, "a_yaw");
+        var pitch = yaw != null ? ForgeVisual.Models.Find(yaw, "a_pitch") : null;
         if (yaw == null || pitch == null) { missing = yaw == null ? "a_yaw" : "a_pitch"; return null; }
         var firing = sentry.m_firingComp != null ? sentry.m_firingComp.TryCast<SentryGunInstance_Firing_Bullets>() : null;
         var muzzle = firing != null ? firing.MuzzleAlign : null;
         if (firing == null || muzzle == null || muzzle.WasCollected) { missing = "firing muzzle"; return null; }
-        if (CountBody(sentry, firing, pitch) == 0) { missing = "gun meshes under a_pitch"; return null; }
+        if (CountBody(sentry, pitch) == 0) { missing = "gun meshes under a_pitch"; return null; }
         return new Rig { Animator = animator, Yaw = yaw, Pitch = pitch, Muzzle = muzzle, Firing = firing };
     }
 
-    /// <summary>Native effect objects that stay visible: the scanner fan, the muzzle flash, the muzzle and shell
-    /// eject aligns (what the game attaches there), and everything of ours.</summary>
-    private static bool Keep(Renderer renderer, SentryGunInstance sentry, SentryGunInstance_Firing_Bullets firing)
+    /// <summary>What of the sentry stays drawn besides its effects (<see cref="ForgeVisual.Models.KeepsSentryEffects"/>): everything of ours.</summary>
+    private static bool Ours(Renderer renderer, SentryGunInstance sentry)
     {
-        var t = renderer.transform;
         var top = sentry.transform.Pointer;
-        for (var p = t; p != null && p.Pointer != top; p = p.parent)
+        for (var p = renderer.transform; p != null && p.Pointer != top; p = p.parent)
             if (p.name.StartsWith("ForgeOrdnance", StringComparison.Ordinal)) return true;
-        var scanner = sentry.m_visualsComp != null ? sentry.m_visualsComp.TryCast<SentryGunInstance_ScannerVisuals_Plane>() : null;
-        if (scanner != null && scanner.m_scannerPlane != null && t.IsChildOf(scanner.m_scannerPlane.transform)) return true;
-        if (firing.m_muzzleFlash != null && t.IsChildOf(firing.m_muzzleFlash.transform)) return true;
-        if (firing.MuzzleAlign != null && t.IsChildOf(firing.MuzzleAlign)) return true;
-        if (firing.ShellEjectAlign != null && t.IsChildOf(firing.ShellEjectAlign)) return true;
         return false;
     }
 
-    private static bool IsBody(Renderer renderer) => renderer.TryCast<MeshRenderer>() != null || renderer.TryCast<SkinnedMeshRenderer>() != null;
-
-    private static int CountBody(SentryGunInstance sentry, SentryGunInstance_Firing_Bullets firing, Transform under)
+    private static int CountBody(SentryGunInstance sentry, Transform under)
     {
+        var effects = ForgeVisual.Models.KeepsSentryEffects(sentry);
         var count = 0;
         foreach (var renderer in under.GetComponentsInChildren<Renderer>(true))
-            if (IsBody(renderer) && !Keep(renderer, sentry, firing)) count++;
+            if (ForgeVisual.Models.IsMesh(renderer) && !Ours(renderer, sentry) && !effects(renderer)) count++;
         return count;
     }
 
-    /// <summary>Switches off the sentry's body meshes (base, gun, screen) that are still on; effects stay.</summary>
-    private static int HideBody(SentryGunInstance sentry, SentryGunInstance_Firing_Bullets firing)
+    /// <summary>Stops drawing the sentry's body meshes (base, gun, screen) that are still drawn; effects stay. The sentry is destroyed
+    /// as a whole, so nothing is given back.</summary>
+    private static int HideBody(SentryGunInstance sentry)
     {
-        var count = 0;
-        foreach (var renderer in sentry.GetComponentsInChildren<Renderer>(true))
-        {
-            if (!renderer.enabled || !IsBody(renderer) || Keep(renderer, sentry, firing)) continue;
-            renderer.enabled = false;
-            count++;
-        }
-        return count;
+        Hidden.Clear();
+        return ForgeVisual.Models.HideSentryBody(sentry, Hidden, renderer => Ours(renderer, sentry));
     }
+    private static readonly List<Renderer> Hidden = new();
 
     private static Look? Mount(SentryGunInstance sentry, Rig rig, string prefab, int mount)
     {
-        var archetype = sentry.ArchetypeData;
-        if (!OrdnanceTurrets.TryGet(prefab, out var model, out var spec))
-        {
-            return null;
-        }
+        if (!OrdnanceTurrets.TryGet(prefab, out var model, out var spec)) return null;
         var rigRoot = rig.Yaw.parent;
         var up = rigRoot != null ? rigRoot.up : sentry.transform.up;
         // Where the sentry faces now: its rest facing turned by a_yaw's change from rest.
@@ -148,61 +144,81 @@ internal static class TurretLooks
         var yawTurn = rigRoot != null ? rig.Yaw.rotation * Quaternion.Inverse(rigRoot.rotation * RestYaw) : Quaternion.identity;
         var facing = Vector3.ProjectOnPlane(yawTurn * restFacing, up).normalized;
         if (facing.sqrMagnitude < 1e-4f) facing = restFacing;
-        var right = Vector3.Cross(up, facing).normalized;
-        var ground = Find(sentry.transform, "Ground_PlacementAlign");
+        var ground = ForgeVisual.Models.Find(sentry.transform, "Ground_PlacementAlign");
         var floorHeight = ground != null ? Vector3.Dot(ground.position, up) : Vector3.Dot(sentry.transform.position, up);
         var floor = rig.Yaw.position - up * (Vector3.Dot(rig.Yaw.position, up) - floorHeight);
 
         var root = model.Spawn(floor, Quaternion.LookRotation(facing, up) * Flip, sentry.transform);
         if (root == null)
         {
-            Plugin.Error("Ordnance sentry keeps the game's look: the turret look " + prefab + " could not be spawned.");
+            Plugin.Logger.ErrorOnce("Ordnance sentry keeps the game's look: the turret look " + prefab + " could not be spawned.");
             return null;
         }
         root.name = "ForgeOrdnance.TurretLook";
         // The game's sentry object is scaled: build the look at its world scale, not at a local scale under that parent.
         var parentScale = sentry.transform.lossyScale;
         var parentUniform = (parentScale.x + parentScale.y + parentScale.z) / 3f;
-        var scale = spec.WorldScale;
-        root.transform.localScale = Vector3.one * (scale / parentUniform);
+        root.transform.localScale = Vector3.one * (spec.WorldScale / parentUniform);
         if (root.transform.Find(spec.Base) == null) throw new InvalidOperationException(prefab + " has no " + spec.Base);
         var turn = root.transform.Find(spec.Yaw) ?? throw new InvalidOperationException(prefab + " has no " + spec.Yaw + " part");
         var head = root.transform.Find(spec.Head) ?? throw new InvalidOperationException(prefab + " has no " + spec.Head);
         var modelMuzzle = root.transform.Find(spec.Muzzle) ?? throw new InvalidOperationException(prefab + " has no " + spec.Muzzle + " point");
-        // The muzzle point belongs to the head: it takes the head's elevation and pitch.
+        // The muzzle point belongs to the head: it takes the head's pitch and kick.
         modelMuzzle.SetParent(head, true);
-        // Barrels along the native muzzle: turn the head about its own pivot by the muzzle's elevation.
-        var muzzleForward = rig.Muzzle.forward;
-        var elevation = Vector3.SignedAngle(facing, Vector3.ProjectOnPlane(muzzleForward, right), right);
-        head.rotation = Quaternion.AngleAxis(elevation, right) * head.rotation;
-        turn.SetParent(rig.Yaw, true);
         turn.name = "ForgeOrdnance.TurretYaw";
         var holder = new GameObject("ForgeOrdnance.TurretPitch").transform;
         holder.SetPositionAndRotation(head.position, head.rotation);
-        holder.SetParent(rig.Yaw, true);
+        holder.SetParent(root.transform, true);
         head.SetParent(holder, true);
         head.name = "ForgeOrdnance.TurretHead";
-        // The look keeps its own proportions on the yaw axis; the game's muzzle point (where shots, flash and tracers start) is
-        // moved onto the look's muzzle instead, now and every frame (LateTick), so they leave the enlarged barrel tip.
-        var nativeRest = rig.Muzzle.localRotation;
+        var barrel = head.Find(spec.Barrel);
         rig.Muzzle.position = modelMuzzle.position;
 
-        HideBody(sentry, rig.Firing);
-        var gap = Vector3.Distance(modelMuzzle.position, rig.Muzzle.position);
-        if (gap > MaxMuzzleGap) Plugin.Error("Sentry look " + prefab + ": the model muzzle is " + Math.Round(gap, 3) + " m from the native muzzle after alignment (limit " + MaxMuzzleGap + " m).");
+        HideBody(sentry);
+        var detection = sentry.m_detection?.TryCast<SentryGunInstance_Detection>();
+        if (detection == null) Plugin.Logger.ErrorOnce("ordnance-sentry-no-detection", "sentry look " + prefab + ": the sentry has no detection component, so the host's gun cannot lay on its target.");
         var look = new Look
         {
-            Sentry = sentry, Prefab = prefab, Yaw = rig.Yaw, Pitch = rig.Pitch, Turn = turn, Holder = holder, Head = head, Root = root,
-            YawAtMount = rig.Yaw.localRotation, PitchAtMount = rig.Pitch.localRotation,
-            PitchToHolder = Quaternion.Inverse(rig.Pitch.rotation) * holder.rotation,
-            RescanUntil = Time.time + LateMeshSeconds, NextRescan = Time.time + 0.25f, Mount = mount,
-            ModelMuzzle = modelMuzzle, NativeMuzzle = rig.Muzzle, NativeMuzzleRest = nativeRest
+            Sentry = sentry,
+            Prefab = prefab,
+            Yaw = rig.Yaw,
+            Turn = turn,
+            Holder = holder,
+            Head = head,
+            Root = root,
+            Barrel = barrel,
+            Motion = spec.Motion,
+            Firing = rig.Firing,
+            ShellEject = rig.Firing.ShellEjectAlign,
+            RescanUntil = Time.time + LateMeshSeconds,
+            NextRescan = Time.time + 0.25f,
+            Mount = mount,
+            ModelMuzzle = modelMuzzle,
+            NativeMuzzle = rig.Muzzle,
+            Detection = detection,
+            Sync = sentry.m_sync?.TryCast<SentryGunInstance_Sync>(),
+            Up = up,
+            Facing = facing,
+            Heading = facing,
+            YawForward = Quaternion.Inverse(rig.Yaw.rotation) * facing,
+            HolderOffset = holder.position - turn.position,
+            TurnRest = turn.rotation,
+            HolderRest = holder.rotation,
+            HeadRest = head.localPosition,
+            HeadBack = Quaternion.Inverse(holder.rotation) * -facing,
         };
+        if (barrel != null)
+        {
+            look.BarrelRest = barrel.localPosition;
+            look.BarrelRestRotation = barrel.localRotation;
+            look.BarrelAxis = Quaternion.Inverse(head.rotation) * facing;
+            look.BarrelBack = -look.BarrelAxis / spec.WorldScale;
+        }
         return look;
     }
 
     /// <summary>Every frame after the animation: mounts sentries whose rig is now present, hides body meshes the game adds
-    /// shortly after, remounts on replaced nodes and confirms once that native aiming turns the look.</summary>
+    /// shortly after, remounts on replaced nodes and draws the looks.</summary>
     internal static void LateTick()
     {
         var now = Time.time;
@@ -224,7 +240,7 @@ internal static class TurretLooks
             {
                 if (now - p.Since < GiveUpSeconds) continue;
                 Waiting.RemoveAt(i);
-                if (ours) Plugin.Error("Ordnance sentry look not mounted after " + GiveUpSeconds + " s: the sentry rig still has no " + missing + "; it keeps the game's look.");
+                if (ours) Plugin.Logger.ErrorOnce("Ordnance sentry look not mounted after " + GiveUpSeconds + " s: the sentry rig still has no " + missing + "; it keeps the game's look.");
                 continue;
             }
             Waiting.RemoveAt(i);
@@ -235,65 +251,144 @@ internal static class TurretLooks
         {
             var l = Looks[i];
             if (l.Sentry == null || l.Sentry.WasCollected) { Looks.RemoveAt(i); continue; }
-            if (Gone(l.Yaw) || Gone(l.Pitch) || Gone(l.Turn) || Gone(l.Holder) || Gone(l.Head))
+            if (Gone(l.Yaw) || Gone(l.Turn) || Gone(l.Holder) || Gone(l.Head) || Gone(l.ModelMuzzle) || Gone(l.NativeMuzzle))
             {
                 Looks.RemoveAt(i);
-                if (!Gone(l.Turn)) Object.Destroy(l.Turn.gameObject);
-                if (!Gone(l.Holder)) Object.Destroy(l.Holder.gameObject);
                 if (l.Root != null && !l.Root.WasCollected) Object.Destroy(l.Root);
                 Waiting.Add(new Pending { Sentry = l.Sentry, Since = now, NextPoll = now, Attempt = l.Mount });
                 continue;
             }
-            l.Holder.rotation = l.Pitch.rotation * l.PitchToHolder;
-            // The head hinges about its own pivot, not the native one, so its muzzle moves differently from the native muzzle point:
-            // put the game's muzzle point (shots, flash, tracers) on the look's muzzle every frame, aimed at the target from there.
-            if (!Gone(l.ModelMuzzle) && !Gone(l.NativeMuzzle)) AimMuzzle(l);
+            Draw(l, Time.deltaTime);
             if (now < l.RescanUntil && now >= l.NextRescan)
             {
                 l.NextRescan = now + 0.25f;
-                var firing = l.Sentry.m_firingComp != null ? l.Sentry.m_firingComp.TryCast<SentryGunInstance_Firing_Bullets>() : null;
-                if (firing != null)
-                {
-                    var late = HideBody(l.Sentry, firing);
-                }
-            }
-            if (!l.MovedLogged)
-            {
-                var yawTurn = Quaternion.Angle(l.Yaw.localRotation, l.YawAtMount);
-                var pitchTurn = Quaternion.Angle(l.Pitch.localRotation, l.PitchAtMount);
-                if (yawTurn > 3f || pitchTurn > 3f)
-                {
-                    l.MovedLogged = true;
-                }
+                HideBody(l.Sentry);
             }
         }
     }
 
-    /// <summary>The game's muzzle point sits on the look's muzzle and its forward (the shot direction, which the game aimed from its own
-    /// muzzle position) points at the target's aim point from there, so a muzzle carried higher than the game's does not lift every shot
-    /// by that height. With no target the muzzle has the rotation the game gave it.</summary>
-    private static void AimMuzzle(Look l)
+    /// <summary>One frame of a standing look: heading, pitch, kick and barrels, then the game's muzzle point on what is drawn.</summary>
+    private static void Draw(Look l, float dt)
     {
+        var motion = l.Motion;
+        var hasTarget = TryAim(l, out var wanted);
+
+        l.ScanWeight = Mathf.MoveTowards(l.ScanWeight, !hasTarget && motion.ScanDegrees > 0f ? 1f : 0f, dt / (hasTarget ? ScanFadeOut : ScanFadeIn));
+        l.ScanClock += dt * l.ScanWeight;
+        var scan = Mathf.Sin(l.ScanClock * 2f * Mathf.PI / motion.ScanSeconds) * motion.ScanDegrees * l.ScanWeight;
+        var aimed = Vector3.ProjectOnPlane(l.Yaw.rotation * l.YawForward, l.Up);
+        var heading = Quaternion.AngleAxis(scan, l.Up) * (aimed.sqrMagnitude > 1e-4f ? aimed.normalized : l.Heading);
+        l.Heading = Vector3.RotateTowards(l.Heading, heading, (hasTarget ? TurnDegrees : ScanTurnDegrees) * Mathf.Deg2Rad * dt, 0f);
+        var turned = Quaternion.AngleAxis(Vector3.SignedAngle(l.Facing, l.Heading, l.Up), l.Up);
+        l.Turn.rotation = turned * l.TurnRest;
+        l.Holder.position = l.Turn.position + turned * l.HolderOffset;
+        var right = Vector3.Cross(l.Up, l.Heading).normalized;
+
+        var pitch = hasTarget ? Mathf.Clamp(Vector3.SignedAngle(l.Heading, Vector3.ProjectOnPlane(wanted, right), right), MaxUp, MaxDown) : 0f;
+        l.Elevation = Mathf.MoveTowards(l.Elevation, pitch, (hasTarget ? PitchDegrees : RestPitchDegrees) * dt);
+        var keep = Mathf.Exp(-motion.RecoilReturn * dt);
+        l.Recoil *= keep;
+        l.BarrelSlide *= keep;
+        l.Tip *= keep;
+        var lay = Quaternion.AngleAxis(l.Elevation, right);
+        l.Holder.rotation = Quaternion.AngleAxis(-l.Tip, right) * lay * turned * l.HolderRest;
+        l.Head.localPosition = l.HeadRest + l.HeadBack * l.Recoil;
+        if (!Gone(l.Barrel))
+        {
+            l.SpinSpeed = Mathf.MoveTowards(l.SpinSpeed, 0f, motion.BarrelSpin / motion.SpinDownSeconds * dt);
+            l.Spin = (l.Spin + l.SpinSpeed * dt) % 360f;
+            l.Barrel!.localPosition = l.BarrelRest + l.BarrelBack * l.BarrelSlide;
+            l.Barrel.localRotation = Quaternion.AngleAxis(l.Spin, l.BarrelAxis) * l.BarrelRestRotation;
+        }
+
         var muzzle = l.NativeMuzzle;
         muzzle.position = l.ModelMuzzle.position;
-        if (!l.DetectionResolved)
+        var along = lay * l.Heading;
+        var shot = hasTarget && Vector3.Angle(along, wanted) <= LockDegrees ? wanted : along;
+        muzzle.rotation = Quaternion.LookRotation(shot, l.Up);
+        // Spent cases leave the side of the gun, not the hidden native one.
+        if (!Gone(l.ShellEject)) l.ShellEject!.position = l.Holder.position + right * (0.08f * l.Root.transform.lossyScale.x);
+    }
+
+    /// <summary>The way from the look's muzzle to the sentry's target, or false with no target. The host has the target itself and lays on the
+    /// middle of its body (the game's aim point sits high, and shots laid on it fly over small or crouching bodies); a client only runs the
+    /// game's synced state, which holds the direction the host's sentry aims.</summary>
+    private static bool TryAim(Look l, out Vector3 wanted)
+    {
+        wanted = default;
+        if (ForgeCore.Session.IsHost)
         {
-            // The same component the game targets with (m_detection, set in OnGearSpawnComplete), read once and kept.
-            l.DetectionResolved = true;
-            l.Detection = l.Sentry.m_detection?.TryCast<SentryGunInstance_Detection>();
-            if (l.Detection == null) Plugin.Error("Ordnance sentry look " + l.Prefab + ": the sentry has no detection component, so the muzzle cannot aim at its target and shots leave at the game's muzzle direction.");
+            if (AimPoint(l) is not { } point) return false;
+            wanted = point - l.ModelMuzzle.position;
+            return wanted.sqrMagnitude > 1e-4f;
         }
-        var aim = l.Detection != null && l.Detection.HasTarget ? l.Detection.TargetAimTrans : null;
-        if (aim == null || aim.WasCollected)
+        if (l.Sync == null) return false;
+        var sync = l.Sync.LastSyncData;
+        if (!sync.hasTarget || sync.targetDir.sqrMagnitude < 1e-4f) return false;
+        wanted = sync.targetDir;
+        return true;
+    }
+
+    private static Vector3? AimPoint(Look l)
+    {
+        if (l.Detection == null || !l.Detection.HasTarget) return null;
+        var target = l.Detection.Target;
+        if (target != null && !target.WasCollected && target.Pointer != l.TargetPointer)
         {
-            muzzle.localRotation = l.NativeMuzzleRest;
+            l.TargetPointer = target.Pointer;
+            l.Body = target.GetComponentInParent<EnemyAgent>()?.AimTargetBody;
+        }
+        if (l.Body != null && !l.Body.WasCollected) return l.Body.position;
+        var aim = l.Detection.TargetAimTrans;
+        return aim != null && !aim.WasCollected ? aim.position : null;
+    }
+
+    /// <summary>Every peer, on one shot of a sentry: its look kicks, its barrel slides and spins.</summary>
+    internal static void Fired(SentryGunInstance_Firing_Bullets firing)
+    {
+        foreach (var l in Looks)
+        {
+            if (l.Firing.Pointer != firing.Pointer) continue;
+            var motion = l.Motion;
+            l.Recoil = Mathf.Min(l.Recoil + motion.Recoil, motion.MaxRecoil);
+            l.Tip = Mathf.Min(l.Tip + motion.Kick, 4f * motion.Kick);
+            l.BarrelSlide = Mathf.Min(l.BarrelSlide + motion.BarrelRecoil, 2f * motion.BarrelRecoil);
+            l.SpinSpeed = motion.BarrelSpin;
             return;
         }
-        var toward = aim.position - muzzle.position;
-        if (toward.sqrMagnitude > 1e-4f) muzzle.rotation = Quaternion.LookRotation(toward, muzzle.up);
     }
 
     private static bool Gone(Transform? t) => t == null || t.WasCollected;
+
+    /// <summary>The look of the sentry the call (<paramref name="thrower"/>, <paramref name="throwId"/>) stood: the sentry's identity is the call's own
+    /// (<see cref="SentryIdentity.For"/>), so two turrets landing side by side keep their own looks.</summary>
+    private static Look? LookOf(ulong thrower, uint throwId)
+    {
+        var identity = SentryIdentity.For(thrower, throwId);
+        foreach (var l in Looks)
+        {
+            if (l.Sentry == null || l.Sentry.WasCollected) continue;
+            if (GearPayload.TryIdentity(l.Sentry, out var found) && found == identity) return l;
+        }
+        return null;
+    }
+
+    /// <summary>Whether the sentry the call stood already wears its look.</summary>
+    internal static bool HasLookOf(ulong thrower, uint throwId) => LookOf(thrower, throwId) != null;
+
+    /// <summary>The call's look goes (its turret is being stowed, drawn by the shell from here): true, with the way it faces and its pitch, when there was one.</summary>
+    internal static bool Retire(ulong thrower, uint throwId, out Vector3 facing, out float pitch)
+    {
+        facing = Vector3.forward;
+        pitch = 0f;
+        var l = LookOf(thrower, throwId);
+        if (l == null) return false;
+        facing = l.Heading;
+        pitch = l.Elevation;
+        Looks.Remove(l);
+        if (l.Root != null && !l.Root.WasCollected) Object.Destroy(l.Root);
+        return true;
+    }
 
     internal static void Clear()
     {
@@ -305,11 +400,19 @@ internal static class TurretLooks
 /// <summary>Every peer: a sentry's gear is spawned; its parts are assembled over the next frames.</summary>
 internal static class TurretLookHook
 {
-    internal static void Subscribe() => ForgeCore.GameHooks.SentryGearSpawned.After((sentry, _) => Spawned(sentry));
+    internal static void Subscribe()
+    {
+        ForgeCore.GameHooks.SentryGearSpawned.After((sentry, _) => Spawned(sentry));
+        ForgeCore.GameHooks.SentryFired.After((firing, _) =>
+        {
+            try { TurretLooks.Fired(firing); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("ordnance-turret-recoil-failed", "a turret look's recoil failed: " + error); }
+        });
+    }
 
     private static void Spawned(SentryGunInstance sentry)
     {
         try { TurretLooks.Assembled(sentry); }
-        catch (Exception error) { Plugin.Error("Registering the Ordnance sentry look failed; the sentry keeps the game's look: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Registering the Ordnance sentry look failed; the sentry keeps the game's look: " + error); }
     }
 }

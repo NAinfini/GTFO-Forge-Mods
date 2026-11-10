@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ForgeCore;
 using SNetwork;
+using UnityEngine;
 
 namespace ForgeOrdnance;
 
@@ -16,6 +17,8 @@ internal static class LobbyRules
     private static bool _wasMaster, _contentReady, _reread, _dirty = true;
     private static ulong _master, _setHash;
     private static int _readVersion;
+    private static float _retryAt;
+    private const float RetrySeconds = 0.5f;
     private static string _localSelection = "";
     private static HostRulesSnapshot? _current;
     private static OrdnanceLevelRules? _currentSettings, _hostRulesSource;
@@ -39,9 +42,14 @@ internal static class LobbyRules
     /// invalidated them (the host, the loaded definitions, the received rules or the selected expedition).</summary>
     internal static void Tick()
     {
-        if (_rules == null || !_dirty) return;
+        if (_rules == null) return;
+        // Rules still missing (no host or local player yet, definitions not loaded, host value or selection not arrived): the
+        // events that would end the wait may have fired before the context was complete, so look again twice a second.
+        if (!_dirty && _current == null && Time.unscaledTime >= _retryAt) _dirty = true;
+        if (!_dirty) return;
+        _retryAt = Time.unscaledTime + RetrySeconds;
         try { RefreshContext(); }
-        catch (Exception error) { Plugin.Error("Host level rules could not be synchronized: " + error); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("Host level rules could not be synchronized: " + error); }
     }
 
     internal static bool TryCurrent(out OrdnanceLevelRules rules, out string levelKey)
@@ -51,7 +59,7 @@ internal static class LobbyRules
             try { RefreshContext(); }
             catch (Exception error)
             {
-                Plugin.Error("Host level rules could not be read: " + error);
+                Plugin.Logger.ErrorOnce("Host level rules could not be read: " + error);
             }
         }
         if (_current != null && _currentSettings != null && _current.DefinitionHash == OrdnanceContent.Set.Hash
@@ -66,10 +74,11 @@ internal static class LobbyRules
         return false;
     }
 
-    /// <summary>Uses the host's slot count and allow-list without changing saved picks outside that view.</summary>
+    /// <summary>Uses the host's slot count and allow-list without changing saved picks outside that view. False while the level's
+    /// <c>LobbyPicker</c> is off: the player's picks are not used then (the host gives the level's own <c>Loadouts</c>).</summary>
     internal static bool TrySubmissionKeys(out List<uint> keys)
     {
-        if (TryCurrent(out var rules, out _))
+        if (TryCurrent(out var rules, out _) && rules.LobbyPicker)
         {
             keys = LoadoutStore.KeysFor(rules);
             return true;
@@ -83,10 +92,10 @@ internal static class LobbyRules
         if (_rules == null) return;
         _dirty = false;
         var local = SNet.LocalPlayer?.Lookup ?? 0UL;
-        var master = SNet.Master?.Lookup ?? (SNet.IsMaster ? local : 0UL);
+        var master = SNet.Master?.Lookup ?? (Session.IsHost ? local : 0UL);
         var selection = OrdnanceContent.SelectedLevelKey() ?? "";
         var hash = OrdnanceContent.Set.Hash;
-        var isMaster = SNet.IsMaster;
+        var isMaster = Session.IsHost;
         var ready = OrdnanceApi.DefinitionsLoaded;
         var hostRules = isMaster && ready ? OrdnanceContent.Settings.For(selection) : null;
         if (master != _master || selection != _localSelection || hash != _setHash || isMaster != _wasMaster
@@ -120,7 +129,7 @@ internal static class LobbyRules
         if (!HostRulesWire.TryDecode(bytes, out var received) || received == null)
         {
             SetCurrent(null, null, null);
-            Plugin.Error("The host sent malformed level rules; they were ignored.");
+            Plugin.Logger.ErrorOnce("The host sent malformed level rules; they were ignored.");
             return;
         }
         // The host publishes again when its selection changes; until the lobby's selection reaches this player the rules wait.
@@ -128,7 +137,7 @@ internal static class LobbyRules
         if (received.AllowedKeys != null && received.AllowedKeys.Any(key => !OrdnanceContent.Set.TryGet(key, out _)))
         {
             SetCurrent(null, null, null);
-            Plugin.Error("The host sent level rules containing an unknown call-in; the rules were ignored.");
+            Plugin.Logger.ErrorOnce("The host sent level rules containing an unknown call-in; the rules were ignored.");
             return;
         }
         SetCurrent(received, bytes, received.ToSettings(OrdnanceContent.Set));
@@ -145,7 +154,7 @@ internal static class LobbyRules
         foreach (Action handler in Changed.GetInvocationList())
         {
             try { handler(); }
-            catch (Exception error) { Plugin.Error("Applying synchronized host level rules failed: " + error); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("Applying synchronized host level rules failed: " + error); }
         }
     }
 }
