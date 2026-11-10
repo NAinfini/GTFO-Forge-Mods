@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json.Nodes;
 
 namespace ForgeWeaponEnergyLab;
@@ -34,18 +33,21 @@ internal sealed class EnergyGear
 internal static class EnergyGears
 {
     internal static EnergyGear[] All { get; private set; } = Array.Empty<EnergyGear>();
-    private static readonly EnergyGear?[] Categories = new EnergyGear[ushort.MaxValue + 1];
+    /// <summary>Every category ID is <c>CategoryBase | (hash &amp; 0x7fff)</c>, so tables indexed by category hold <see cref="CategorySlots"/> rows from <see cref="Slot"/>.</summary>
+    internal const uint CategoryBase = 0x8000u;
+    internal const int CategorySlots = 0x8000;
+    internal static int Slot(uint categoryId) => categoryId - CategoryBase < CategorySlots ? (int)(categoryId - CategoryBase) : -1;
+    private static readonly EnergyGear?[] Categories = new EnergyGear[CategorySlots];
     private static bool _frozen;
     internal static (uint Gear, uint Category, uint Archetype) Ids(string id)
         => (0x20000000u | (ForgeCore.Fnv.Hash32(id + "/gear") & 0x1fffffffu),
-            0x8000u | (ForgeCore.Fnv.Hash32(id + "/category") & 0x7fffu),
+            CategoryBase | (ForgeCore.Fnv.Hash32(id + "/category") & (CategorySlots - 1u)),
             0x20000000u | (ForgeCore.Fnv.Hash32(id + "/archetype") & 0x1fffffffu));
 
     /// <summary>Closes registration once. A weapon whose bundle is missing or the wrong size is left out with a line in <paramref name="errors"/>; the others stay.</summary>
     internal static void Freeze(List<string> errors)
     {
         if (_frozen) return;
-        _frozen = true;
         var hashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var kept = new List<EnergyGear>();
         foreach (var gear in EnergyLab.Freeze(errors))
@@ -58,17 +60,30 @@ internal static class EnergyGears
                     errors.Add(gear.Definition.Id + ".model.bundle: missing bundle or size outside 1 KiB..128 MiB: " + gear.ModelPath + "; this weapon is skipped.");
                     continue;
                 }
-                using var stream = File.OpenRead(gear.ModelPath);
-                using var sha = SHA256.Create();
-                hashes.Add(gear.ModelPath, Convert.ToHexString(sha.ComputeHash(stream)));
+                try
+                {
+                    using var stream = File.OpenRead(gear.ModelPath);
+                    using var sha = SHA256.Create();
+                    hashes.Add(gear.ModelPath, Convert.ToHexString(sha.ComputeHash(stream)));
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                {
+                    errors.Add(gear.Definition.Id + ".model.bundle: could not be read (" + error.Message + "): " + gear.ModelPath + "; this weapon is skipped.");
+                    continue;
+                }
             }
             gear.ModelDigest = hashes[gear.ModelPath];
             kept.Add(gear);
         }
-        foreach (var gear in kept) Categories[gear.CategoryId] = gear;
+        foreach (var gear in kept) Categories[Slot(gear.CategoryId)] = gear;
         All = kept.ToArray();
+        _frozen = true;
     }
-    internal static EnergyGear? ForCategory(uint categoryId) => categoryId <= ushort.MaxValue ? Categories[categoryId] : null;
+    internal static EnergyGear? ForCategory(uint categoryId)
+    {
+        var slot = Slot(categoryId);
+        return slot < 0 ? null : Categories[slot];
+    }
     internal static EnergyMode ModeForCategory(uint categoryId) => ForCategory(categoryId)?.Mode ?? EnergyMode.Off;
     internal static bool IsSelection(uint categoryId, int mode) => categoryId == 0 && mode == (int)EnergyMode.Off || Match(categoryId, mode) != null;
     internal static EnergyGear? Match(uint categoryId, int mode) => ForCategory(categoryId) is { } gear && (int)gear.Mode == mode ? gear : null;

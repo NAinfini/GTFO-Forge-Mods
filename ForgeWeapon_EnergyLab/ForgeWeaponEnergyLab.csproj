@@ -7,7 +7,6 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>ForgeWeaponEnergyLab</AssemblyName>
-    <Version>1.0.0</Version>
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
@@ -22,18 +21,20 @@
   </Target>
   <ItemGroup>
     <Compile Include="Core/*.cs;Native/**/*.cs;Presentation/*.cs" />
+    <EmbeddedResource Include="Data/gun-grips.json" LogicalName="ForgeWeaponEnergyLab.Data.gun-grips.json" />
+    <EmbeddedResource Include="Data/gun-sights.json" LogicalName="ForgeWeaponEnergyLab.Data.gun-sights.json" />
     <!-- ForgeUI reads the player-visible texts from lang/ beside the DLL. -->
-    <None Update="lang/*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="lang/*.forge" CopyToOutputDirectory="PreserveNewest" />
     <!-- The eight shipped guns are a ForgeEnergyLab definition file with its own lang/ folder, like any content pack's. -->
-    <None Update="ForgeEnergyLab/**/*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="ForgeEnergyLab/**/*.forge" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="../ForgeCore/ForgeCore.csproj" Private="false" />
     <ProjectReference Include="../ForgeUI/ForgeUI.csproj" Private="false" />
     <ProjectReference Include="../ForgeAudio/ForgeAudio.csproj" Private="false" />
     <ProjectReference Include="../ForgeVisual/ForgeVisual.csproj" Private="false" />
     <!-- ForgeAudio reads the cues and their Ogg files from audio/ beside the DLL; the Ogg files are local media (Assets/Audio/ogg). -->
-    <None Include="audio/cues.json" Link="audio/cues.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="audio/cues.forge" Link="audio/cues.forge" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(ForgeModsRoot)ForgeWeapon_EnergyLab/Assets/Audio/ogg/*.ogg" Link="audio/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <!-- The eight weapon model bundles sit beside energylab.json, which names them; they are local media (Assets/Models). -->
+    <!-- The eight weapon model bundles sit beside energylab.forge, which names them; they are local media (Assets/Models). -->
     <None Include="$(ForgeModsRoot)ForgeWeapon_EnergyLab/Assets/Models/forge-energy-model-*.bundle" Link="ForgeEnergyLab/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <EmbeddedResource Include="$(ForgeModsRoot)ForgeWeapon_EnergyLab/Assets/Vfx/forge-energy-disc.bundle" LogicalName="ForgeWeaponEnergyLab.Vfx.forge-energy-disc.bundle" />
     <Reference Include="BepInEx.Core" HintPath="$(GTFOBepInExPath)/core/BepInEx.Core.dll" Private="false" />

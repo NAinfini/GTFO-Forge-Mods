@@ -1,5 +1,4 @@
 using System;
-using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using Player;
 using UnityEngine;
 
@@ -23,10 +22,15 @@ internal sealed class BlastShells
         internal float Until, Damage;
         internal int Dimension;
         internal bool Fresh;
+        /// <summary>The shot's number (the host's word on where it burst names it), and: when a machine that only draws it stopped (it then
+        /// waits for the host until this time), and whether the burst place is settled.</summary>
+        internal uint Sequence;
+        internal float Hold;
+        internal bool Confirmed;
     }
 
     private readonly Shell[] _shells = new Shell[Capacity];
-    private readonly Il2CppStructArray<RaycastHit> _sweep = new(QueryCapacity);
+    private readonly ProjectileSweep _sweep = new(QueryCapacity);
     private readonly ForgeCore.ColliderQuery _overlap = new(QueryCapacity);
     private readonly EnergyExplosion _explosion = new();
     private readonly NativeShot _contact = new();
@@ -44,18 +48,19 @@ internal sealed class BlastShells
     internal bool CanLaunch => _active < Capacity;
     internal bool Idle => _active == 0;
 
-    internal void Launch(PlayerAgent owner, EnergyGear gear, Vector3 position, Vector3 direction, float damage, float now)
+    internal void Launch(PlayerAgent owner, EnergyGear gear, Vector3 position, Vector3 direction, float damage, float now, uint sequence)
     {
         if (direction.sqrMagnitude < 0.0001f) throw new ArgumentException("Blast shell direction is empty.");
         for (var index = 0; index < Capacity; index++)
         {
             var shell = _shells[index];
-            if (shell.Owner != null) continue;
+            if (shell.Owner is not null) continue;
             shell.Owner = owner; shell.Gear = gear; shell.Dimension = (int)owner.DimensionIndex;
             shell.Position = position; shell.Direction = direction.normalized;
             shell.Until = now + Reach / gear.Numbers.Speed;
             shell.Damage = damage;
             shell.Fresh = true;
+            shell.Sequence = sequence; shell.Hold = 0f; shell.Confirmed = false;
             _active++;
             _visuals.Shell(index, position, now);
             return;
@@ -69,12 +74,14 @@ internal sealed class BlastShells
         for (var index = 0; index < Capacity; index++)
         {
             var shell = _shells[index];
-            if (shell.Owner == null) continue;
+            // A slot is in use while it holds an owner object: a shooter Unity destroyed still reads == null, so slots are tested by
+            // reference and Advance ends that shell.
+            if (shell.Owner is null) continue;
             // A query that outgrew its budget drops this shell only, never the gun.
             try { Advance(index, shell, delta, now); }
             catch (BudgetExhausted error)
             {
-                Plugin.Error("A blast shell was dropped: " + error);
+                Plugin.Logger.ErrorOnce("energylab-blast-shell-dropped", "A blast shell was dropped: " + error);
                 End(index);
             }
         }
@@ -83,7 +90,15 @@ internal sealed class BlastShells
     private void Advance(int index, Shell shell, float delta, float now)
     {
         var owner = shell.Owner!;
-        if (owner.WasCollected || !owner.Alive || (int)owner.DimensionIndex != shell.Dimension || now >= shell.Until) { End(index); return; }
+        if (owner == null || owner.WasCollected || !owner.Alive || (int)owner.DimensionIndex != shell.Dimension || now >= shell.Until) { End(index); return; }
+        if (shell.Hold > 0f)
+        {
+            // Stopped here, waiting for the host's word on where it burst; none came in time.
+            if (now < shell.Hold) return;
+            shell.Hold = 0f; shell.Confirmed = true;
+            Explode(index, shell, now, default);
+            return;
+        }
         // Even a shell launched inside a receiver waits until Fire has returned before it explodes.
         if (shell.Fresh)
         {
@@ -99,16 +114,8 @@ internal sealed class BlastShells
             }
         }
         var distance = shell.Gear.Numbers.Speed * delta;
-        var hits = Physics.SphereCastNonAlloc(shell.Position, BodyRadius, shell.Direction, _sweep, distance,
-            LayerManager.MASK_BULLETWEAPON_RAY, QueryTriggerInteraction.UseGlobal);
-        if (hits == _sweep.Length) throw new BudgetExhausted("Blast shell sweep budget exhausted; no truncated collision result used.");
-        var stop = -1;
-        for (var row = 0; row < hits; row++)
-        {
-            var collider = _sweep[row].collider;
-            if (collider == null || ForgeCore.Combat.IsPartOf(collider, owner)) continue;
-            if (stop < 0 || _sweep[row].distance < _sweep[stop].distance) stop = row;
-        }
+        var stop = _sweep.Nearest(_sweep.Cast(shell.Position, BodyRadius, shell.Direction, distance), owner);
+
         if (stop < 0)
         {
             shell.Position += shell.Direction * distance;
@@ -116,21 +123,23 @@ internal sealed class BlastShells
             return;
         }
         var hit = _sweep[stop];
-        // A sweep that starts inside a receiver can report a zero-distance placeholder point.
-        if (hit.distance <= 0f) hit.point = hit.collider.ClosestPoint(shell.Position);
         shell.Position += shell.Direction * MathF.Max(0f, hit.distance - 0.01f);
         Explode(index, shell, now, hit);
     }
 
     private void Explode(int index, Shell shell, float now, RaycastHit hit)
     {
+        // A machine that only draws the shell waits where it stopped: the host says where the shell burst.
+        if (!_damageEnabled && !shell.Confirmed) { shell.Hold = now + EnergyProtocol.FlightEndWaitSeconds; return; }
         var owner = shell.Owner!;
         var gear = shell.Gear;
         var position = shell.Position;
-        // Claim the end of this shell before any native write; a partial explosion is never retried.
+        // Its trail runs on to the point it burst at, then the shell's end is claimed before any native write; a partial explosion is never retried.
+        _visuals.Shell(index, position, now);
         End(index);
-        _visuals.GrenadeExplosion(position, gear.Numbers.BlastRadius, now);
+        _visuals.GrenadeExplosion(position);
         if (!_damageEnabled) return;
+        FlightEnds.Announce(owner, FlightKind.Shell, shell.Sequence, position);
         // The contact itself carries no damage (the explosion does); it registers the shot on the enemy limb it struck.
         if (_contact.ContactTarget(position, shell.Direction, hit, out var limb))
         {
@@ -141,10 +150,23 @@ internal sealed class BlastShells
         WeaponNoise.Explosion(owner, gear, position);
     }
 
+    /// <summary>The host's word: shot <paramref name="sequence"/> burst at <paramref name="at"/>. The shell, if it is still flying here, bursts there.</summary>
+    internal void Finish(uint sequence, Vector3 at, float now)
+    {
+        for (var index = 0; index < Capacity; index++)
+        {
+            var shell = _shells[index];
+            if (shell.Owner is null || shell.Sequence != sequence) continue;
+            shell.Position = at; shell.Hold = 0f; shell.Confirmed = true;
+            Explode(index, shell, now, default);
+            return;
+        }
+    }
+
     private void End(int index)
     {
         var shell = _shells[index];
-        if (shell.Owner == null) return;
+        if (shell.Owner is null) return;
         shell.Owner = null;
         _active--;
         _visuals.EndShell(index);

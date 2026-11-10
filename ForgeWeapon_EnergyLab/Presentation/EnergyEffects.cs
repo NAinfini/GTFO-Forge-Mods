@@ -40,6 +40,9 @@ internal sealed class EnergyEffects : IDisposable
     private bool _disposed;
     private bool _arcHeld;
 
+    /// <summary>The sounds of the gun in the hand; the owner sets it when the gun changes.</summary>
+    internal EnergyLook Look { get; set; } = EnergyLook.Default;
+
     public EnergyEffects()
     {
         _root = new GameObject("Energy weapon effects");
@@ -71,7 +74,7 @@ internal sealed class EnergyEffects : IDisposable
         _root.transform.position = start;
         if (!_beaming)
         {
-            _beamEvent.Play(BeamStart, 0.7f);
+            _beamEvent.Play(Look.Cue(BeamStart), 0.7f);
             _beamStarted = now;
             _beaming = true;
             _beamReleased = -1f;
@@ -81,14 +84,14 @@ internal sealed class EnergyEffects : IDisposable
         if (introDone && hit && (!_beamWasHit || now >= _nextBeamHit) && !_beamHit.Playing)
         {
             _beamHit.Anchor.position = end;
-            _beamHit.Play(BeamHit, 0.33f);
+            _beamHit.Play(Look.Cue(BeamHit), 0.33f);
             _nextBeamHit = now + 0.16f;
         }
         _beamWasHit = hit;
         if (introDone)
         {
             _beamLoopGain = (hit ? 0.63f : 0.55f) * Mathf.Clamp01((now - _beamStarted - BeamLoopEntry) / BeamLoopFadeIn);
-            _loop.Hold(BeamLoop, _beamLoopGain);
+            _loop.Hold(Look.Cue(BeamLoop), _beamLoopGain);
         }
     }
 
@@ -102,14 +105,14 @@ internal sealed class EnergyEffects : IDisposable
             _charging = true;
             _chargedFull = false;
             _chargeFull.Stop();
-            _chargeRise.Play(ChargeRise, 0.95f);
+            _chargeRise.Play(Look.Cue(ChargeRise), 0.95f);
         }
         if (power >= 1f && !_chargedFull)
         {
             _chargedFull = true;
             _chargeRise.Stop();
-            _chargeFull.Play(ChargeFull, 0.9f);
-            _chargeHold.Hold(ChargeHold, ChargeHoldGain);
+            _chargeFull.Play(Look.Cue(ChargeFull), 0.9f);
+            _chargeHold.Hold(Look.Cue(ChargeHold), ChargeHoldGain);
         }
     }
 
@@ -123,7 +126,7 @@ internal sealed class EnergyEffects : IDisposable
     {
         StopCharge();
         _root.transform.position = position;
-        _launchVoices[_launchCursor].Play(arcOrb ? ParcLaunch : PlasmaLaunch, 0.8f);
+        _launchVoices[_launchCursor].Play(Look.Cue(arcOrb ? ParcLaunch : PlasmaLaunch), 0.8f);
         _launchCursor = (_launchCursor + 1) % _launchVoices.Length;
     }
 
@@ -140,7 +143,7 @@ internal sealed class EnergyEffects : IDisposable
     {
         if (!_charging) return;
         StopCharge();
-        _chargeFull.Play(ChargeCancel, 0.45f);
+        _chargeFull.Play(Look.Cue(ChargeCancel), 0.45f);
     }
 
     public void Chain(ReadOnlySpan<Vector3> starts, ReadOnlySpan<Vector3> ends, ReadOnlySpan<bool> hits, float now, float lifetime, float hopDelay)
@@ -153,7 +156,7 @@ internal sealed class EnergyEffects : IDisposable
         _arcStarted = now; _arcLifetime = lifetime; _arcHopDelay = hopDelay;
         _arcHitMask = 0;
         _root.transform.position = starts[0];
-        _arcEvent.Play(Arc, 0.82f);
+        _arcEvent.Play(Look.Cue(Arc), 0.82f);
         Tick(now);
     }
 
@@ -161,7 +164,7 @@ internal sealed class EnergyEffects : IDisposable
     {
         if (held == _arcHeld) return;
         _arcHeld = held;
-        if (held) _arcLoop.Hold(ArcLoop, 0.5f);
+        if (held) _arcLoop.Hold(Look.Cue(ArcLoop), 0.5f);
         else _arcLoop.Stop();
     }
 
@@ -183,7 +186,7 @@ internal sealed class EnergyEffects : IDisposable
             if (age < index * _arcHopDelay || !_hits[index] || (_arcHitMask & (1 << index)) != 0) continue;
             _arcHitMask |= 1 << index;
             _arcHits[index].Anchor.position = _ends[index];
-            _arcHits[index].Play(ArcHit, index == 0 ? 0.34f : 0.22f);
+            _arcHits[index].Play(Look.Cue(ArcHit), index == 0 ? 0.34f : 0.22f);
         }
     }
 
@@ -197,7 +200,7 @@ internal sealed class EnergyEffects : IDisposable
         if (_beaming && !_disposed)
         {
             // The start keeps its tail; the hold fades out in Tick while the stop plays over it.
-            _beamStop.Play(BeamStop, 0.55f);
+            _beamStop.Play(Look.Cue(BeamStop), 0.55f);
             if (_loop.Playing) { _beamReleased = float.PositiveInfinity; _beamReleaseGain = _beamLoopGain; }
         }
         _beaming = false;

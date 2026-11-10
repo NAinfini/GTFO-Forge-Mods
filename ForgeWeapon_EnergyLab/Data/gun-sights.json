@@ -1,0 +1,21 @@
+{
+  "format": "forge-gun-sights",
+  "schemaVersion": "1.0.0",
+  "about": "Which ForgeVisual sight (Data/sights.json) an energy gun model wears instead of its own optic (ForgeVisual GunSights, embedded). at is where the middle of the sight's base stands, in the model's export frame (front +Z, metres, model size), on the rail under it; replace names the model's own optic parts. The other guns keep their own optics.",
+  "models": {
+    "beam": {
+      "sight": "scope-2x",
+      "at": [
+        0.0,
+        0.1855,
+        0.1
+      ],
+      "replace": [
+        "Sight",
+        "SightGlass",
+        "SightReticle1"
+      ],
+      "about": "2x prism scope: the beam holds a line on a far target; in place of its holo-wedge sight"
+    }
+  }
+}

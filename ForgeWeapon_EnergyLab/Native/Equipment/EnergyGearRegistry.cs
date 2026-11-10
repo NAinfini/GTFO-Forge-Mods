@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using ForgeCore;
 using GameData;
 using Gear;
@@ -54,12 +55,14 @@ internal static class EnergyGearRegistry
 
     internal static void Install()
     {
+        // Every offline gear load calls this; once installed and the blocks still stand, there is nothing to clone again.
+        if (Ready && EnergyGears.All.All(gear => GameDataBlockBase<PlayerOfflineGearDataBlock>.GetBlock(gear.GearId) != null)) return;
         Ready = false;
         try
         {
             var problems = new List<string>();
             EnergyGears.Freeze(problems);
-            foreach (var problem in problems) Plugin.Error(problem);
+            foreach (var problem in problems) Plugin.Logger.ErrorOnce(problem);
             Presentation.EnergyIcons.Supply();
             var mainGear = Require<PlayerOfflineGearDataBlock>(MainTemplate);
             var specialGear = Require<PlayerOfflineGearDataBlock>(SpecialTemplate);
@@ -140,17 +143,15 @@ internal static class EnergyGearRegistry
                 ValidateOwned(archetype); ValidateOwned(category); ValidateOwned(block);
                 staged.Add((archetype, category, block, audio, casing, recoil));
             }
-            // All JSON, templates and collisions are checked before the first native write.
-            // A native AddBlock failure is recoverable: a re-install skips this package's
-            // already registered blocks individually, and completes only the missing suffix.
+            // One transaction: every collision is checked before the first native write and a failed write is removed again.
+            // A re-install skips this package's blocks that are already registered.
             EnergyNetwork.SealDefinitions();
+            var all = new List<object>();
             foreach (var block in staged)
-            {
-                AddMissing(block.Audio);
-                AddMissing(block.Casing);
-                AddMissing(block.Recoil);
-                AddMissing(block.Archetype); AddMissing(block.Category); AddMissing(block.Gear);
-            }
+                all.AddRange(new object[] { block.Audio, block.Casing, block.Recoil, block.Archetype, block.Category, block.Gear });
+            var added = DataBlocks.AddAll(Plugin.Id, all);
+            if (added is not (DataBlockResult.Added or DataBlockResult.AlreadyAdded))
+                throw new InvalidOperationException($"Energy blocks registration failed ({added}).");
             foreach (var gear in EnergyGears.All)
                 if (GameDataBlockBase<PlayerOfflineGearDataBlock>.GetBlock(gear.GearId) == null ||
                     GameDataBlockBase<GearCategoryDataBlock>.GetBlock(gear.CategoryId) == null ||
@@ -163,11 +164,12 @@ internal static class EnergyGearRegistry
             foreach (var gear in EnergyGears.All)
                 CurrentPackets[gear.CategoryId] = (gear, new GearIDRange(Require<PlayerOfflineGearDataBlock>(gear.GearId).GearJSON).GetPacketStruct().Comps);
             EnergyText.Register();
+            EnergyRules.Apply();
             Ready = true;
         }
         catch (Exception error)
         {
-            Plugin.Error("Energy gear registration failed; all energy firing remains disabled: " + error);
+            Plugin.Logger.ErrorOnce("Energy gear registration failed; all energy firing remains disabled: " + error);
         }
     }
 
@@ -203,7 +205,7 @@ internal static class EnergyGearRegistry
         }
         catch (Exception error)
         {
-            Plugin.Error("Forge Weapon Energy Lab weapons are not confirmed in the loadout: " + error);
+            Plugin.Logger.ErrorOnce("Forge Weapon Energy Lab weapons are not confirmed in the loadout: " + error);
         }
     }
 

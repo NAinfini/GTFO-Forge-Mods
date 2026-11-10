@@ -2,7 +2,7 @@
 
 python import_audio.py --source <recordings folder> --qa <report.json>
 Files are named `<weapon>-<event>-<version>.wav` and the cue is `<weapon>-<event>`; loops end in `-loop`.
-Its cues.md lists every cue with its length; that table is the only length source. The runtime cues are the keys of audio/cues.json;
+Its cues.md lists every cue with its length; that table is the only length source. The runtime cues are the keys of audio/cues.forge;
 each is written to Assets/Audio/ogg/<cue>.ogg (FFmpeg with libvorbis on PATH), which the build copies into the audio folder beside the DLL.
 One-shots keep full level for the table length, then up to TAIL more of their natural decay, faded out:
 that tail is what overlaps the next sound (a beam's start under its loop, its stop over the loop's fade).
@@ -151,7 +151,7 @@ def main() -> None:
         match = FILE.match(path.name)
         if not match or match[1] not in table: raise ValueError(f"Not a listed cue recording: {path.name}")
         recordings.setdefault(match[1], {})[int(match[2])] = path
-    runtime = list(json.loads((MOD / "audio/cues.json").read_text(encoding="utf-8"))["cues"])
+    runtime = list(json.loads((MOD / "audio/cues.forge").read_text(encoding="utf-8"))["cues"])
     known = set(runtime)
     manifest_path = OUT / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -195,10 +195,10 @@ def main() -> None:
         if old.name not in names: old.unlink()
     old = [e["cue"] for e in ordered if "sources" not in e and "external" not in e]
     manifest = {
-        "format": "Ogg Vorbis (libvorbis quality 7) mono 48000 Hz, one recording per runtime cue; played through ForgeAudio with audio/cues.json",
+        "format": "Ogg Vorbis (libvorbis quality 7) mono 48000 Hz, one recording per runtime cue; played through ForgeAudio with audio/cues.forge",
         "generator": "tools/import_audio.py",
         "source": "Adobe Firefly sound effects (commercial use permitted), not published; cues listed in cues.md. The blast-fire and blast-explode cues are copied from ForgeOrdnance_Arsenal",
-        "rights": "Adobe Firefly output, commercial use permitted; MIT, copyright 2026 NAinfini. blast-fire and blast-explode: see License.txt",
+        "rights": "Adobe Firefly output, commercial use permitted; MIT, copyright 2026 NAinfini. blast-fire and blast-explode: see LICENSE.txt",
         "pendingFromOldLibrary": old,
         "outputs": ordered,
     }

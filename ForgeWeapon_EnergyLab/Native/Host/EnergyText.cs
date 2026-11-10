@@ -4,7 +4,7 @@ using ForgeUI;
 
 namespace ForgeWeaponEnergyLab.Native;
 
-/// <summary>Every player-visible Energy Lab text. The chat line and the default description come from <c>lang/&lt;language&gt;.json</c>
+/// <summary>Every player-visible Energy Lab text. The chat line and the default description come from <c>lang/&lt;language&gt;.forge</c>
 /// beside the plugin; each gun's name and description come from the <c>lang</c> folder beside its definition file
 /// (<c>&lt;Id&gt;.Name</c>, <c>&lt;Id&gt;.Description</c>), in the language ForgeUI has chosen, else as the file wrote them.</summary>
 /// <remarks>The gear packet's public name travels in the game's synced gear packet and in saved loadouts, so it stays the file's
@@ -51,7 +51,7 @@ internal static class EnergyText
             if (claimed.TryGetValue(find, out var holder))
             {
                 if (holder != gear.Definition.Id)
-                    Plugin.Error(key + ": the text \"" + find + "\" is already shown for " + holder + "; this gun shares that translation on drawn screens.");
+                    Plugin.Logger.ErrorOnce(key + ": the text \"" + find + "\" is already shown for " + holder + "; this gun shares that translation on drawn screens.");
                 return;
             }
             claimed.Add(find, gear.Definition.Id);

@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using ForgeWeaponEnergyLab.Presentation;
 using Gear;
 using Player;
@@ -26,12 +25,20 @@ internal sealed class RemoteWeapon : IDisposable
     private EnergyGear? _chargeGear;
     /// <summary>The charge point as the shooter reported it, in the shooter's yaw frame, so it turns with the shooter.</summary>
     private Vector3 _chargeLocal;
-    private float _chargeStartedAt;
-    private bool _charging;
+    private float _chargeStartedAt, _chargeUntil;
+    private bool _charging, _chargedFull;
     private bool _disposed;
     internal bool Faulted { get; private set; }
     private float _beamUntil, _flameUntil, _arcHoldUntil;
+    /// <summary>The held beam or flame between two shots: it stays on the gun this machine shows, as the shooter moves; its far end and aim are the last shot's.</summary>
+    private PlayerAgent? _streamOwner;
+    private BulletWeapon? _streamWeapon;
+    private EnergyGear? _streamGear;
+    private Vector3 _streamLocal, _streamEnd, _streamDirection;
+    private float _streamReach;
+    private bool _streamHit;
     private Quaternion _look = Quaternion.identity;
+    private EnergyLook _gearLook = EnergyLook.Default;
     private const float MaximumShownOffset = 3f;
 
     internal RemoteWeapon(bool authoritative, RemotePeerState? state = null)
@@ -46,6 +53,8 @@ internal sealed class RemoteWeapon : IDisposable
             weapon.Owner.Pointer != owner.Pointer || EnergyGearRegistry.DefinitionOf(weapon) != gear ||
             weapon.GearPartHolder == null) return;
         WeaponModels.Ensure(weapon.GearPartHolder);
+        // The mode packet arrives when the shooter takes the gun up; the voices and buffers its shots need are made then, not mid-fight on its first shot.
+        if (PresentationPreload.Ready) PreparePresentation(gear);
     }
 
     internal bool CanLaunch(EnergyGear gear)
@@ -121,16 +130,21 @@ internal sealed class RemoteWeapon : IDisposable
     internal bool StartCharge(PlayerAgent owner, ChargePacket packet, float now)
     {
         if (_disposed || packet.Phase != 1 || packet.Mode is not ((int)EnergyMode.PlasmaBlast or (int)EnergyMode.PlasmaArc) ||
-            EnergyGears.Match(packet.CategoryId, packet.Mode) is not { } gear || !Finite(packet.Position) || (_authoritative && (packet.Position - owner.Position).sqrMagnitude > 12.25f)) return false;
+            EnergyGears.Match(packet.CategoryId, packet.Mode) is not { } gear || !Finite(packet.Position) || !float.IsFinite(packet.Held) || packet.Held < 0f ||
+            (_authoritative && (packet.Position - owner.Position).sqrMagnitude > EnergyProtocol.MaximumMuzzleDistance * EnergyProtocol.MaximumMuzzleDistance)) return false;
+        _chargeLocal = GunPose.ToYawFrame(packet.Position - owner.Position, owner.TargetLookDir);
+        _chargeUntil = now + EnergyProtocol.ChargeExpirySeconds;
+        // The shooter repeating a charge this machine is drawing only keeps it alive.
+        if (_charging && _chargeGear == gear && _chargeOwner == owner) return true;
         _effects?.StopCharge();
         _plasma?.Visuals.Hide(EnergyProjectiles.Capacity);
         _chargeOwner = owner;
         _chargeGear = gear;
         PreparePresentation(gear);
+        UseLook(gear);
         SetModel(owner, owner.Inventory?.WieldedItem?.TryCast<BulletWeapon>(), gear);
-        _chargeLocal = GunPose.ToYawFrame(packet.Position - owner.Position, owner.TargetLookDir);
-        _chargeStartedAt = now;
-        _charging = true;
+        _chargeStartedAt = now - packet.Held;
+        _charging = true; _chargedFull = false;
         return true;
     }
 
@@ -138,6 +152,14 @@ internal sealed class RemoteWeapon : IDisposable
     {
         if (!_charging || _chargeGear == null || packet.Phase != 0 || packet.Mode != (int)_chargeGear.Mode || packet.CategoryId != _chargeGear.CategoryId) return false;
         return StopCharge();
+    }
+
+    /// <summary>The host's word on where this shooter's projectile ended (<see cref="FlightEnds"/>).</summary>
+    internal void Finish(FlightKind kind, uint sequence, Vector3 at, float now)
+    {
+        if (_disposed) return;
+        if (kind == FlightKind.Plasma) _plasma?.Finish(sequence, at, now);
+        else _special?.Finish(kind, sequence, at, now);
     }
 
     private bool StopCharge()
@@ -155,10 +177,11 @@ internal sealed class RemoteWeapon : IDisposable
             visual.Direction.sqrMagnitude < 0.25f || visual.Direction.sqrMagnitude > 2.25f ||
             !float.IsFinite(visual.Power)) return;
         var mode = gear.Mode;
+        UseLook(gear);
         weapon ??= owner.Inventory?.WieldedItem?.TryCast<BulletWeapon>();
         SetModel(owner, weapon, gear);
-        // The shooter's start is where its gun was on its own screen. Draw from where this machine shows that gun;
-        // the host keeps simulating and damaging from the reported start.
+        // The shooter's start is where its gun was on its own screen. What starts at the gun is drawn from where this machine shows that gun;
+        // what flies is simulated from the reported start on every machine, so it lands where the host deals it.
         var start = ShownStart(owner, weapon, gear, visual.Start);
         var reported = visual.Start;
         var direction = visual.Direction.normalized;
@@ -170,6 +193,9 @@ internal sealed class RemoteWeapon : IDisposable
                 Effects().Beam(start, visual.End(0), visual.Hit(0), now);
                 Visuals().Beam(start, visual.End(0), visual.Hit(0), now);
                 _beamUntil = now + 0.3f;
+                HoldStream(owner, weapon, gear, reported);
+                _streamEnd = visual.End(0);
+                _streamHit = visual.Hit(0);
                 break;
             case EnergyMode.ArcChain:
                 if (visual.Segments < 1 || visual.Segments > gear.Numbers.Targets) return;
@@ -191,57 +217,79 @@ internal sealed class RemoteWeapon : IDisposable
             case EnergyMode.PlasmaArc:
                 if (visual.Power < 0f || visual.Power > 1f) return;
                 StopCharge();
-                Plasma().Launch(owner, _authoritative ? reported : start, direction, visual.Power, gear, now);
+                // The shooter's own gate let this shot go and the host accepted it: when no slot is free here the oldest flight gives way (admitted).
+                Plasma().Launch(owner, reported, direction, visual.Power, gear, now, visual.Sequence, FlightEnds.Scale(gear, visual.Damage), admitted: true);
                 Effects().Discharge(mode == EnergyMode.PlasmaArc, start);
                 break;
             case EnergyMode.Blast:
                 Effects().Hide();
-                Visuals().Blast(start, now);
+                Visuals().Blast(start, direction, now);
                 Special().Visuals.Origin(start);
                 Special().Visuals.BlastLaunch();
-                Special().LaunchShell(owner, gear, _authoritative ? reported : start, direction, visual.Damage, now);
+                Special().LaunchShell(owner, gear, reported, direction, MathF.Min(visual.Damage, gear.Numbers.Shot.Damage * EnergyProtocol.MaximumDamageBoost), now, visual.Sequence);
                 break;
             case EnergyMode.Disc:
-                Special().LaunchDisc(owner, gear, _authoritative ? reported : start, direction, now);
+                Special().LaunchDisc(owner, gear, reported, direction, now, visual.Sequence, FlightEnds.Scale(gear, visual.Damage), admitted: true);
                 break;
             case EnergyMode.Flame:
                 if (visual.Power < 0f || visual.Power > gear.Numbers.Shot.Range) return;
                 Special().Visuals.Flame(start, direction, visual.Power, now);
                 _flameUntil = now + 0.3f;
+                HoldStream(owner, weapon, gear, reported);
+                _streamDirection = direction;
+                _streamReach = visual.Power;
                 break;
             case EnergyMode.BlackHole:
-                Special().LaunchHole(owner, gear, _authoritative ? reported : start, direction, now);
+                Special().LaunchHole(owner, gear, reported, direction, now, visual.Sequence, FlightEnds.Scale(gear, visual.Damage), admitted: true);
                 break;
         }
     }
 
-    // Where this machine shows the charging gun's muzzle: the shooter's third-person gun follows its aim, and the reported point (kept in the
+    private void HoldStream(PlayerAgent owner, BulletWeapon? weapon, EnergyGear gear, Vector3 reported)
+    {
+        _streamOwner = owner;
+        _streamWeapon = weapon;
+        _streamGear = gear;
+        _streamLocal = GunPose.ToYawFrame(reported - owner.Position, owner.TargetLookDir);
+    }
+
+    // Where this machine shows the gun's muzzle: the shooter's third-person gun follows its aim, and the reported point (kept in the
     // shooter's yaw frame) stands in only while that gun is not shown.
-    internal static Vector3 ChargePoint(PlayerAgent owner, EnergyGear gear, Vector3 local)
-        => ShownStart(owner, owner.Inventory?.WieldedItem?.TryCast<BulletWeapon>(), gear,
-            owner.Position + GunPose.FromYawFrame(local, owner.TargetLookDir));
+    private static Vector3 ShownPoint(PlayerAgent owner, BulletWeapon? weapon, EnergyGear gear, Vector3 local)
+        => ShownStart(owner, weapon, gear, owner.Position + GunPose.FromYawFrame(local, owner.TargetLookDir));
 
     private static Vector3 ShownStart(PlayerAgent owner, BulletWeapon? weapon, EnergyGear gear, Vector3 reported)
     {
         if (weapon == null || weapon.Owner == null || weapon.Owner.Pointer != owner.Pointer ||
             EnergyGearRegistry.DefinitionOf(weapon) != gear || weapon.MuzzleAlign == null) return reported;
         var shown = weapon.MuzzleAlign.position;
-        // A gun shown far from the report is mid-switch or teleporting; keep the reported start then.
-        return Finite(shown) && (shown - reported).sqrMagnitude <= MaximumShownOffset * MaximumShownOffset ? shown : reported;
+        // A gun far from its own shooter is not in the hands (a switch in progress). The report is no measure of that: on a lagging link it runs ahead of the moving shooter this machine shows.
+        return Finite(shown) && (shown - owner.Position).sqrMagnitude <= MaximumShownOffset * MaximumShownOffset ? shown : reported;
     }
 
     internal void Tick(float delta, float now)
     {
         if (_disposed) return;
-        if (_charging && (_chargeOwner == null || !_chargeOwner.Alive)) StopCharge();
+        // No shot or repeat for a while means the shooter stopped or the link did: neither leaves the charge standing.
+        if (_charging && (_chargeOwner == null || !_chargeOwner.Alive || now >= _chargeUntil)) StopCharge();
+        if (_streamOwner != null && _streamOwner.Alive && now <= _beamUntil)
+        {
+            var from = ShownPoint(_streamOwner, _streamWeapon, _streamGear!, _streamLocal);
+            Effects().Beam(from, _streamEnd, _streamHit, now);
+            Visuals().Beam(from, _streamEnd, _streamHit, now);
+        }
+        if (_streamOwner != null && _streamOwner.Alive && now <= _flameUntil)
+            Special().Visuals.Flame(ShownPoint(_streamOwner, _streamWeapon, _streamGear!, _streamLocal), _streamDirection, _streamReach, now);
         if (_charging && _chargeOwner != null)
         {
-            var position = ChargePoint(_chargeOwner, _chargeGear!, _chargeLocal);
+            var position = ShownPoint(_chargeOwner, _chargeOwner.Inventory?.WieldedItem?.TryCast<BulletWeapon>(), _chargeGear!, _chargeLocal);
             var power = (float)Math.Clamp((now - _chargeStartedAt - _chargeGear!.Numbers.MinimumCharge) /
                 (_chargeGear!.Numbers.FullCharge - _chargeGear!.Numbers.MinimumCharge), 0d, 1d);
             Effects().Charge(power, position);
-            Plasma().Visuals.ChargingOrb(EnergyProjectiles.Capacity, position,
-                PlasmaPayload.FromCharge(power, _chargeGear!.Numbers).BodyRadius, now, _chargeGear!.Mode == EnergyMode.PlasmaArc, sight: null);
+            var orbs = Plasma().Visuals;
+            orbs.ChargingOrb(EnergyProjectiles.Capacity, position,
+                PlasmaPayload.FromCharge(power, _chargeGear!.Numbers).BodyRadius, now, _chargeGear!.Mode == EnergyMode.PlasmaArc, firstPerson: false, sight: null);
+            if (power >= 1f && !_chargedFull) { _chargedFull = true; orbs.Charged(EnergyProjectiles.Capacity); }
         }
         _effects?.Tick(now);
         _visuals?.Tick(now);
@@ -255,10 +303,36 @@ internal sealed class RemoteWeapon : IDisposable
         { _arcHoldUntil = 0f; _effects?.ArcHold(false); }
     }
 
-    private EnergyEffects Effects() => _effects ??= new EnergyEffects();
-    private EnergyVisuals Visuals() => _visuals ??= new EnergyVisuals();
-    private EnergyProjectiles Plasma() => _plasma ??= new EnergyProjectiles(_authoritative);
-    private SpecialWeapons Special() => _special ??= new SpecialWeapons(_authoritative);
+    private EnergyEffects Effects() => _effects ??= new EnergyEffects { Look = _gearLook };
+    private EnergyVisuals Visuals() => _visuals ??= new EnergyVisuals { Look = _gearLook };
+    private EnergyProjectiles Plasma()
+    {
+        if (_plasma != null) return _plasma;
+        _plasma = new EnergyProjectiles(_authoritative);
+        _plasma.Visuals.Look = _gearLook;
+        return _plasma;
+    }
+    private SpecialWeapons Special()
+    {
+        if (_special != null) return _special;
+        _special = new SpecialWeapons(_authoritative);
+        _special.Visuals.Look = _gearLook;
+        return _special;
+    }
+
+    // What this player's gun plays and draws is that gun's own (its definition's Look). A beam or chain held under the other look is let go first.
+    private void UseLook(EnergyGear gear)
+    {
+        var look = EnergyLook.Of(gear);
+        if (look == _gearLook) return;
+        _effects?.Hide();
+        _visuals?.Hide();
+        _gearLook = look;
+        if (_effects != null) _effects.Look = look;
+        if (_visuals != null) _visuals.Look = look;
+        if (_plasma != null) _plasma.Visuals.Look = look;
+        if (_special != null) _special.Visuals.Look = look;
+    }
 
     private void PreparePresentation(EnergyGear gear)
     {
@@ -267,16 +341,10 @@ internal sealed class RemoteWeapon : IDisposable
         var bit = 1 << (int)mode;
         if ((_preparedModes & bit) != 0) return;
         Effects();
-        if (mode is EnergyMode.Beam or EnergyMode.ArcChain or EnergyMode.Blast) Prepare(Visuals().Prepare());
-        if (mode is EnergyMode.PlasmaBlast or EnergyMode.PlasmaArc) Prepare(Plasma().Visuals.Prepare());
-        if (mode is EnergyMode.Disc or EnergyMode.Flame or EnergyMode.BlackHole or EnergyMode.Blast) Prepare(Special().Visuals.Prepare());
+        if (mode is EnergyMode.Beam or EnergyMode.ArcChain or EnergyMode.Blast) Visuals();
+        if (mode is EnergyMode.PlasmaBlast or EnergyMode.PlasmaArc) Plasma();
+        if (mode is EnergyMode.Disc or EnergyMode.Flame or EnergyMode.BlackHole or EnergyMode.Blast) Special();
         _preparedModes |= bit;
-    }
-
-    private static void Prepare(IEnumerator work)
-    {
-        using var cleanup = work as IDisposable;
-        while (work.MoveNext()) { }
     }
 
     private static bool Finite(Vector3 value) => float.IsFinite(value.x) && float.IsFinite(value.y) && float.IsFinite(value.z);

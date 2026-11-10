@@ -1,6 +1,5 @@
 using System;
 using Gear;
-using SNetwork;
 using UnityEngine;
 
 namespace ForgeWeaponEnergyLab.Native;
@@ -33,10 +32,20 @@ internal sealed class EnergyDischarge
             ? (_shots[0].End - start).normalized : direction.normalized;
         var visual = new FireVisual
         {
-            Epoch = EnergyNetwork.Epoch, Sequence = EnergyNetwork.NextSequence(), Shooter = owner.Owner.Lookup,
-            CategoryId = gear.CategoryId, Mode = (int)gear.Mode, Segments = 1,
-            X = start.x, Y = start.y, Z = start.z, Dx = direction.x, Dy = direction.y, Dz = direction.z,
-            Power = EnergyNativeFire.Current!.Power, Damage = tuning.Damage
+            Epoch = EnergyNetwork.Epoch,
+            Sequence = EnergyNetwork.NextSequence(),
+            Shooter = owner.Owner.Lookup,
+            CategoryId = gear.CategoryId,
+            Mode = (int)gear.Mode,
+            Segments = 1,
+            X = start.x,
+            Y = start.y,
+            Z = start.z,
+            Dx = direction.x,
+            Dy = direction.y,
+            Dz = direction.z,
+            Power = EnergyNativeFire.Current!.Power,
+            Damage = tuning.Damage
         };
         // Launches use the native direction and our muzzle trace, but contacts and pulses wait for a later Tick.
         if (EnergyNativeFire.Delayed(gear.Mode)) { visual.Segments = 0; return visual; }

@@ -22,8 +22,11 @@ internal sealed class ChainLightning
             if (!_enemies.Nearest(owner, TargetRelationFilter.Enemies, hitInterveningReceiver: true,
                 origin, numbers.JumpRange, _visited.AsSpan(0, segments),
                 _visited[segments - 1], out var hit, out var identity)) break;
-            var tuning = shot with { Range = numbers.JumpRange,
-                Damage = shot.Damage * MathF.Pow(numbers.DamageRetention, segments) };
+            var tuning = shot with
+            {
+                Range = numbers.JumpRange,
+                Damage = shot.Damage * MathF.Pow(numbers.DamageRetention, segments)
+            };
             shots[segments].ResolveHit(owner, tuning, origin, (hit.point - origin).normalized, hit);
             var recipient = shots[segments].Receiver?.GetBaseAgent()?.TryCast<EnemyAgent>();
             _visited[segments++] = identity;

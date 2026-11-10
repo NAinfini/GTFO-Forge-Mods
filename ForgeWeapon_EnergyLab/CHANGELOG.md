@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.1
+
+Changes since the first upload. Version 1.0.1 because it is released early; it needs ForgeCore, ForgeUI, ForgeAudio and ForgeVisual 1.0.0.
+
+- Effects are rebuilt from selected effect slots, with new beam, arc, black hole and shock orb looks.
+- The Flame and Black Hole default tuning changed: Flame `AmmoPerRound` 1.614 to 1.8 and `Damage` 2.695 to 2.4; Black Hole `Damage` 6.75 to 9.
+- Weapons fire again after the second level; scopes have no lens glass; guns can be held under the handguard.
+- The Blast Gun's explosion is now the same heavy blast as the grenade launcher, lifted off the surface it hits.
+- The guns hold better: the left hand follows the game's own grip and is pulled back along the gun into reach.
+- Energy Lab's own sounds load before other energy packs, and a gun whose sound finishes loading late still gets it.
+
+### Interface changes
+
+- No public signature was removed. The public default values of `FlameTuning` and `BlackHoleTuning` changed (above); set the fields explicitly if you relied on the old numbers.
+
 ## 1.0.0
 
 First stable release.

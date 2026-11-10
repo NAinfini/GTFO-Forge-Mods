@@ -5,7 +5,6 @@ using FX_EffectSystem;
 using Gear;
 using HarmonyLib;
 using Player;
-using SNetwork;
 using UnityEngine;
 
 namespace ForgeWeaponEnergyLab.Native;
@@ -48,7 +47,7 @@ internal static class EnergyNativeFire
         if (frame == null) return;
         try
         {
-            if (frame.Gear != null && error != null) Plugin.Error("Native energy fire failed; committed hits will not be retried: " + error);
+            if (frame.Gear != null && error != null) Plugin.Logger.ErrorOnce("Native energy fire failed; committed hits will not be retried: " + error);
         }
         finally
         {
@@ -88,16 +87,16 @@ internal static class EnergyNativeFire
         frame.Hit = hit;
         var owner = frame.Weapon.Owner?.Owner;
         // Synced human fire is presentation only. Bots deal their native hits on the host.
-        if (owner == null || frame.Synced && !owner.IsBot || (owner.IsBot ? !SNet.IsMaster : !owner.IsLocal)) return;
+        if (owner == null || frame.Synced && !owner.IsBot || (owner.IsBot ? !ForgeCore.Session.IsHost : !owner.IsLocal)) return;
         try { EnergyController.NativeDischarge(frame.Weapon, frame.Gear!, origin, hit.fireDir); }
         catch (BudgetExhausted error)
         {
             // This shot found no room (a busy projectile slot); the gun is fine and only this shot is dropped.
-            Plugin.Error("An energy shot was dropped: " + error);
+            Plugin.Logger.ErrorOnce("An energy shot was dropped: " + error);
         }
         catch (Exception error)
         {
-            Plugin.Error("Energy discharge stopped; committed hits will not be retried: " + error);
+            Plugin.Logger.ErrorOnce("Energy discharge stopped; committed hits will not be retried: " + error);
             EnergyController.StopNativeDischarge(frame.Weapon);
         }
     }
@@ -118,7 +117,7 @@ internal static class NativeEnergyBotShotReady
     private static bool Prefix(PlayerBotActionUseFirearm __instance)
     {
         var weapon = __instance.m_bulletWeapon;
-        if (!SNet.IsMaster || weapon?.Owner?.Owner?.IsBot != true ||
+        if (!ForgeCore.Session.IsHost || weapon?.Owner?.Owner?.IsBot != true ||
             EnergyGearRegistry.DefinitionOf(weapon) is not { } gear || !EnergyNativeFire.Delayed(gear.Mode)) return true;
         return EnergyController.CanLaunch(weapon, gear);
     }

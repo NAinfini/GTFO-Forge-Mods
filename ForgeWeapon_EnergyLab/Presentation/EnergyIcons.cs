@@ -1,5 +1,4 @@
 using ForgeUI;
-using ForgeWeaponEnergyLab.Native;
 using Gear;
 using UnityEngine;
 

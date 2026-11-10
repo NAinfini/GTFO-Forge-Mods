@@ -43,24 +43,7 @@ internal static class WeaponBindings
     private static readonly Dictionary<IntPtr, Binding> Entries = new();
     private static readonly List<IntPtr> Departed = new();
 
-    // A mount owns this registration and rolls it back when binding fails.
-    internal sealed class Snapshot
-    {
-        internal IntPtr WeaponPointer;
-        internal Binding? Entry;
-    }
-
-    internal static Snapshot Capture(ItemEquippable weapon)
-    {
-        Entries.TryGetValue(weapon.Pointer, out var entry);
-        return new Snapshot { WeaponPointer = weapon.Pointer, Entry = entry };
-    }
-
-    internal static void Restore(Snapshot snapshot)
-    {
-        if (snapshot.Entry != null) Entries[snapshot.WeaponPointer] = snapshot.Entry;
-        else Entries.Remove(snapshot.WeaponPointer);
-    }
+    internal static void Forget(IntPtr weapon) => Entries.Remove(weapon);
 
     internal static bool TryGet(ItemEquippable? weapon, out Binding binding)
     {
@@ -69,9 +52,9 @@ internal static class WeaponBindings
             binding.Weapon != null && binding.Model != null;
     }
 
-    internal static void Register(ItemEquippable weapon, Snapshot snapshot)
+    // Everything that can throw runs before the one write at the end, so a failed registration changes nothing.
+    internal static void Register(ItemEquippable weapon)
     {
-        if (weapon.Pointer != snapshot.WeaponPointer) throw new InvalidOperationException("Registration belongs to another weapon.");
         if (!weapon.IsFirstPerson || weapon.GearCategoryData == null || weapon.GearPartHolder == null) return;
         var mode = EnergyGears.ModeForCategory(weapon.GearCategoryData.persistentID);
         if (mode == EnergyMode.Off) return;
@@ -80,7 +63,7 @@ internal static class WeaponBindings
         if (Entries.TryGetValue(weapon.Pointer, out var existing) && existing.Model == model && existing.Presentation == presentation) return;
         Prune();
         if (Entries.Count >= 128) throw new InvalidOperationException("Viewmodel instance budget exhausted.");
-        var sight = ModelSockets.Require(model, "SightLook");
+        var sight = ForgeVisual.Models.RequireSocket(model, ForgeVisual.GunNodes.SightSocket);
         var reticles = new List<Reticle>();
         Vector2 lensMin = new(float.PositiveInfinity, float.PositiveInfinity), lensMax = new(float.NegativeInfinity, float.NegativeInfinity);
         foreach (var part in presentation.Parts)
@@ -95,14 +78,28 @@ internal static class WeaponBindings
                 var center = model.TransformPoint(rest) + surface.TransformVector(mesh.bounds.center);
                 Vector2 markMin = new(float.PositiveInfinity, float.PositiveInfinity), markMax = new(float.NegativeInfinity, float.NegativeInfinity);
                 Extent(sight, surface, rest, ref markMin, ref markMax);
-                reticles.Add(new Reticle { Surface = surface, RestPosition = rest,
-                    PlaneDepth = sight.InverseTransformPoint(center).z, Center = (markMin + markMax) * .5f, HalfSize = (markMax - markMin) * .5f });
+                reticles.Add(new Reticle
+                {
+                    Surface = surface,
+                    RestPosition = rest,
+                    PlaneDepth = sight.InverseTransformPoint(center).z,
+                    Center = (markMin + markMax) * .5f,
+                    HalfSize = (markMax - markMin) * .5f
+                });
             }
         }
         if (reticles.Count != 0 && !float.IsFinite(lensMin.x))
             throw new InvalidOperationException("An optic with reticle marks needs a glass surface: " + presentation.Mode);
-        Entries[weapon.Pointer] = new Binding { Weapon = weapon, Model = model, Sight = sight, Presentation = presentation,
-            Reticles = reticles.ToArray(), LensCenter = (lensMin + lensMax) * .5f, LensRadius = (lensMax - lensMin) * .5f };
+        Entries[weapon.Pointer] = new Binding
+        {
+            Weapon = weapon,
+            Model = model,
+            Sight = sight,
+            Presentation = presentation,
+            Reticles = reticles.ToArray(),
+            LensCenter = (lensMin + lensMax) * .5f,
+            LensRadius = (lensMax - lensMin) * .5f
+        };
     }
 
     // Grows an optic-local XY box by a surface's mesh bounds, with the surface placed at the given local position.

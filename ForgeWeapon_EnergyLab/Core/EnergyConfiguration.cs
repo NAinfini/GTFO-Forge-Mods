@@ -12,6 +12,8 @@ namespace ForgeWeaponEnergyLab;
 internal static class EnergyConfiguration
 {
     internal static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
+    /// <summary>How every file a player or author writes by hand is read: comments and a trailing comma are allowed (DEVELOPERS.md says so).</summary>
+    internal static readonly JsonDocumentOptions FileOptions = new() { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
     private static readonly Dictionary<string, string> Descriptions = new()
     {
         ["magazine"] = "Whole rounds in the magazine (1..10000).",
@@ -71,15 +73,19 @@ internal static class EnergyConfiguration
     internal static JsonNode TuningJson(EnergyTuning tuning)
         => JsonSerializer.SerializeToNode(tuning, tuning.GetType(), JsonOptions)!;
 
-    internal const string OverridesFile = "tuning-overrides.json", DefaultsFile = "tuning-defaults.json";
+    internal const string OverridesFile = "tuning-overrides.forge", DefaultsFile = "tuning-defaults.forge";
     private static readonly string[] RootFields = { "weapons" };
 
     internal static EnergyTuning DefaultTuning(EnergyMode mode) => mode switch
     {
-        EnergyMode.Beam => new BeamTuning(), EnergyMode.ArcChain => new ArcChainTuning(),
-        EnergyMode.PlasmaBlast => new PlasmaBlastTuning(), EnergyMode.PlasmaArc => new PlasmaArcTuning(),
-        EnergyMode.Blast => new BlastTuning(), EnergyMode.Disc => new DiscTuning(),
-        EnergyMode.Flame => new FlameTuning(), EnergyMode.BlackHole => new BlackHoleTuning(),
+        EnergyMode.Beam => new BeamTuning(),
+        EnergyMode.ArcChain => new ArcChainTuning(),
+        EnergyMode.PlasmaBlast => new PlasmaBlastTuning(),
+        EnergyMode.PlasmaArc => new PlasmaArcTuning(),
+        EnergyMode.Blast => new BlastTuning(),
+        EnergyMode.Disc => new DiscTuning(),
+        EnergyMode.Flame => new FlameTuning(),
+        EnergyMode.BlackHole => new BlackHoleTuning(),
         _ => throw new ForgeCore.StrictJsonException("Mode", "must be a firing behaviour, not Off.")
     };
 
@@ -106,19 +112,22 @@ internal static class EnergyConfiguration
     // The defaults file is a reference rewritten on every launch, so it always shows this build's values.
     // The overrides file holds only the values a player changed; every other value follows the current defaults. A problem is
     // added to errors and costs only what it names: one weapon's overrides, or the whole file when it cannot be read at all.
-    internal static WeaponDefinition[] Load(string directory, WeaponDefinition[] defaults, List<string> errors)
+    internal static WeaponDefinition[] Load(string directory, WeaponDefinition[] defaults, List<string> errors, IReadOnlyDictionary<string, JsonElement>? rundownTuning = null)
     {
         var path = Path.Combine(directory, OverridesFile);
+        // The rundown's Settings.forge tuning sits between the definitions and the player's own overrides.
+        var baseline = rundownTuning == null || rundownTuning.Count == 0 ? defaults : Apply(defaults, rundownTuning, EnergySettings.FileName, "Tuning.", "its own tuning", errors);
         try
         {
             Directory.CreateDirectory(directory);
             var reference = new JsonObject();
             foreach (var definition in defaults) reference.Add(definition.Id, TuningJson(definition.Tuning));
-            File.WriteAllText(Path.Combine(directory, DefaultsFile), new JsonObject
+            ForgeCore.Store.WriteText(Path.Combine(directory, DefaultsFile), new JsonObject
             {
                 ["_note"] = "Reference only, rewritten on every launch. Copy the values you want to change into " + OverridesFile + ".",
-                ["_descriptions"] = JsonSerializer.SerializeToNode(Descriptions, JsonOptions), ["weapons"] = reference
-            }.ToJsonString(JsonOptions), new System.Text.UTF8Encoding(false));
+                ["_descriptions"] = JsonSerializer.SerializeToNode(Descriptions, JsonOptions),
+                ["weapons"] = reference
+            }.ToJsonString(JsonOptions));
             if (!File.Exists(path))
             {
                 using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
@@ -128,9 +137,9 @@ internal static class EnergyConfiguration
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { errors.Add(directory + ": could not write the tuning files: " + error); }
         JsonDocument doc;
-        try { doc = JsonDocument.Parse(File.ReadAllText(path)); }
-        catch (JsonException error) { errors.Add($"{OverridesFile}: invalid JSON at line {error.LineNumber + 1}, byte {error.BytePositionInLine + 1}; no override applied."); return defaults; }
-        catch (IOException error) { errors.Add($"{OverridesFile}: could not be read: {error}; no override applied."); return defaults; }
+        try { doc = JsonDocument.Parse(File.ReadAllText(path), FileOptions); }
+        catch (JsonException error) { errors.Add($"{OverridesFile}: invalid JSON at line {error.LineNumber + 1}, byte {error.BytePositionInLine + 1}; no override applied."); return baseline; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { errors.Add($"{OverridesFile}: could not be read: {error}; no override applied."); return baseline; }
         using (doc)
         {
             JsonElement weapons;
@@ -140,31 +149,39 @@ internal static class EnergyConfiguration
                 ForgeCore.StrictJson.OnlyKnown(doc.RootElement, "", RootFields);
                 weapons = ForgeCore.StrictJson.Object(doc.RootElement, "", "weapons");
             }
-            catch (ForgeCore.StrictJsonException error) { errors.Add($"{OverridesFile}: {error.Field}: {error.Message} No override applied."); return defaults; }
-            var known = new HashSet<string>(defaults.Select(d => d.Id), StringComparer.Ordinal);
-            foreach (var entry in weapons.EnumerateObject())
-                if (!known.Contains(entry.Name)) errors.Add($"{OverridesFile}: weapons.{entry.Name}: no weapon with this id is loaded (is its package installed?); skipped.");
-            var result = new WeaponDefinition[defaults.Length];
-            for (var index = 0; index < defaults.Length; index++)
-            {
-                var definition = defaults[index];
-                result[index] = definition;
-                if (!weapons.TryGetProperty(definition.Id, out var item)) continue;
-                var field = "weapons." + definition.Id;
-                try
-                {
-                    var tuning = MergeTuning(definition.Tuning, item, field);
-                    ValidateTuning(definition.Mode, tuning, field);
-                    result[index] = definition with { Tuning = tuning };
-                }
-                catch (ForgeCore.StrictJsonException error) { errors.Add($"{OverridesFile}: {error.Field}: {error.Message} This weapon keeps its default tuning."); }
-                catch (InvalidDataException error) { errors.Add($"{OverridesFile}: {error.Message}. This weapon keeps its default tuning."); }
-                catch (JsonException error) { errors.Add($"{OverridesFile}: {field}: invalid number type at line {error.LineNumber + 1}. This weapon keeps its default tuning."); }
-            }
-            return result;
+            catch (ForgeCore.StrictJsonException error) { errors.Add($"{OverridesFile}: {error.Field}: {error.Message} No override applied."); return baseline; }
+            return Apply(baseline, weapons.EnumerateObject().Select(e => new KeyValuePair<string, JsonElement>(e.Name, e.Value)), OverridesFile, "weapons.", "its default tuning", errors);
         }
     }
 
+    /// <summary><paramref name="entries"/> (weapon ID to the fields it changes) laid over <paramref name="baseline"/>. A problem costs only what it names: one weapon's entry,
+    /// which keeps <paramref name="keeps"/>, or an entry whose weapon is not loaded.</summary>
+    internal static WeaponDefinition[] Apply(WeaponDefinition[] baseline, IEnumerable<KeyValuePair<string, JsonElement>> entries, string file, string root, string keeps, List<string> errors)
+    {
+        var table = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        foreach (var entry in entries) table[entry.Key] = entry.Value;
+        var known = new HashSet<string>(baseline.Select(d => d.Id), StringComparer.Ordinal);
+        foreach (var id in table.Keys)
+            if (!known.Contains(id)) errors.Add($"{file}: {root}{id}: no weapon with this id is loaded (is its package installed?); skipped.");
+        var result = new WeaponDefinition[baseline.Length];
+        for (var index = 0; index < baseline.Length; index++)
+        {
+            var definition = baseline[index];
+            result[index] = definition;
+            if (!table.TryGetValue(definition.Id, out var item)) continue;
+            var field = root + definition.Id;
+            try
+            {
+                var tuning = MergeTuning(definition.Tuning, item, field);
+                ValidateTuning(definition.Mode, tuning, field);
+                result[index] = definition with { Tuning = tuning };
+            }
+            catch (ForgeCore.StrictJsonException error) { errors.Add($"{file}: {error.Field}: {error.Message} This weapon keeps {keeps}."); }
+            catch (InvalidDataException error) { errors.Add($"{file}: {error.Message}. This weapon keeps {keeps}."); }
+            catch (JsonException error) { errors.Add($"{file}: {field}: invalid number type at line {error.LineNumber + 1}. This weapon keeps {keeps}."); }
+        }
+        return result;
+    }
     internal static void ValidateDefinition(WeaponDefinition definition)
     {
         if (definition == null) throw new ArgumentNullException(nameof(definition));
@@ -174,6 +191,7 @@ internal static class EnergyConfiguration
         if (definition.Slot is not (WeaponSlot.Main or WeaponSlot.Special)) Fail(definition.Id + ".slot", "expected Main or Special");
         if (definition.Model == null || string.IsNullOrWhiteSpace(definition.Model.Key) || definition.Model.Key.Length > 128) Fail(definition.Id + ".model.key", "expected a prefab key");
         if (string.IsNullOrWhiteSpace(definition.Model!.BundlePath) || !Path.IsPathFullyQualified(definition.Model.BundlePath)) Fail(definition.Id + ".model.bundlePath", "expected an absolute bundle path");
+        if (definition.Look != null) EnergyLookNames.Validate(definition.Look, definition.Mode, definition.Id + ".look");
         ValidateTuning(definition.Mode, definition.Tuning, definition.Id + ".tuning");
     }
 
@@ -181,10 +199,15 @@ internal static class EnergyConfiguration
     {
         var valid = mode switch
         {
-            EnergyMode.Beam => t is BeamTuning, EnergyMode.ArcChain => t is ArcChainTuning,
-            EnergyMode.PlasmaBlast => t is PlasmaBlastTuning, EnergyMode.PlasmaArc => t is PlasmaArcTuning,
-            EnergyMode.Blast => t is BlastTuning, EnergyMode.Disc => t is DiscTuning,
-            EnergyMode.Flame => t is FlameTuning, EnergyMode.BlackHole => t is BlackHoleTuning, _ => false
+            EnergyMode.Beam => t is BeamTuning,
+            EnergyMode.ArcChain => t is ArcChainTuning,
+            EnergyMode.PlasmaBlast => t is PlasmaBlastTuning,
+            EnergyMode.PlasmaArc => t is PlasmaArcTuning,
+            EnergyMode.Blast => t is BlastTuning,
+            EnergyMode.Disc => t is DiscTuning,
+            EnergyMode.Flame => t is FlameTuning,
+            EnergyMode.BlackHole => t is BlackHoleTuning,
+            _ => false
         };
         if (!valid) Fail(path, "tuning record type must match a firing behaviour");
         void Check(string name, double number, double min, double max) { if (!double.IsFinite(number) || number + 1e-7 < min || number - 1e-7 > max) Fail(path + "." + JsonOptions.PropertyNamingPolicy!.ConvertName(name), FormattableString.Invariant($"expected {min}..{max}")); }

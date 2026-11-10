@@ -1,6 +1,5 @@
 using System;
 using Enemies;
-using LevelGeneration;
 using Player;
 using SNetwork;
 using UnityEngine;
@@ -33,7 +32,7 @@ internal sealed class EnergyExplosion
     internal void Apply(PlayerAgent owner, EnergyGear gear, Vector3 position, float radius, float damage)
     {
         try { ApplyChecked(owner, gear, position, radius, damage); }
-        catch (BudgetExhausted error) { Plugin.Error("An energy explosion was dropped: " + error); }
+        catch (BudgetExhausted error) { Plugin.Logger.ErrorOnce("An energy explosion was dropped: " + error); }
     }
 
     private void ApplyChecked(PlayerAgent owner, EnergyGear gear, Vector3 position, float radius, float damage)
@@ -101,7 +100,7 @@ internal sealed class EnergyExplosion
             if (_overlap.Truncated || nativeCount >= DamageUtil.s_tempColliders.Length)
                 throw new BudgetExhausted("Native explosion target budget exhausted; truncated damage refused.");
             // Run this query before enemy destruction can spawn new physics objects into its target volume.
-            ForgeCore.Combat.Explode(position, radius, damage, gear.Numbers.ExplosionForce, nativeMask, SNet.IsMaster,
+            ForgeCore.Combat.Explode(position, radius, damage, gear.Numbers.ExplosionForce, nativeMask, ForgeCore.Session.IsHost,
                 DamageUtil.ExplosionDamageType.Damage, gear.CategoryId);
             for (var index = 0; index < targets; index++)
             {

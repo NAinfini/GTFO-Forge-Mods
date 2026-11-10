@@ -1,0 +1,373 @@
+{
+ "Slots": {
+  "energy.arc": {
+   "Item": "Master_MagicFX_Bundle_1_8f912873_9c7fed",
+   "Line": true,
+   "Scale": 0.3,
+   "LaserHead": "Par_BlueShoot_Hit",
+   "LaserBodies": [
+    "LaserInner",
+    "LaserInner (2)"
+   ],
+   "Size": 10.0,
+   "Seconds": 0.33
+  },
+  "energy.arc.hit": {
+   "Item": "Master_MagicFX_Bundle_1_9816fb56",
+   "Scale": 0.15,
+   "Light": {
+    "Colour": [
+     0.502,
+     0.749,
+     1.0
+    ],
+    "Range": 5,
+    "Peak": 3,
+    "Life": 0.2,
+    "Flicker": 0.4
+   }
+  },
+  "energy.beam": {
+   "Item": "Master_MagicFX_Bundle_1_a5a422ac",
+   "Line": true,
+   "Hold": 0.15,
+   "Scale": 0.06,
+   "LaserHead": "Par_BlueShoot_Hit",
+   "LaserBodies": [
+    "LaserInner",
+    "LaserInner2"
+   ],
+   "Size": 10.0,
+   "Linger": 0.1
+  },
+  "energy.beam.hit": {
+   "Item": "Triple_A_Sci_fi_effects_a8efd017_1b1ca5",
+   "Hold": 0.15,
+   "Scale": 0.3,
+   "Linger": 0.1,
+   "Light": {
+    "Colour": [
+     0.451,
+     0.749,
+     1.0
+    ],
+    "Range": 4.5,
+    "Peak": 2.5,
+    "Life": 0,
+    "Flicker": 0.3
+   }
+  },
+  "energy.beam.muzzle": {
+   "Item": "Master_MagicFX_Bundle_1_584be756_1b1ca5",
+   "Hold": 0.15,
+   "Scale": 0.07,
+   "Linger": 0.1,
+   "Light": {
+    "Colour": [
+     0.4,
+     0.698,
+     1.0
+    ],
+    "Range": 3,
+    "Peak": 1.5,
+    "Life": 0,
+    "Flicker": 0.2
+   }
+  },
+  "energy.blast.muzzle": {
+   "Item": "Free_Quick_Effects_Vol_1_4f5fc4bb",
+   "Scale": 0.15,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.6,
+     0.251
+    ],
+    "Range": 4,
+    "Peak": 3,
+    "Life": 0.12
+   }
+  },
+  "energy.blast.shell": {
+   "None": true
+  },
+  "energy.disc": {
+   "Item": "Master_MagicFX_Bundle_1_390d6fb5",
+   "Hold": 0.15,
+   "Scale": 0.13,
+   "Linger": 0.5
+  },
+  "energy.disc.hit": {
+   "Item": "Master_MagicFX_Bundle_1_36c2aa7c",
+   "Scale": 0.2,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.698,
+     0.4
+    ],
+    "Range": 2.5,
+    "Peak": 1.4,
+    "Life": 0.12,
+    "Flicker": 0.3
+   }
+  },
+  "energy.disc.launch": {
+   "None": true
+  },
+  "energy.discharge": {
+   "Item": "Electricity_Assets_for_V_4d910670",
+   "Scale": 0.2,
+   "Light": {
+    "Colour": [
+     0.549,
+     0.4,
+     1.0
+    ],
+    "Range": 3,
+    "Peak": 2,
+    "Life": 0.12,
+    "Flicker": 0.5
+   }
+  },
+  "energy.flame": {
+   "Item": "Particle_Pack_Starter_As_007c57e2",
+   "Hold": 0.15,
+   "Size": 11.3,
+   "Linger": 1.2,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.451,
+     0.1216
+    ],
+    "Range": 12,
+    "Peak": 4,
+    "Life": 0,
+    "Flicker": 0.35
+   }
+  },
+  "energy.flame.hit": {
+   "Item": "Master_MagicFX_Bundle_1_c8fd4698",
+   "Scale": 0.25,
+   "Light": {
+    "Colour": [
+     1.0,
+     0.451,
+     0.1216
+    ],
+    "Range": 2.5,
+    "Peak": 2,
+    "Life": 0.1,
+    "Flicker": 0.4
+   }
+  },
+  "energy.flame.muzzle": {
+   "None": true
+  },
+  "energy.hole": {
+   "Item": "Super_Magic_FX_1700_Uniq_8a6cb2b6",
+   "Hold": 0.15,
+   "Size": 6.3,
+   "AxisUp": true,
+   "Centre": [
+    0,
+    -0.25,
+    0
+   ],
+   "Linger": 0.25,
+   "AlwaysDraw": true,
+   "Light": {
+    "Colour": [
+     0.549,
+     0.149,
+     1.0
+    ],
+    "Range": 6,
+    "Peak": 2,
+    "Life": 0,
+    "Flicker": 0.2
+   }
+  },
+  "energy.hole.collapse": {
+   "Light": {
+    "Colour": [
+     0.749,
+     0.502,
+     1.0
+    ],
+    "Range": 8,
+    "Peak": 4,
+    "Life": 0.35,
+    "Delay": 0.28
+   }
+  },
+  "energy.hole.launch": {
+   "Item": "Master_MagicFX_Bundle_1_0001259a",
+   "Scale": 0.035,
+   "Light": {
+    "Colour": [
+     0.6039,
+     0.3137,
+     1.0
+    ],
+    "Range": 2,
+    "Peak": 3,
+    "Life": 0.08
+   }
+  },
+  "energy.hole.open": {
+   "Light": {
+    "Colour": [
+     0.6,
+     0.298,
+     1.0
+    ],
+    "Range": 9,
+    "Peak": 5,
+    "Life": 0.4
+   }
+  },
+  "energy.hole.shell": {
+   "Item": "Super_Magic_FX_1700_Uniq_c2b239f6",
+   "Hold": 0.15,
+   "Size": 1.2,
+   "AxisUp": true,
+   "Linger": 0.1,
+   "Light": {
+    "Colour": [
+     0.549,
+     0.149,
+     1.0
+    ],
+    "Range": 6,
+    "Peak": 2,
+    "Life": 0,
+    "Flicker": 0.2
+   }
+  },
+  "energy.orb": {
+   "Item": "Master_MagicFX_Bundle_1_37d06094",
+   "Hold": 0.15,
+   "Size": 5.0,
+   "Linger": 0.1,
+   "Light": {
+    "Colour": [
+     0.251,
+     0.549,
+     1.0
+    ],
+    "Range": 4,
+    "Peak": 1.4,
+    "Life": 0,
+    "Flicker": 0.25
+   }
+  },
+  "energy.orb.charge": {
+   "Item": "Free_Quick_Effects_Vol_1_0f3d407f_815e86",
+   "Hold": 0.15,
+   "Size": 4.58,
+   "Linger": 0.1,
+   "Light": {
+    "Colour": [
+     0.4314,
+     0.5098,
+     0.6
+    ],
+    "Range": 4,
+    "Peak": 1.4,
+    "Life": 0,
+    "Flicker": 0.35
+   }
+  },
+  "energy.orb.charged": {
+   "Light": {
+    "Colour": [
+     0.298,
+     0.6,
+     1.0
+    ],
+    "Range": 3,
+    "Peak": 2.5,
+    "Life": 0.2
+   }
+  },
+  "energy.orb.muzzle": {
+   "Item": "Master_MagicFX_Bundle_1_78e3b644",
+   "Scale": 0.05,
+   "Light": {
+    "Colour": [
+     0.298,
+     0.6,
+     1.0
+    ],
+    "Range": 5,
+    "Peak": 3,
+    "Life": 0.15
+   }
+  },
+  "energy.orb.trail": {
+   "Item": "Master_MagicFX_Bundle_1_ff2c6ef3",
+   "Hold": 0.15,
+   "Size": 4.0,
+   "Linger": 0.5
+  },
+  "energy.plasma.blast": {
+   "Item": "Master_MagicFX_Bundle_1_fba8fe35",
+   "Size": 12.0,
+   "AxisUp": true,
+   "AlwaysDraw": true,
+   "Light": {
+    "Colour": [
+     0.349,
+     0.6,
+     1.0
+    ],
+    "Range": 14,
+    "Peak": 3,
+    "Life": 0.55,
+    "Flicker": 0.2
+   }
+  },
+  "energy.shock.burst": {
+   "Item": "Electricity_Assets_for_V_038aaa67",
+   "Scale": 0.3
+  },
+  "energy.shock.orb": {
+   "Item": "Super_Magic_FX_1700_Uniq_d8f74c97",
+   "Hold": 0.15,
+   "Size": 2.6,
+   "Centre": [
+    0,
+    1.1,
+    0
+   ],
+   "Linger": 0.1,
+   "Light": {
+    "Colour": [
+     0.502,
+     0.349,
+     1.0
+    ],
+    "Range": 4,
+    "Peak": 1.4,
+    "Life": 0,
+    "Flicker": 0.45
+   }
+  },
+  "energy.sparks": {
+   "Item": "War_FX_e74af37e",
+   "Light": {
+    "Colour": [
+     1.0,
+     0.698,
+     0.4
+    ],
+    "Range": 2.5,
+    "Peak": 2,
+    "Life": 0.12,
+    "Flicker": 0.3
+   }
+  }
+ }
+}

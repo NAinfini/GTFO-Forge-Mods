@@ -1,9 +1,7 @@
 using System;
 using Enemies;
 using ForgeWeaponEnergyLab.Presentation;
-using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using Player;
-using SNetwork;
 using UnityEngine;
 using UnityEngine.AI;
 using NVector3 = System.Numerics.Vector3;
@@ -22,6 +20,11 @@ internal sealed class SpecialWeapons : IDisposable
         internal float Until;
         internal int Bounces, Dimension;
         internal readonly PlasmaContacts Contacts = new();
+        /// <summary>The shot's number; when a machine that only draws the disc found its last stop (it then waits for the host's word
+        /// until this time, standing there); whether its end is settled; its damage factor; when it was launched.</summary>
+        internal uint Sequence;
+        internal float Hold, Scale, Born;
+        internal bool Confirmed;
     }
     private struct HoleTarget
     {
@@ -30,7 +33,7 @@ internal sealed class SpecialWeapons : IDisposable
         internal float Distance;
     }
     private readonly Disc[] _discs = { new(), new(), new() };
-    private readonly Il2CppStructArray<RaycastHit> _sweep = new(Capacity);
+    private readonly ProjectileSweep _sweep = new(Capacity);
     private readonly ForgeCore.ColliderQuery _overlap = new(Capacity);
     private readonly RaycastHit[] _flameHits = new RaycastHit[Capacity];
     private readonly long[] _identities = new long[Capacity];
@@ -47,7 +50,9 @@ internal sealed class SpecialWeapons : IDisposable
     private PlayerAgent? _holeOwner;
     private EnergyGear _holeGear = null!;
     private Vector3 _holePosition, _holeVelocity;
-    private float _holeUntil, _holeBorn, _nextQuery;
+    private float _holeUntil, _holeBorn, _nextQuery, _holeHold, _holeScale = 1f;
+    private uint _holeSequence;
+    private bool _holeConfirmed;
     private int _victimCount, _holeDimension;
     private bool _field, _collapsing;
     internal SpecialEffects Visuals { get; }
@@ -62,41 +67,71 @@ internal sealed class SpecialWeapons : IDisposable
 
     internal bool CanLaunchShell => _shells.CanLaunch;
 
-    internal void LaunchShell(PlayerAgent owner, EnergyGear gear, Vector3 position, Vector3 direction, float damage, float now)
+    internal void LaunchShell(PlayerAgent owner, EnergyGear gear, Vector3 position, Vector3 direction, float damage, float now, uint sequence)
     {
         if (!CanLaunchShell) throw new BudgetExhausted("Blast shell limit reached for " + gear.Definition.Id);
-        _shells.Launch(owner, gear, position, direction, damage, now);
+        _shells.Launch(owner, gear, position, direction, damage, now, sequence);
+    }
+
+    /// <summary>The host's word on where a projectile of shot <paramref name="sequence"/> ended (<see cref="FlightEnds"/>).</summary>
+    internal void Finish(FlightKind kind, uint sequence, Vector3 at, float now)
+    {
+        switch (kind)
+        {
+            case FlightKind.Shell: _shells.Finish(sequence, at, now); break;
+            case FlightKind.Disc:
+                for (var index = 0; index < _discs.Length; index++)
+                {
+                    var disc = _discs[index];
+                    if (disc.Owner is null || disc.Sequence != sequence) continue;
+                    disc.Position = at; disc.Hold = 0f; disc.Confirmed = true;
+                    EndDisc(index);
+                    break;
+                }
+                break;
+            case FlightKind.Hole:
+                if (_holeOwner is not null && !_field && _holeSequence == sequence)
+                {
+                    _holePosition = at; _holeHold = 0f; _holeConfirmed = true;
+                    StartField(now);
+                }
+                break;
+        }
     }
 
     internal bool CanLaunchDisc(EnergyGear gear)
     {
         var active = 0; var free = false;
         foreach (var disc in _discs)
-            if (disc.Owner == null) free = true;
+            if (disc.Owner is null) free = true;
             else if (disc.Gear.CategoryId == gear.CategoryId) active++;
         return free && active < gear.Numbers.ActiveProjectiles;
     }
-    internal bool CanLaunchHole => _holeOwner == null;
+    internal bool CanLaunchHole => _holeOwner is null;
 
     /// <summary>No disc or gravity projectile exists, so a tick has nothing to move.</summary>
     internal bool Idle
     {
         get
         {
-            if (_holeOwner != null || !_shells.Idle) return false;
-            foreach (var disc in _discs) if (disc.Owner != null) return false;
+            if (_holeOwner is not null || !_shells.Idle) return false;
+            foreach (var disc in _discs) if (disc.Owner is not null) return false;
             return true;
         }
     }
 
-    internal void LaunchDisc(PlayerAgent owner, EnergyGear gear, Vector3 position, Vector3 direction, float now)
+    /// <summary><paramref name="admitted"/>: the shooter's own gate already let this shot go (its round is spent), so when no room is left
+    /// the oldest disc is dropped instead of this shot. <paramref name="scale"/>: the factor on the gun's damage the shot's native hit carried.</summary>
+    internal void LaunchDisc(PlayerAgent owner, EnergyGear gear, Vector3 position, Vector3 direction, float now, uint sequence, float scale, bool admitted = false)
     {
+        if (admitted && !CanLaunchDisc(gear)) DropOldestDisc(gear);
         if (!CanLaunchDisc(gear)) throw new BudgetExhausted("Ricochet disc limit reached for " + gear.Definition.Id);
         for (var index = 0; index < _discs.Length; index++)
         {
             var disc = _discs[index];
-            if (disc.Owner != null) continue;
+            if (disc.Owner is not null) continue;
             disc.Owner = owner; disc.Gear = gear; disc.Dimension = (int)owner.DimensionIndex; disc.Position = position; disc.Direction = direction.normalized;
+            disc.Sequence = sequence; disc.Scale = scale; disc.Born = now; disc.Hold = 0f; disc.Confirmed = false;
             disc.Bounces = 0; disc.Until = now + gear.Numbers.Lifetime; disc.Contacts.Reset();
             Visuals.Disc(index, position, disc.Direction, now, true);
             return;
@@ -104,12 +139,30 @@ internal sealed class SpecialWeapons : IDisposable
         throw new BudgetExhausted("All ricochet disc slots are occupied.");
     }
 
-    internal void LaunchHole(PlayerAgent owner, EnergyGear gear, Vector3 position, Vector3 direction, float now)
+    // The oldest disc of this gun (any disc when none is this gun's) leaves, with no end of its own: its slot goes to the shot just admitted.
+    private void DropOldestDisc(EnergyGear gear)
     {
+        var oldest = -1; var sameGun = false;
+        for (var index = 0; index < _discs.Length; index++)
+        {
+            var disc = _discs[index];
+            if (disc.Owner is null) continue;
+            var same = disc.Gear.CategoryId == gear.CategoryId;
+            if (oldest < 0 || (same && !sameGun) || (same == sameGun && disc.Born < _discs[oldest].Born)) { oldest = index; sameGun = same; }
+        }
+        if (oldest >= 0) EndDisc(oldest);
+    }
+
+    /// <summary><paramref name="admitted"/>: the shooter's own gate already let this shot go (its round is spent), so a gravity projectile or
+    /// field still standing is ended instead of this shot being dropped.</summary>
+    internal void LaunchHole(PlayerAgent owner, EnergyGear gear, Vector3 position, Vector3 direction, float now, uint sequence, float scale, bool admitted = false)
+    {
+        if (admitted && !CanLaunchHole) EndHole();
         if (!CanLaunchHole) throw new BudgetExhausted("A gravity projectile or field is already active.");
+        _holeSequence = sequence; _holeScale = scale; _holeHold = 0f; _holeConfirmed = false;
         _holeOwner = owner; _holeGear = gear; _holeDimension = (int)owner.DimensionIndex; _holePosition = position; _holeVelocity = direction.normalized * gear.Numbers.Speed;
         _holeUntil = now + gear.Numbers.FlightLifetime; _field = false; _collapsing = false;
-        Visuals.HoleLaunch(position);
+        Visuals.HoleLaunch(position, direction);
         Visuals.HoleProjectile(position, gear.Numbers.BodyRadius);
     }
 
@@ -122,22 +175,34 @@ internal sealed class SpecialWeapons : IDisposable
         for (var index = 0; index < _discs.Length; index++)
         {
             var disc = _discs[index];
-            if (disc.Owner == null) continue;
-            if (!disc.Owner.Alive || (int)disc.Owner.DimensionIndex != disc.Dimension || now >= disc.Until) { EndDisc(index); continue; }
+            if (disc.Owner is null) continue;
+            if (disc.Owner == null || !disc.Owner.Alive || (int)disc.Owner.DimensionIndex != disc.Dimension) { EndDisc(index); continue; }
+            if (disc.Hold > 0f)
+            {
+                // Stopped here, waiting for the host's word on where it ended; none came in time.
+                if (now >= disc.Hold) { disc.Hold = 0f; disc.Confirmed = true; EndDisc(index); }
+                continue;
+            }
+            if (now >= disc.Until) { SettleDisc(index, now); continue; }
             // A query that outgrew its budget ends this disc only, never the gun.
             try { MoveDisc(index, disc.Gear.Numbers.Speed * dt, now); }
-            catch (BudgetExhausted error) { Plugin.Error("A special projectile was dropped: " + error); EndDisc(index); }
+            catch (BudgetExhausted error) { Plugin.Logger.ErrorOnce("A special projectile was dropped: " + error); EndDisc(index); }
         }
         try { TickHole(dt, now); }
-        catch (BudgetExhausted error) { Plugin.Error("A special projectile was dropped: " + error); EndHole(); }
+        catch (BudgetExhausted error) { Plugin.Logger.ErrorOnce("A special projectile was dropped: " + error); EndHole(); }
     }
 
     private void TickHole(float dt, float now)
     {
-        if (_holeOwner != null)
+        if (_holeOwner is not null)
         {
-            if (!_holeOwner.Alive || (int)_holeOwner.DimensionIndex != _holeDimension) EndHole();
-            else if (!_field) MoveHole(dt, now);
+            if (_holeOwner == null || !_holeOwner.Alive || (int)_holeOwner.DimensionIndex != _holeDimension) EndHole();
+            else if (!_field)
+            {
+                // Stopped here, waiting for the host's word on where it came down; none came in time.
+                if (_holeHold <= 0f) MoveHole(dt, now);
+                else if (now >= _holeHold) { _holeHold = 0f; _holeConfirmed = true; StartField(now); }
+            }
             else if (now >= _holeUntil) EndHole();
             else
             {
@@ -156,8 +221,8 @@ internal sealed class SpecialWeapons : IDisposable
                         var interval = _holeGear.Numbers.Pulse.Interval;
                         _nextHolePulse = now - _nextHolePulse >= interval ? now + interval : _nextHolePulse + interval;
                     }
-                    if (_damageEnabled && SNet.IsMaster && (damage || now >= _nextQuery)) QueryHoleTargets(now);
-                    if (_damageEnabled && SNet.IsMaster)
+                    if (_damageEnabled && ForgeCore.Session.IsHost && (damage || now >= _nextQuery)) QueryHoleTargets(now);
+                    if (_damageEnabled && ForgeCore.Session.IsHost)
                     {
                         if (damage) DamageHole();
                         // The pull is applied at a fixed rate with the time gathered since its last step.
@@ -177,16 +242,9 @@ internal sealed class SpecialWeapons : IDisposable
         {
             DiscOverlap(disc, now);
             // A door may close around a flying disc between frames. Do not escape through it.
-            if (MuzzleBlocked(disc.Position, 0.02f)) { Visuals.Sparks(disc.Position, -disc.Direction, now); EndDisc(index); return; }
-            var count = Sweep(disc.Position, disc.Gear.Numbers.BodyRadius, disc.Direction, distance);
-            var stop = -1;
-            for (var row = 0; row < count; row++)
-            {
-                var collider = _sweep[row].collider;
-                if (collider == null || ForgeCore.Combat.IsPartOf(collider, disc.Owner!)) continue;
-                if (ColliderKinds.Of(collider) != ColliderKind.None) continue;
-                if (stop < 0 || _sweep[row].distance < _sweep[stop].distance) stop = row;
-            }
+            if (MuzzleBlocked(disc.Position, 0.02f)) { Visuals.Sparks(disc.Position, -disc.Direction, now); SettleDisc(index, now); return; }
+            var count = _sweep.Cast(disc.Position, disc.Gear.Numbers.BodyRadius, disc.Direction, distance);
+            var stop = _sweep.Nearest(count, disc.Owner, SweepPass.Agents);
             var limit = stop < 0 ? distance : _sweep[stop].distance;
             for (var row = 0; row < count; row++)
             {
@@ -199,7 +257,7 @@ internal sealed class SpecialWeapons : IDisposable
             if (stop < 0) break;
             var hit = _sweep[stop];
             Visuals.Sparks(disc.Position, hit.normal, now);
-            if (++disc.Bounces > disc.Gear.Numbers.Bounces) { EndDisc(index); return; }
+            if (++disc.Bounces > disc.Gear.Numbers.Bounces) { SettleDisc(index, now); return; }
             disc.Direction = U(SpecialWeaponMath.Reflect(N(disc.Direction), N(hit.normal)));
             disc.Contacts.Reset();
             disc.Position += hit.normal * 0.015f;
@@ -221,7 +279,8 @@ internal sealed class SpecialWeapons : IDisposable
         for (var row = 0; row < count; row++)
         {
             var collider = _overlap[row];
-            if (collider == null || Blocked(disc.Position, collider.ClosestPoint(disc.Position))) continue;
+            // Only a receiver can be hit, so the level's own (possibly non-convex) colliders never reach ClosestPoint or the blocking query.
+            if (collider == null || !ForgeCore.Combat.DirectReceiver(disc.Owner!, collider, out _) || Blocked(disc.Position, collider.ClosestPoint(disc.Position))) continue;
             DiscContact(disc, NativeShot.OverlapContact(collider, disc.Position, disc.Direction), now);
         }
     }
@@ -231,18 +290,11 @@ internal sealed class SpecialWeapons : IDisposable
         if (!_hit.ContactTarget(disc.Position, disc.Direction, collision, out collision)
             || !ForgeCore.Combat.DirectReceiver(disc.Owner!, collision.collider, out var identity)
             || !disc.Contacts.Remember(identity)) return;
-        _hit.ResolveHit(disc.Owner!, disc.Gear.Numbers.Shot, disc.Position, disc.Direction, collision);
+        _hit.ResolveHit(disc.Owner!, disc.Gear.Numbers.Shot with { Damage = disc.Gear.Numbers.Shot.Damage * disc.Scale }, disc.Position, disc.Direction, collision);
         if (_damageEnabled) _hit.Apply();
         Visuals.DiscImpact(collision.point, disc.Direction, now);
     }
 
-    private int Sweep(Vector3 start, float radius, Vector3 direction, float distance)
-    {
-        var count = Physics.SphereCastNonAlloc(start, radius, direction, _sweep, distance,
-            LayerManager.MASK_BULLETWEAPON_RAY, QueryTriggerInteraction.UseGlobal);
-        if (count == Capacity) throw new BudgetExhausted("Special projectile collision budget exhausted; truncated hits refused.");
-        return count;
-    }
 
     internal float FlameRange(EnergyGear gear, Vector3 start, Vector3 direction)
         => MuzzleBlocked(start, 0.025f) ? 0f : Physics.Raycast(start, direction, out var hit, gear.Numbers.Shot.Range,
@@ -259,7 +311,7 @@ internal sealed class SpecialWeapons : IDisposable
         var count = _overlap.Sphere(center, radius, LayerManager.MASK_BULLETWEAPON_RAY, QueryTriggerInteraction.UseGlobal);
         if (_overlap.Truncated)
         {
-            Plugin.Error("A flame tick was dropped: its target budget is exhausted.");
+            Plugin.Logger.ErrorOnce("A flame tick was dropped: its target budget is exhausted.");
             return;
         }
         var used = 0;
@@ -296,26 +348,37 @@ internal sealed class SpecialWeapons : IDisposable
     {
         var overlaps = Overlap(_holePosition, _holeGear.Numbers.BodyRadius);
         for (var row = 0; row < overlaps; row++)
-            if (_overlap[row] != null && !PlayerCollider(_overlap[row])) { StartField(now); return; }
+            if (_overlap[row] != null && !PlayerCollider(_overlap[row])) { SettleHole(now); return; }
         var offset = _holeVelocity * delta;
         var direction = offset.normalized;
         var distance = offset.magnitude;
-        var count = Sweep(_holePosition, _holeGear.Numbers.BodyRadius, direction, distance);
-        var stop = -1;
-        for (var row = 0; row < count; row++)
-        {
-            if (_sweep[row].collider == null || PlayerCollider(_sweep[row].collider)) continue;
-            if (stop < 0 || _sweep[row].distance < _sweep[stop].distance) stop = row;
-        }
+        var stop = _sweep.Nearest(_sweep.Cast(_holePosition, _holeGear.Numbers.BodyRadius, direction, distance), null, SweepPass.Players);
         if (stop >= 0)
         {
             _holePosition += direction * MathF.Max(0f, _sweep[stop].distance - 0.025f);
-            StartField(now); return;
+            SettleHole(now); return;
         }
         _holePosition += offset;
         _holeVelocity += Vector3.down * (_holeGear.Numbers.Gravity * delta);
-        if (now >= _holeUntil) { StartField(now); return; }
+        if (now >= _holeUntil) { SettleHole(now); return; }
         Visuals.HoleProjectile(_holePosition, _holeGear.Numbers.BodyRadius);
+    }
+
+    // The gravity projectile came down here. A machine that only draws it waits where it stopped: the host says where it came down.
+    private void SettleHole(float now)
+    {
+        if (!_damageEnabled && !_holeConfirmed) { _holeHold = now + EnergyProtocol.FlightEndWaitSeconds; return; }
+        if (_damageEnabled) FlightEnds.Announce(_holeOwner!, FlightKind.Hole, _holeSequence, _holePosition);
+        StartField(now);
+    }
+
+    // The disc's last stop (its bounces or its time are spent, or a door closed on it); the same wait for the host's word.
+    private void SettleDisc(int index, float now)
+    {
+        var disc = _discs[index];
+        if (!_damageEnabled && !disc.Confirmed) { disc.Hold = now + EnergyProtocol.FlightEndWaitSeconds; return; }
+        if (_damageEnabled) FlightEnds.Announce(disc.Owner!, FlightKind.Disc, disc.Sequence, disc.Position);
+        EndDisc(index);
     }
 
     private void StartField(float now)
@@ -323,14 +386,20 @@ internal sealed class SpecialWeapons : IDisposable
         _field = true; _holeBorn = now; _holeUntil = now + _holeGear.Numbers.Lifetime; _nextQuery = now;
         _nextHolePulse = double.NegativeInfinity;
         _pullTime = 0f;
-        Visuals.Hole(_holePosition, 0.1f, _holeGear.Numbers.Radius, true);
+        // A well that came down stands its core clear of the floor. The field itself moves there, so what pulls and what shows stay one point on every machine.
+        var core = _holeGear.Numbers.CoreRadius;
+        if (ForgeCore.Level.FloorBelow(_holePosition, core, out var floor) &&
+            !Physics.Raycast(floor.point, Vector3.up, out _, core, LayerManager.MASK_EXPLOSION_BLOCKERS, QueryTriggerInteraction.Ignore))
+            _holePosition.y = floor.point.y + core;
+        // The well opens from nothing and grows (TickHole), so its size only ever rises and then falls.
+        Visuals.Hole(_holePosition, 0f, _holeGear.Numbers.Radius, true);
     }
 
     private void QueryHoleTargets(float now)
     {
         _nextQuery = now + _holeGear.Numbers.QueryInterval;
         Array.Clear(_victims, 0, _victimCount); _victimCount = 0;
-        var count = _overlap.Sphere(_holePosition, _holeGear.Numbers.Radius, LayerManager.MASK_BULLETWEAPON_RAY, QueryTriggerInteraction.Ignore);
+        var count = _overlap.Sphere(_holePosition, _holeGear.Numbers.Radius, LayerManager.MASK_BULLETWEAPON_RAY, QueryTriggerInteraction.UseGlobal);
         if (_overlap.Truncated) throw new BudgetExhausted("Gravity target budget exhausted; truncated damage/pull refused.");
         for (var row = 0; row < count; row++)
         {
@@ -363,7 +432,7 @@ internal sealed class SpecialWeapons : IDisposable
             if (!_hit.RayTarget(_holePosition, target.Collider.ClosestPoint(_holePosition), target.Collider, out var collision)
                 || Blocked(_holePosition, collision.point)) continue;
             var direction = (collision.point - _holePosition).normalized;
-            var tuning = _holeGear.Numbers.Pulse with { Damage = SpecialWeaponMath.HoleDamageAt(target.Distance, _holeGear.Numbers) };
+            var tuning = _holeGear.Numbers.Pulse with { Damage = SpecialWeaponMath.HoleDamageAt(target.Distance, _holeGear.Numbers) * _holeScale };
             _hit.ResolveHit(_holeOwner!, tuning, _holePosition, direction, collision);
             _hit.Apply();
         }
@@ -418,7 +487,7 @@ internal sealed class SpecialWeapons : IDisposable
     private void EndDisc(int index) { _discs[index].Owner = null; Visuals.HideDisc(index); }
     private void EndHole()
     {
-        _holeOwner = null; _field = false; _pullTime = 0f; Array.Clear(_victims, 0, _victimCount); _victimCount = 0; Visuals.HideHole();
+        _holeOwner = null; _field = false; _holeHold = 0f; _pullTime = 0f; Array.Clear(_victims, 0, _victimCount); _victimCount = 0; Visuals.HideHole();
     }
     internal void Clear()
     {

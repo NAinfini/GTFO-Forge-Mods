@@ -1,5 +1,4 @@
 using ForgeWeaponEnergyLab.Presentation;
-using HarmonyLib;
 
 namespace ForgeWeaponEnergyLab.Native;
 
@@ -13,6 +12,6 @@ internal static class BindEnergyInventoryModel
         EnergyMuzzleFlash.Queue(item);
         // The model bind owns its registration snapshot and rollback, including deferred asset mounts.
         try { WeaponModels.BindWeapon(item); }
-        catch (System.Exception error) { Plugin.Error("Energy native socket binding failed: " + error); }
+        catch (System.Exception error) { Plugin.Logger.ErrorOnce("Energy native socket binding failed: " + error); }
     }
 }

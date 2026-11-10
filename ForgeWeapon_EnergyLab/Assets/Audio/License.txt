@@ -3,7 +3,7 @@ Copyright (c) 2026 NAinfini
 
 The sound effects in this directory were made with Adobe Firefly, whose output may be used commercially, and are licensed under the
 MIT License in ../../LICENSE. manifest.json preserves source filenames and SHA-256 hashes and lists each runtime cue's Ogg Vorbis file;
-the audio folder's cues.json describes how ForgeAudio plays them.
+the audio folder's cues.forge describes how ForgeAudio plays them.
 
 The blast-fire and blast-explode cues are not Firefly sounds. They are the grenade launcher's fire and burst sounds of
 ForgeOrdnance_Arsenal, copied unchanged (provenance of every clip in ForgeOrdnance_Arsenal/Assets/Audio/sources.json). Their sources:

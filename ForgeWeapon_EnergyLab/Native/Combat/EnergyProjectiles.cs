@@ -1,7 +1,5 @@
 using System;
-using Enemies;
 using ForgeWeaponEnergyLab.Presentation;
-using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using Player;
 using UnityEngine;
 
@@ -27,10 +25,15 @@ internal sealed class EnergyProjectiles : IDisposable
         internal float Until;
         internal readonly PlasmaContacts Contacts = new();
         internal double NextPulse;
+        /// <summary>The shot's number, when a machine that only draws it stopped (it then waits for the host's word until this time),
+        /// whether its end is settled, and when it was launched.</summary>
+        internal uint Sequence;
+        internal float Hold, Born;
+        internal bool Confirmed;
     }
 
     private readonly Flight[] _flights = new Flight[Capacity];
-    private readonly Il2CppStructArray<RaycastHit> _sweep = new(QueryCapacity);
+    private readonly ProjectileSweep _sweep = new(QueryCapacity);
     private readonly ForgeCore.ColliderQuery _overlap = new(QueryCapacity);
     private readonly VisibleEnemies _enemies = new();
     private readonly EnergyExplosion _explosion = new();
@@ -58,9 +61,13 @@ internal sealed class EnergyProjectiles : IDisposable
         return free && active < gear.Numbers.ActiveProjectiles;
     }
 
-    internal void Launch(PlayerAgent owner, Vector3 position, Vector3 direction, float power, EnergyGear gear, float now)
+    /// <summary>Launches a flight. <paramref name="admitted"/>: the shooter's own gate already let this shot go (its round is spent), so
+    /// when no room is left the oldest flight of the same gun is dropped instead of this shot. <paramref name="scale"/>: the factor on the
+    /// gun's damage the shot's native hit carried.</summary>
+    internal void Launch(PlayerAgent owner, Vector3 position, Vector3 direction, float power, EnergyGear gear, float now, uint sequence, float scale, bool admitted = false)
     {
         var mode = gear.Mode;
+        if (admitted && !CanLaunch(gear)) DropOldest(gear);
         if (!CanLaunch(gear)) throw new BudgetExhausted("Energy projectile limit reached for " + gear.Definition.Id);
         if (mode is not (EnergyMode.PlasmaBlast or EnergyMode.PlasmaArc)) throw new ArgumentOutOfRangeException(nameof(mode));
         if (direction.sqrMagnitude < 0.0001f) throw new ArgumentException("Plasma launch direction is empty.");
@@ -73,8 +80,10 @@ internal sealed class EnergyProjectiles : IDisposable
             flight.Mode = mode; flight.Gear = gear;
             flight.Position = position;
             flight.Direction = direction.normalized;
-            flight.Payload = PlasmaPayload.FromCharge(power, gear.Numbers);
+            var payload = PlasmaPayload.FromCharge(power, gear.Numbers);
+            flight.Payload = payload with { Damage = payload.Damage * scale, ArcDamage = payload.ArcDamage * scale };
             flight.Until = now + flight.Payload.Lifetime;
+            flight.Sequence = sequence; flight.Born = now; flight.Hold = 0f; flight.Confirmed = false;
             flight.Phase = Phase.Launched;
             flight.Contacts.Reset();
             flight.NextPulse = double.NegativeInfinity;
@@ -82,6 +91,28 @@ internal sealed class EnergyProjectiles : IDisposable
             return;
         }
         throw new BudgetExhausted("All energy projectile slots are occupied.");
+    }
+
+    // The oldest flight of this gun that has not finished leaves, with no burst: its slot goes to the shot just admitted.
+    private void DropOldest(EnergyGear gear)
+    {
+        var oldest = -1;
+        for (var index = 0; index < Capacity; index++)
+            if (_flights[index].Phase != Phase.Free && _flights[index].Gear.CategoryId == gear.CategoryId && (oldest < 0 || _flights[index].Born < _flights[oldest].Born)) oldest = index;
+        if (oldest >= 0) Clear(oldest);
+    }
+
+    /// <summary>The host's word: shot <paramref name="sequence"/> ended at <paramref name="at"/>. The flight, if it is still flying here, ends there.</summary>
+    internal void Finish(uint sequence, Vector3 at, float now)
+    {
+        for (var index = 0; index < Capacity; index++)
+        {
+            var flight = _flights[index];
+            if (flight.Phase is not (Phase.Launched or Phase.Flying) || flight.Sequence != sequence) continue;
+            flight.Phase = Phase.Flying; flight.Position = at; flight.Hold = 0f; flight.Confirmed = true;
+            EndFlight(index, now);
+            return;
+        }
     }
 
     internal void Tick(float delta, float now)
@@ -94,7 +125,7 @@ internal sealed class EnergyProjectiles : IDisposable
             try { Advance(index, delta, now); }
             catch (BudgetExhausted error)
             {
-                Plugin.Error("A plasma projectile was dropped: " + error);
+                Plugin.Logger.ErrorOnce("A plasma projectile was dropped: " + error);
                 Clear(index);
             }
         }
@@ -109,6 +140,14 @@ internal sealed class EnergyProjectiles : IDisposable
             SpawnContacts(index, now);
             if (flight.Phase != Phase.Flying) return;
         }
+        if (flight.Hold > 0f)
+        {
+            // Stopped here, waiting for the host's word on where it ended; none came in time.
+            if (now < flight.Hold) return;
+            flight.Hold = 0f; flight.Confirmed = true;
+            EndFlight(index, now);
+            return;
+        }
         if (flight.Phase is Phase.Exploding or Phase.Fading)
         {
             var lifetime = flight.Phase == Phase.Exploding ? ExplosionLifetime(flight) : flight.Gear.Numbers.FadeLifetime;
@@ -120,17 +159,8 @@ internal sealed class EnergyProjectiles : IDisposable
         }
         var remainingTime = MathF.Max(0f, flight.Until - (now - delta));
         var distance = flight.Payload.Speed * Math.Clamp(delta, 0f, remainingTime);
-        var count = Physics.SphereCastNonAlloc(flight.Position, flight.Payload.BodyRadius, flight.Direction,
-            _sweep, distance, LayerManager.MASK_BULLETWEAPON_RAY, QueryTriggerInteraction.UseGlobal);
-        if (count == _sweep.Length) throw new BudgetExhausted("Plasma sweep budget exhausted; no truncated collision result used.");
-        var stop = -1;
-        for (var hit = 0; hit < count; hit++)
-        {
-            var collider = _sweep[hit].collider;
-            if (collider == null || ForgeCore.Combat.IsPartOf(collider, flight.Owner)
-                || (flight.Mode == EnergyMode.PlasmaArc && ColliderKinds.IsActor(collider))) continue;
-            if (stop < 0 || _sweep[hit].distance < _sweep[stop].distance) stop = hit;
-        }
+        var count = _sweep.Cast(flight.Position, flight.Payload.BodyRadius, flight.Direction, distance);
+        var stop = _sweep.Nearest(count, flight.Owner, flight.Mode == EnergyMode.PlasmaArc ? SweepPass.Actors : SweepPass.Owner);
         if (flight.Mode == EnergyMode.PlasmaArc)
         {
             var stopDistance = stop < 0 ? float.PositiveInfinity : _sweep[stop].distance;
@@ -138,8 +168,6 @@ internal sealed class EnergyProjectiles : IDisposable
             {
                 var collision = _sweep[hit];
                 if (collision.collider == null || collision.distance > stopDistance) continue;
-                // A sphere sweep that starts inside a receiver can report a zero-distance placeholder point.
-                if (collision.distance <= 0f) collision.point = collision.collider.ClosestPoint(flight.Position);
                 Contact(flight, collision);
             }
         }
@@ -215,6 +243,9 @@ internal sealed class EnergyProjectiles : IDisposable
     private void EndFlight(int index, float now)
     {
         var flight = _flights[index];
+        // A machine that only draws the flight waits where it stopped: the host says where it ended.
+        if (!_damageEnabled && !flight.Confirmed) { flight.Hold = now + EnergyProtocol.FlightEndWaitSeconds; return; }
+        if (_damageEnabled) FlightEnds.Announce(flight.Owner!, FlightKind.Plasma, flight.Sequence, flight.Position);
         if (flight.Mode == EnergyMode.PlasmaBlast) { Explode(index, now); return; }
         flight.Phase = Phase.Fading;
         flight.Until = now + flight.Gear.Numbers.FadeLifetime;

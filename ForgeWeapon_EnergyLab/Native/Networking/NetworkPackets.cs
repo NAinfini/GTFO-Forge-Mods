@@ -5,7 +5,6 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
-using Agents;
 using ForgeCore;
 using UnityEngine;
 
@@ -24,7 +23,7 @@ internal struct BuildFingerprint : IEquatable<BuildFingerprint>
     {
         var text = new StringBuilder();
         foreach (var type in new[] { typeof(FireCommand), typeof(FireVisual),
-                     typeof(ChargePacket), typeof(ModePacket), typeof(BuildFingerprint) })
+                     typeof(ChargePacket), typeof(ModePacket), typeof(FlightEnd), typeof(BuildFingerprint) })
         {
             text.Append('|').Append(type.Name).Append(':').Append(Marshal.SizeOf(type));
             foreach (var field in type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
@@ -32,47 +31,40 @@ internal struct BuildFingerprint : IEquatable<BuildFingerprint>
                 text.Append('|').Append(field.Name).Append(':').Append(field.FieldType.FullName)
                     .Append('@').Append(Marshal.OffsetOf(type, field.Name).ToInt32());
         }
-        // Inline numeric literals are tuning too. Including our CLR bodies prevents an
-        // un-named formula edit from evading the development-build handshake.
-        foreach (var type in typeof(EnergyLab).Assembly.GetTypes().OrderBy(t => t.FullName, StringComparer.Ordinal))
-        {
-            text.Append('|').Append(type.FullName);
-            foreach (var field in type.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
-                         .OrderBy(f => f.Name, StringComparer.Ordinal))
-            {
-                if (field.IsLiteral)
-                    text.Append('|').Append(field.Name).Append('=').Append(Convert.ToString(field.GetRawConstantValue(), CultureInfo.InvariantCulture));
-            }
-            foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
-                         .Cast<MethodBase>().Concat(type.GetConstructors(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
-                         .OrderBy(m => m.ToString(), StringComparer.Ordinal))
-            {
-                var il = method.GetMethodBody()?.GetILAsByteArray();
-                if (il != null) text.Append('|').Append(method).Append(':').Append(Convert.ToHexString(il));
-            }
-        }
+        // The module's version ID changes with every change of the compiled code, inline numeric literals and embedded resources
+        // included (deterministic builds derive it from the whole image), so an un-named formula or bundle edit cannot evade the
+        // development-build handshake.
+        text.Append('|').Append(typeof(EnergyLab).Assembly.ManifestModule.ModuleVersionId);
         foreach (var gear in EnergyGears.All.OrderBy(g => g.Definition.Id, StringComparer.Ordinal))
         {
             var definition = gear.Definition;
             var node = new System.Text.Json.Nodes.JsonObject
             {
-                ["id"] = definition.Id, ["name"] = definition.Name, ["slot"] = (int)definition.Slot,
-                ["mode"] = (int)definition.Mode, ["gearId"] = gear.GearId, ["categoryId"] = gear.CategoryId,
-                ["archetypeId"] = gear.ArchetypeId, ["tuningType"] = definition.Tuning.GetType().FullName,
-                ["tuning"] = EnergyConfiguration.TuningJson(definition.Tuning), ["modelKey"] = definition.Model.Key,
-                ["modelSha256"] = gear.ModelDigest
+                ["id"] = definition.Id,
+                ["name"] = definition.Name,
+                ["slot"] = (int)definition.Slot,
+                ["mode"] = (int)definition.Mode,
+                ["gearId"] = gear.GearId,
+                ["categoryId"] = gear.CategoryId,
+                ["archetypeId"] = gear.ArchetypeId,
+                ["tuningType"] = definition.Tuning.GetType().FullName,
+                ["tuning"] = EnergyConfiguration.TuningJson(definition.Tuning),
+                ["modelKey"] = definition.Model.Key,
+                ["modelSha256"] = gear.ModelDigest,
+                ["look"] = EnergyLookNames.Canonical(definition.Look)
             };
             text.Append('|').Append(node.ToJsonString());
         }
-        foreach (var resource in typeof(EnergyLab).Assembly.GetManifestResourceNames().OrderBy(n => n, StringComparer.Ordinal))
-        {
-            using var stream = typeof(EnergyLab).Assembly.GetManifestResourceStream(resource)!;
-            using var sha = SHA256.Create();
-            text.Append('|').Append(resource).Append(':').Append(Convert.ToHexString(sha.ComputeHash(stream)));
-        }
+        // Which guns players may choose, rundown-wide and per level: a host and a client with other lists are refused like other builds.
+        text.Append('|').Append(EnergyLab.Settings.Canonical());
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString()));
-        return new() { A = BitConverter.ToUInt64(hash, 0), B = BitConverter.ToUInt64(hash, 8),
-            C = BitConverter.ToUInt64(hash, 16), D = BitConverter.ToUInt64(hash, 24) };
+        return new()
+        {
+            A = BitConverter.ToUInt64(hash, 0),
+            B = BitConverter.ToUInt64(hash, 8),
+            C = BitConverter.ToUInt64(hash, 16),
+            D = BitConverter.ToUInt64(hash, 24)
+        };
     }
 }
 
@@ -92,10 +84,21 @@ internal struct FireCommand : INetEpoch
     internal Vector3 Direction => new(Dx, Dy, Dz);
     internal static FireCommand Create(uint sequence, EnergyGear gear, Vector3 start,
         Vector3 direction, int dimension, float power = 0f, float damage = 0f) => new()
-    {
-        Epoch = EnergyNetwork.Epoch, Sequence = sequence, Mode = (int)gear.Mode, CategoryId = gear.CategoryId, Dimension = dimension,
-        X = start.x, Y = start.y, Z = start.z, Dx = direction.x, Dy = direction.y, Dz = direction.z, Power = power, Damage = damage
-    };
+        {
+            Epoch = EnergyNetwork.Epoch,
+            Sequence = sequence,
+            Mode = (int)gear.Mode,
+            CategoryId = gear.CategoryId,
+            Dimension = dimension,
+            X = start.x,
+            Y = start.y,
+            Z = start.z,
+            Dx = direction.x,
+            Dy = direction.y,
+            Dz = direction.z,
+            Power = power,
+            Damage = damage
+        };
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
@@ -114,8 +117,10 @@ internal struct FireVisual : INetEpoch
     internal bool Hit(int index) => (HitMask & (1 << index)) != 0;
     internal Vector3 End(int index) => index switch
     {
-        0 => new(E0x, E0y, E0z), 1 => new(E1x, E1y, E1z),
-        2 => new(E2x, E2y, E2z), 3 => new(E3x, E3y, E3z),
+        0 => new(E0x, E0y, E0z),
+        1 => new(E1x, E1y, E1z),
+        2 => new(E2x, E2y, E2z),
+        3 => new(E3x, E3y, E3z),
         _ => throw new ArgumentOutOfRangeException(nameof(index))
     };
     internal void SetEnd(int index, Vector3 end)
@@ -131,9 +136,19 @@ internal struct FireVisual : INetEpoch
     }
     internal static FireVisual From(FireCommand command, ulong shooter) => new()
     {
-        Epoch = command.Epoch, Shooter = shooter, Sequence = command.Sequence, Mode = command.Mode, CategoryId = command.CategoryId,
-        X = command.X, Y = command.Y, Z = command.Z,
-        Dx = command.Dx, Dy = command.Dy, Dz = command.Dz, Power = command.Power, Damage = command.Damage
+        Epoch = command.Epoch,
+        Shooter = shooter,
+        Sequence = command.Sequence,
+        Mode = command.Mode,
+        CategoryId = command.CategoryId,
+        X = command.X,
+        Y = command.Y,
+        Z = command.Z,
+        Dx = command.Dx,
+        Dy = command.Dy,
+        Dz = command.Dz,
+        Power = command.Power,
+        Damage = command.Damage
     };
 }
 
@@ -145,12 +160,40 @@ internal struct ChargePacket : INetEpoch
     internal uint CategoryId;
     internal int Mode, Phase;
     internal float X, Y, Z;
+    /// <summary>Seconds the shooter has been charging when this was sent: a machine that missed the start, or let the charge run out in a stall, draws it at its real power.</summary>
+    internal float Held;
     internal Vector3 Position => new(X, Y, Z);
-    internal static ChargePacket Create(ulong shooter, EnergyGear gear, bool start, Vector3 position) => new()
+    internal static ChargePacket Create(ulong shooter, EnergyGear gear, bool start, Vector3 position, float held) => new()
     {
-        Epoch = EnergyNetwork.Epoch, Shooter = shooter, Mode = (int)gear.Mode, CategoryId = gear.CategoryId, Phase = start ? 1 : 0,
-        X = position.x, Y = position.y, Z = position.z
+        Epoch = EnergyNetwork.Epoch,
+        Shooter = shooter,
+        Mode = (int)gear.Mode,
+        CategoryId = gear.CategoryId,
+        Phase = start ? 1 : 0,
+        X = position.x,
+        Y = position.y,
+        Z = position.z,
+        Held = held
     };
+}
+
+/// <summary>What a flying projectile is (<see cref="FlightEnd.Kind"/>).</summary>
+internal enum FlightKind { Shell = 1, Plasma, Disc, Hole }
+
+/// <summary>The host's word on where a projectile of <see cref="Shooter"/>'s shot number <see cref="Sequence"/> ended (a shell burst, a plasma
+/// body's stop, a disc's last stop, the gravity projectile's well): the other machines move their picture there, so the picture they
+/// draw is where the host dealt the damage.</summary>
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+internal struct FlightEnd : INetEpoch
+{
+    ulong INetEpoch.Epoch { readonly get => Epoch; set => Epoch = value; }
+    internal ulong Epoch, Shooter;
+    internal uint Sequence;
+    internal int Kind;
+    internal float X, Y, Z;
+    internal Vector3 Position => new(X, Y, Z);
+    internal static FlightEnd Create(ulong shooter, FlightKind kind, uint sequence, Vector3 at) => new()
+    { Epoch = EnergyNetwork.Epoch, Shooter = shooter, Sequence = sequence, Kind = (int)kind, X = at.x, Y = at.y, Z = at.z };
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]

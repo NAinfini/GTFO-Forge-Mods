@@ -9,15 +9,11 @@ namespace ForgeWeaponEnergyLab.Native;
 
 /// <summary>
 /// The game gives an assembled gun its base item's ItemFPSSettings block. That block is shared with vanilla guns,
-/// so each energy category gets its own settings and recoil animation with a wider hip item-camera FOV.
-/// Aim FOVs and firing animations are copied unchanged.
+/// so each energy category gets its own settings with its own recoil animation. Where the gun is held and the hip item-camera FOV
+/// are ForgeVisual's gun-holding rule, put on by its GunMount for every gun model; aim FOVs and firing animations are copied unchanged.
 /// </summary>
 internal static class EnergyItemFps
 {
-    internal const int HipItemFov = 45;
-    /// <summary>The energy guns carry more bulk behind the grip than their donors, so the hip and relaxed holds sit
-    /// further forward and lower than the donor's (vanilla holds range z 0.31–0.70, y -0.06 to -0.50). Aim stays native.</summary>
-    internal static readonly UnityEngine.Vector3 HoldOffset = new(0.02f, -0.05f, 0.14f);
 
     private sealed class Entry
     {
@@ -41,9 +37,6 @@ internal static class EnergyItemFps
             var recoil = EnergyGearRegistry.RegisterRecoilAnimation(CloneRecoilAnimation(source, definition));
             var own = donor.MemberwiseClone().Cast<ItemFPSSettingsDataBlock>();
             own.RecoilAnimation = recoil.persistentID;
-            own.ItemCameraFOVDefault = HipItemFov;
-            own.localPosHip = donor.localPosHip + HoldOffset;
-            own.localPosRelaxed = donor.localPosRelaxed + HoldOffset;
             ByCategory[category] = entry = new Entry { Donor = donor, Own = own };
         }
         // The native setter resolves RecoilAnimation again; changing the settings ID alone leaves the cached block stale.

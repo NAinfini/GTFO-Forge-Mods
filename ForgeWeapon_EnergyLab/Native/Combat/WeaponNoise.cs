@@ -17,9 +17,7 @@ internal static class WeaponNoise
     /// <summary>An energy projectile's explosion. Call only where the explosion's damage is authoritative (the host).</summary>
     internal static void Explosion(PlayerAgent owner, EnergyGear gear, Vector3 position)
     {
-        if (!ForgeCore.Level.CourseNodeAt(position, 1f, out var node, out _, (int)owner.DimensionIndex) || node == null) node = owner.CourseNode;
-        // Outside every area (out of bounds, falling) there are no enemies to alert.
-        if (node == null) return;
-        ForgeCore.Combat.Noise(position, gear.Numbers.NoiseRadius, node);
+        // Outside every area (out of bounds, falling) there are no enemies to alert: the call makes nothing.
+        ForgeCore.Combat.Noise(position, gear.Numbers.NoiseRadius, (int)owner.DimensionIndex);
     }
 }

@@ -17,4 +17,5 @@
     <Compile Include="../../../ForgeCore/Once/Fnv.cs;../../../ForgeCore/Once/StrictJson.cs" Link="ForgeCore/%(Filename)%(Extension)" />
     <Compile Include="Program.cs" />
   </ItemGroup>
+  <ItemGroup><Compile Include="../../../ForgeCore/Core/Store.cs;../../../ForgeCore/Core/Log.cs" LinkBase="ForgeCore" /></ItemGroup>
 </Project>

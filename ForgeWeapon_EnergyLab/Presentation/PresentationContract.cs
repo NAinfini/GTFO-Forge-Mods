@@ -18,10 +18,12 @@ internal sealed class PresentationColor
 internal sealed class PartPresentation
 {
     public string Name { get; set; } = "";
-    // body: textured with its texture set; glass: transparent tint; reticle: unlit first-person mark.
+    // body: textured with its texture set; glass: not drawn, it bounds where a mark shows; reticle: unlit first-person mark.
     public string Surface { get; set; } = "";
     public string TextureSet { get; set; } = "";
     public Vector3 Pivot { get; set; }
+    // Triangles of the reduced mesh drawn in every view but first person; 0 when the part has none.
+    public int ReducedTriangles { get; set; }
     public PresentationColor Color { get; set; } = new();
 }
 

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
-using ForgeWeaponEnergyLab;
 
 namespace ForgeWeaponEnergyLab.Api;
 
@@ -54,8 +53,14 @@ public sealed record WeaponModel(string Key, string BundlePath);
 /// <param name="Tuning">Complete gameplay values for this weapon.</param>
 /// <param name="Model">The model bundle and prefab key.</param>
 /// <param name="Description">Player-visible loadout description, or null for the default text.</param>
+/// <param name="Look">Sounds and effects this weapon plays instead of its behaviour's own, or null for the defaults.</param>
 public sealed record WeaponDefinition(string Id, string Name, WeaponSlot Slot, EnergyMode Mode,
-    EnergyTuning Tuning, WeaponModel Model, string? Description = null);
+    EnergyTuning Tuning, WeaponModel Model, string? Description = null, WeaponLook? Look = null);
+
+/// <summary>Replacements for what a weapon plays and draws. Keys name what is replaced, values what replaces it; every key not listed keeps the behaviour's own.</summary>
+/// <param name="Sounds">Cue name of the Energy Lab sounds (such as <c>beam-start</c>) to the sound that plays instead: a cue of the weapon's own <c>audio</c> folder, or <c>identity/cue</c> for a cue of any loaded ForgeAudio library.</param>
+/// <param name="Fx">Effect slot name (such as <c>energy.beam.muzzle</c>) to the ForgeVisual effect drawn instead, as <c>Pack:item</c>.</param>
+public sealed record WeaponLook(IReadOnlyDictionary<string, string> Sounds, IReadOnlyDictionary<string, string> Fx);
 
 /// <summary>Immutable gameplay values. Distances are metres, times are seconds and ammunition costs are whole rounds.</summary>
 public abstract record EnergyTuning
@@ -207,7 +212,7 @@ public sealed record DiscTuning : EnergyTuning
 public sealed record FlameTuning : EnergyTuning
 {
     /// <summary>Creates the built-in flame cone defaults.</summary>
-    public FlameTuning() { Magazine = 50; AmmoPerRound = 1.614f; Interval = 0.1; Damage = 2.695f; Stagger = 0.12f; }
+    public FlameTuning() { Magazine = 50; AmmoPerRound = 1.8f; Interval = 0.1; Damage = 2.4f; Stagger = 0.12f; }
     /// <summary>Flame length.</summary>
     public float Range { get; init; } = 8f;
     /// <summary>Cone radius at the muzzle.</summary>
@@ -220,7 +225,7 @@ public sealed record FlameTuning : EnergyTuning
 public sealed record BlackHoleTuning : EnergyTuning
 {
     /// <summary>Creates the built-in gravity core defaults.</summary>
-    public BlackHoleTuning() { Magazine = 2; AmmoPerRound = 28; Interval = 2; Damage = 6.75f; Stagger = 0.1f; ReloadTime = 3.3f; AimTime = 0.35f; }
+    public BlackHoleTuning() { Magazine = 2; AmmoPerRound = 28; Interval = 2; Damage = 9f; Stagger = 0.1f; ReloadTime = 3.3f; AimTime = 0.35f; }
     /// <summary>Launch speed in metres per second.</summary>
     public float Speed { get; init; } = 20f;
     /// <summary>Projectile collision radius.</summary>
@@ -255,7 +260,7 @@ public static class EnergyLab
     /// <summary>BepInEx dependency GUID.</summary>
     public const string PluginId = "NAinfini.ForgeWeaponEnergyLab";
     /// <summary>Plugin package version.</summary>
-    public const string Version = "1.0.0";
+    public const string Version = "1.0.1"; // package-version: NAinfini-ForgeWeapon_EnergyLab
     private static readonly object Gate = new();
     private static readonly Dictionary<string, WeaponDefinition> Definitions = new(StringComparer.Ordinal);
     private static readonly List<string> Order = new();
@@ -310,7 +315,8 @@ public static class EnergyLab
     public static EnergyTuning GetTuning(string id) => GetDefinition(id).Tuning;
 
     /// <summary>Replaces tuning atomically before installation. Existing snapshots remain unchanged.
-    /// Throws InvalidOperationException once gear installation has started.</summary>
+    /// Throws InvalidOperationException once gear installation has started, KeyNotFoundException for an unregistered id,
+    /// and InvalidDataException when the replacement tuning is invalid.</summary>
     /// <param name="id">Registered namespaced identity.</param>
     /// <param name="tuning">Replacement of the same behaviour-specific record type.</param>
     public static void SetTuning(string id, EnergyTuning tuning)
@@ -323,6 +329,12 @@ public static class EnergyLab
             Definitions[id] = definition;
         }
     }
+
+    /// <summary>The rundown's <c>Settings.forge</c> rules, read before registration closes; <see cref="EnergySettings.None"/> without one.</summary>
+    internal static EnergySettings Settings { get; private set; } = EnergySettings.None;
+
+    /// <summary>Takes the rundown's rules; the Tuning in them is laid over every gun when registration closes.</summary>
+    internal static void UseSettings(EnergySettings settings) { lock (Gate) { RequireOpen(); Settings = settings; } }
 
     internal static void Initialize(string configDirectory)
     {
@@ -341,7 +353,10 @@ public static class EnergyLab
         {
             RequireInitialized();
             _closed = true;
-            var tuned = EnergyConfiguration.Load(_configDirectory, Order.Select(id => Definitions[id]).ToArray(), errors);
+            // Settings.forge was read before any plugin registered; its Allowed Ids are checked now that every gun is known.
+            foreach (var id in Settings.UnknownAllowed(Definitions.ContainsKey))
+                errors.Add(EnergySettings.FileName + ": Allowed: '" + id + "' is not a loaded gun (is its package installed?).");
+            var tuned = EnergyConfiguration.Load(_configDirectory, Order.Select(id => Definitions[id]).ToArray(), errors, Settings.Tuning);
             foreach (var definition in tuned) Definitions[definition.Id] = definition;
             return tuned.Select(d => new EnergyGear(d)).ToArray();
         }

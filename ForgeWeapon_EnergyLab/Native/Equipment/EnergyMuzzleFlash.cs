@@ -34,7 +34,7 @@ internal static class EnergyMuzzleFlash
                 flash.m_startColor = flash.m_endColor = Color.clear;
                 flash.gameObject.SetActive(false);
             }
-            catch (System.Exception error) { Plugin.Error("Energy gun muzzle flash could not be switched off: " + error); }
+            catch (System.Exception error) { Plugin.Logger.ErrorOnce("Energy gun muzzle flash could not be switched off: " + error); }
         }
         Pending.Clear();
     }

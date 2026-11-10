@@ -4,62 +4,71 @@
     "bundles": [
         {
             "bundle": "forge-energy-model-beam.bundle",
-            "sha256": "a5d6cbd5519189d4f0687d38c14d08e7654fb8bafa20fef48a03122ae0175520",
-            "bytes": 8014362,
+            "sha256": "18dea98f8d46dc215a38e820da14c79d2e8ecbd87b5506ae1954a59c4d59d678",
+            "bytes": 8724188,
             "weapon": {
                 "mode": "beam",
                 "sight": "holo-wedge",
                 "rail": "picatinny-21",
                 "length": 0.8414999842643738,
                 "triangles": 77518,
+                "reducedTriangles": 14990,
                 "parts": [
                     {
                         "name": "Receiver",
                         "surface": "body",
                         "textureSet": "beam-Receiver",
-                        "triangles": 22466
+                        "triangles": 22466,
+                        "reducedTriangles": 3854
                     },
                     {
                         "name": "Rail",
                         "surface": "body",
                         "textureSet": "rail-picatinny-21",
-                        "triangles": 3748
+                        "triangles": 3748,
+                        "reducedTriangles": 1058
                     },
                     {
                         "name": "Front",
                         "surface": "body",
                         "textureSet": "beam-Front",
-                        "triangles": 23968
+                        "triangles": 23968,
+                        "reducedTriangles": 3886
                     },
                     {
                         "name": "Stock",
                         "surface": "body",
                         "textureSet": "beam-Stock",
-                        "triangles": 10366
+                        "triangles": 10366,
+                        "reducedTriangles": 2160
                     },
                     {
                         "name": "Magazine",
                         "surface": "body",
                         "textureSet": "beam-Magazine",
-                        "triangles": 12818
+                        "triangles": 12818,
+                        "reducedTriangles": 2508
                     },
                     {
                         "name": "Sight",
                         "surface": "body",
                         "textureSet": "sight-holo-wedge",
-                        "triangles": 3672
+                        "triangles": 3672,
+                        "reducedTriangles": 1044
                     },
                     {
                         "name": "SightGlass",
                         "surface": "glass",
                         "textureSet": "",
-                        "triangles": 4
+                        "triangles": 4,
+                        "reducedTriangles": 0
                     },
                     {
                         "name": "SightReticle1",
                         "surface": "reticle",
                         "textureSet": "",
-                        "triangles": 476
+                        "triangles": 476,
+                        "reducedTriangles": 0
                     }
                 ]
             },
@@ -215,62 +224,71 @@
         },
         {
             "bundle": "forge-energy-model-arc.bundle",
-            "sha256": "685f5314650ac6535b3ee31bf323f831b9c75ec3e79be4161b79eba281222c01",
-            "bytes": 9857974,
+            "sha256": "ce635207e5ca6af13cb911e311e39cc4a7f429705f26d7594b08c0dc564960ca",
+            "bytes": 10593667,
             "weapon": {
                 "mode": "arc",
                 "sight": "holo-hood",
                 "rail": "picatinny-17",
                 "length": 0.8200899958610535,
                 "triangles": 141336,
+                "reducedTriangles": 14994,
                 "parts": [
                     {
                         "name": "Receiver",
                         "surface": "body",
                         "textureSet": "arc-Receiver",
-                        "triangles": 20298
+                        "triangles": 20298,
+                        "reducedTriangles": 2744
                     },
                     {
                         "name": "Rail",
                         "surface": "body",
                         "textureSet": "rail-picatinny-17",
-                        "triangles": 3332
+                        "triangles": 3332,
+                        "reducedTriangles": 730
                     },
                     {
                         "name": "Front",
                         "surface": "body",
                         "textureSet": "arc-Front",
-                        "triangles": 93626
+                        "triangles": 93626,
+                        "reducedTriangles": 7544
                     },
                     {
                         "name": "Stock",
                         "surface": "body",
                         "textureSet": "arc-Stock",
-                        "triangles": 14830
+                        "triangles": 14830,
+                        "reducedTriangles": 2076
                     },
                     {
                         "name": "Magazine",
                         "surface": "body",
                         "textureSet": "arc-Magazine",
-                        "triangles": 4280
+                        "triangles": 4280,
+                        "reducedTriangles": 870
                     },
                     {
                         "name": "Sight",
                         "surface": "body",
                         "textureSet": "sight-holo-hood",
-                        "triangles": 4896
+                        "triangles": 4896,
+                        "reducedTriangles": 956
                     },
                     {
                         "name": "SightGlass",
                         "surface": "glass",
                         "textureSet": "",
-                        "triangles": 6
+                        "triangles": 6,
+                        "reducedTriangles": 0
                     },
                     {
                         "name": "SightReticle1",
                         "surface": "reticle",
                         "textureSet": "",
-                        "triangles": 68
+                        "triangles": 68,
+                        "reducedTriangles": 0
                     }
                 ]
             },
@@ -426,62 +444,71 @@
         },
         {
             "bundle": "forge-energy-model-plasma-blast.bundle",
-            "sha256": "12e8f9157ea60cb764a3013731b0e11a9b039f3633b87c3847752976faebb845",
-            "bytes": 8009528,
+            "sha256": "2c602420b33fa8207cb14b181fd57c579fe6d3b5931b1945ebaa3a3610622989",
+            "bytes": 8719671,
             "weapon": {
                 "mode": "plasma-blast",
                 "sight": "reflex-low",
                 "rail": "picatinny-17",
                 "length": 0.8007799983024597,
                 "triangles": 70062,
+                "reducedTriangles": 14994,
                 "parts": [
                     {
                         "name": "Receiver",
                         "surface": "body",
                         "textureSet": "plasma-blast-Receiver",
-                        "triangles": 18220
+                        "triangles": 18220,
+                        "reducedTriangles": 3688
                     },
                     {
                         "name": "Rail",
                         "surface": "body",
                         "textureSet": "rail-picatinny-17",
-                        "triangles": 3332
+                        "triangles": 3332,
+                        "reducedTriangles": 1076
                     },
                     {
                         "name": "Front",
                         "surface": "body",
                         "textureSet": "plasma-blast-Front",
-                        "triangles": 29536
+                        "triangles": 29536,
+                        "reducedTriangles": 4964
                     },
                     {
                         "name": "Stock",
                         "surface": "body",
                         "textureSet": "plasma-blast-Stock",
-                        "triangles": 10578
+                        "triangles": 10578,
+                        "reducedTriangles": 2418
                     },
                     {
                         "name": "Magazine",
                         "surface": "body",
                         "textureSet": "plasma-blast-Magazine",
-                        "triangles": 4616
+                        "triangles": 4616,
+                        "reducedTriangles": 1352
                     },
                     {
                         "name": "Sight",
                         "surface": "body",
                         "textureSet": "sight-reflex-low",
-                        "triangles": 3370
+                        "triangles": 3370,
+                        "reducedTriangles": 1086
                     },
                     {
                         "name": "SightGlass",
                         "surface": "glass",
                         "textureSet": "",
-                        "triangles": 6
+                        "triangles": 6,
+                        "reducedTriangles": 0
                     },
                     {
                         "name": "SightReticle1",
                         "surface": "reticle",
                         "textureSet": "",
-                        "triangles": 404
+                        "triangles": 404,
+                        "reducedTriangles": 0
                     }
                 ]
             },
@@ -637,62 +664,71 @@
         },
         {
             "bundle": "forge-energy-model-plasma-arc.bundle",
-            "sha256": "f747ba2251ed930d90089729688fc6e40b83408326ef2c5cacef704a1673b8a5",
-            "bytes": 7936431,
+            "sha256": "ad9207bb952109453e2a313623768c8ec35bcbd799583d1367c0271786b2190d",
+            "bytes": 8703742,
             "weapon": {
                 "mode": "plasma-arc",
                 "sight": "holo-trap",
                 "rail": "picatinny-07",
                 "length": 0.8200200200080872,
                 "triangles": 78722,
+                "reducedTriangles": 14994,
                 "parts": [
                     {
                         "name": "Receiver",
                         "surface": "body",
                         "textureSet": "plasma-arc-Receiver",
-                        "triangles": 16216
+                        "triangles": 16216,
+                        "reducedTriangles": 3330
                     },
                     {
                         "name": "Rail",
                         "surface": "body",
                         "textureSet": "rail-picatinny-07",
-                        "triangles": 1596
+                        "triangles": 1596,
+                        "reducedTriangles": 634
                     },
                     {
                         "name": "Front",
                         "surface": "body",
                         "textureSet": "plasma-arc-Front",
-                        "triangles": 43758
+                        "triangles": 43758,
+                        "reducedTriangles": 6452
                     },
                     {
                         "name": "Stock",
                         "surface": "body",
                         "textureSet": "plasma-arc-Stock",
-                        "triangles": 10346
+                        "triangles": 10346,
+                        "reducedTriangles": 2350
                     },
                     {
                         "name": "Magazine",
                         "surface": "body",
                         "textureSet": "plasma-arc-Magazine",
-                        "triangles": 2784
+                        "triangles": 2784,
+                        "reducedTriangles": 938
                     },
                     {
                         "name": "Sight",
                         "surface": "body",
                         "textureSet": "sight-holo-trap",
-                        "triangles": 3924
+                        "triangles": 3924,
+                        "reducedTriangles": 1192
                     },
                     {
                         "name": "SightGlass",
                         "surface": "glass",
                         "textureSet": "",
-                        "triangles": 6
+                        "triangles": 6,
+                        "reducedTriangles": 0
                     },
                     {
                         "name": "SightReticle1",
                         "surface": "reticle",
                         "textureSet": "",
-                        "triangles": 92
+                        "triangles": 92,
+                        "reducedTriangles": 0
                     }
                 ]
             },
@@ -841,62 +877,71 @@
         },
         {
             "bundle": "forge-energy-model-blast.bundle",
-            "sha256": "bb7c38123e7166985dad00d7845cc0eca81c39222d2191756c8c1c068518ec93",
-            "bytes": 7275240,
+            "sha256": "78b68fc9fb529f9b310ef58958b220d18ad3eea22677ed2b635d49e7846251e7",
+            "bytes": 7869693,
             "weapon": {
                 "mode": "blast",
                 "sight": "blast-reflex",
                 "rail": "picatinny-17",
                 "length": 0.8405439853668213,
                 "triangles": 53602,
+                "reducedTriangles": 14996,
                 "parts": [
                     {
                         "name": "Receiver",
                         "surface": "body",
                         "textureSet": "blast-Receiver",
-                        "triangles": 15302
+                        "triangles": 15302,
+                        "reducedTriangles": 3832
                     },
                     {
                         "name": "Rail",
                         "surface": "body",
                         "textureSet": "rail-picatinny-17",
-                        "triangles": 3332
+                        "triangles": 3332,
+                        "reducedTriangles": 1318
                     },
                     {
                         "name": "Front",
                         "surface": "body",
                         "textureSet": "blast-Front",
-                        "triangles": 20364
+                        "triangles": 20364,
+                        "reducedTriangles": 4682
                     },
                     {
                         "name": "Stock",
                         "surface": "body",
                         "textureSet": "blast-Stock",
-                        "triangles": 5752
+                        "triangles": 5752,
+                        "reducedTriangles": 1932
                     },
                     {
                         "name": "Magazine",
                         "surface": "body",
                         "textureSet": "blast-Magazine",
-                        "triangles": 6124
+                        "triangles": 6124,
+                        "reducedTriangles": 2018
                     },
                     {
                         "name": "Sight",
                         "surface": "body",
                         "textureSet": "sight-blast-reflex",
-                        "triangles": 2632
+                        "triangles": 2632,
+                        "reducedTriangles": 1118
                     },
                     {
                         "name": "SightGlass",
                         "surface": "glass",
                         "textureSet": "",
-                        "triangles": 4
+                        "triangles": 4,
+                        "reducedTriangles": 0
                     },
                     {
                         "name": "SightReticle1",
                         "surface": "reticle",
                         "textureSet": "",
-                        "triangles": 92
+                        "triangles": 92,
+                        "reducedTriangles": 0
                     }
                 ]
             },
@@ -1045,62 +1090,71 @@
         },
         {
             "bundle": "forge-energy-model-disc.bundle",
-            "sha256": "609533243867e635721ab9c0f9082211fab6d1780e28e10ba071db4985add4cd",
-            "bytes": 7393849,
+            "sha256": "4df749659df28f593924066f9ad2b5fbc771c1fda28b972ac20ab5fa3886a26c",
+            "bytes": 8019571,
             "weapon": {
                 "mode": "disc",
                 "sight": "disc-delta",
                 "rail": "picatinny-17",
                 "length": 0.8859000205993652,
                 "triangles": 50962,
+                "reducedTriangles": 14994,
                 "parts": [
                     {
                         "name": "Receiver",
                         "surface": "body",
                         "textureSet": "disc-Receiver",
-                        "triangles": 18194
+                        "triangles": 18194,
+                        "reducedTriangles": 4558
                     },
                     {
                         "name": "Rail",
                         "surface": "body",
                         "textureSet": "rail-picatinny-17",
-                        "triangles": 3332
+                        "triangles": 3332,
+                        "reducedTriangles": 1388
                     },
                     {
                         "name": "Front",
                         "surface": "body",
                         "textureSet": "disc-Front",
-                        "triangles": 16638
+                        "triangles": 16638,
+                        "reducedTriangles": 4280
                     },
                     {
                         "name": "Stock",
                         "surface": "body",
                         "textureSet": "disc-Stock",
-                        "triangles": 7930
+                        "triangles": 7930,
+                        "reducedTriangles": 2548
                     },
                     {
                         "name": "Magazine",
                         "surface": "body",
                         "textureSet": "disc-Magazine",
-                        "triangles": 856
+                        "triangles": 856,
+                        "reducedTriangles": 536
                     },
                     {
                         "name": "Sight",
                         "surface": "body",
                         "textureSet": "sight-disc-delta",
-                        "triangles": 3868
+                        "triangles": 3868,
+                        "reducedTriangles": 1540
                     },
                     {
                         "name": "SightGlass",
                         "surface": "glass",
                         "textureSet": "",
-                        "triangles": 4
+                        "triangles": 4,
+                        "reducedTriangles": 0
                     },
                     {
                         "name": "SightReticle1",
                         "surface": "reticle",
                         "textureSet": "",
-                        "triangles": 140
+                        "triangles": 140,
+                        "reducedTriangles": 0
                     }
                 ]
             },
@@ -1256,62 +1310,71 @@
         },
         {
             "bundle": "forge-energy-model-flame.bundle",
-            "sha256": "209748abbfb31294085ba05aa9f46d18b18a709c5c60bb8c8af27703ec8db0ba",
-            "bytes": 7240818,
+            "sha256": "a77cf65aa6dc4038f5804c424e4081de74a33dca2875a0ff4bb40e997dcc728f",
+            "bytes": 7849390,
             "weapon": {
                 "mode": "flame",
                 "sight": "flame-ring",
                 "rail": "picatinny-13",
                 "length": 0.8604999780654907,
                 "triangles": 50232,
+                "reducedTriangles": 14994,
                 "parts": [
                     {
                         "name": "Receiver",
                         "surface": "body",
                         "textureSet": "flame-Receiver",
-                        "triangles": 23080
+                        "triangles": 23080,
+                        "reducedTriangles": 5426
                     },
                     {
                         "name": "Rail",
                         "surface": "body",
                         "textureSet": "rail-picatinny-13",
-                        "triangles": 2916
+                        "triangles": 2916,
+                        "reducedTriangles": 1228
                     },
                     {
                         "name": "Front",
                         "surface": "body",
                         "textureSet": "flame-Front",
-                        "triangles": 7580
+                        "triangles": 7580,
+                        "reducedTriangles": 2400
                     },
                     {
                         "name": "Stock",
                         "surface": "body",
                         "textureSet": "flame-Stock",
-                        "triangles": 5178
+                        "triangles": 5178,
+                        "reducedTriangles": 1838
                     },
                     {
                         "name": "Magazine",
                         "surface": "body",
                         "textureSet": "flame-Magazine",
-                        "triangles": 7450
+                        "triangles": 7450,
+                        "reducedTriangles": 2370
                     },
                     {
                         "name": "Sight",
                         "surface": "body",
                         "textureSet": "sight-flame-ring",
-                        "triangles": 3766
+                        "triangles": 3766,
+                        "reducedTriangles": 1470
                     },
                     {
                         "name": "SightGlass",
                         "surface": "glass",
                         "textureSet": "",
-                        "triangles": 14
+                        "triangles": 14,
+                        "reducedTriangles": 0
                     },
                     {
                         "name": "SightReticle1",
                         "surface": "reticle",
                         "textureSet": "",
-                        "triangles": 248
+                        "triangles": 248,
+                        "reducedTriangles": 0
                     }
                 ]
             },
@@ -1460,62 +1523,71 @@
         },
         {
             "bundle": "forge-energy-model-hole.bundle",
-            "sha256": "3c4b781b4c5fde06986e9da05ecdb040431f002564fe9385183e14546bcaf038",
-            "bytes": 7371390,
+            "sha256": "60aa2504a347f61a2c2086f1cbeb62313eeb3cbcaed9c1fd0bc8a21039c53e0a",
+            "bytes": 7960354,
             "weapon": {
                 "mode": "hole",
                 "sight": "hole-octa",
                 "rail": "picatinny-17",
                 "length": 0.8610000014305115,
                 "triangles": 54222,
+                "reducedTriangles": 14994,
                 "parts": [
                     {
                         "name": "Receiver",
                         "surface": "body",
                         "textureSet": "hole-Receiver",
-                        "triangles": 15674
+                        "triangles": 15674,
+                        "reducedTriangles": 3812
                     },
                     {
                         "name": "Rail",
                         "surface": "body",
                         "textureSet": "rail-picatinny-17",
-                        "triangles": 3332
+                        "triangles": 3332,
+                        "reducedTriangles": 1288
                     },
                     {
                         "name": "Front",
                         "surface": "body",
                         "textureSet": "hole-Front",
-                        "triangles": 19072
+                        "triangles": 19072,
+                        "reducedTriangles": 4372
                     },
                     {
                         "name": "Stock",
                         "surface": "body",
                         "textureSet": "hole-Stock",
-                        "triangles": 7158
+                        "triangles": 7158,
+                        "reducedTriangles": 2202
                     },
                     {
                         "name": "Magazine",
                         "surface": "body",
                         "textureSet": "hole-Magazine",
-                        "triangles": 5492
+                        "triangles": 5492,
+                        "reducedTriangles": 1828
                     },
                     {
                         "name": "Sight",
                         "surface": "body",
                         "textureSet": "sight-hole-octa",
-                        "triangles": 3276
+                        "triangles": 3276,
+                        "reducedTriangles": 1274
                     },
                     {
                         "name": "SightGlass",
                         "surface": "glass",
                         "textureSet": "",
-                        "triangles": 6
+                        "triangles": 6,
+                        "reducedTriangles": 0
                     },
                     {
                         "name": "SightReticle1",
                         "surface": "reticle",
                         "textureSet": "",
-                        "triangles": 212
+                        "triangles": 212,
+                        "reducedTriangles": 0
                     }
                 ]
             },

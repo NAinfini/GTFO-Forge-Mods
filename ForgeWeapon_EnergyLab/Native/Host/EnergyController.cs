@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using ForgeVisual;
 using ForgeWeaponEnergyLab.Presentation;
@@ -36,7 +35,6 @@ internal sealed class EnergyController
     private SpecialEffects? _warmSpecial;
     private bool _preparationFailed;
     private bool _instancesReady, _simulationsReady, _fireGateClosed;
-    private IEnumerator? _vfxPreparation;
     private readonly Dictionary<ulong, RemoteWeapon> _remotes = new();
     private readonly Dictionary<ulong, RemotePeerState> _remoteStates = new();
     private uint _armSequence;
@@ -48,6 +46,7 @@ internal sealed class EnergyController
     private bool _chargeAnnounced;
     private EnergyGear? _announcedGear;
     private Vector3 _announcedPosition;
+    private float _chargeAnnouncedAt, _nextChargeRenew;
     private bool _wielded;
     // The local player's wielded bullet weapon, kept by the wield events (BulletWeapon.OnWield / OnUnWield) instead of read from the hand
     // every frame. Its energy definition is resolved once per wield.
@@ -80,6 +79,8 @@ internal sealed class EnergyController
         _instance = this;
         ForgeCore.GameEvents.LevelEnded += OnLevelEnded;
         ForgeCore.GameEvents.CheckpointReloaded += ForgetPlayer;
+        // Host and clients build every level, so each world starts here.
+        GTFO.API.LevelAPI.OnBuildStart += WorldStarted;
         for (var index = 0; index < _shots.Length; index++) _shots[index] = new NativeShot();
         _preCull = DelegateSupport.ConvertDelegate<Camera.CameraCallback>(new Action<Camera>(PreCull));
         Camera.onPreCull = Camera.onPreCull == null ? _preCull
@@ -96,7 +97,7 @@ internal sealed class EnergyController
 
     private PlayerAgent? LocalPlayer()
     {
-        if (_player == null) _player = PlayerManager.GetLocalPlayerAgent();
+        if (_player == null) _player = ForgeCore.Players.Local;
         return _player;
     }
 
@@ -126,11 +127,12 @@ internal sealed class EnergyController
     internal static bool Owns(BulletWeapon? weapon)
         => EnergyGearRegistry.ModeOf(weapon) != EnergyMode.Off;
 
+    // A local fault stops this player's own gun for the rest of the world (SessionReady); the channel and the other players' weapons go on (PresentationReady).
     private static bool SessionReady()
-        => EnergyNetwork.Ready && _instance?.PresentationReady == true;
+        => EnergyNetwork.Ready && _instance is { PresentationReady: true, _faulted: false };
 
-    internal bool PresentationReady => EnergyNetwork.WorldReady && EnergyGearRegistry.Ready && PresentationPreload.Ready &&
-        _instancesReady && _simulationsReady && !_preparationFailed && !_faulted;
+    internal bool PresentationReady => ForgeCore.Net.WorldReady && EnergyGearRegistry.Ready && PresentationPreload.Ready &&
+        _instancesReady && _simulationsReady && !_preparationFailed;
 
     private void PrepareVisuals()
     {
@@ -142,47 +144,30 @@ internal sealed class EnergyController
             else if (_visuals == null && _warmVisuals == null) _warmVisuals = new EnergyVisuals();
             else if (_plasma == null && _warmPlasma == null) _warmPlasma = new PlasmaEffects(EnergyProjectiles.Capacity + 1);
             else if (_special == null && _warmSpecial == null) _warmSpecial = new SpecialEffects();
-            else
-            {
-                _vfxPreparation ??= PrepareVfx();
-                if (_vfxPreparation.MoveNext()) return;
-                (_vfxPreparation as IDisposable)?.Dispose(); _vfxPreparation = null;
-                _instancesReady = true;
-            }
+            else _instancesReady = true;
         }
         catch (Exception error)
         {
             _preparationFailed = true;
-            (_vfxPreparation as IDisposable)?.Dispose(); _vfxPreparation = null;
-            Plugin.Error("Energy instance preparation failed: " + error);
-        }
-    }
-
-    private IEnumerator PrepareVfx()
-    {
-        var phases = new[] { _warmVisuals!.Prepare(), _warmPlasma!.Prepare(), _warmSpecial!.Prepare() };
-        foreach (var phase in phases)
-        {
-            using var cleanup = phase as IDisposable;
-            while (phase.MoveNext()) yield return null;
+            Plugin.Logger.ErrorOnce("Energy instance preparation failed: " + error);
         }
     }
 
     private void PrepareSimulations()
     {
-        if (_simulationsReady || _preparationFailed || !EnergyNetwork.WorldReady || !_instancesReady) return;
+        if (_simulationsReady || _preparationFailed || !ForgeCore.Net.WorldReady || !_instancesReady) return;
         try
         {
             // Allocate physics/contacts buffers before first wield,
             // one simulator per frame; equip takes the prepared instances without new native arrays.
             if (_plasma == null)
             {
-                _plasma = new EnergyProjectiles(SNet.IsMaster, _warmPlasma);
+                _plasma = new EnergyProjectiles(ForgeCore.Session.IsHost, _warmPlasma);
                 _warmPlasma = null;
             }
             else if (_special == null)
             {
-                _special = new SpecialWeapons(SNet.IsMaster, _warmSpecial);
+                _special = new SpecialWeapons(ForgeCore.Session.IsHost, _warmSpecial);
                 _warmSpecial = null;
                 _simulationsReady = true;
             }
@@ -190,7 +175,7 @@ internal sealed class EnergyController
         catch (Exception error)
         {
             _preparationFailed = true;
-            Plugin.Error("Energy simulation preparation failed: " + error);
+            Plugin.Logger.ErrorOnce("Energy simulation preparation failed: " + error);
         }
     }
 
@@ -199,8 +184,9 @@ internal sealed class EnergyController
         try
         {
             // Each stage runs only while it has work; the preload, the preparation and the model queue end by themselves.
-            if (!PresentationPreload.Ready) PresentationPreload.Tick();
-            if (WeaponModels.HasWork) { WeaponModels.TickPending(); WeaponModels.TickAnimations(); }
+            // Tick also picks up a gun whose own sounds finished decoding after the pass became ready.
+            PresentationPreload.Tick();
+            if (WeaponModels.HasWork) WeaponModels.TickPending();
             if (!_simulationsReady && !_preparationFailed) { PrepareVisuals(); PrepareSimulations(); }
             Tick();
             // Energy lights follow this frame's effects (local and remote) and fade on their own.
@@ -212,7 +198,7 @@ internal sealed class EnergyController
     // A damage call can have committed before throwing. Stop, never replay it or fire a stock shot.
     private void Fault(Exception error)
     {
-        Plugin.Error("An energy gun stopped. Any native writes already attempted are not retried. " + error);
+        Plugin.Logger.ErrorOnce("An energy gun stopped. Any native writes already attempted are not retried. " + error);
         _faulted = true;
         _streamHeld = _chargeHeld = false;
         HideBeam();
@@ -238,7 +224,7 @@ internal sealed class EnergyController
         catch (Exception error) { controller.Fault(error); }
     }
 
-    // These queries never deal damage or bill ammo. Aimed through an optic, the charging orb stays below the look camera's ray `sight`; from the hip nothing needs keeping clear and the whole charge shows.
+    // These queries never deal damage or bill ammo. The charge shows at its first-person size; aimed through an optic it also stays below the look camera's ray `sight`.
     private void PresentHeld(float now, Ray? sight)
     {
         if (!_streamHeld && !_chargeHeld) return;
@@ -248,7 +234,7 @@ internal sealed class EnergyController
         if (_chargeHeld)
         {
             _plasma!.Visuals.ChargingOrb(EnergyProjectiles.Capacity, _shots[0].Start,
-                PlasmaPayload.FromCharge(_chargePower, numbers).BodyRadius, now, _mode == EnergyMode.PlasmaArc, sight);
+                PlasmaPayload.FromCharge(_chargePower, numbers).BodyRadius, now, _mode == EnergyMode.PlasmaArc, firstPerson: true, sight);
             _effects!.Charge(_chargePower, _shots[0].Start);
         }
         else if (_mode == EnergyMode.Beam)
@@ -266,9 +252,12 @@ internal sealed class EnergyController
     private void Tick()
     {
         EnergyNetwork.Pump(this);
-        if (!SessionReady())
+        if (_faulted && _mode != EnergyMode.Off) Disarm();
+        if (!(EnergyNetwork.Ready && PresentationReady))
         {
             if (_mode != EnergyMode.Off) Disarm();
+            // Other players' weapons stop with their ticks and messages: nothing they were showing may stay.
+            ClearRemotes();
             PointLights.Clear();
             return;
         }
@@ -289,12 +278,12 @@ internal sealed class EnergyController
             try { pair.Value.Tick(Time.deltaTime, now); }
             catch (Exception error)
             {
-                Plugin.Error("Remote energy simulation stopped; committed damage will not be retried: " + error);
+                Plugin.Logger.ErrorOnce("Remote energy simulation stopped; committed damage will not be retried: " + error);
                 pair.Value.StopAfterFault();
             }
         }
         foreach (var identity in _departed)
-        { _remotes[identity].Dispose(); _remotes.Remove(identity); }
+        { _remotes[identity].Dispose(); _remotes.Remove(identity); _remoteStates.Remove(identity); }
         _departed.Clear();
         // Nothing armed and no energy gun in the hand: only a wield event can change that.
         if (_mode == EnergyMode.Off && WieldedGear() == null) return;
@@ -352,6 +341,7 @@ internal sealed class EnergyController
         }
         if (++_armSequence == 0) ++_armSequence;
         _weapon = weapon; _gear = gear; _mode = gear.Mode; _wielded = true;
+        ApplyLook(gear);
         // This frame's special-weapon tick ran before the arm; the flame is drawn from the current view at once.
         if (_special != null) _special.Visuals.ViewRotation = LookRotation(LocalPlayer());
         CancelCharge();
@@ -360,13 +350,24 @@ internal sealed class EnergyController
         _modeDirty = true;
     }
 
+    // The sounds and effects every presentation object plays are the armed gun's own (its definition's Look). A beam or chain held under the
+    // other gun's effects is let go first, so it never stays up under a handle the new look no longer releases.
+    private void ApplyLook(EnergyGear gear)
+    {
+        var look = EnergyLook.Of(gear);
+        if (_effects!.Look != look) { _effects.Hide(); _effects.Look = look; }
+        if (_visuals!.Look != look) { _visuals.Hide(); _visuals.Look = look; }
+        _plasma!.Visuals.Look = look;
+        _special!.Visuals.Look = look;
+    }
+
     internal static bool CanLaunch(BulletWeapon weapon, EnergyGear gear)
     {
         var controller = _instance;
         if (controller == null || !SessionReady()) return false;
         if (!EnergyNativeFire.Delayed(gear.Mode)) return true;
         if (weapon.Owner?.Owner?.IsBot == true)
-            return SNet.IsMaster && controller.RemoteFor(weapon.Owner.Owner.Lookup, authoritative: true).CanLaunch(gear);
+            return ForgeCore.Session.IsHost && controller.RemoteFor(weapon.Owner.Owner.Lookup, authoritative: true).CanLaunch(gear);
         return gear.Mode switch
         {
             EnergyMode.PlasmaBlast or EnergyMode.PlasmaArc => controller._plasma!.CanLaunch(gear),
@@ -403,7 +404,7 @@ internal sealed class EnergyController
             var remote = controller.RemoteFor(owner.Owner.Lookup, authoritative: true);
             visual = remote.NativeDischarge(weapon, gear, origin, direction, Time.time);
         }
-        if (!SNet.IsMaster && EnergyNativeFire.Delayed(gear.Mode))
+        if (!ForgeCore.Session.IsHost && EnergyNativeFire.Delayed(gear.Mode))
             EnergyNetwork.Send(FireCommand.Create(visual.Sequence, gear, visual.Start, visual.Direction,
                 (int)owner.DimensionIndex, visual.Power, visual.Damage));
         else EnergyNetwork.SendVisual(visual);
@@ -442,20 +443,20 @@ internal sealed class EnergyController
                 break;
             case EnergyMode.PlasmaBlast:
             case EnergyMode.PlasmaArc:
-                _plasma!.Launch(_weapon!.Owner, visual.Start, visual.Direction, visual.Power, _gear!, now);
+                _plasma!.Launch(_weapon!.Owner, visual.Start, visual.Direction, visual.Power, _gear!, now, visual.Sequence, FlightEnds.Scale(_gear!, visual.Damage));
                 _effects!.Discharge(_mode == EnergyMode.PlasmaArc, visual.Start);
                 break;
             case EnergyMode.Disc:
-                _special!.LaunchDisc(_weapon!.Owner, _gear!, visual.Start, visual.Direction, now);
+                _special!.LaunchDisc(_weapon!.Owner, _gear!, visual.Start, visual.Direction, now, visual.Sequence, FlightEnds.Scale(_gear!, visual.Damage));
                 break;
             case EnergyMode.BlackHole:
-                _special!.LaunchHole(_weapon!.Owner, _gear!, visual.Start, visual.Direction, now);
+                _special!.LaunchHole(_weapon!.Owner, _gear!, visual.Start, visual.Direction, now, visual.Sequence, FlightEnds.Scale(_gear!, visual.Damage));
                 break;
             case EnergyMode.Blast:
                 _effects!.Hide();
-                _visuals!.Blast(visual.Start, now);
+                _visuals!.Blast(visual.Start, visual.Direction, now);
                 _special!.Visuals.Origin(visual.Start); _special.Visuals.BlastLaunch();
-                _special.LaunchShell(_weapon!.Owner, _gear!, visual.Start, visual.Direction, visual.Damage, now);
+                _special.LaunchShell(_weapon!.Owner, _gear!, visual.Start, visual.Direction, visual.Damage, now, visual.Sequence);
                 break;
         }
     }
@@ -476,19 +477,21 @@ internal sealed class EnergyController
     {
         var numbers = _gear!.Numbers;
         var ammo = WeaponAmmo.Available(weapon);
-        var allowed = ammo >= 1 && _plasma!.CanLaunch(_gear!);
+        var next = _nextOrbShots.TryGetValue(_gear!.CategoryId, out var value) ? value : double.NegativeInfinity;
+        // No charge starts inside the cooldown: a release there used to be dropped after the whole charge was spent.
+        var allowed = ammo >= 1 && _plasma!.CanLaunch(_gear!) && now + 1e-7 >= next;
         var released = _charge.Update(now, weapon.FireButton, weapon.FireButtonPressed, allowed, numbers, out var power);
         if (_charge.Charging)
         {
             _chargePower = _charge.Power(now, numbers);
             _chargeHeld = true;
-            if (!_chargeAnnounced)
+            if (!_chargeAnnounced || now >= _nextChargeRenew)
             {
                 _shots[0].Trace(weapon, numbers.Shot);
-                _chargeAnnounced = true;
-                _announcedGear = _gear;
+                if (!_chargeAnnounced) { _chargeAnnounced = true; _chargeAnnouncedAt = now; _announcedGear = _gear; }
+                _nextChargeRenew = now + EnergyProtocol.ChargeRenewSeconds;
                 _announcedPosition = _shots[0].Start;
-                PublishCharge(_gear!, true, _announcedPosition);
+                PublishCharge(_gear!, true, _announcedPosition, now - _chargeAnnouncedAt);
             }
             if (_chargePower >= 1f && !_chargedFull)
             {
@@ -499,8 +502,6 @@ internal sealed class EnergyController
         }
         CancelCharge(audible: !released);
         if (!released) return;
-        var next = _nextOrbShots.TryGetValue(_gear.CategoryId, out var value) ? value : double.NegativeInfinity;
-        if (now + 1e-7 < next) return;
         _nextOrbShots[_gear.CategoryId] = now - next >= numbers.Shot.Interval ? now + numbers.Shot.Interval : next + numbers.Shot.Interval;
         // Power belongs to this release's single native Fire, including a replacement body.
         _releasedPower = power;
@@ -509,10 +510,10 @@ internal sealed class EnergyController
         weapon.FPItemHolder.DontRelax();
     }
 
-    private void PublishCharge(EnergyGear gear, bool start, Vector3 position)
+    private void PublishCharge(EnergyGear gear, bool start, Vector3 position, float held)
     {
-        var packet = ChargePacket.Create(0, gear, start, position);
-        if (!SNet.IsMaster) { EnergyNetwork.SendCharge(packet); return; }
+        var packet = ChargePacket.Create(0, gear, start, position, held);
+        if (!ForgeCore.Session.IsHost) { EnergyNetwork.SendCharge(packet); return; }
         if (SNet.LocalPlayer == null) throw new InvalidOperationException("Energy host has no local network player.");
         packet.Shooter = SNet.LocalPlayer.Lookup;
         EnergyNetwork.BroadcastCharge(packet);
@@ -522,7 +523,7 @@ internal sealed class EnergyController
     {
         if (!SessionReady()) return;
         var packet = ModePacket.Create(mode == EnergyMode.Off ? null : _gear, _armSequence);
-        if (!SNet.IsMaster) { EnergyNetwork.SendMode(packet); return; }
+        if (!ForgeCore.Session.IsHost) { EnergyNetwork.SendMode(packet); return; }
         if (SNet.LocalPlayer == null) throw new InvalidOperationException("Energy host has no local network player.");
         packet.Shooter = SNet.LocalPlayer.Lookup;
         EnergyNetwork.BroadcastMode(packet);
@@ -569,7 +570,7 @@ internal sealed class EnergyController
         }
         catch (Exception error)
         {
-            Plugin.Error("Remote energy model stopped: " + error);
+            Plugin.Logger.ErrorOnce("Remote energy model stopped: " + error);
             remote.StopAfterFault();
         }
     }
@@ -587,7 +588,7 @@ internal sealed class EnergyController
         try { remote.SetModel(owner, owner.Inventory?.WieldedItem?.TryCast<BulletWeapon>(), EnergyGears.Match(packet.CategoryId, packet.Mode)); }
         catch (Exception error)
         {
-            Plugin.Error("Remote energy model visual stopped: " + error);
+            Plugin.Logger.ErrorOnce("Remote energy model visual stopped: " + error);
             remote.StopAfterFault();
         }
     }
@@ -598,10 +599,14 @@ internal sealed class EnergyController
         // A charge from a player who is down, switching guns or leaving has nothing to charge.
         if (!SNet.TryGetPlayer(sender, out var peer) || peer == null || peer.IsLocal || peer.IsBot) return;
         var owner = peer.PlayerAgent?.TryCast<PlayerAgent>();
-        var weapon = owner?.Inventory?.WieldedItem?.TryCast<BulletWeapon>();
-        if (owner == null || !owner.Alive || owner.Owner == null || owner.Owner.Lookup != sender ||
-            weapon == null || weapon.Owner == null || weapon.Owner.Pointer != owner.Pointer) return;
-        if (!EnergyGearRegistry.Matches(weapon, packet.CategoryId, packet.Mode)) return;
+        if (owner == null || owner.Owner == null || owner.Owner.Lookup != sender) return;
+        // A stop always counts: a shooter who just switched guns or went down still has a charge to end, here and on every other machine.
+        if (packet.Phase == 1)
+        {
+            var weapon = owner.Inventory?.WieldedItem?.TryCast<BulletWeapon>();
+            if (!owner.Alive || weapon == null || weapon.Owner == null || weapon.Owner.Pointer != owner.Pointer ||
+                !EnergyGearRegistry.Matches(weapon, packet.CategoryId, packet.Mode)) return;
+        }
         if (!_remotes.TryGetValue(sender, out var remote))
         {
             if (packet.Phase != 1) return;
@@ -610,15 +615,14 @@ internal sealed class EnergyController
         try
         {
             // Charge packets only control presentation; a launch does not require a host-observed charge.
-            var accepted = packet.Phase == 1 ? remote.StartCharge(owner, packet, Time.time)
-                : remote.EndCharge(packet);
-            if (!accepted) return;
+            if (packet.Phase == 1) { if (!remote.StartCharge(owner, packet, Time.time)) return; }
+            else remote.EndCharge(packet);
             packet.Shooter = sender;
             EnergyNetwork.BroadcastCharge(packet);
         }
         catch (Exception error)
         {
-            Plugin.Error("Remote energy charge stopped: " + error);
+            Plugin.Logger.ErrorOnce("Remote energy charge stopped: " + error);
             remote.StopAfterFault();
         }
     }
@@ -641,7 +645,7 @@ internal sealed class EnergyController
         }
         catch (Exception error)
         {
-            Plugin.Error("Remote energy charge visual stopped: " + error);
+            Plugin.Logger.ErrorOnce("Remote energy charge visual stopped: " + error);
             remote.StopAfterFault();
         }
     }
@@ -657,9 +661,11 @@ internal sealed class EnergyController
         {
             if (remote.TryLaunch(owner, weapon, command, Time.time, out var visual)) EnergyNetwork.Broadcast(visual);
         }
+        // Launches that a stalled link delivers together can find no free slot: this shot is dropped, the gun is fine.
+        catch (BudgetExhausted error) { Plugin.Logger.ErrorOnce("energylab-remote-shot-dropped", "A remote energy shot was dropped: " + error.Message); }
         catch (Exception error)
         {
-            Plugin.Error("Remote energy launch stopped; committed effects will not be replayed: " + error);
+            Plugin.Logger.ErrorOnce("Remote energy launch stopped; committed effects will not be replayed: " + error);
             remote.StopAfterFault();
         }
     }
@@ -677,11 +683,30 @@ internal sealed class EnergyController
             remote = RemoteFor(visual.Shooter, authoritative: false);
         }
         try { remote.PresentAccepted(owner, visual, Time.time); }
+        catch (BudgetExhausted error) { Plugin.Logger.ErrorOnce("energylab-remote-shot-dropped", "A remote energy shot was dropped: " + error.Message); }
         catch (Exception error)
         {
-            Plugin.Error("Remote energy visual stopped: " + error);
+            Plugin.Logger.ErrorOnce("Remote energy visual stopped: " + error);
             remote.StopAfterFault();
         }
+    }
+
+    /// <summary>The host's word on where a projectile ended (<see cref="FlightEnds"/>): this player's own, or another's.</summary>
+    internal void ReceiveFlightEnd(FlightEnd end)
+    {
+        if (SNet.LocalPlayer == null || !float.IsFinite(end.X + end.Y + end.Z) || !Enum.IsDefined((FlightKind)end.Kind)) return;
+        var kind = (FlightKind)end.Kind;
+        var now = Time.time;
+        try
+        {
+            if (end.Shooter != SNet.LocalPlayer.Lookup)
+            {
+                if (_remotes.TryGetValue(end.Shooter, out var remote)) remote.Finish(kind, end.Sequence, end.Position, now);
+            }
+            else if (kind == FlightKind.Plasma) _plasma?.Finish(end.Sequence, end.Position, now);
+            else _special?.Finish(kind, end.Sequence, end.Position, now);
+        }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("A projectile's end could not be applied: " + error); }
     }
 
     internal void ReceiveNativeVisual(ulong sender, FireVisual visual)
@@ -698,9 +723,18 @@ internal sealed class EnergyController
         }
         catch (Exception error)
         {
-            Plugin.Error("Remote native energy presentation stopped: " + error);
+            Plugin.Logger.ErrorOnce("Remote native energy presentation stopped: " + error);
             remote.StopAfterFault();
         }
+    }
+
+    // A fault stops the gun of the world it happened in (a committed hit is never replayed there). Between levels nothing is armed,
+    // so a fault from the lobby or the last level must not keep the next world's guns from firing.
+    private void WorldStarted()
+    {
+        if (_mode != EnergyMode.Off) Disarm();
+        _faulted = false;
+        _preparationFailed = false;
     }
 
     internal void SessionChanged()
@@ -710,6 +744,7 @@ internal sealed class EnergyController
         ClearRemotes(); _remoteStates.Clear();
         _nextOrbShots.Clear();
         _preparationFailed = false;
+        _faulted = false;
     }
 
     private void ClearRemotes()
@@ -748,7 +783,7 @@ internal sealed class EnergyController
     {
         if (_chargeAnnounced)
         {
-            if (SessionReady()) PublishCharge(_announcedGear!, false, _announcedPosition);
+            if (SessionReady()) PublishCharge(_announcedGear!, false, _announcedPosition, 0f);
             _chargeAnnounced = false;
         }
         _chargeHeld = false;
@@ -774,7 +809,7 @@ internal sealed class EnergyController
     {
         if (_mode != EnergyMode.Off && SessionReady())
             try { PublishMode(EnergyMode.Off); }
-            catch (Exception error) { Plugin.Error("Energy model disarm announcement failed: " + error); }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("Energy model disarm announcement failed: " + error); }
         _streamHeld = false;
         CancelCharge();
         if (releaseResources)
@@ -794,13 +829,13 @@ internal sealed class EnergyController
         _mode = EnergyMode.Off; _gear = null;
         _lastNativeShot = float.NegativeInfinity;
         _fireGateClosed = false;
-        _faulted = false;
     }
 
     private void Shutdown()
     {
         ForgeCore.GameEvents.LevelEnded -= OnLevelEnded;
         ForgeCore.GameEvents.CheckpointReloaded -= ForgetPlayer;
+        GTFO.API.LevelAPI.OnBuildStart -= WorldStarted;
         if (_preCull != null)
         {
             Camera.onPreCull = Il2CppSystem.Delegate.Remove(Camera.onPreCull, _preCull)?.Cast<Camera.CameraCallback>();
@@ -809,10 +844,8 @@ internal sealed class EnergyController
         WeaponBindings.Clear();
         _warmEffects?.Dispose(); _warmVisuals?.Dispose(); _warmPlasma?.Dispose(); _warmSpecial?.Dispose();
         _warmEffects = null; _warmVisuals = null; _warmPlasma = null; _warmSpecial = null;
-        (_vfxPreparation as IDisposable)?.Dispose(); _vfxPreparation = null;
         Disarm(true);
         ClearRemotes();
-        EnergyNetwork.Reset();
         if (ReferenceEquals(_instance, this)) _instance = null;
     }
 }

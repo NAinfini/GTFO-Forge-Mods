@@ -8,34 +8,64 @@ using UnityEngine;
 namespace ForgeWeaponEnergyLab.Presentation;
 
 /// <summary>
-/// The energy weapons' effect prefabs. The effects come from ForgeVisual's shared bundle (pack <c>Forge</c>, CC0); the ricochet disc bundle is embedded in this DLL and
-/// registered with ForgeVisual as the pack <c>EnergyLabDisc</c>; every prefab is resolved once into a
-/// <see cref="ModelHandle"/> and played from ForgeVisual's pools. Prefabs face +Z; line members are one metre long. A missing
-/// bundle or prefab fails preparation rather than substituting another effect.
+/// The energy weapons' effects and the ricochet disc's model. Every effect is a slot of the effect library, found once at load and played with ForgeVisual's <see cref="Fx"/>; the disc's bundle is
+/// embedded in this DLL and registered with ForgeVisual as the pack <c>EnergyLabDisc</c>. A slot that is missing, or a disc that cannot be prepared, logs its error and is not drawn: nothing
+/// substitutes another effect, and the guns fire either way.
 /// </summary>
 internal static class EnergyVfx
 {
-    private const string Pack = "Forge", DiscPack = "EnergyLabDisc";
+    private const string DiscPack = "EnergyLabDisc";
 
-    internal static ModelHandle Beam = null!, Arc = null!, Explosion = null!, Flame = null!, FlameImpact = null!, Discharge = null!,
-        PlasmaExplosion = null!, Orb = null!, Sparks = null!, BlackHole = null!, Disc = null!;
+    /// <summary>The effect library's slots for this mod (<see cref="FxSlots.Empty"/> without the bundle) and the handles the per-frame effects hold, found once at load.</summary>
+    internal static FxSlots Library = FxSlots.Empty;
+    internal static FxHandle? BeamLine, ArcLine, FlameLine, DiscTrail, OrbCharge, OrbTrail, HoleShell, OrbBody, ShockOrb, HoleField, FlameHit, PlasmaBlast, SparksHit,
+        BlastMuzzle, OrbMuzzle, Discharge, DiscHit, DiscLaunch, HoleLaunch, BeamMuzzle, BeamHit, ArcHit, ShockBurst,
+        OrbCharged, HoleOpen, HoleCollapse;
+
+    /// <summary>Plays a slot's effect found at load; a slot the table lacked (reported then) draws nothing.</summary>
+    internal static void Play(FxHandle? fx, UnityEngine.Vector3 at, UnityEngine.Vector3 direction)
+    {
+        if (fx != null) Fx.Play(fx, at, direction);
+    }
+
+    /// <summary>The ricochet disc's model; null when it could not be prepared.</summary>
+    internal static ModelHandle? Disc;
 
     internal static IEnumerator Preload()
     {
-        Register(DiscPack, "forge-energy-disc.bundle");
-        Beam = Resolve(Pack, "forge_energy_beam");
-        Arc = Resolve(Pack, "forge_lightning_arc");
-        Explosion = Resolve(Pack, "forge_explosion");
-        Flame = Resolve(Pack, "forge_flame");
-        FlameImpact = Resolve(Pack, "forge_flame_impact");
-        Discharge = Resolve(Pack, "forge_plasma_discharge");
-        PlasmaExplosion = Resolve(Pack, "forge_plasma_explosion");
-        Orb = Resolve(Pack, "forge_plasma_orb");
-        Sparks = Resolve(Pack, "forge_sparks");
-        BlackHole = Resolve(Pack, "forge_black_hole");
-        Disc = Resolve(DiscPack, "forge_ricochet_disc");
-        UseNativeDiscShaders(Disc.Prefab);
+        try
+        {
+            Register(DiscPack, "forge-energy-disc.bundle");
+            var disc = Resolve(DiscPack, "forge_ricochet_disc");
+            UseNativeDiscShaders(disc.Prefab);
+            Disc = disc;
+        }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("energylab-disc-prepare-failed", "the ricochet disc could not be prepared and is not drawn; the gun still fires: " + error); }
+        UseLibrary();
         yield break;
+    }
+
+    /// <summary>The effect library's prefabs: the bundle <c>forge-energylab-fx.bundle</c> and its slot table <c>fx-slots.forge</c> next to the
+    /// plugin, made by <c>Tools/Vfx/FxLibrary/fx_slots.py</c> from the owner's selection.</summary>
+    private static void UseLibrary()
+    {
+        try
+        {
+            var set = Library = FxSlots.Load(Plugin.Id, "EnergyLabFx", "forge-energylab-fx.bundle", "fx-slots.forge");
+            FlameHit = set.Find("energy.flame.hit");
+            PlasmaBlast = set.Find("energy.plasma.blast"); SparksHit = set.Find("energy.sparks");
+            // The beam and arc are line effects (authored along +Z, stretched from muzzle to end); the flame jet is held at the muzzle, its size the reach.
+            BeamLine = set.Find("energy.beam"); BeamMuzzle = set.Find("energy.beam.muzzle"); BeamHit = set.Find("energy.beam.hit");
+            ArcLine = set.Find("energy.arc"); ArcHit = set.Find("energy.arc.hit"); FlameLine = set.Find("energy.flame");
+            DiscTrail = set.Find("energy.disc"); OrbCharge = set.Find("energy.orb.charge"); OrbTrail = set.Find("energy.orb.trail");
+            HoleShell = set.Find("energy.hole.shell");
+            OrbBody = set.Find("energy.orb"); ShockOrb = set.Find("energy.shock.orb"); ShockBurst = set.Find("energy.shock.burst"); HoleField = set.Find("energy.hole");
+            BlastMuzzle = set.Find("energy.blast.muzzle"); OrbMuzzle = set.Find("energy.orb.muzzle"); Discharge = set.Find("energy.discharge");
+            DiscHit = set.Find("energy.disc.hit"); DiscLaunch = set.Find("energy.disc.launch"); HoleLaunch = set.Find("energy.hole.launch");
+            // Light-only moments: the slot is a light and no prefab.
+            OrbCharged = set.Find("energy.orb.charged"); HoleOpen = set.Find("energy.hole.open"); HoleCollapse = set.Find("energy.hole.collapse");
+        }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("energylab-effects-prepare-failed", "library effects could not be prepared and are not drawn; the guns still fire: " + error); }
     }
 
     private static void Register(string pack, string file)

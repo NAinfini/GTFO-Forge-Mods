@@ -33,7 +33,7 @@ internal sealed class VisibleEnemies
         try { return NearestChecked(context, relation, hitInterveningReceiver, origin, range, visited, ignore, out hit, out identity); }
         catch (BudgetExhausted error)
         {
-            Plugin.Error("An arc target search was dropped: " + error);
+            Plugin.Logger.ErrorOnce("An arc target search was dropped: " + error);
             hit = default; identity = 0;
             return false;
         }

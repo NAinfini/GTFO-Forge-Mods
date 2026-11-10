@@ -1,0 +1,25 @@
+ForgeWeapon_EnergyLab - notices and credits
+Copyright (c) 2026 NAinfini. Licensed under the MIT License (see LICENSE), except for the third-party material listed below,
+which keeps its own licence.
+
+This is an unofficial fan-made mod for GTFO. It is not made, endorsed or supported by 10 Chambers Collective.
+GTFO and its game data belong to their owners; no file taken from the game is included in this package.
+Own work (MIT): the eight weapon model bundles (rebuilt from CAD, one bundle per weapon), the forge-energy-disc effect bundle, the plugin and its text.
+The shared effect bundle (forge-vfx.bundle, CC0 1.0) comes with ForgeVisual.
+
+Sound effects (audio/*.ogg):
+- Generated with Adobe Firefly, whose output may be used commercially; shared here under MIT. The record of every file (source name and SHA-256) is kept in the source repository.
+- blast-fire and blast-explode, and the grenade-launcher clips weapon.grenade_*, are copied unchanged from ForgeOrdnance_Arsenal:
+  - "Sci-fi Grenade Launcher" by ValhallaProject, https://freesound.org/people/ValhallaProject/sounds/771167/, CC BY 4.0
+    (https://creativecommons.org/licenses/by/4.0/); converted and trimmed for game use.
+  - "2 High Quality Explosions (explode.wav)" by Michel Baradari (apollo-music.de), https://opengameart.org/content/2-high-quality-explosions,
+    CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/); converted and trimmed for game use.
+  - "163458_2263027-hq.mp3" by LeMudCrab, https://freesound.org/people/LeMudCrab/sounds/163458/, CC0 1.0 (credit given anyway).
+  - Sonniss GameAudioGDC bundle sound (BluezoneCorp stone and metal impacts), royalty-free; the Sonniss licence terms apply to the originals.
+  - Boom Library sound effects, used under the author's licence from Boom Library.
+- Draw, holster, reload and disc-hit-on-flesh sounds are the game's own and are played from the installed game; they are not in this package.
+
+Effects in forge-energylab-fx.bundle are rebuilt from Unity Asset Store packs under the Asset Store EULA (commercial use allowed; shipped inside this built bundle, not redistributed on their own; Assets/Vfx/fx-licences.forge lists the packs).
+
+The package is compiled against BepInEx, HarmonyX, Il2CppInterop, GTFO-API and the game's interop assemblies, which the mod manager installs
+separately and which are not included here.

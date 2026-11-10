@@ -59,23 +59,52 @@ internal readonly record struct WeaponNumbers
         var range = t switch { ArcChainTuning arc => arc.Range, FlameTuning flame => flame.Range, _ => EnergyLimits.Reach };
         var values = new WeaponNumbers { Shot = new(range, t.Interval, t.Damage, t.Stagger, t.Precision) };
         if (t is PlasmaTuning orb)
-            values = values with { MinimumCharge = orb.MinimumCharge, FullCharge = orb.FullCharge,
+            values = values with
+            {
+                MinimumCharge = orb.MinimumCharge,
+                FullCharge = orb.FullCharge,
                 BotChargePower = orb.BotChargePower,
-                Speed = orb.Speed, FullSpeed = orb.FullSpeed, BodyRadius = orb.BodyRadius, FullBodyRadius = orb.FullBodyRadius,
-                TravelDistance = orb.TravelDistance, FullTravelDistance = orb.FullTravelDistance, FullDamage = orb.FullDamage,
-                ActiveProjectiles = orb.ActiveProjectiles };
+                Speed = orb.Speed,
+                FullSpeed = orb.FullSpeed,
+                BodyRadius = orb.BodyRadius,
+                FullBodyRadius = orb.FullBodyRadius,
+                TravelDistance = orb.TravelDistance,
+                FullTravelDistance = orb.FullTravelDistance,
+                FullDamage = orb.FullDamage,
+                ActiveProjectiles = orb.ActiveProjectiles
+            };
         return t switch
         {
             ArcChainTuning arc => values with { Targets = arc.Targets, JumpRange = arc.JumpRange, DamageRetention = arc.DamageRetention, ArcLifetime = arc.ArcLifetime, HopDelay = arc.HopDelay },
             PlasmaBlastTuning blastOrb => values with { BlastRadius = blastOrb.BlastRadius, FullBlastRadius = blastOrb.FullBlastRadius, ExplosionLifetime = blastOrb.ExplosionLifetime, NoiseRadius = blastOrb.NoiseRadius, ExplosionForce = blastOrb.ExplosionForce },
-            PlasmaArcTuning arcOrb => values with { ArcRadius = arcOrb.ArcRadius, FullArcRadius = arcOrb.FullArcRadius,
-                Pulse = new(0, arcOrb.PulseInterval, 0, arcOrb.PulseStagger, arcOrb.Precision), PulseDamageFraction = arcOrb.PulseDamageFraction, PulseTargets = arcOrb.PulseTargets, FadeLifetime = arcOrb.FadeLifetime },
+            PlasmaArcTuning arcOrb => values with
+            {
+                ArcRadius = arcOrb.ArcRadius,
+                FullArcRadius = arcOrb.FullArcRadius,
+                Pulse = new(0, arcOrb.PulseInterval, 0, arcOrb.PulseStagger, arcOrb.Precision),
+                PulseDamageFraction = arcOrb.PulseDamageFraction,
+                PulseTargets = arcOrb.PulseTargets,
+                FadeLifetime = arcOrb.FadeLifetime
+            },
             BlastTuning blast => values with { Speed = blast.Speed, BlastRadius = blast.BlastRadius, FullBlastRadius = blast.BlastRadius, ExplosionLifetime = blast.ExplosionLifetime, NoiseRadius = blast.NoiseRadius, ExplosionForce = blast.ExplosionForce },
             DiscTuning disc => values with { Speed = disc.Speed, BodyRadius = disc.BodyRadius, Bounces = disc.Bounces, Lifetime = disc.Lifetime, ActiveProjectiles = disc.ActiveProjectiles },
             FlameTuning flame => values with { StartRadius = flame.StartRadius, RadiusPerMetre = flame.RadiusPerMetre },
-            BlackHoleTuning hole => values with { Speed = hole.Speed, BodyRadius = hole.BodyRadius, FlightLifetime = hole.FlightLifetime, Gravity = hole.Gravity,
-                Radius = hole.Radius, CoreRadius = hole.CoreRadius, Lifetime = hole.Lifetime, CollapseDuration = hole.CollapseDuration, GrowthDuration = hole.GrowthDuration,
-                Pulse = new(hole.Radius, hole.PulseInterval, hole.Damage, hole.Stagger, hole.Precision), EdgeDamageFraction = hole.EdgeDamageFraction, PullSpeed = hole.PullSpeed, QueryInterval = hole.QueryInterval },
+            BlackHoleTuning hole => values with
+            {
+                Speed = hole.Speed,
+                BodyRadius = hole.BodyRadius,
+                FlightLifetime = hole.FlightLifetime,
+                Gravity = hole.Gravity,
+                Radius = hole.Radius,
+                CoreRadius = hole.CoreRadius,
+                Lifetime = hole.Lifetime,
+                CollapseDuration = hole.CollapseDuration,
+                GrowthDuration = hole.GrowthDuration,
+                Pulse = new(hole.Radius, hole.PulseInterval, hole.Damage, hole.Stagger, hole.Precision),
+                EdgeDamageFraction = hole.EdgeDamageFraction,
+                PullSpeed = hole.PullSpeed,
+                QueryInterval = hole.QueryInterval
+            },
             _ => values
         };
     }

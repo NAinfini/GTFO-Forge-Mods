@@ -11,26 +11,28 @@ namespace ForgeWeaponEnergyLab.Native;
 
 [BepInPlugin(Id, "Forge Weapon Energy Lab", Version)]
 [BepInDependency("dev.gtfomodding.gtfo-api", ">=0.6.1")]
-[BepInDependency("NAinfini.ForgeCore")]
-[BepInDependency(ForgeUI.UIKit.PluginId)]
-[BepInDependency(ForgeAudio.AudioKit.PluginId)]
-[BepInDependency("NAinfini.ForgeVisual")]
+[BepInDependency("NAinfini.ForgeCore", ">=1.0.0")]
+[BepInDependency(ForgeUI.UIKit.PluginId, ">=1.0.0")]
+[BepInDependency(ForgeAudio.AudioKit.PluginId, ">=1.0.0")]
+[BepInDependency("NAinfini.ForgeVisual", ">=1.0.0")]
 // MTFO marks the game as modded (achievements and public matchmaking off), so the guns stay out of official play.
 [BepInDependency("com.dak.MTFO")]
 internal sealed class Plugin : BasePlugin
 {
     internal const string Id = EnergyLab.PluginId;
     internal const string Version = EnergyLab.Version;
-    // Errors only. Each exact text is written once.
-    internal static void Error(string message) => ForgeCore.Log.For(Id).ErrorOnce(message);
+    /// <summary>Errors only; `ErrorOnce` writes each exact text once.</summary>
+    internal static readonly ForgeCore.ModLog Logger = ForgeCore.Log.For(Id);
 
     public override void Load()
     {
         // The kit's volumes in the game's audio settings (ForgeAudio holds the values, ForgeUI draws the rows; added once however many packages ask).
-        ForgeUI.SettingsPages.AddAudioSliders("ForgeAudio.volumes",
-            ForgeAudio.AudioVolumes.HeadingEnglish, ForgeAudio.AudioVolumes.HeadingChinese,
-            ForgeAudio.AudioVolumes.Controls.Select(c => new ForgeUI.SettingsSlider(c.Id, c.English, c.Chinese, c.Get, c.Set)).ToList(), ForgeAudio.AudioVolumes.ResetAll);
+        ForgeUI.SettingsPages.AddAudioSliders("ForgeAudio.volumes", ForgeAudio.AudioVolumes.HeadingKey,
+            ForgeAudio.AudioVolumes.Controls.Select(c => new ForgeUI.SettingsSlider(c.Id, c.TextKey, c.Get, c.Set)).ToList(), ForgeAudio.AudioVolumes.ResetAll);
         EnergyLab.Initialize(System.IO.Path.Combine(Paths.ConfigPath, "ForgeWeapon_EnergyLab"));
+        // Queue this package's own sounds before any definition pack: ForgeAudio decodes one library at a time, so a
+        // third-party pack's slow or stuck decode must never be in front of the sounds every energy gun needs.
+        Presentation.EnergyAudio.Load();
         LoadDefinitionFiles();
         var harmony = new Harmony(Id);
         try
@@ -38,14 +40,13 @@ internal sealed class Plugin : BasePlugin
             harmony.PatchAll(typeof(Plugin).Assembly);
             EnergyGameHooks.Subscribe();
             EnergyMuzzleFlash.Register();
-            Presentation.EnergyAudio.Load();
             EnergyGearRegistry.Register();
             EnergyNetwork.Register();
             EnergyController.Start(Id);
         }
         catch (System.Exception error)
         {
-            Error("Energy Lab initialization failed: " + error);
+            Logger.ErrorOnce("Energy Lab initialization failed: " + error);
             harmony.UnpatchSelf();
             throw;
         }
@@ -54,19 +55,27 @@ internal sealed class Plugin : BasePlugin
     public override bool Unload() => false;
 
     // Every ForgeEnergyLab folder under the plugins tree (this package's own, content packs and loose files) and the active rundown's
-    // CustomPath/ForgeEnergyLab. A problem skips one entry and is logged; the other guns still load.
+    // CustomPath/ForgeEnergyLab (where Settings.forge, the rundown's rules, is read from). A problem skips one entry and is logged; the other guns still load.
     private static void LoadDefinitionFiles()
     {
         var errors = new System.Collections.Generic.List<string>();
         var folders = new System.Collections.Generic.SortedSet<string>(System.StringComparer.OrdinalIgnoreCase);
         foreach (var folder in ForgeCore.ContentFolders.Find(EnergyContent.FolderName, errors)) folders.Add(folder);
+        string? rundownFolder = null;
         if (MTFO.API.MTFOPathAPI.HasCustomPath)
         {
             var rundown = System.IO.Path.GetFullPath(System.IO.Path.Combine(MTFO.API.MTFOPathAPI.CustomPath, EnergyContent.FolderName));
-            if (System.IO.Directory.Exists(rundown)) folders.Add(rundown);
+            if (System.IO.Directory.Exists(rundown)) { folders.Add(rundown); rundownFolder = rundown; }
         }
-        foreach (var (definition, folder) in EnergyContent.Load(folders, errors)) EnergyText.Bind(definition.Id, folder);
-        foreach (var error in errors) Error(error);
+        foreach (var (definition, folder) in EnergyContent.Load(folders, errors, rundownFolder))
+        {
+            EnergyText.Bind(definition.Id, folder);
+            // A gun's own sounds: the audio folder beside its definition file, when it has a cues.forge.
+            Presentation.EnergyAudio.BindPack(definition.Id, folder);
+        }
+        // The rundown's own rules (Settings.forge): the guns players may choose and the guns' numbers, before registration closes.
+        EnergyRules.Read(rundownFolder, errors);
+        foreach (var error in errors) Logger.ErrorOnce(error);
     }
 }
 
@@ -76,9 +85,9 @@ internal static class EnergyLazyHooks
 {
     internal static readonly ForgeCore.LazyPatches Hooks = ForgeCore.Patches.Lazy(Plugin.Id, harmony =>
     {
-        // The local player's first-person holder: the pose goes in before the game's LateUpdate reads the hand points, the sight after it.
-        ForgeCore.GameHooks.FirstPersonHolderLateUpdate.Before(HolderPose.Before);
+        // The local player's first-person holder: the sight after the game's LateUpdate placed the gun (ForgeVisual's GunMount puts the hand pose in before it).
         ForgeCore.GameHooks.FirstPersonHolderLateUpdate.After(HolderPose.After);
+        ForgeCore.GameHooks.MagazineVisibility.After((call, _) => Presentation.WeaponModels.NoteMagazineVisible(call.Weapon, call.Visible));
         NativeEnergyBotShotReady.Install(harmony);
         NativeEnergyShotReady.Install();
     });
@@ -109,7 +118,7 @@ internal static class CurrentSavedEnergyPacket
     {
         if (!__result) return;
         try { EnergyGearRegistry.UseCurrentPacket(__instance); }
-        catch (System.Exception error) { Plugin.Error("Saved energy gun packet update failed: " + error); }
+        catch (System.Exception error) { Plugin.Logger.ErrorOnce("Saved energy gun packet update failed: " + error); }
     }
 }
 
@@ -122,14 +131,14 @@ internal static class EnergyItemFpsSettings
     private static void Prefix(GearIDRange gearIDRange)
     {
         try { EnergyGearRegistry.UseCurrentPacket(gearIDRange); }
-        catch (System.Exception error) { Plugin.Error("Energy gun packet update failed: " + error); }
+        catch (System.Exception error) { Plugin.Logger.ErrorOnce("Energy gun packet update failed: " + error); }
     }
 
     [HarmonyPostfix]
     private static void Postfix(GearIDRange gearIDRange, ItemEquippable __result)
     {
         try { EnergyItemFps.Apply(__result, gearIDRange); }
-        catch (System.Exception error) { Plugin.Error("Energy first-person settings failed: " + error); }
+        catch (System.Exception error) { Plugin.Logger.ErrorOnce("Energy first-person settings failed: " + error); }
     }
 }
 
@@ -201,36 +210,20 @@ internal static unsafe class NativeEnergyShotReady
         }
         catch (System.Exception error)
         {
-            Plugin.Error("Energy shot gate failed: " + error);
+            Plugin.Logger.ErrorOnce("Energy shot gate failed: " + error);
             return held;
         }
     }
 }
 
-// This game's LateUpdate inlines UpdateIKGrips and reads both grip targets in its native body.
-// Update all first-person presentation outputs before those reads, irrespective of MonoBehaviour ordering.
 // Installed by EnergyLazyHooks.
 internal static class HolderPose
 {
-    internal static void Before(FirstPersonItemHolder holder)
-    {
-        try { Presentation.WeaponModels.UpdateFirstPersonPose(); }
-        catch (System.Exception error) { Plugin.Error("Energy hand pose update failed: " + error); }
-    }
-
     internal static void After(FirstPersonItemHolder holder, bool ran)
     {
         try { Presentation.WeaponModels.TickSight(holder); }
-        catch (System.Exception error) { Plugin.Error("Energy sight update failed: " + error); }
+        catch (System.Exception error) { Plugin.Logger.ErrorOnce("Energy sight update failed: " + error); }
     }
-}
-
-// Native reload visibility actions apply to the authored magazine as well as the hidden donor.
-[HarmonyPatch(typeof(BulletWeapon), nameof(BulletWeapon.SetMagazineVisibile))]
-internal static class EnergyMagazineVisibility
-{
-    [HarmonyPostfix]
-    private static void Postfix(BulletWeapon __instance, bool value) => Presentation.WeaponModels.SetMagazineVisible(__instance, value);
 }
 
 // The game methods the energy guns read that ForgeCore patches once for every package (`ForgeCore.GameHooks`). Subscribed at
@@ -252,7 +245,7 @@ internal static class EnergyGameHooks
     private static void MountModel(GearPartHolder holder, bool ran)
     {
         try { Presentation.WeaponModels.Ensure(holder); }
-        catch (System.Exception error) { Plugin.Error("Energy model mount failed: " + error); }
+        catch (System.Exception error) { Plugin.Logger.ErrorOnce("Energy model mount failed: " + error); }
     }
 
     private static void BindWieldModel(BulletWeapon weapon, bool ran)
@@ -262,7 +255,7 @@ internal static class EnergyGameHooks
         Presentation.WeaponModels.NoteHeld(weapon, true);
         EnergyLazyHooks.Hooks.Ensure();
         try { Presentation.WeaponModels.BindWeapon(weapon); }
-        catch (System.Exception error) { Plugin.Error("Energy wield model binding failed: " + error); }
+        catch (System.Exception error) { Plugin.Logger.ErrorOnce("Energy wield model binding failed: " + error); }
     }
 
     // The held gun leaving the hand ends the controller's armed state without a per-frame look at the hand.
@@ -279,7 +272,7 @@ internal static class EnergyGameHooks
         if (item.IsFirstPerson)
         {
             try { Presentation.WeaponModels.BindWeapon(item); }
-            catch (System.Exception error) { Plugin.Error("Energy reload model binding failed: " + error); }
+            catch (System.Exception error) { Plugin.Logger.ErrorOnce("Energy reload model binding failed: " + error); }
         }
     }
 }

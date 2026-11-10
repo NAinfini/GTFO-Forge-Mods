@@ -1,8 +1,8 @@
 {
-  "format": "Ogg Vorbis (libvorbis quality 7) mono 48000 Hz, one recording per runtime cue; played through ForgeAudio with audio/cues.json",
+  "format": "Ogg Vorbis (libvorbis quality 7) mono 48000 Hz, one recording per runtime cue; played through ForgeAudio with audio/cues.forge",
   "generator": "tools/import_audio.py",
   "source": "Adobe Firefly sound effects (commercial use permitted), not published; cues listed in cues.md. The blast-fire and blast-explode cues are copied from ForgeOrdnance_Arsenal",
-  "rights": "Adobe Firefly output, commercial use permitted; MIT, copyright 2026 NAinfini. blast-fire and blast-explode: see License.txt",
+  "rights": "Adobe Firefly output, commercial use permitted; MIT, copyright 2026 NAinfini. blast-fire and blast-explode: see LICENSE.txt",
   "pendingFromOldLibrary": [],
   "outputs": [
     {
@@ -273,7 +273,7 @@
     },
     {
       "cue": "blast-fire",
-      "external": "ForgeOrdnance_Arsenal cue weapon.grenade_fire (copied unchanged; provenance and licences in ForgeOrdnance_Arsenal/Assets/Audio/sources.json and License.txt)",
+      "external": "ForgeOrdnance_Arsenal cue weapon.grenade_fire (copied unchanged; provenance and licences in ForgeOrdnance_Arsenal/Assets/Audio/sources.json and LICENSE.txt)",
       "files": [
         "ogg/weapon.grenade_fire-01.ogg",
         "ogg/weapon.grenade_fire-02.ogg"
@@ -299,7 +299,7 @@
     },
     {
       "cue": "blast-explode",
-      "external": "ForgeOrdnance_Arsenal cue weapon.grenade_burst (copied unchanged; provenance and licences in ForgeOrdnance_Arsenal/Assets/Audio/sources.json and License.txt)",
+      "external": "ForgeOrdnance_Arsenal cue weapon.grenade_burst (copied unchanged; provenance and licences in ForgeOrdnance_Arsenal/Assets/Audio/sources.json and LICENSE.txt)",
       "files": [
         "ogg/weapon.grenade_burst-l1-01.ogg",
         "ogg/weapon.grenade_burst-l2-01.ogg",

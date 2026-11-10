@@ -1,0 +1,15 @@
+{
+  "format": "forge-gun-grips",
+  "schemaVersion": "1.0.0",
+  "about": "How each model is held (ForgeVisual GunGrips, forge-gun-grips): preset is the game's hold (ForgeVisual Data/gun-hold.json presets) the model follows, the hold of the gear the gun is built on: rifle-2 for the main guns (gear 5), machinegun-2 for the special guns (gear 43, the same left hand). The mount keeps the model's own hand sockets (a missing right grip is the model's origin) and derives a missing left hand from that hold (GunHold.LeftGrip: where the game gun's left palm sits relative to its right palm, on the model's own right grip); it pulls the left hand back along the gun into the arm's reach. No row gives hand points. adjust is the only per-gun hand fine-tune (none is needed here). The model's own muzzle, SightLook, shell-eject and flashlight sockets are its geometry; a model rebuilt with different hand sockets keeps this row.",
+  "models": {
+    "arc": {"preset": "rifle-2"},
+    "beam": {"preset": "rifle-2"},
+    "blast": {"preset": "machinegun-2"},
+    "disc": {"preset": "machinegun-2"},
+    "flame": {"preset": "rifle-2"},
+    "hole": {"preset": "machinegun-2"},
+    "plasma-arc": {"preset": "machinegun-2"},
+    "plasma-blast": {"preset": "machinegun-2"}
+  }
+}

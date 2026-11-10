@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using ForgeVisual;
 using UnityEngine;
 
@@ -8,44 +7,30 @@ namespace ForgeWeaponEnergyLab.Presentation;
 /// <summary>Resolved segments only; chain hops retain their native timing. This renderer never applies damage.</summary>
 internal sealed class EnergyVisuals : IDisposable
 {
-    private const string IgniteState = "ignite";
-    private static readonly PointLightSpec BeamMuzzleLight = new(new Color(0.4f, 0.7f, 1f), 3f, 1.5f, flicker: 0.2f);
-    private static readonly PointLightSpec BeamImpactLight = new(new Color(0.45f, 0.75f, 1f), 4.5f, 2.5f, flicker: 0.3f);
-    private static readonly PointLightSpec ArcLight = new(new Color(0.5f, 0.75f, 1f), 5f, 3f, 0.2f, 0.4f);
-    private static readonly PointLightSpec BlastMuzzleLight =new(new Color(1f, 0.6f, 0.25f), 4f, 3f, 0.12f);
     private const int Capacity = EnergyLimits.ArcTargets;
-    private readonly FxInstancePool _pool = new("Energy weapon visuals");
     private readonly Vector3[] _starts = new Vector3[Capacity];
     private readonly Vector3[] _ends = new Vector3[Capacity];
     private readonly bool[] _hits = new bool[Capacity];
-    private FxInstance? _beam;
-    private int _beamMuzzleLight, _beamImpactLight;
+    /// <summary>This weapon's own hold keys for its beam, the glow at its muzzle and the burn where it lands.</summary>
+    private readonly int _beamKey = Fx.NewKey(), _muzzleKey = Fx.NewKey(), _hitKey = Fx.NewKey();
     private float _arcStarted, _arcHopDelay;
     private int _segments, _started;
-    private bool _disposed, _prepared;
+    private bool _beaming, _beamHit, _disposed;
 
-    internal IEnumerator Prepare()
-    {
-        if (_prepared) yield break;
-        foreach (var step in _pool.Prepare(EnergyVfx.Beam, 2)) yield return step;
-        foreach (var step in _pool.Prepare(EnergyVfx.Arc, Capacity * 2)) yield return step;
-        _prepared = true;
-    }
+    /// <summary>The effects of the gun in the hand; the owner sets it when the gun changes.</summary>
+    internal EnergyLook Look { get; set; } = EnergyLook.Default;
 
-    /// <summary>The held beam this frame; its end glow, sparks and light show only while it hits something.</summary>
+    /// <summary>The held beam this frame with the glow at its muzzle; the burn where it lands, with its light, shows only while it hits something.</summary>
     public void Beam(Vector3 start, Vector3 end, bool hit, float now)
     {
         if (_disposed) return;
         _segments = 0;
-        var ignite = _beam == null;
-        _beam ??= _pool.Take(EnergyVfx.Beam).Hold();
-        _beam.Stretch(start, end);
-        _beam.Emit("impact", hit);
-        _beam.Keep();
-        if (ignite) _beam.PlayState(IgniteState);
-        PointLights.Hold(ref _beamMuzzleLight, start, BeamMuzzleLight, now);
-        if (hit) PointLights.Hold(ref _beamImpactLight, end, BeamImpactLight, now);
-        else PointLights.Release(ref _beamImpactLight);
+        _beaming = true;
+        if (Look.Effect(EnergyVfx.BeamLine) is { } line) Fx.Line(line, _beamKey, start, end, hit, Color.white);
+        if (Look.Effect(EnergyVfx.BeamMuzzle) is { } muzzle) Fx.Hold(muzzle, _muzzleKey, start, end - start, float.NaN, Color.white);
+        if (hit && Look.Effect(EnergyVfx.BeamHit) is { } burn) Fx.Hold(burn, _hitKey, end, start - end, float.NaN, Color.white);
+        else if (_beamHit && Look.Effect(EnergyVfx.BeamHit) is { } gone) Fx.Release(gone, _hitKey);
+        _beamHit = hit;
     }
 
     public void Chain(ReadOnlySpan<Vector3> starts, ReadOnlySpan<Vector3> ends, ReadOnlySpan<bool> hits, float now, float hopDelay)
@@ -64,11 +49,11 @@ internal sealed class EnergyVisuals : IDisposable
     }
 
     /// <summary>A Blast Gun shot: only the muzzle flashes; the explosion appears at the impact with no line between.</summary>
-    public void Blast(Vector3 start, float now)
+    public void Blast(Vector3 start, Vector3 direction, float now)
     {
         if (_disposed) return;
         Hide();
-        PointLights.Flash(start, BlastMuzzleLight, now);
+        EnergyVfx.Play(Look.Effect(EnergyVfx.BlastMuzzle), start, direction);
     }
 
     /// <summary>Starts each chain hop's arc when its delay is due; the arc then plays out on its own.</summary>
@@ -77,30 +62,28 @@ internal sealed class EnergyVisuals : IDisposable
         if (_disposed) return;
         while (_started < _segments && now - _arcStarted >= _started * _arcHopDelay)
         {
-            var arc = _pool.Take(EnergyVfx.Arc);
-            arc.Stretch(_starts[_started], _ends[_started]);
-            arc.Emit("end", _hits[_started]);
-            arc.Start();
-            if (_hits[_started]) PointLights.Flash(_ends[_started], ArcLight, now);
+            // The arc runs from this hop's start to its end: the line effect's +Z points at the target.
+            if (Look.Effect(EnergyVfx.ArcLine) is { } line) Fx.Line(line, _starts[_started], _ends[_started], _hits[_started]);
+            if (_hits[_started])
+            {
+                EnergyVfx.Play(Look.Effect(EnergyVfx.ArcHit), _ends[_started], _starts[_started] - _ends[_started]);
+            }
             _started++;
         }
     }
 
-    /// <summary>Lets the beam go and drops chain hops not yet started; arcs already playing finish.</summary>
+    /// <summary>Lets the beam go, its line, muzzle glow and burn gone at once, and drops chain hops not yet started; arcs already playing finish.</summary>
     public void Hide()
     {
-        if (_segments == 0 && _beam == null && _beamMuzzleLight == 0 && _beamImpactLight == 0) return;
+        if (_beaming)
+        {
+            _beaming = _beamHit = false;
+            if (Look.Effect(EnergyVfx.BeamLine) is { } line) Fx.Release(line, _beamKey);
+            if (Look.Effect(EnergyVfx.BeamMuzzle) is { } muzzle) Fx.Release(muzzle, _muzzleKey);
+            if (Look.Effect(EnergyVfx.BeamHit) is { } burn) Fx.Release(burn, _hitKey);
+        }
         _segments = _started = 0;
-        _beam?.Release();
-        _beam = null;
-        PointLights.Release(ref _beamMuzzleLight);
-        PointLights.Release(ref _beamImpactLight);
     }
 
-    public void Dispose()
-    {
-        if (_disposed) return;
-        _disposed = true;
-        _pool.Dispose();
-    }
+    public void Dispose() => _disposed = true;
 }

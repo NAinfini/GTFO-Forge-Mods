@@ -60,14 +60,15 @@ try {
         $receipt = "ENERGY_BUNDLE_VERIFIED $name $length bytes $hash"
         if ($entry[0].sha256 -cne $hash -or $entry[0].bytes -ne $length -or !(Select-String -LiteralPath $log -Pattern $receipt -SimpleMatch -Quiet)) { throw "Unity's current run did not verify $name; see $log" }
     }
+    # The disc bundle is replaced with the models: it must exist before any file is replaced.
+    $discBundle = Join-Path $candidate 'forge-energy-disc.bundle'
+    if (!(Test-Path -LiteralPath $discBundle)) { throw "Missing forge-energy-disc.bundle; see $log" }
 
-
-    New-Item -ItemType Directory -Force (Join-Path $module 'Assets/Models') | Out-Null
+    New-Item -ItemType Directory -Force (Join-Path $module 'Assets/Models'), (Join-Path $module 'Assets/Vfx') | Out-Null
     foreach ($mode in $modes) {
         Copy-Asset (Join-Path $candidate "forge-energy-model-$mode.bundle") (Join-Path $module "Assets/Models/forge-energy-model-$mode.bundle")
-
     }
-    Copy-Asset (Join-Path $candidate 'forge-energy-disc.bundle') (Join-Path $module 'Assets/Vfx/forge-energy-disc.bundle')
+    Copy-Asset $discBundle (Join-Path $module 'Assets/Vfx/forge-energy-disc.bundle')
     Copy-Asset $manifestPath (Join-Path $module 'Assets/Models/weapon-models-manifest.json')
     Write-Host "Verified and copied $($modes.Count) model bundles, and the manifest into $module/Assets. Evidence: $Evidence."
 } finally {

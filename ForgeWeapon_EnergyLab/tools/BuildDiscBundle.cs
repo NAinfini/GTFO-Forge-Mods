@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
-using UnityEditor.Build;
-using UnityEditor.Rendering;
 using UnityEngine;
+
+// The material-parameters shader (ForgeEnergyLab/DiscParameters) keeps its compiled pass: the runtime binds GTFO's shaders before any draw,
+// but a bundle shader with no pass logs "All passes removed" when the game loads it.
 
 public static class ForgeEnergyDiscBuild
 {
@@ -76,15 +76,5 @@ public static class ForgeEnergyDiscBuild
         finally { bundle.Unload(true); }
         Directory.CreateDirectory(output);
         File.Copy(path, Path.Combine(output, file), true);
-    }
-}
-
-// This shader stores material properties; runtime binds GTFO's shaders before any draw.
-public sealed class DiscParameterShader : IPreprocessShaders
-{
-    public int callbackOrder { get { return 0; } }
-    public void OnProcessShader(Shader shader, ShaderSnippetData snippet, IList<ShaderCompilerData> variants)
-    {
-        if (shader.name == "ForgeEnergyLab/DiscParameters") variants.Clear();
     }
 }
