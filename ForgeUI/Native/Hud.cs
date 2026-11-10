@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 using TMPro;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -76,6 +75,9 @@ internal static class Hud
 
     internal static IReadOnlyList<HudElement> Elements => Registered.Ordered;
 
+    /// <summary>While set, only this mod's elements show (<see cref="UIKitMod.HudAlone"/>).</summary>
+    internal static string? AloneMod;
+
     /// <summary>The screen and the game's HUD as measured this frame (the weapon list's space).</summary>
     internal static HudScene Scene => _scene;
 
@@ -88,7 +90,7 @@ internal static class Hud
             Layout.Add(element.Entry);
             return element;
         }
-        Plugin.Error("HUD element not added: " + problem + ".");
+        Plugin.Error("ui-hud-element-not-added", "HUD element not added: " + problem + ".");
         return null;
     }
 
@@ -107,6 +109,8 @@ internal static class Hud
         element.IsRegistered = false;
         Layout.Remove(element.Entry);
         element.Discard();
+        // The text caches are keyed by native pointers: a new object may land on a freed one's address, so every entry is relearned once.
+        HudDraw.Forget();
     }
 
     /// <summary>Changes an element's slot (its priority or declared size); the layout follows from the next frame.</summary>
@@ -177,7 +181,8 @@ internal static class Hud
             for (var i = 0; i < elements.Count; i++)
             {
                 var element = elements[i];
-                var live = element.IsRegistered && element.Visible && !element.Faulted && element.RootObject != null;
+                // The pointer is the library's own cursor for whichever mod holds it: a mod that has the screen alone still needs it drawn.
+                var live = element.IsRegistered && element.Visible && !element.Faulted && element.RootObject != null && (AloneMod == null || element.Mod == AloneMod || HudPointer.Draws(element));
                 element.Entry.Visible = live;
                 if (!live) continue;
                 element.MeasureDrawn(now);
@@ -200,7 +205,7 @@ internal static class Hud
                 element.Tick(now, dt);
             }
         }
-        catch (Exception error) { Plugin.Error("HUD elements failed to update: " + error); }
+        catch (Exception error) { Plugin.Error("ui-hud-elements-failed-update", "HUD elements failed to update: " + error); }
     }
 
     internal static string N(float n) => HudBox.N(n);
@@ -331,7 +336,7 @@ internal static class Hud
         try { element.BuildCallback(element); }
         catch (Exception error)
         {
-            Plugin.Error("HUD element '" + element.Id + "' failed to build and stays off on this HUD: " + error);
+            Plugin.Error("ui-hud-element-failed-build-stays-off", "HUD element '" + element.Id + "' failed to build and stays off on this HUD: " + error);
             element.Fail(list);
             return;
         }
@@ -572,7 +577,7 @@ public sealed class HudElement
     {
         Faulted = true;
         Visible = false;
-        Plugin.Error("HUD element '" + Id + "' failed while updating and stays off: " + error);
+        Plugin.Error("ui-hud-element-failed-while-updating-stays", "HUD element '" + Id + "' failed while updating and stays off: " + error);
     }
 
     /// <summary>Yours to switch; the element is laid out and shows only while this is true and the game shows its HUD. A hidden element

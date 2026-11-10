@@ -59,7 +59,7 @@ internal sealed class Registry<T> where T : class
 
 /// <summary>Namespaced IDs: every registration is <c>mod/element</c>, the mod's own ID (its plugin GUID, for example
 /// <c>NAinfini.ForgeOrdnance</c>) and the element's name inside it, so two mods can never take each other's names.</summary>
-public static class ModIds
+internal static class ModIds
 {
     public const char Separator = '/';
 

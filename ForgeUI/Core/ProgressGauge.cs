@@ -15,7 +15,7 @@ public enum ProgressMode : byte
 }
 
 /// <summary>How a <see cref="ProgressGauge"/> is drawn.</summary>
-public enum ProgressShape : byte
+internal enum ProgressShape : byte
 {
     /// <summary>The shared progress bar (<see cref="ProgressBar"/>).</summary>
     Bar,

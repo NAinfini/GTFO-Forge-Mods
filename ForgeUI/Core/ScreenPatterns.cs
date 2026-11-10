@@ -6,7 +6,7 @@ namespace ForgeUI;
 /// The placeholder pictures of the screen overlays, drawn in code until the delivered art files are in the kit's <c>icons</c> folder:
 /// each is an alpha in 0..1 at a texel (u, v in 0..1, v up). Deterministic, so every machine draws the same picture.
 /// </summary>
-public static class ScreenPatterns
+internal static class ScreenPatterns
 {
     /// <summary>The hit-edge flash at pixel (<paramref name="x"/>, <paramref name="y"/>) of a <paramref name="w"/> x <paramref name="h"/> texture
     /// drawn at one texel per screen pixel, y = 0 at the screen edge: a bright line along the edge with 45° chamfered ends, and under it a

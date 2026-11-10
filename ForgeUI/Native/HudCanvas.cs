@@ -54,7 +54,7 @@ public sealed class HudCanvas
 
     private UIKitFont? _font;
     private readonly HudElement _hud;
-    private readonly Pool<TextMeshPro> _texts = new(0, 0), _textGlows = new(-2, 0), _textFringes = new(-1, 0);
+    private readonly Pool<TextMeshPro> _texts, _textGlows, _textFringes;
     private readonly Pool<SpriteRenderer> _rects, _lines, _cells, _sprites, _plates, _forms, _glows, _fringes;
     private readonly Pool<SpriteRenderer>[] _spritePools;
     private readonly Pool<TextMeshPro>[] _textPools;
@@ -75,17 +75,22 @@ public sealed class HudCanvas
     /// <param name="lineOrder">Sorting order of every line.</param>
     /// <param name="cellOrder">Sorting order of every cell.</param>
     /// <param name="spriteOrder">Sorting order of the first sprite or icon; each later one is one higher.</param>
-    public HudCanvas(HudElement hud, int rectOrder = -100, int lineOrder = -50, int cellOrder = -5, int spriteOrder = -20)
+    /// <param name="layer">Added to every sorting order: a canvas with a higher layer draws wholly over one with a lower layer, plates over texts included (on one canvas every plate is behind every text, whatever the order of the calls). Two thousand apart keeps a full canvas' pieces apart.</param>
+    /// <param name="stackPlates">Each later plate draws over the earlier ones (a button on a panel), from far enough below the rectangles to leave them room for 400 plates; otherwise all plates share one order and overlapping ones have no set order.</param>
+    public HudCanvas(HudElement hud, int rectOrder = -100, int lineOrder = -50, int cellOrder = -5, int spriteOrder = -20, int layer = 0, bool stackPlates = false)
     {
         _hud = hud ?? throw new ArgumentNullException(nameof(hud));
-        _rects = new(rectOrder, 1);
-        _lines = new(lineOrder, 0);
-        _cells = new(cellOrder, 0);
-        _sprites = new(spriteOrder, 1);
-        _plates = new(rectOrder - 30, 0);
-        _forms = new(lineOrder - 10, 0);
-        _glows = new(rectOrder - 50, 0);
-        _fringes = new(rectOrder - 45, 0);
+        _texts = new(layer, 0);
+        _textGlows = new(layer - 2, 0);
+        _textFringes = new(layer - 1, 0);
+        _rects = new(layer + rectOrder, 1);
+        _lines = new(layer + lineOrder, 0);
+        _cells = new(layer + cellOrder, 0);
+        _sprites = new(layer + spriteOrder, 1);
+        _plates = stackPlates ? new(layer + rectOrder - 400, 1) : new(layer + rectOrder - 30, 0);
+        _forms = new(layer + lineOrder - 10, 0);
+        _glows = new(layer + rectOrder - 50, 0);
+        _fringes = new(layer + rectOrder - 45, 0);
         _spritePools = new[] { _rects, _lines, _cells, _sprites, _plates, _forms, _glows, _fringes };
         _textPools = new[] { _texts, _textGlows, _textFringes };
     }
@@ -290,6 +295,24 @@ public sealed class HudCanvas
     public const int MaxWidths = 1024;
     private readonly Dictionary<(string Text, float Size, byte Face), float> _widths = new();
 
+    /// <summary><paramref name="text"/> as it fits <paramref name="width"/> at <paramref name="px"/>: whole when it does, else cut with an
+    /// ellipsis, empty when not even that fits. Each answer is kept, so calling it every frame costs a lookup.</summary>
+    public string FitText(string text, float px, bool bold, float width)
+    {
+        if (string.IsNullOrEmpty(text) || TextWidth(text, px, bold) <= width) return text;
+        var key = (text, px, bold, width);
+        if (_cut.TryGetValue(key, out var known)) return known;
+        var n = text.Length - 1;
+        while (n > 0 && TextWidth(text.Substring(0, n) + "…", px, bold) > width) n--;
+        if (_cut.Count >= MaxWidths) _cut.Clear();
+        return _cut[key] = n == 0 && TextWidth("…", px, bold) > width ? "" : text.Substring(0, n) + "…";
+    }
+
+    private readonly Dictionary<(string Text, float Px, bool Bold, float Width), string> _cut = new();
+
+    /// <summary>The lines of <paramref name="text"/> no wider than <paramref name="width"/> at <paramref name="px"/> (<see cref="TextWrap"/>), written into <paramref name="into"/> (cleared first).</summary>
+    public void Wrap(string text, float px, bool bold, float width, List<string> into) => TextWrap.Lines(text, s => TextWidth(s, px, bold), width, int.MaxValue, into);
+
     /// <summary>A progress bar in the shared look (<see cref="ProgressBar"/>): from <paramref name="left"/>, <paramref name="width"/>
     /// long, centred on <paramref name="y"/>, filled to the gauge's <see cref="ProgressGauge.Fill"/> in <paramref name="colour"/>, flashing
     /// and folding away after completion. Draws nothing while the gauge is not visible.</summary>
@@ -419,18 +442,42 @@ public sealed class HudCanvas
 
     /// <summary>A text button whose right edge is at <paramref name="right"/> (which then moves left past it, for a row of buttons
     /// laid out from the right), centred on <paramref name="y"/>: lit in <paramref name="accent"/> while <paramref name="on"/>, framed in
-    /// it while the HUD pointer is over it. True on the frame it is clicked.</summary>
-    public bool Button(ref float right, float y, string text, bool on, Color accent)
+    /// it while the HUD pointer is over it. True on the frame it is clicked. Three looks that never pass for each other: lit (filled in
+    /// the accent, dark text, bright outline), available (dark plate, light text) and, when not <paramref name="enabled"/>, unavailable
+    /// (no plate, faint outline, dim text; it does not answer the pointer).</summary>
+    public bool Button(ref float right, float y, string text, bool on, Color accent, bool enabled = true)
     {
-        var width = TextWidth(text, 16f, true) + 36f;
+        var width = ButtonWidth(text);
         var cx = right - width / 2f;
-        var over = HudPointer.Over(_hud, cx, y, width, 34f);
-        Plate(cx, y, width, 34f, 8f, on ? accent : UIKitColors.Shade);
-        Frame(cx, y, width, 34f, 8f, over ? accent : Faded(UIKitColors.Line, 0.5f));
-        Text(text, cx, y, 16f, on ? UIKitColors.OnAccent : over ? UIKitColors.Bright : UIKitColors.Text, HudAlign.Centre, bold: true);
         right -= width + 10f;
-        return over && HudPointer.Pressed;
+        if (!enabled)
+        {
+            Frame(cx, y, width, 34f, 8f, Faded(UIKitColors.Line, 0.25f));
+            Text(text, cx, y, 16f, UIKitColors.Dim, HudAlign.Centre, bold: true);
+            HudPointer.Click(_hud, cx, y, width, 34f, false);
+            return false;
+        }
+        var over = HudPointer.Hover(_hud, cx, y, width, 34f);
+        var down = HudPointer.PressedOn(_hud, cx, y, width, 34f);
+        Plate(cx, y, width, 34f, 8f, on ? accent : UIKitColors.Shade);
+        Pointed(cx, y, width, 34f, 8f, accent, over, down, on);
+        Text(text, cx, y, 16f, on || over ? UIKitColors.Bright : UIKitColors.Text, HudAlign.Centre, bold: true);
+        return HudPointer.Click(_hud, cx, y, width, 34f);
     }
+
+    /// <summary>The one look of every clickable thing on the HUD, drawn over its own plate: at rest a faint frame (a selected one: the bright frame of its solid fill), under the pointer a fill and
+    /// a frame in <paramref name="accent"/> (a selected one lights its frame), pressed a deeper fill drawn a pixel in. <paramref name="over"/> and <paramref name="down"/> come from
+    /// <see cref="HudPointer.Hover"/> and <see cref="HudPointer.PressedOn"/>. A row or a card with no frame of its own passes <paramref name="rest"/> false.</summary>
+    public void Pointed(float x, float y, float width, float height, float cut, Color accent, bool over, bool down, bool selected, bool rest = true)
+    {
+        if (down && over) Plate(x, y, width - 2f, height - 2f, cut, Faded(accent, 0.45f));
+        else if (over) Plate(x, y, width, height, cut, Faded(accent, selected ? 0.25f : 0.18f));
+        var frame = selected ? over ? UIKitColors.Text : UIKitColors.Bright : over || down ? accent : Faded(UIKitColors.Line, 0.5f);
+        if (rest || over || down || selected) Frame(x, y, width, height, cut, frame);
+    }
+
+    /// <summary>How wide <see cref="Button"/> draws <paramref name="text"/>, without its 10 gap to the next one.</summary>
+    public float ButtonWidth(string text) => TextWidth(text, 16f, true) + 36f;
 
     // ---- Coming online ------------------------------------------------------------------------------------------------------------
 
@@ -593,9 +640,23 @@ public sealed class HudCanvas
         }
         if (label.maxVisibleCharacters != shown) label.maxVisibleCharacters = shown;
         pool.Last[index] = new Last { A = x, B = y, C = px, D = width, R = colour.r, G = colour.g, Bl = colour.b, Al = colour.a, Align = (byte)align, Face = face, Text = text, Typed = typed };
-        label.transform.localPosition = new Vector3(left, y, 0f);
+        label.transform.localPosition = new Vector3(left, y - Lift(label.font) * size, 0f);
         label.color = colour;
         return width;
+    }
+
+    // TextMeshPro centres a line on the middle of its ascent and descent lines, which is not the middle of the capitals: a font with a deep descent line draws its text above the
+    // centre of a block it was put on. The offset, in ems, from the line's middle to the capitals' middle (positive: the text sits high), read from the face's own metrics once per face.
+    private static readonly Dictionary<TMP_FontAsset, float> Lifts = new();
+
+    private static float Lift(TMP_FontAsset? font)
+    {
+        if (font == null) return 0f;
+        if (Lifts.TryGetValue(font, out var lift)) return lift;
+        var face = font.faceInfo;
+        lift = face.pointSize > 0f ? (face.capLine * 0.5f - (face.ascentLine + face.descentLine) * 0.5f) / face.pointSize : 0f;
+        Lifts[font] = lift;
+        return lift;
     }
 
     private byte Face(bool bold) =>
@@ -634,8 +695,15 @@ public sealed class HudCanvas
         return soft;
     }
 
-    private static float Width(TextMeshPro label, string text) =>
-        string.IsNullOrEmpty(text) ? 0f : label.GetPreferredValues(text, float.PositiveInfinity, float.PositiveInfinity).x * label.transform.localScale.x;
+    // The laid-out text: TMP's preferred width, or the glyphs' bounds when they are wider (the game font's capitals), so a box drawn to it
+    // holds the text in any language.
+    private static float Width(TextMeshPro label, string text)
+    {
+        if (string.IsNullOrEmpty(text)) return 0f;
+        label.text = text;
+        label.ForceMeshUpdate(true, false);
+        return Math.Max(label.preferredWidth, label.textBounds.size.x) * label.transform.localScale.x;
+    }
 
     private Pool<SpriteRenderer>[] Sprites() => _spritePools;
 

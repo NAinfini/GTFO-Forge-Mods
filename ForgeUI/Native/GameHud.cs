@@ -10,6 +10,15 @@ namespace ForgeUI;
 
 public sealed partial class UIKitMod
 {
+    /// <summary>While true only this mod's HUD elements show, every other mod's wait hidden: for a mod that takes the whole screen for what is
+    /// not the local player's game, such as playing a recording. Set it back when done; the last mod to set it has it.</summary>
+    /// <example><c>ui.HudAlone = true;</c></example>
+    public bool HudAlone
+    {
+        get => Hud.AloneMod == Id;
+        set { if (value) Hud.AloneMod = Id; else if (Hud.AloneMod == Id) Hud.AloneMod = null; }
+    }
+
     /// <summary>A claim to hide the game's own HUD while <see cref="GameHudHide.Active"/> is set, keeping the parts in
     /// <paramref name="keep"/> (by default <see cref="GameHudClaims.DefaultKeep"/>: world-space markers, chat and the crosshair's hit,
     /// kill, charge-up, friendly and ping feedback). Null (logged) when the name cannot be used or is taken.</summary>
@@ -86,7 +95,7 @@ public sealed class GameHudHide
             if (Claim.Active == value) return;
             if (value && !GameHud.CanHold(out var why))
             {
-                Plugin.Error("Game HUD claim '" + Id + "' not taken: " + why + ".");
+                Plugin.Error("ui-game-hud-claim-not-taken", "Game HUD claim '" + Id + "' not taken: " + why + ".");
                 return;
             }
             GameHud.Claims.SetActive(Claim, value);
@@ -159,7 +168,7 @@ public sealed class GameChatMove
             if (Claim.Active == value) return;
             if (value && !GameHud.CanHold(out var why))
             {
-                Plugin.Error("Chat move '" + Id + "' not taken: " + why + ".");
+                Plugin.Error("ui-chat-move-not-taken", "Chat move '" + Id + "' not taken: " + why + ".");
                 return;
             }
             GameHud.Claims.SetActive(Claim, value);
@@ -203,10 +212,10 @@ internal static class GameHud
     private static readonly Registry<object> Handles = new();
     private static readonly Dictionary<string, object> ById = new(StringComparer.Ordinal);
     private const int Parts = 16;
-    // The glass reflection is two of the game's HUD blit parameters, not pieces: hidden, they are set to 0 (again whenever the game
-    // sets them back) and the game's own values are put back on release.
-    private static bool _reflectionOff;
-    private static float _homeReflection, _homeReflectionOpacity;
+    // The glass reflection and the glass curve are the game's HUD blit parameters, not pieces: hidden, they are set to 0 (again whenever
+    // the game sets them back) and the game's own values are put back on release.
+    private static bool _glassOff;
+    private static (float Skew, float Amount, float Opacity, float Hud) _homeGlass, _setGlass;
     private const float Recheck = 0.25f, MissingRecheck = 3f;
     private static float _nextMissing;
     // Per part: the roots and the objects above kept pieces whose child counts tell that the game built something (Signature).
@@ -261,7 +270,7 @@ internal static class GameHud
         PatchGroups.Ensure(PatchGroup.HudHides);
         var problem = Handles.Add(id, handle);
         if (problem == null) { ById[id] = handle; return true; }
-        Plugin.Error("Game HUD claim not added: " + problem + ".");
+        Plugin.Error("ui-game-hud-claim-not-added", "Game HUD claim not added: " + problem + ".");
         return false;
     }
 
@@ -285,7 +294,7 @@ internal static class GameHud
             reason = SNet.IsInLobby ? GameHudRelease.LeftLevel : GameHudRelease.Disconnected;
             return "not in a level";
         }
-        var player = PlayerManager.GetLocalPlayerAgent();
+        var player = ForgeCore.Players.Local;
         if (player == null || player.WasCollected || !player.Alive)
         {
             reason = GameHudRelease.PlayerDied;
@@ -306,7 +315,7 @@ internal static class GameHud
                 if (handle is GameHudHide hide) hide.OnReleased(why);
                 else if (handle is GameChatMove move) move.OnReleased(why);
             }
-            catch (Exception error) { Plugin.Error("Game HUD claim '" + claim.Id + "' release callback failed: " + error); }
+            catch (Exception error) { Plugin.Error("ui-game-hud-claim-release-callback-failed", "Game HUD claim '" + claim.Id + "' release callback failed: " + error); }
         });
         Apply();
     }
@@ -324,7 +333,7 @@ internal static class GameHud
             if (PatchGroups.Has(PatchGroup.Pickups)) UIKit.PickupsReading.Tick();
             if (PatchGroups.Has(PatchGroup.Interaction)) UIKit.InteractionReading.Tick();
         }
-        catch (Exception error) { Plugin.Error("Game HUD claims failed to update: " + error); }
+        catch (Exception error) { Plugin.Error("ui-game-hud-claims-failed-update", "Game HUD claims failed to update: " + error); }
     }
 
     /// <summary>While a game screen is open (<see cref="HudFocus.Away"/>) no part is hidden: the game shows its screen and puts its own
@@ -348,14 +357,14 @@ internal static class GameHud
             _stale |= hidden & ~Hidden;
             Hidden = hidden;
         }
-        Reflection((hidden & GameHudPart.GlassReflection) != GameHudPart.None);
+        Glass((hidden & GameHudPart.GlassReflection) != GameHudPart.None, (hidden & GameHudPart.GlassCurve) != GameHudPart.None, Hud.AloneMod != null);
         if (hidden == GameHudPart.None)
         {
             _stale = GameHudPart.None;
             if (_changed) { _changed = false; Reconcile(); }
             return;
         }
-        var now = Time.unscaledTime;
+        var now = ForgeCore.Frame.UnscaledTime;
         if (now >= _nextCheck)
         {
             _nextCheck = now + Recheck;
@@ -388,16 +397,16 @@ internal static class GameHud
         for (var i = Order.Count - 1; i >= 0; i--)
         {
             var c = Order[i];
-            if (c.Node.WasCollected) { Applied.Remove(c.Key); Order.RemoveAt(i); continue; }
+            if (ForgeCore.NativeObjects.Gone(c.Node)) { Applied.Remove(c.Key); Order.RemoveAt(i); continue; }
             if (c.Node.localScale != Vector3.zero) c.Node.localScale = Vector3.zero;
         }
         for (var part = 0; part < Parts; part++)
         {
             if (((int)hidden & (1 << part)) == 0) continue;
             foreach (var r in LooseRenderers[part])
-                if (!r.WasCollected && r.enabled) { r.enabled = false; OffRenderers[part][r.Pointer] = r; }
+                if (!ForgeCore.NativeObjects.Gone(r) && r.enabled) { r.enabled = false; OffRenderers[part][r.Pointer] = r; }
             foreach (var g in LooseGraphics[part])
-                if (!g.WasCollected && g.enabled) { g.enabled = false; OffGraphics[part][g.Pointer] = g; }
+                if (!ForgeCore.NativeObjects.Gone(g) && g.enabled) { g.enabled = false; OffGraphics[part][g.Pointer] = g; }
         }
     }
 
@@ -408,11 +417,11 @@ internal static class GameHud
         Wanted.Clear();
         for (var part = 0; part < Parts; part++)
             foreach (var t in Covered[part])
-                if (!t.WasCollected) Wanted[t.Pointer] = (t, (GameHudPart)(1 << part));
+                if (!ForgeCore.NativeObjects.Gone(t)) Wanted[t.Pointer] = (t, (GameHudPart)(1 << part));
         for (var i = Order.Count - 1; i >= 0; i--)
         {
             var c = Order[i];
-            if (c.Node.WasCollected) { Applied.Remove(c.Key); Order.RemoveAt(i); }
+            if (ForgeCore.NativeObjects.Gone(c.Node)) { Applied.Remove(c.Key); Order.RemoveAt(i); }
             else if (!Wanted.TryGetValue(c.Key, out var still))
             {
                 c.Node.localScale = c.Home;
@@ -431,30 +440,31 @@ internal static class GameHud
         }
     }
 
-    /// <summary>The game's HUD glass reflection (<see cref="GameHudPart.GlassReflection"/>) off or back to the game's own values.</summary>
-    private static void Reflection(bool off)
+    /// <summary>The game's HUD glass reflection (<see cref="GameHudPart.GlassReflection"/>) and glass curve (<see cref="GameHudPart.GlassCurve"/>)
+    /// off or back to the game's own values; <paramref name="opaque"/> draws the whole HUD at full strength where the game keeps it at 80%,
+    /// which lets a fifth of the picture through every panel (<see cref="UIKitMod.HudAlone"/>).</summary>
+    private static void Glass(bool reflectionOff, bool curveOff, bool opaque)
     {
-        if (!off)
+        if (!reflectionOff && !curveOff && !opaque)
         {
-            if (!_reflectionOff) return;
-            _reflectionOff = false;
-            SetReflection(_homeReflection, _homeReflectionOpacity);
+            if (!_glassOff) return;
+            _glassOff = false;
+            SetGlass(_homeGlass);
             return;
         }
-        var amount = UI_Apply.s_reflectionAmount;
-        var opacity = UI_Apply.s_reflectionOpacity;
-        if (_reflectionOff && amount == 0f && opacity == 0f) return;
+        var now = (UI_Apply.s_skewing, UI_Apply.s_reflectionAmount, UI_Apply.s_reflectionOpacity, UI_Apply.s_opacity);
         // First time, or the game set its values again (settings, menu style): those are the ones to put back.
-        _homeReflection = amount;
-        _homeReflectionOpacity = opacity;
-        _reflectionOff = true;
-        SetReflection(0f, 0f);
+        if (!_glassOff || now != _setGlass) _homeGlass = now;
+        _glassOff = true;
+        var want = (curveOff ? 0f : _homeGlass.Skew, reflectionOff ? 0f : _homeGlass.Amount, reflectionOff ? 0f : _homeGlass.Opacity, opaque ? 1f : _homeGlass.Hud);
+        _setGlass = want;
+        if (now != want) SetGlass(want);
     }
 
-    private static void SetReflection(float amount, float opacity)
+    private static void SetGlass((float Skew, float Amount, float Opacity, float Hud) glass)
     {
-        UI_Apply.SetParameters(UI_Apply.s_skewing, amount, opacity, UI_Apply.s_pixelPatternOpacity, UI_Apply.s_mirrorOpacity,
-            UI_Apply.s_backgroundIntensity, UI_Apply.s_opacity);
+        UI_Apply.SetParameters(glass.Skew, glass.Amount, glass.Opacity, UI_Apply.s_pixelPatternOpacity, UI_Apply.s_mirrorOpacity,
+            UI_Apply.s_backgroundIntensity, glass.Hud);
         UI_Apply.ApplySetttings();
     }
 
@@ -465,8 +475,8 @@ internal static class GameHud
     {
         if (inLevel)
         {
-            foreach (var r in OffRenderers[part].Values) if (!r.WasCollected) r.enabled = true;
-            foreach (var g in OffGraphics[part].Values) if (!g.WasCollected) g.enabled = true;
+            foreach (var r in OffRenderers[part].Values) if (!ForgeCore.NativeObjects.Gone(r)) r.enabled = true;
+            foreach (var g in OffGraphics[part].Values) if (!ForgeCore.NativeObjects.Gone(g)) g.enabled = true;
         }
         else
         {
@@ -489,8 +499,8 @@ internal static class GameHud
     private static void GiveBackDeferred()
     {
         if (DeferredRenderers.Count == 0 && DeferredGraphics.Count == 0) return;
-        foreach (var r in DeferredRenderers.Values) if (!r.WasCollected) r.enabled = true;
-        foreach (var g in DeferredGraphics.Values) if (!g.WasCollected) g.enabled = true;
+        foreach (var r in DeferredRenderers.Values) if (!ForgeCore.NativeObjects.Gone(r)) r.enabled = true;
+        foreach (var g in DeferredGraphics.Values) if (!ForgeCore.NativeObjects.Gone(g)) g.enabled = true;
         DeferredRenderers.Clear();
         DeferredGraphics.Clear();
     }
@@ -542,7 +552,7 @@ internal static class GameHud
             {
                 // A camera image effect, not a GUI object: the game turns it on when the strangle starts (SetGlassShatterProgression
                 // enables it once progress is above 0 and never turns it off); turning the component off skips its OnRenderImage.
-                var player = PlayerManager.GetLocalPlayerAgent();
+                var player = ForgeCore.Players.Local;
                 var shatter = player == null ? null : player.FPSCamera?.HUDGlassShatter;
                 if (shatter != null && !shatter.WasCollected) LooseGraphics[part].Add(shatter);
             }
@@ -578,14 +588,15 @@ internal static class GameHud
 
     // ---- The library's own pieces inside the game's HUD -------------------------------------------------------------------------
 
-    private static readonly List<GameObject> OwnRoots = new();
+    private static readonly List<(GameObject Root, IntPtr Transform)> OwnRoots = new();
 
     /// <summary>A root object the library placed inside one of the game's HUD trees (a HUD element, a crosshair attachment): it and
     /// everything under it is never hidden.</summary>
     internal static void Own(GameObject root)
     {
-        OwnRoots.Add(root);
-        OwnTransforms.Add(root.transform.Pointer);
+        var pointer = root.transform.Pointer;
+        OwnRoots.Add((root, pointer));
+        OwnTransforms.Add(pointer);
     }
 
     /// <summary>The transforms of the library's own roots: a part's signature does not count them, so the kit's HUD elements, built
@@ -649,8 +660,8 @@ internal static class GameHud
         Ancestors.Clear();
         for (var i = OwnRoots.Count - 1; i >= 0; i--)
         {
-            var root = OwnRoots[i];
-            if (root.WasCollected || root.m_CachedPtr == IntPtr.Zero) { OwnRoots.RemoveAt(i); continue; }
+            var (root, transform) = OwnRoots[i];
+            if (ForgeCore.NativeObjects.Gone(root)) { OwnRoots.RemoveAt(i); OwnTransforms.Remove(transform); continue; }
             Spare(root.transform);
         }
         var skip = layer?.m_skipText;
@@ -745,6 +756,6 @@ internal static class GameHud
             ReleaseAll(GameHudRelease.LevelEnded);
             ChatDock.Reset();
         }
-        catch (Exception error) { Plugin.Error("Releasing the game HUD claims at level cleanup failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-releasing-game-hud-claims-at-level", "Releasing the game HUD claims at level cleanup failed: " + error); }
     }
 }

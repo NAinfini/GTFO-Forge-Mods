@@ -135,7 +135,12 @@ internal static class ChatSkin
         {
             was = new TextWas
             {
-                Text = text, Font = text.font, Material = text.fontSharedMaterial, Size = text.fontSize, Style = text.fontStyle, Colour = text.color,
+                Text = text,
+                Font = text.font,
+                Material = text.fontSharedMaterial,
+                Size = text.fontSize,
+                Style = text.fontStyle,
+                Colour = text.color,
                 Coloured = colour != null,
             };
             Texts[key] = was;
@@ -226,8 +231,12 @@ internal static class ChatSkin
         if (Lines.ContainsKey(key)) return;
         var was = new LineWas
         {
-            Item = item, In = item.m_colorChatMsgIn, Out = item.m_colorChatMsgOut, Event = item.m_colorGameEvent,
-            Alert = item.m_colorAlert, Positive = item.m_colorPositivePop,
+            Item = item,
+            In = item.m_colorChatMsgIn,
+            Out = item.m_colorChatMsgOut,
+            Event = item.m_colorGameEvent,
+            Alert = item.m_colorAlert,
+            Positive = item.m_colorPositivePop,
         };
         Lines[key] = was;
         item.m_colorChatMsgIn = item.m_colorChatMsgOut = item.m_colorGameEvent = item.m_colorPositivePop = look.Text;

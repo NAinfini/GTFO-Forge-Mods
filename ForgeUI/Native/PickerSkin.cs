@@ -34,7 +34,7 @@ internal static class PickerSkin
         catch (Exception error)
         {
             _clipFailed = true;
-            Plugin.Error("The picker rows could not be handed to the list's clipping: " + error);
+            Plugin.Error("ui-picker-rows-could-not-be-handed", "The picker rows could not be handed to the list's clipping: " + error);
         }
     }
 
@@ -64,7 +64,7 @@ internal sealed class PickerRowSkin
         var text = card.m_nameText ?? card.GetComponentInChildren<TextMeshPro>(true);
         if (like == null || text == null)
         {
-            Plugin.Error("A picker card has no sprite or text to draw its row with; it shows the game's card.");
+            Plugin.Error("ui-picker-card-has-no-sprite", "A picker card has no sprite or text to draw its row with; it shows the game's card.");
             return null;
         }
         var canvas = new MenuCanvas(card.transform, "ForgeUI.Row", like, text, MenuCanvas.TopOrder(card) + 1);
@@ -131,7 +131,7 @@ internal sealed class PickerSlotSkin
         var like = slot.GetComponentInChildren<SpriteRenderer>(true);
         if (like == null || text == null)
         {
-            Plugin.Error("A picker slot has no sprite or text to draw its tile with; it shows the game's button.");
+            Plugin.Error("ui-picker-slot-has-no-sprite", "A picker slot has no sprite or text to draw its tile with; it shows the game's button.");
             return null;
         }
         var canvas = new MenuCanvas(slot.transform, "ForgeUI.SlotTile", like, text, MenuCanvas.TopOrder(slot) + 1);
@@ -252,7 +252,7 @@ internal sealed class PickerTabsSkin
         var text = header.GetComponentInChildren<TextMeshPro>(true);
         if (like == null || text == null)
         {
-            Plugin.Error("A picker tab has no sprite or text to draw with; it shows the game's tab.");
+            Plugin.Error("ui-picker-tab-has-no-sprite", "A picker tab has no sprite or text to draw with; it shows the game's tab.");
             return null;
         }
         var canvas = new MenuCanvas(header.transform, "ForgeUI.Tab", like, text, MenuCanvas.TopOrder(header) + 1);
@@ -287,7 +287,7 @@ internal sealed class PickerDetailSkin
         var text = box.m_infoDescriptionText ?? box.m_infoMainTitleText;
         if (like == null || text == null)
         {
-            Plugin.Error("The picker's details box has no sprite or text to draw with; it shows the game's box.");
+            Plugin.Error("ui-pickers-details-box-has-no-sprite", "The picker's details box has no sprite or text to draw with; it shows the game's box.");
             return null;
         }
         var area = MenuCanvas.BoxIn(box.transform, box.m_collider, new Rect(-300f, -350f, 600f, 700f));

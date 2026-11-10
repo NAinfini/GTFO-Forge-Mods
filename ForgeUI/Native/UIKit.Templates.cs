@@ -58,6 +58,15 @@ public sealed partial class UIKitMod
         return id == null ? null : Hud.Add(id, new HudHintLine(), slot ?? new HudSlot(HudRegion.WeaponList, 0, 300f, 30f));
     }
 
+    /// <summary>A readout at a place you choose (see <see cref="HudPlaced"/>): text, a thin bar, a row of cells or a clock in the game's
+    /// HUD look. It takes no room in any region: it may overlap the game's HUD or other elements.</summary>
+    /// <example><c>var air = ui.AddPlaced("Air", new HudPlacement(HudAnchor.Bottom, 0, -128, 660, 30)); air.Kind = HudPlacedKind.Bar; air.Text = "AIR {percent}"; air.Set(62, 100);</c></example>
+    public HudPlaced? AddPlaced(string name, HudPlacement placement)
+    {
+        var id = Full(name, "HUD element");
+        return id == null ? null : Hud.Add(id, new HudPlaced(placement), new HudSlot(HudRegion.World));
+    }
+
     /// <summary>The list of commands called by typing an arrow code (see <see cref="HudCommandList"/>). Hidden until you call
     /// <see cref="HudCommandList.Show"/>. It stands at the right edge of the screen, its middle on the middle of the screen, clear of the
     /// rest of the HUD (<see cref="CommandDock"/>); while it shows, the game's glass reflection is held off (a hide claim named
@@ -139,7 +148,7 @@ public sealed partial class MenuBarPage
         if (-Cursor > Size.y && !_overflowLogged)
         {
             _overflowLogged = true;
-            Plugin.Error("Menu bar page '" + Id + "' has more text than fits the window (" + NativeUi.F(Size.y) + " units tall); the rest is cut off.");
+            Plugin.Error("ui-menu-bar-page-has-more-text", "Menu bar page '" + Id + "' has more text than fits the window (" + NativeUi.F(Size.y) + " units tall); the rest is cut off.");
         }
     }
 }

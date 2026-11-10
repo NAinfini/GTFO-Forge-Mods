@@ -39,11 +39,11 @@ internal static class WorldView
         if (!EngineCalls.Prepare(out var why))
         {
             _failed = true;
-            Plugin.Error("Nothing is drawn over the world (world points, enemy health bars, hit feedback): an engine call is missing (" + why + ").");
+            Plugin.Error("ui-nothing-drawn-over-world-world-points", "Nothing is drawn over the world (world points, enemy health bars, hit feedback): an engine call is missing (" + why + ").");
             return false;
         }
         var now = Time.time;
-        if (_camera == null || _camera.WasCollected || _camera.m_CachedPtr == IntPtr.Zero || _transform == null || _transform.m_CachedPtr == IntPtr.Zero || now >= _nextCamera)
+        if (ForgeCore.NativeObjects.Gone(_camera) || ForgeCore.NativeObjects.Gone(_transform) || now >= _nextCamera)
         {
             _nextCamera = now + CameraRecheck;
             var camera = HudScreen.WorldCamera();

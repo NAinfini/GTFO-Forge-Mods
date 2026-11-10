@@ -41,7 +41,7 @@ internal static class WeaponListHidden
 
     /// <summary>The hidden item in the local backpack's <paramref name="slot"/>.</summary>
     private static bool HiddenIn(InventorySlot slot) =>
-        PlayerManager.GetLocalPlayerAgent() != null && PlayerBackpackManager.LocalBackpack is { } backpack && backpack.TryGetBackpackItem(slot, out var item) && Hidden(item);
+        ForgeCore.Players.Local != null && PlayerBackpackManager.LocalBackpack is { } backpack && backpack.TryGetBackpackItem(slot, out var item) && Hidden(item);
 
     /// <summary>Any slot of the list holds a hidden item.</summary>
     private static bool Holding(PUI_Inventory inventory)
@@ -66,18 +66,14 @@ internal static class WeaponListHidden
             }
             catch (Exception error)
             {
-                Plugin.Error("Holding the weapon list for a hidden item failed: " + error);
+                Plugin.Error("ui-holding-weapon-list-hidden-item-failed", "Holding the weapon list for a hidden item failed: " + error);
                 return true;
             }
         }
     }
 
-    [PatchGroup(PatchGroup.WeaponListHidden)]
-    [HarmonyPatch(typeof(PUI_Inventory), nameof(PUI_Inventory.UpdateItemUI))]
-    private static class ItemUi
-    {
-        private static bool Prefix(PUI_Inventory __instance, BackpackItem bpItem) => !(Own(__instance) && Hidden(bpItem));
-    }
+    // PUI_Inventory.UpdateItemUI needs no patch: its native body only calls UpdateInfoForItem and UpdateAmmoForItem for the same
+    // item, and both are held below.
 
     [PatchGroup(PatchGroup.WeaponListHidden)]
     [HarmonyPatch(typeof(PUI_Inventory), nameof(PUI_Inventory.UpdateInfoForItem))]
@@ -102,7 +98,7 @@ internal static class WeaponListHidden
             try { return !(Own(__instance) && HiddenIn(slot)); }
             catch (Exception error)
             {
-                Plugin.Error("Holding the weapon list's counts for a hidden item failed: " + error);
+                Plugin.Error("ui-holding-weapon-lists-counts-hidden-item", "Holding the weapon list's counts for a hidden item failed: " + error);
                 return true;
             }
         }

@@ -61,7 +61,8 @@ internal static class ScreenTextWrite
 /// The centre-top readout of the screen: the game's objective timer, borrowed while the game is not using it. One
 /// slot holds at most one borrow. The borrow is a receipt of what the game's title and text fields held and what
 /// this slot wrote, so it is given back only while the fields still read what was written, and it is dropped
-/// (never fought over) when the game starts using the timer or another writer changes it.
+/// (never fought over) when the game starts using the timer or another writer changes it. A hide still takes down
+/// the frame this slot activated, unless the game is showing the timer itself.
 /// </summary>
 public sealed class ScreenTimer
 {
@@ -120,12 +121,17 @@ public sealed class ScreenTimer
         return true;
     }
 
-    /// <summary>Gives the timer back and holds nothing.</summary>
+    /// <summary>Gives the timer back and holds nothing. A frame this slot activated is taken down even when the
+    /// game or another writer has since changed the fields it wrote, because the activation is still this slot's;
+    /// a timer the game is showing itself is left alone exactly as a write is.</summary>
     public void Hide()
     {
-        if (Reconcile() || _held is not { } held) return;
+        if (_held is not { } held) return;
         _held = null;
-        held.RestoreText();
+        var layer = GuiManager.Current?.m_playerLayer;
+        if (held.Matches(layer)) held.RestoreText();
+        else if (held.Timer.WasCollected || layer == null || layer.m_objectiveTimer != held.Timer
+            || layer.TimerOnMainScreenVisible || held.Timer.Visible) return;
         held.Timer.SetTimerActive(false, false);
     }
 
@@ -156,9 +162,11 @@ public sealed class ScreenTimer
             _lastTimer = Timer.m_lastSetTimer; _seconds = Timer.m_secondsCounter;
         }
 
+        // `Visible` is not read: it is the layer's own `SetVisible` flag, which `SetTimerActive` never sets, so a
+        // borrow showing on screen reads false there and would be dropped before it could be given back.
         internal bool Matches(PlayerGuiLayer? layer)
             => layer != null && Timer != null && !Timer.WasCollected && layer.m_objectiveTimer == Timer
-                && Timer.Visible && !layer.TimerOnMainScreenVisible
+                && !layer.TimerOnMainScreenVisible
                 && Timer.m_lastSetTimer == _lastTimer && Timer.m_secondsCounter == _seconds
                 && Timer.m_titleText != null && !Timer.m_titleText.WasCollected
                 && Timer.m_timerText != null && !Timer.m_timerText.WasCollected
@@ -171,6 +179,53 @@ public sealed class ScreenTimer
             Timer.UpdateTimerTitle(_originalTitle);
             Timer.m_timerText!.SetText(_originalBody);
         }
+    }
+}
+
+/// <summary>
+/// The game's interaction message line with its progress bar (the one a scan or a reactor step writes with
+/// <c>SetMessage</c> and <c>SetMessageTimer</c>), borrowed while the game is not showing it. One slot holds at most
+/// one claim. The game's own hold-to-use prompt is a different piece of the same layer and is never touched.
+/// </summary>
+public sealed class ScreenProgress
+{
+    private bool _held;
+
+    /// <summary>Whether this slot holds the message line.</summary>
+    public bool Holding => _held;
+
+    /// <summary>Checks, without writing, that the line can be written now. <paramref name="owned"/> says the caller
+    /// already holds it through this slot.</summary>
+    public ScreenTextRefusal Check(bool owned)
+    {
+        var layer = GuiManager.InteractionLayer;
+        if (layer == null || layer.WasCollected) return ScreenTextRefusal.NoLayer;
+        if (_held && !layer.MessageVisible) _held = false;
+        return !owned && (layer.MessageVisible || layer.MessageTimerVisible) ? ScreenTextRefusal.Busy : ScreenTextRefusal.None;
+    }
+
+    /// <summary>Shows <paramref name="text"/> with the bar filled to <paramref name="fraction"/> (0..1). Call after <see cref="Check"/>.</summary>
+    public ScreenTextRefusal Show(string text, float fraction)
+    {
+        var layer = GuiManager.InteractionLayer;
+        if (layer == null || layer.WasCollected) return ScreenTextRefusal.NoLayer;
+        layer.SetMessage(text, ePUIMessageStyle.Default);
+        layer.MessageVisible = true;
+        layer.SetMessageTimer(Mathf.Clamp01(fraction));
+        layer.MessageTimerVisible = true;
+        _held = true;
+        return ScreenTextRefusal.None;
+    }
+
+    /// <summary>Takes the line down if this slot put it up; leaves the game's own line alone otherwise.</summary>
+    public void Hide()
+    {
+        if (!_held) return;
+        _held = false;
+        var layer = GuiManager.InteractionLayer;
+        if (layer == null || layer.WasCollected) return;
+        layer.MessageTimerVisible = false;
+        layer.MessageVisible = false;
     }
 }
 

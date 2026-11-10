@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using CellMenu;
 using UnityEngine;
-using Object = UnityEngine.Object;
 
 namespace ForgeUI;
 
@@ -78,7 +77,7 @@ internal static class ConfirmDialogs
     private static void Answered(ConfirmQuestion question, ConfirmAnswer answer)
     {
         try { question.Answered(answer); }
-        catch (Exception error) { Plugin.Error("Confirmation callback of '" + question.Mod.Id + "' failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-confirmation-callback-failed", "Confirmation callback of '" + question.Mod.Id + "' failed: " + error); }
     }
 
     internal static ConfirmTicket Ask(UIKitMod mod, ConfirmQuestion question)
@@ -207,7 +206,7 @@ internal static class ConfirmWindow
         catch (Exception error)
         {
             Close();
-            Plugin.Error("The confirmation window could not be opened (the question waits): " + error);
+            Plugin.Error("ui-confirmation-window-could-not-be-opened", "The confirmation window could not be opened (the question waits): " + error);
             return;
         }
         _version = queue.Version;
@@ -266,7 +265,7 @@ internal static class ConfirmWindow
         {
             _page?.Destroy();
         }
-        catch (Exception error) { Plugin.Error("Closing the confirmation window failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-closing-confirmation-window-failed", "Closing the confirmation window failed: " + error); }
         finally
         {
             _page = null;

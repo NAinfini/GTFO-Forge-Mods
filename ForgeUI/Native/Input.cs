@@ -63,7 +63,7 @@ internal static class Input
     {
         if (!Routes.TryGetValue(instance.Pointer, out var route)) return true;
         try { route.Click(); }
-        catch (Exception error) { Plugin.Error("Menu click failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-menu-click-failed", "Menu click failed: " + error); }
         return false;
     }
 
@@ -71,7 +71,7 @@ internal static class Input
     {
         if (!Routes.TryGetValue(instance.Pointer, out var route) || route.Hover == null) return;
         try { route.Hover(inside); }
-        catch (Exception error) { Plugin.Error("Menu hover failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-menu-hover-failed", "Menu hover failed: " + error); }
     }
 
     [PatchGroup(PatchGroup.Clicks)]

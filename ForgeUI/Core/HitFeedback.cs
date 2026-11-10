@@ -16,7 +16,7 @@ public enum HitKind : byte
 /// longest ago is dropped for the new one. Every array is made once: adding, ticking and reading
 /// allocate nothing.
 /// </summary>
-public sealed class FloatingNumbers
+internal sealed class FloatingNumbers
 {
     /// <summary>The most numbers any pool may hold.</summary>
     public const int Limit = 32;
@@ -106,7 +106,7 @@ public sealed class FloatingNumbers
 /// where killed targets were (a ring of <see cref="Kills"/>, the oldest overwritten) and when the last kill was, for the confirmation
 /// beside the crosshair.
 /// </summary>
-public sealed class HitFeedbackBook
+internal sealed class HitFeedbackBook
 {
     public const int Kills = 4;
     public const float HitSeconds = 0.22f, KillPulseSeconds = 0.5f, KillMarkSeconds = 0.35f, ConfirmSeconds = 0.3f;

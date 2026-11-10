@@ -17,7 +17,7 @@ public static class TeammateAmmo
 }
 
 /// <summary>Which of an inventory slot's counts the game's own weapon list shows: a count its show flag leaves off is −1.</summary>
-public static class InventoryAmmo
+internal static class InventoryAmmo
 {
     public static int Shown(bool show, int value) => show ? value : -1;
 

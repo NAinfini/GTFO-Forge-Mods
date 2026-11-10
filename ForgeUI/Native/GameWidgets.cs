@@ -31,7 +31,7 @@ public static partial class UIKit
         }
         catch (Exception error)
         {
-            Plugin.Error("The world marker '" + title + "' could not be placed: " + error);
+            Plugin.Error("ui-world-marker-could-not-be-placed", "The world marker '" + title + "' could not be placed: " + error);
             return null;
         }
     }
@@ -55,7 +55,7 @@ public static partial class UIKit
         }
         catch (Exception error)
         {
-            Plugin.Error("The enemy marker could not be placed: " + error);
+            Plugin.Error("ui-enemy-marker-could-not-be-placed", "The enemy marker could not be placed: " + error);
             return null;
         }
     }
@@ -66,7 +66,7 @@ public static partial class UIKit
     /// <example><c>UIKit.PostChatNotice("Teammate's call-in files differ; call-ins are off.");</c></example>
     public static bool PostChatNotice(string text)
     {
-        if (string.IsNullOrEmpty(text)) { Plugin.Error("A chat notice needs a text."); return false; }
+        if (string.IsNullOrEmpty(text)) { Plugin.Error("ui-chat-notice-needs-text", "A chat notice needs a text."); return false; }
         try
         {
             var player = SNetwork.SNet.LocalPlayer;
@@ -76,7 +76,7 @@ public static partial class UIKit
         }
         catch (Exception error)
         {
-            Plugin.Error("The chat notice '" + text + "' could not be posted: " + error);
+            Plugin.Error("ui-chat-notice-could-not-be-posted", "The chat notice '" + text + "' could not be posted: " + error);
             return false;
         }
     }
@@ -91,7 +91,7 @@ public static partial class UIKit
         return new WeaponListLine(name, null);
     }
 
-    /// <summary>A picture file (PNG, any size) as a sprite sized for the picker's cards and details: the long side is about
+    /// <summary>A picture file (PNG, up to 8192 pixels a side) as a sprite sized for the picker's cards and details: the long side is about
     /// 2.56 units like the game's own gear icons. Loaded once per file and kept for the session; null (and one logged error)
     /// when the file is missing or is not an image the game can decode.</summary>
     public static Sprite? LoadIcon(string path)
@@ -100,9 +100,9 @@ public static partial class UIKit
         if (Icons.TryGetValue(path, out var known)) return known;
         try
         {
-            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false) { name = "ForgeUI.Icon." + Path.GetFileName(path), hideFlags = HideFlags.HideAndDontSave };
-            if (!ImageConversion.LoadImage(texture, File.ReadAllBytes(path), markNonReadable: true))
-                throw new InvalidDataException("the file is not a PNG the game can decode");
+            var texture = ForgeCore.Images.Decode(File.ReadAllBytes(path), out var failure) ?? throw new InvalidDataException(failure);
+            texture.name = "ForgeUI.Icon." + Path.GetFileName(path);
+            texture.hideFlags = HideFlags.HideAndDontSave;
             texture.filterMode = FilterMode.Bilinear;
             texture.wrapMode = TextureWrapMode.Clamp;
             var sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f), Math.Max(texture.width, texture.height) / IconUnits);
@@ -113,7 +113,7 @@ public static partial class UIKit
         catch (Exception error)
         {
             Icons[path] = null;
-            Plugin.Error("Icon " + path + " could not be loaded; no picture is shown: " + error);
+            Plugin.Error("ui-icon-could-not-be-loaded", "Icon " + path + " could not be loaded; no picture is shown: " + error);
             return null;
         }
     }
@@ -142,7 +142,7 @@ public sealed partial class UIKitMod
         var prompt = new InteractPrompt(id);
         var problem = Prompts.Add(id, prompt);
         if (problem == null) return prompt;
-        Plugin.Error("Interaction prompt not added: " + problem + ".");
+        Plugin.Error("ui-interaction-prompt-not-added", "Interaction prompt not added: " + problem + ".");
         return null;
     }
 
@@ -211,7 +211,7 @@ public sealed class NavMarkerHandle
             _title = value;
             if (!IsPlaced) return;
             try { _marker!.SetTitle(value); }
-            catch (Exception error) { Plugin.Error("Changing the text of the world marker failed: " + error); }
+            catch (Exception error) { Plugin.Error("ui-changing-text-world-marker-failed", "Changing the text of the world marker failed: " + error); }
         }
     }
 
@@ -243,7 +243,7 @@ public sealed class NavMarkerHandle
         _marker = null;
         if (marker == null || marker.WasCollected) return;
         try { ForgeCore.NavMarkers.Remove(marker); }
-        catch (Exception error) { Plugin.Error("Removing a world marker failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-removing-world-marker-failed", "Removing a world marker failed: " + error); }
     }
 }
 
@@ -310,7 +310,7 @@ public sealed class WeaponListLine
 
     private void Scan()
     {
-        var now = Time.unscaledTime;
+        var now = ForgeCore.Frame.UnscaledTime;
         if (now < _next) return;
         _next = now + Interval;
         var slots = GuiManager.PlayerLayer?.Inventory?.m_inventorySlots;

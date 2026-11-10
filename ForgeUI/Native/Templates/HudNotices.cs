@@ -46,7 +46,7 @@ internal sealed class NoticesView : HudWidget
         foreach (var handle in Handles)
             if (handle.Id == id)
             {
-                Plugin.Error("Notices not added: the ID '" + id + "' is already registered.");
+                Plugin.Error("ui-notices-not-added-id-already-registered", "Notices not added: the ID '" + id + "' is already registered.");
                 return null;
             }
         if (_view == null)

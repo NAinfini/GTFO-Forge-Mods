@@ -3,7 +3,7 @@ using System;
 namespace ForgeUI;
 
 /// <summary>One measurement of the screen in the weapon list's space: its middle and half its size.</summary>
-public readonly record struct ScreenSample(float CentreX, float CentreY, float HalfWidth, float HalfHeight)
+internal readonly record struct ScreenSample(float CentreX, float CentreY, float HalfWidth, float HalfHeight)
 {
     /// <summary>A measurement the layout can use: finite and larger than a unit each way.</summary>
     public bool Usable => float.IsFinite(CentreX) && float.IsFinite(CentreY) && float.IsFinite(HalfWidth) && float.IsFinite(HalfHeight)
@@ -12,7 +12,7 @@ public readonly record struct ScreenSample(float CentreX, float CentreY, float H
 
 /// <summary>What the screen's measurement depends on: the resolution, the HUD camera's field of view and the HUD's scale. The screen
 /// is measured again only when one of them changes, never because the HUD sways.</summary>
-public readonly record struct ScreenKey(int Width, int Height, float FieldOfView, float Scale)
+internal readonly record struct ScreenKey(int Width, int Height, float FieldOfView, float Scale)
 {
     /// <summary>The same setup as <paramref name="other"/> (the field of view and the scale within rounding).</summary>
     public bool Same(in ScreenKey other) => Width == other.Width && Height == other.Height
@@ -25,7 +25,7 @@ public readonly record struct ScreenKey(int Width, int Height, float FieldOfView
 /// setup changed, keeps their median, and holds it until the setup (<see cref="ScreenKey"/>) changes again. Unusable measurements
 /// (a camera that is not ready gives zero) are never taken. Nothing is laid out before the first median exists.
 /// </summary>
-public sealed class ScreenSampler
+internal sealed class ScreenSampler
 {
     public const int Samples = 12;
 
@@ -87,7 +87,7 @@ public sealed class ScreenSampler
 
 /// <summary>Keeps a measured box steady: a new measurement replaces the kept one only when an edge moved by more than the tolerance, so
 /// the game's HUD swaying under a measurement does not move the elements laid out around it.</summary>
-public static class HudBoxes
+internal static class HudBoxes
 {
     /// <summary>How far an edge may wander before the box counts as moved, in HUD units.</summary>
     public const float Tolerance = 6f;

@@ -49,7 +49,7 @@ internal static class GearNames
         if (texts == null) throw new ArgumentNullException(nameof(texts));
         PatchGroups.Ensure(PatchGroup.GearNames);
         var problem = Book.Add(texts, find, texts, key, byPacket);
-        if (problem != null) Plugin.Error("Gear name not added: " + problem + ".");
+        if (problem != null) Plugin.Error("ui-gear-name-not-added", "Gear name not added: " + problem + ".");
     }
 
     internal static void Register(string packetName, Func<string> name)
@@ -57,7 +57,7 @@ internal static class GearNames
         if (name == null) throw new ArgumentNullException(nameof(name));
         PatchGroups.Ensure(PatchGroup.GearNames);
         var problem = Book.Add(name.Method.Module.Assembly, packetName, name, true);
-        if (problem != null) Plugin.Error("Gear name not added: " + problem + ".");
+        if (problem != null) Plugin.Error("ui-gear-name-not-added", "Gear name not added: " + problem + ".");
     }
 
     /// <summary>The language changed: the screens already drawn show the new language.</summary>
@@ -104,7 +104,7 @@ internal static class GearNames
     {
         if (!Book.HasPackets) return;
         var lines = GuiManager.PlayerLayer?.Inventory?.m_inventorySlots;
-        if (lines == null || PlayerManager.GetLocalPlayerAgent() == null) return;
+        if (lines == null || ForgeCore.Players.Local == null) return;
         var backpack = PlayerBackpackManager.LocalBackpack;
         if (backpack == null) return;
         for (var i = 0; i < GearSlots.Length; i++)
@@ -161,7 +161,7 @@ internal static class GearNames
         {
             if (Book.IsEmpty) return;
             try { name = Book.Display(name); }
-            catch (Exception error) { Plugin.Error("A gear name in the weapon list could not be translated: " + error); }
+            catch (Exception error) { Plugin.Error("ui-gear-name-weapon-list", "A gear name in the weapon list could not be translated: " + error); }
         }
     }
 
@@ -173,7 +173,7 @@ internal static class GearNames
         {
             yield return AccessTools.Method(typeof(PUI_InventoryItem), nameof(PUI_InventoryItem.SetArchetypeName));
             yield return AccessTools.Method(typeof(PUI_InventoryItem), nameof(PUI_InventoryItem.SetDetailedName));
-            yield return AccessTools.Method(typeof(PUI_Inventory), nameof(PUI_Inventory.UpdateItemUI));
+            // UpdateItemUI needs no patch: its native body calls UpdateInfoForItem, then only UpdateAmmoForItem, which sets no name.
             yield return AccessTools.Method(typeof(PUI_Inventory), nameof(PUI_Inventory.UpdateInfoForItem));
             yield return AccessTools.Method(typeof(PUI_Inventory), nameof(PUI_Inventory.UpdateAllSlots));
         }
@@ -182,7 +182,7 @@ internal static class GearNames
         private static void Postfix()
         {
             try { NameSlots(); }
-            catch (Exception error) { Plugin.Error("A gear name in the weapon list could not be set: " + error); }
+            catch (Exception error) { Plugin.Error("ui-gear-names-gear-name-weapon-list", "A gear name in the weapon list could not be set: " + error); }
         }
     }
 
@@ -202,7 +202,7 @@ internal static class GearNames
         {
             if (Book.IsEmpty) return;
             try { Retext(__instance); }
-            catch (Exception error) { Plugin.Error("A gear name in a gear slot could not be translated: " + error); }
+            catch (Exception error) { Plugin.Error("ui-gear-name-gear-slot", "A gear name in a gear slot could not be translated: " + error); }
         }
     }
 
@@ -216,7 +216,7 @@ internal static class GearNames
         {
             if (Book.IsEmpty) return;
             try { RetextChildren(__instance); }
-            catch (Exception error) { Plugin.Error("A gear name in the lobby weapon window could not be translated: " + error); }
+            catch (Exception error) { Plugin.Error("ui-gear-name-lobby-weapon-window", "A gear name in the lobby weapon window could not be translated: " + error); }
         }
     }
 }

@@ -25,6 +25,10 @@ Report bugs on [GitHub](https://github.com/NAinfini/GTFO-Forge-Mods/issues), or 
 - Cockpit pieces for vehicles and suits: hiding the game's HUD while piloting (and putting it back), moving the chat, a wide segmented armour bar, arcs beside the crosshair, a ring of contacts out of sight with a turn-around hint, ability slots, a hull damage disc, hit-direction flashes and a faint helmet visor with struts and cracks, plus the game's objectives, prompts, subtitles, inventory and teammates (with infection and ammunition) redrawn in the same style.
 - Hit-direction flashes and the visor shade are merged by priority and drawn in one full-screen pass (colour flash, corner shade, low-health pulse, blur, colour split).
 - Enemy health bars for the enemies you hit and can see: each hit's lost piece flashes and shrinks, a small damage number rises (a burst adds up into one), and a kill leaves a short mark and a small confirmation by the crosshair.
+- A wheel in the middle of the screen: hold the mod's key, point at a slot and let go to choose it. Choices waiting for you, such as a teammate's offer, glow.
+
+  ![The wheel, as Forge Emote uses it](https://raw.githubusercontent.com/NAinfini/GTFO-Forge-Mods/main/ForgeEmote/docs/images/wheel.jpg)
+
 - A line in the player's own chat box, shown only on their machine, for notices that belong to no screen element.
 
 - Keys you can change: every mod's keys are listed in the game's own settings (Controls), under the game's keys, one heading per mod. Click a key and press the new one; Esc cancels, Backspace or Delete unbinds, the page's reset puts them back. A key two actions or the game also use is marked.
@@ -51,6 +55,10 @@ After the first launch, the settings are in `BepInEx/config/NAinfini.ForgeUI.cfg
 | `Screen / HitFlashSeconds` | 0.3 | How long a full hit flash lasts, 0.1 to 2 seconds. |
 | `Screen / Glow` | 1 | Strength of the soft glow round the lit parts of HUD pieces mods draw, 0 to 2. 0 turns it off. |
 | `Screen / Fringe` | On | A faint 1 px red and blue colour fringe on those pieces, like a display seen through a visor. |
+| `Wheel / DeadZone` | 0.35 | How far from the centre, as a share of the wheel's radius, the pointer must move before a slot is chosen. |
+| `Wheel / HoverSeconds` | 0.08 | How long the pointer rests on a slot before it lights. |
+| `Wheel / TextScale` | 1 | Size of the wheel's text. |
+| `Wheel / HighContrast` | Off | Solid dark slots with white text and outlines. |
 | `EnemyHealthBars / Enabled` | On | Draws the enemy health bars, damage numbers and kill marks mods switch on. Off hides them in every mod. Written the first time a mod uses them. |
 
 A value that is not a number warns once and uses 0.

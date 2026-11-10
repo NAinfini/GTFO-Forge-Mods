@@ -8,7 +8,7 @@ using ForgeCore;
 namespace ForgeUI;
 
 /// <summary>
-/// One set of language files: <c>&lt;code&gt;.json</c> files in a folder (usually your plugin's <c>lang</c> folder), each a JSON
+/// One set of language files: <c>&lt;code&gt;.forge</c> files in a folder (usually your plugin's <c>lang</c> folder), each a JSON
 /// object of key → text, where a text may hold <c>{0}</c>, <c>{1}</c>… placeholders. All files are read and checked the first time
 /// a text is asked for; after that a text is a dictionary lookup that returns the cached string. Take your mod's set with
 /// <see cref="UIKitMod.Texts"/> (or use <see cref="UIKitMod.Text(string)"/>), a set in another folder with

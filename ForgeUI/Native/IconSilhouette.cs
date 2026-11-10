@@ -43,7 +43,7 @@ internal static class IconSilhouette
         }
         catch (Exception error)
         {
-            Plugin.Error("Icon '" + source.name + "' could not be copied (" + look.Name + ") and is not drawn: " + error);
+            Plugin.Error("ui-icon-could-not-be-copied", "Icon '" + source.name + "' could not be copied (" + look.Name + ") and is not drawn: " + error);
             made = null;
         }
         look.Made[source.Pointer] = (source, made);

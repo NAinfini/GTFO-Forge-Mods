@@ -4,10 +4,10 @@ using System.Collections.Generic;
 namespace ForgeUI;
 
 /// <summary>Line breaking for HUD text by estimated width (<see cref="TextWidth.Estimate"/>); call it only when the text changes.</summary>
-public static class TextWrap
+internal static class TextWrap
 {
     /// <summary>Breaks <paramref name="text"/> into at most <paramref name="maxLines"/> lines no wider than <paramref name="width"/> at
-    /// <paramref name="px"/>, written into <paramref name="lines"/> (cleared first). Breaks at spaces, or anywhere in text without spaces
+    /// <paramref name="px"/>, written into <paramref name="lines"/> (cleared first). Breaks at spaces and after Chinese punctuation, or anywhere in text without them
     /// (Chinese); line breaks in the text are kept; the last line is cut with "…" when the text does not fit. Returns the line count.</summary>
     public static int Lines(string text, float px, float width, int maxLines, List<string> lines)
         => Lines(text, s => TextWidth.Estimate(s, px), width, maxLines, lines);
@@ -27,6 +27,7 @@ public static class TextWrap
             {
                 if (measure(text.Substring(start, end - start + 1)) > width && end > start) break;
                 if (text[end] == ' ') lastBreak = end;
+                else if (text[end] is '、' or '，' or '：' or '；' or '。') lastBreak = end + 1;
                 end++;
             }
             var hardEnd = end >= text.Length || text[end] == '\n';

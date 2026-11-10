@@ -23,7 +23,7 @@ public sealed partial class UIKitMod
         if (id == null) return null;
         style ??= new HitFeedbackStyle();
         var problem = style.Problem();
-        if (problem != null) { Plugin.Error(id + ": hit feedback not added: " + problem + "."); return null; }
+        if (problem != null) { Plugin.Error("ui-hit-feedback-not-added", id + ": hit feedback not added: " + problem + "."); return null; }
         return HitFeedbacks.Add(new HitFeedback(id, style));
     }
 }
@@ -108,7 +108,7 @@ public sealed class HitFeedback
         {
             if (value == null) throw new ArgumentNullException(nameof(value));
             var problem = value.Problem();
-            if (problem != null) { Plugin.Error(Id + ": hit feedback style refused: " + problem + "."); return; }
+            if (problem != null) { Plugin.Error("ui-hit-feedback-style-refused", Id + ": hit feedback style refused: " + problem + "."); return; }
             _style = value;
             HitFeedbacks.Restyle(this);
         }
@@ -158,7 +158,7 @@ internal static class HitFeedbacks
     {
         if (Registered.ContainsKey(feedback.Id))
         {
-            Plugin.Error(feedback.Id + ": hit feedback not added: the name is already taken.");
+            Plugin.Error("ui-hit-feedback-not-added-name-already", feedback.Id + ": hit feedback not added: the name is already taken.");
             return null;
         }
         PatchGroups.Ensure(PatchGroup.LocalHits);

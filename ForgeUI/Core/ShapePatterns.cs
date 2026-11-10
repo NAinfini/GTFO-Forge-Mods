@@ -7,7 +7,7 @@ namespace ForgeUI;
 /// square of <see cref="Size"/> texels whose borders hold the shaped part, so the shape keeps its corner or end at any size; the
 /// arguments are texel centres (x right, y up).
 /// </summary>
-public static class ShapePatterns
+internal static class ShapePatterns
 {
     /// <summary>Texture side of the chamfer and skew shapes; their border is <see cref="Border"/> texels (one unit when drawn).</summary>
     public const int Size = 64, Border = 16;

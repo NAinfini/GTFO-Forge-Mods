@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Text;
 using UnityEngine;
 
 namespace ForgeUI;
@@ -83,7 +81,7 @@ internal static class ChatDock
             Size(owner);
             var slot = element.Box;
             Place(slot);
-            var now = Time.unscaledTime;
+            var now = ForgeCore.Frame.UnscaledTime;
             var count = _log.m_logItems?.Count ?? 0;
             var look = owner.Look;
             // Lit (typed in, or the plate still fading): every line the slot holds; otherwise, with a look, only the newest few.
@@ -139,7 +137,7 @@ internal static class ChatDock
     {
         if (_subscribed) return;
         _subscribed = true;
-        ForgeCore.GameHooks.GameLogAdded.After((_, _) => _lastLine = Time.unscaledTime);
+        ForgeCore.GameHooks.GameLogAdded.After((_, _) => _lastLine = ForgeCore.Frame.UnscaledTime);
     }
 
     /// <summary>The level's cleanup: the chat goes back and every line is drawn again.</summary>
@@ -162,7 +160,7 @@ internal static class ChatDock
         if (log != null && _rect == null && !_missingLogged)
         {
             _missingLogged = true;
-            Plugin.Error("The game's chat box has no rect: it is neither docked nor lit.");
+            Plugin.Error("ui-games-chat-box-has-no-rect", "The game's chat box has no rect: it is neither docked nor lit.");
         }
     }
 
@@ -290,7 +288,7 @@ internal static class ChatDock
     {
         if (_failed) return;
         var typing = GameStateManager.CurrentStateName == eGameStateName.InLevel && !HudFocus.Away && PlayerChatManager.InChatMode;
-        var now = Time.unscaledTime;
+        var now = ForgeCore.Frame.UnscaledTime;
         var dt = _last > 0f ? now - _last : 0f;
         _last = now;
         if (typing != _typing)

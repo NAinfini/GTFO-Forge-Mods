@@ -18,7 +18,6 @@ internal enum PatchGroup : byte
     /// <summary>A claim hiding a game HUD part.</summary>
     HudHides,
     WeaponListHidden,
-    EnemyBars,
     /// <summary>The local player's enemy hits (health bars and hit feedback).</summary>
     LocalHits,
     // The game readouts: used from the first read of the matching UIKit property.
@@ -30,6 +29,8 @@ internal enum PatchGroup : byte
     Intel,
     Boosters,
     Pickups,
+    /// <summary>A teammate tag drawn above the teammate's name marker.</summary>
+    Markers,
 }
 
 /// <summary>Marks a Harmony patch class that goes on with its <see cref="PatchGroup"/>.</summary>

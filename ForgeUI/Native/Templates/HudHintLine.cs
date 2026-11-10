@@ -39,7 +39,7 @@ public readonly struct HintPart
 /// </summary>
 public sealed class HintRow
 {
-    private const float WordPx = 14f, KeyPx = 14f, KeyPadX = 5f, KeyHeight = 18f, Gap = 6f, WideGap = 14f;
+    private const float WordPx = 14f, KeyPx = 14f, KeyPadX = 6f, KeyPadY = 3f, KeyHeight = 18f, Gap = 6f, WideGap = 14f;
 
     private sealed class Piece
     {
@@ -64,6 +64,9 @@ public sealed class HintRow
     public float Place(float right, float centre)
     {
         var x = right;
+        // The width is summed from the parts, not read off the end position: "right - x" carries a rounding error that depends on where the
+        // line stands, and a caller that sizes its plate by the width and places the line by the plate saw it alternate between two values.
+        var used = 0f;
         var drawn = 0;
         for (var i = _parts.Length - 1; i >= 0; i--)
         {
@@ -75,17 +78,22 @@ public sealed class HintRow
             if (part.IsKey)
             {
                 width = HudDraw.Line(_hud, piece.Text, text, KeyPx, x - KeyPadX, centre, UIKitColors.Bright, false) + KeyPadX * 2f;
-                HudDraw.Frame(piece.Frame, x, centre, width, KeyHeight, UIKitColors.Line);
+                // The box is as tall as the laid-out glyphs and centred on them, so capitals and accents stay inside it.
+                var bounds = piece.Text.textBounds; var scale = piece.Text.transform.localScale.y;
+                var height = Math.Max(KeyHeight, bounds.size.y * scale + KeyPadY * 2f);
+                HudDraw.Frame(piece.Frame, x, centre + bounds.center.y * scale, width, height, UIKitColors.Line);
             }
             else
             {
                 foreach (var f in piece.Frame) HudDraw.SetActive(f, false);
                 width = HudDraw.Line(_hud, piece.Text, text, WordPx, x, centre, UIKitColors.Text, false);
             }
-            x -= width + (part.Wide ? WideGap : Gap);
+            var step = width + (part.Wide ? WideGap : Gap);
+            x -= step;
+            used += step;
         }
         for (var i = drawn; i < _pieces.Count; i++) Hide(_pieces[i]);
-        return drawn == 0 ? 0f : right - x - (LastGap());
+        return drawn == 0 ? 0f : used - LastGap();
     }
 
     /// <summary>Hides every piece.</summary>

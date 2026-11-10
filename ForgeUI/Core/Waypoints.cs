@@ -30,7 +30,7 @@ public readonly struct WaypointId : IEquatable<WaypointId>
 /// the one added longest ago (it is dropped); <see cref="Remove"/> frees one. Ids carry a generation, so
 /// an id kept after its point was dropped or removed finds nothing. Every array is made once: adding, removing and reading allocate nothing.
 /// </summary>
-public sealed class WaypointBook
+internal sealed class WaypointBook
 {
     private readonly int[] _generation;
     private readonly long[] _order;
@@ -113,7 +113,7 @@ public enum WaypointPlace : byte
 /// <summary>A world point's place on the HUD, without Unity: projected through the camera's clip transform (a point behind the camera
 /// mirrored, as the camera's own viewport projection does), then kept on the point while it is on screen or moved onto the screen's edge
 /// with an arrow (<see cref="ScreenMath.EdgeMarker"/>), and faded with distance.</summary>
-public static class WaypointMath
+internal static class WaypointMath
 {
     /// <summary>The viewport point (0..1 from the bottom left) of world (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>),
     /// mirrored when it is behind the camera (<paramref name="behind"/>); false only for a point on the camera's own plane.</summary>

@@ -44,7 +44,7 @@ public static class GearIcons
         PatchGroups.Ensure(PatchGroup.GearIcons);
         if (Supplied.TryGetValue(category, out var existing))
         {
-            if (existing != model) Plugin.Error("Gear icons of category " + category + " not supplied: another provider already supplies them.");
+            if (existing != model) Plugin.Error("ui-gear-icons-category-not-supplied-another", "Gear icons of category " + category + " not supplied: another provider already supplies them.");
             return;
         }
         Supplied[category] = model;
@@ -61,7 +61,7 @@ public static class GearIcons
         {
             if (GearIconRendering.TryGetGearIconFilePath(checksum, out var path) && File.Exists(path)) File.Delete(path);
         }
-        catch (Exception error) { Plugin.Error("Gear icon file could not be cleared: " + error); }
+        catch (Exception error) { Plugin.Error("ui-gear-icon-file", "Gear icon file could not be cleared: " + error); }
     }
 
     /// <summary>The renderer is about to load the gear of <paramref name="job"/>: a supplied category's job is loaded here (true), any other
@@ -101,7 +101,7 @@ public static class GearIcons
             }
             if (failure != null)
             {
-                Plugin.Error("Gear icon of category " + waiting.Category + " is empty: " + failure);
+                Plugin.Error("ui-gear-icon-category-empty", "Gear icon of category " + waiting.Category + " is empty: " + failure);
                 model = new GameObject("Gear icon (no model)");
             }
             IconJobLoad.Complete(waiting.Job, model!);

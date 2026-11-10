@@ -35,7 +35,7 @@ internal static class HudFocus
         }
         catch (Exception error)
         {
-            if (!_logged) { _logged = true; Plugin.Error("Reading the game's focus state failed: " + error); }
+            if (!_logged) { _logged = true; Plugin.Error("ui-reading-games-focus-state-failed", "Reading the game's focus state failed: " + error); }
             away = false;
         }
         if (away == Away) return;

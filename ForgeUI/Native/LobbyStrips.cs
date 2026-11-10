@@ -112,7 +112,7 @@ internal static class LobbyStrips
         {
             return true;
         }
-        Plugin.Error("Lobby strip not added: " + problem + ".");
+        Plugin.Error("ui-lobby-strip-not-added", "Lobby strip not added: " + problem + ".");
         return false;
     }
 
@@ -144,7 +144,7 @@ internal static class LobbyStrips
             var bar = bars[i];
             if (bar == null || bar.WasCollected) continue;
             try { Sync(bar); }
-            catch (Exception error) { Plugin.Error("Lobby strips failed to update: " + error); }
+            catch (Exception error) { Plugin.Error("ui-lobby-strips-failed-update", "Lobby strips failed to update: " + error); }
         }
     }
 
@@ -165,7 +165,7 @@ internal static class LobbyStrips
             if (show)
             {
                 try { items = strip.Items(player!); }
-                catch (Exception error) { Plugin.Error("Lobby strip '" + strip.Id + "' items failed: " + error); }
+                catch (Exception error) { Plugin.Error("ui-lobby-strip-items-failed", "Lobby strip '" + strip.Id + "' items failed: " + error); }
             }
             if (!Registered.Contains(strip.Id, strip)) continue;
             var count = items == null ? 0 : Math.Min(items.Count, strip.Max);
@@ -268,7 +268,7 @@ internal static class LobbyStrips
         var label = clothes.GetComponentInChildren<TextMeshPro>(true);
         if (like == null || label == null)
         {
-            Plugin.Error("Lobby strip '" + strip.Id + "' cannot be drawn: the APPAREL button has no sprite or text to copy.");
+            Plugin.Error("ui-lobby-strip-cannot-be-drawn-apparel", "Lobby strip '" + strip.Id + "' cannot be drawn: the APPAREL button has no sprite or text to copy.");
             return null;
         }
         var canvas = new MenuCanvas(clothes.transform.parent, "ForgeUI.LobbyStrip." + strip.Id, like, label, MenuCanvas.TopOrder(clothes) + 1);

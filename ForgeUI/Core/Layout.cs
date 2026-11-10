@@ -75,3 +75,19 @@ internal static class IconFit
         return (spriteWidth * scale, spriteHeight * scale);
     }
 }
+
+/// <summary>How a block is fitted into a room: scaled down (never up) until it is no wider or taller than the room, then moved the least
+/// that puts it inside, so a block that already fits is left exactly where it is.</summary>
+internal static class BoxFit
+{
+    /// <summary>The scale and shift for <paramref name="block"/> (about the origin of its units: a point p goes to p * Scale + (X, Y)).</summary>
+    internal static (float Scale, float X, float Y) Fit(HudBox block, HudBox room)
+    {
+        if (block.Width <= 0f || block.Height <= 0f || room.Width <= 0f || room.Height <= 0f) return (1f, 0f, 0f);
+        var scale = Math.Min(1f, Math.Min(room.Width / block.Width, room.Height / block.Height));
+        return (scale, Into(block.Left * scale, block.Right * scale, room.Left, room.Right), Into(block.Bottom * scale, block.Top * scale, room.Bottom, room.Top));
+    }
+
+    // The least move that puts low..high inside from..to (the span is never longer than the room here).
+    private static float Into(float low, float high, float from, float to) => low < from ? from - low : high > to ? to - high : 0f;
+}

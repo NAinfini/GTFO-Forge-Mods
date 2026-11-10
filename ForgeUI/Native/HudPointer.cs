@@ -1,6 +1,6 @@
+using BepInEx.Configuration;
 using System;
 using System.Collections.Generic;
-using BepInEx.Configuration;
 using UnityEngine;
 
 namespace ForgeUI;
@@ -10,7 +10,10 @@ namespace ForgeUI;
 /// holds it (<see cref="Hold"/>, <see cref="PointerHold.Active"/>) in a level, and the game is not showing one of its own full screens
 /// (<see cref="HudFocus.Away"/>), ForgeUI draws a pointer on the HUD and moves it with the mouse, and the game's own look, fire, aim,
 /// reload, use, movement and weapon keys are held off through a ForgeCore <c>InputLease</c>, so the view stays still and a click never
-/// fires the gun. The system cursor is never unlocked: the game keeps it locked as it always does, so nothing fights over it.
+/// fires the gun. The system cursor drives it: while shown the cursor is confined to the window instead of locked and hidden under the
+/// arrow, so the arrow moves exactly as the system cursor does, whatever the game's look sensitivity. Anything of the game's that locks the
+/// cursor again anyway leaves the arrow on the mouse's own movement. Letting go in first-person play locks it again as the game does; on
+/// the way to one of the game's own screens the cursor is the game's, which has already set it.
 /// Hit tests are in the HUD units of a <see cref="HudRegion.World"/> element (x right, y up); <see cref="ScreenBounds"/> gives the
 /// screen's edges in the same units.
 /// </summary>
@@ -23,7 +26,8 @@ public static class HudPointer
     // Where the pointer is, in the weapon list's space (the space every HUD element's root is placed in).
     private static float _x, _y;
     private static PointerView? _view;
-    private static ConfigEntry<float>? _speed;
+    private static Vector3 _mouse;
+    private static bool _freed;
 
     private static readonly InputAction[] Blocked =
     {
@@ -58,6 +62,9 @@ public static class HudPointer
 
     /// <summary>True while the pointer is on screen this frame.</summary>
     public static bool Shown => _shown;
+
+    /// <summary>The element is the pointer's own (it shows even while a mod has the HUD alone, <see cref="UIKitMod.HudAlone"/>).</summary>
+    internal static bool Draws(HudElement element) => _view != null && ReferenceEquals(_view.Element, element);
 
     /// <summary>The left button went down this frame (only while <see cref="Shown"/>).</summary>
     public static bool Pressed => _shown && UnityEngine.Input.GetMouseButtonDown(0);
@@ -99,8 +106,48 @@ public static class HudPointer
     public static bool Over(HudElement hud, float x, float y, float width, float height)
         => Position(hud, out var px, out var py) && Math.Abs(px - x) <= width / 2f && Math.Abs(py - y) <= height / 2f;
 
-    /// <summary>The box was clicked this frame: <see cref="Pressed"/> while <see cref="Over"/>.</summary>
-    public static bool Clicked(HudElement hud, float x, float y, float width, float height) => Pressed && Over(hud, x, y, width, height);
+    // Where the pointer was when the press that is going on began (a click is a press and a release on the same box).
+    private static float _downX, _downY;
+    private static bool _pressing;
+
+    private static bool Within(float px, float py, HudElement hud, float x, float y, float width, float height)
+        => Math.Abs(px - hud.Entry.RootX - x) <= width / 2f && Math.Abs(py - hud.Entry.RootY - y) <= height / 2f;
+
+    /// <summary>The box was clicked this frame: the left button came up over it and had gone down over it (a press that moved off the box and came up elsewhere is no click, and
+    /// a press that began elsewhere and came up here is none either). A click fires on the release, as the game's own menu buttons do.</summary>
+    public static bool Clicked(HudElement hud, float x, float y, float width, float height)
+        => Released && _pressing && hud != null && Within(_downX, _downY, hud, x, y, width, height) && Over(hud, x, y, width, height);
+
+    /// <summary>The left button is down and went down over the box (the pressed look of a button; it stays pressed while the pointer is off it, and does not click there).</summary>
+    public static bool PressedOn(HudElement hud, float x, float y, float width, float height)
+        => Held && _pressing && hud != null && Within(_downX, _downY, hud, x, y, width, height);
+
+    /// <summary>What a button makes known with a sound: the pointer coming onto it, a click on it, a click on one that is not available.</summary>
+    public enum ButtonSoundKind { Hover, Click, Denied }
+
+    /// <summary>The one place a sound for the HUD's buttons is attached: a mod sets it (ForgeUI does not depend on ForgeAudio) and every button drawn through <see cref="HudCanvas"/> calls it.
+    /// <see cref="ButtonSoundKind.Hover"/> once as the pointer comes onto a button, <see cref="ButtonSoundKind.Click"/> on its click, <see cref="ButtonSoundKind.Denied"/> on a click on an unavailable one.</summary>
+    public static Action<ButtonSoundKind>? ButtonSound { get; set; }
+
+    private static int _hoverNow, _hoverBefore;
+
+    /// <summary>The pointer is over the box (as <see cref="Over"/>); the first frame it is, <see cref="ButtonSound"/> hears <see cref="ButtonSoundKind.Hover"/>.</summary>
+    public static bool Hover(HudElement hud, float x, float y, float width, float height)
+    {
+        if (!Over(hud, x, y, width, height)) return false;
+        var id = HashCode.Combine(hud, (int)MathF.Round(x), (int)MathF.Round(y), (int)MathF.Round(width));
+        _hoverNow = id;
+        if (_hoverBefore != id) ButtonSound?.Invoke(ButtonSoundKind.Hover);
+        return true;
+    }
+
+    /// <summary>A click on a button (<see cref="Clicked"/>) with its sound.</summary>
+    public static bool Click(HudElement hud, float x, float y, float width, float height, bool enabled = true)
+    {
+        if (!Clicked(hud, x, y, width, height)) return false;
+        ButtonSound?.Invoke(enabled ? ButtonSoundKind.Click : ButtonSoundKind.Denied);
+        return enabled;
+    }
 
     /// <summary>Development: puts the pointer at (<paramref name="x"/>, <paramref name="y"/>) in <paramref name="hud"/>'s units, for a
     /// readback that cannot move the mouse.</summary>
@@ -120,7 +167,7 @@ public static class HudPointer
             var held = UnityEngine.Input.GetKey(KeyCode.LeftControl) || UnityEngine.Input.GetKey(KeyCode.RightControl);
             var pressed = UnityEngine.Input.GetKeyDown(KeyCode.LeftControl) || UnityEngine.Input.GetKeyDown(KeyCode.RightControl);
             var released = UnityEngine.Input.GetKeyUp(KeyCode.LeftControl) || UnityEngine.Input.GetKeyUp(KeyCode.RightControl);
-            foreach (var toggle in Toggles) toggle.Update(held, pressed, released, Time.unscaledTime);
+            foreach (var toggle in Toggles) toggle.Update(held, pressed, released, ForgeCore.Frame.UnscaledTime);
         }
         var want = false;
         foreach (var hold in Holds) want |= hold.Active;
@@ -133,35 +180,67 @@ public static class HudPointer
                 _lease.Block(Blocked);
             }
             _view ??= Hud.Add(ModIds.Join(UIKit.PluginId, "Pointer"), new PointerView(), new HudSlot(HudRegion.World));
-            _speed ??= ForgeCore.Settings.Bind(Plugin.Id, "Hud", "PointerScale", 1f,
-                "How fast the HUD pointer moves compared with the mouse: 1 moves it by the same share of the screen as the mouse's own movement (the same as the system cursor); 2 is twice as fast.");
             Move();
         }
         else if (_shown)
         {
             _lease?.Dispose();
             _lease = null;
+            if (_freed)
+            {
+                _freed = false;
+                if (InLevelPlay())
+                {
+                    if (InputMapper.Current != null) InputMapper.Current.m_mouseLocked = true;
+                    Cursor.lockState = CursorLockMode.Locked;
+                    Cursor.visible = false;
+                }
+            }
         }
         if (_view != null) _view.Visible = want;
         _shown = want;
+        // The press that is going on: where it began (the release of it is this frame's or a later one's), over when the button comes up.
+        if (!want || !UnityEngine.Input.GetMouseButton(0) && !UnityEngine.Input.GetMouseButtonUp(0)) _pressing = false;
+        else if (UnityEngine.Input.GetMouseButtonDown(0)) { _pressing = true; _downX = _x; _downY = _y; }
+        _hoverBefore = _hoverNow; _hoverNow = 0;
     }
 
-    // The game's own look input (read past every lease) moves the pointer; it stays on the screen.
     private static void Move()
     {
+        _freed = true;
+        // While this is set InputMapper.CheckLockMouse locks and centres the cursor; the game sets it again itself on a change of focus.
+        if (InputMapper.Current != null) InputMapper.Current.m_mouseLocked = false;
+        var free = Cursor.lockState != CursorLockMode.Locked;
+        Cursor.lockState = CursorLockMode.Confined;
+        Cursor.visible = false;
         if (!Edges(out var left, out var bottom, out var right, out var top)) return;
         if (!_placed) { _x = (left + right) / 2f; _y = (bottom + top) / 2f; _placed = true; }
-        // The mouse's own movement in pixels (the game's InputManager has "Mouse X" and, spelled so, "Mouse y": mouse-movement axes of sensitivity 1; the system cursor is locked, but its movement still arrives), turned into the share of the
-        // screen it covers, so the pointer crosses the screen as far as the system cursor would for the same hand movement.
-        var scale = (_speed?.Value ?? 1f) * (right - left) / Math.Max(1, Screen.width);
-        _x = Math.Clamp(_x + UnityEngine.Input.GetAxisRaw("Mouse X") * scale, left, right);
-        _y = Math.Clamp(_y + UnityEngine.Input.GetAxisRaw("Mouse y") * scale, bottom, top);
+        if (!free)
+        {
+            // Locked since last frame, so the cursor's place says nothing: the mouse's own movement (the game's InputManager has "Mouse X"
+            // and, spelled so, "Mouse y"), as a share of the screen.
+            var scale = Speed * (right - left) / Math.Max(1, Screen.width);
+            _x = Math.Clamp(_x + UnityEngine.Input.GetAxisRaw("Mouse X") * scale, left, right);
+            _y = Math.Clamp(_y + UnityEngine.Input.GetAxisRaw("Mouse y") * scale, bottom, top);
+            return;
+        }
+        // Only when it moved, so a development Place stays until the mouse is touched.
+        var mouse = UnityEngine.Input.mousePosition;
+        if (mouse == _mouse) return;
+        if (!HudScreen.FromViewport(mouse.x / Math.Max(1, Screen.width), mouse.y / Math.Max(1, Screen.height), out var x, out var y)) return;
+        _mouse = mouse; _x = x; _y = y;
     }
+
+    private static ConfigEntry<float>? _speed;
+
+    /// <summary>How fast the pointer moves compared with the mouse (the player's <c>Hud / PointerScale</c>); the wheel's pointer uses it too.</summary>
+    internal static float Speed => (_speed ??= ForgeCore.Settings.Bind(Plugin.Id, "Hud", "PointerScale", 1f,
+        "How fast the HUD pointer and the wheel's pointer move compared with the mouse: 1 moves it by the same share of the screen as the mouse's own movement (the same as the system cursor); 2 is twice as fast.")).Value;
 
     private static bool InLevelPlay()
     {
         try { return GameStateManager.CurrentStateName == eGameStateName.InLevel && !HudFocus.Away; }
-        catch (Exception error) { Plugin.Error("The HUD pointer could not read the game state: " + error); return false; }
+        catch (Exception error) { Plugin.Error("ui-hud-pointer-could-not-read-game", "The HUD pointer could not read the game state: " + error); return false; }
     }
 
     /// <summary>The pointer itself: an arrow with a dark edge, its tip on the point.</summary>

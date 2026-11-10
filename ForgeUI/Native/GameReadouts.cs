@@ -99,7 +99,7 @@ public sealed class GameLocation
         _frame = Time.frameCount;
         try
         {
-            var agent = PlayerManager.GetLocalPlayerAgent();
+            var agent = ForgeCore.Players.Local;
             if (agent == null || agent.WasCollected)
             {
                 _readout.Clear();
@@ -119,7 +119,7 @@ public sealed class GameLocation
         }
         catch (Exception error)
         {
-            Plugin.Error("The location readout could not be read: " + error);
+            Plugin.Error("ui-location-readout-could-not-be-read", "The location readout could not be read: " + error);
         }
     }
 }
@@ -167,7 +167,7 @@ public sealed class GameVitals
         _held = PlayerHold.None;
         try
         {
-            var agent = PlayerManager.GetLocalPlayerAgent();
+            var agent = ForgeCore.Players.Local;
             if (agent == null || agent.WasCollected) return;
             var damage = agent.Damage;
             if (damage != null)
@@ -179,7 +179,7 @@ public sealed class GameVitals
             _downed = GameTeammates.IsDowned(agent);
             _held = GameTeammates.HoldOf(agent);
         }
-        catch (Exception error) { Plugin.Error("Reading the local player's health failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-reading-local-players-health-failed", "Reading the local player's health failed: " + error); }
     }
 }
 
@@ -262,18 +262,15 @@ public sealed class GameTeammates
 
     internal static bool IsDowned(PlayerAgent agent)
     {
-        var locomotion = agent.Locomotion;
-        return locomotion != null && locomotion.m_currentStateEnum == PlayerLocomotion.PLOC_State.Downed;
+        return ForgeCore.Players.Motion(agent) == ForgeCore.PlayerMotion.Downed;
     }
 
     internal static PlayerHold HoldOf(PlayerAgent agent)
     {
-        var locomotion = agent.Locomotion;
-        if (locomotion == null) return PlayerHold.None;
-        return locomotion.m_currentStateEnum switch
+        return ForgeCore.Players.Motion(agent) switch
         {
-            PlayerLocomotion.PLOC_State.GrabbedByTank or PlayerLocomotion.PLOC_State.GrabbedByPouncer or PlayerLocomotion.PLOC_State.GrabbedByTrap => PlayerHold.Grabbed,
-            PlayerLocomotion.PLOC_State.Stunned => PlayerHold.Stunned,
+            ForgeCore.PlayerMotion.GrabbedByTank or ForgeCore.PlayerMotion.GrabbedByPouncer or ForgeCore.PlayerMotion.GrabbedByTrap => PlayerHold.Grabbed,
+            ForgeCore.PlayerMotion.Stunned => PlayerHold.Stunned,
             _ => PlayerHold.None
         };
     }
@@ -298,44 +295,46 @@ public sealed class GameTeammates
         _count = 0;
         try
         {
-            var agents = PlayerManager.PlayerAgentsInLevel;
-            if (agents == null) return;
-            var now = Time.unscaledTime;
-            var names = now >= _nextNames;
-            if (names) _nextNames = now + 1f;
-            var slow = now >= _nextSlow;
-            if (slow)
+            var now = ForgeCore.Frame.UnscaledTime;
+            _namesDue = now >= _nextNames;
+            if (_namesDue) _nextNames = now + 1f;
+            _slowDue = now >= _nextSlow;
+            if (_slowDue)
             {
                 _nextSlow = now + 0.25f;
                 _speaker = Speaker();
             }
-            for (var i = 0; i < agents.Count && _count < Max; i++)
-            {
-                var agent = agents[i];
-                if (agent == null || agent.WasCollected || agent.IsLocallyOwned) continue;
-                var at = CacheOf(agent.Pointer);
-                var fresh = _cache[at].Name == null;
-                _cache[at].Frame = _frame;
-                if (fresh || names) _cache[at].Name = agent.PlayerName ?? "";
-                var owner = agent.Owner;
-                if (fresh || slow)
-                {
-                    _cache[at].Ammo = AmmoOf(owner);
-                    _cache[at].Speaking = _speaker != 0UL && owner != null && owner.Lookup == _speaker;
-                }
-                var name = _cache[at].Name ?? "";
-                var damage = agent.Damage;
-                var health = damage != null && damage.HealthMax > 0f ? Ease.Clamp01(damage.Health / damage.HealthMax) : 0f;
-                var infection = damage != null ? Ease.Clamp01(damage.Infection) : -1f;
-                _states[_count++] = new TeammateState(agent.Owner, name, health, IsDowned(agent), HoldOf(agent), agent.Alive, agent.PlayerSlotIndex,
-                    infection, _cache[at].Ammo, _cache[at].Speaking);
-            }
+            ForgeCore.Players.Each(this, static (self, info) => self.ReadTeammate(info));
             // Slot order, insertion sort on at most a handful.
             for (var i = 1; i < _count; i++)
                 for (var j = i; j > 0 && _states[j].Slot < _states[j - 1].Slot; j--)
                     (_states[j], _states[j - 1]) = (_states[j - 1], _states[j]);
         }
-        catch (Exception error) { Plugin.Error("Reading the teammates failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-reading-teammates-failed", "Reading the teammates failed: " + error); }
+    }
+
+    private bool _namesDue, _slowDue;
+
+    private void ReadTeammate(ForgeCore.PlayerInfo info)
+    {
+        var agent = info.Agent;
+        if (_count >= Max || info.IsLocal) return;
+        var at = CacheOf(agent.Pointer);
+        var fresh = _cache[at].Name == null;
+        _cache[at].Frame = _frame;
+        if (fresh || _namesDue) _cache[at].Name = agent.PlayerName ?? "";
+        var owner = agent.Owner;
+        if (fresh || _slowDue)
+        {
+            _cache[at].Ammo = AmmoOf(owner);
+            _cache[at].Speaking = _speaker != 0UL && owner != null && owner.Lookup == _speaker;
+        }
+        var name = _cache[at].Name ?? "";
+        var damage = agent.Damage;
+        var health = damage != null && damage.HealthMax > 0f ? Ease.Clamp01(damage.Health / damage.HealthMax) : 0f;
+        var infection = damage != null ? Ease.Clamp01(damage.Infection) : -1f;
+        _states[_count++] = new TeammateState(agent.Owner, name, health, IsDowned(agent), HoldOf(agent), agent.Alive, info.Slot,
+            infection, _cache[at].Ammo, _cache[at].Speaking);
     }
 
     /// <summary>The player the game's voice chat currently singles out as speaking (its lookup), or 0.</summary>
@@ -390,6 +389,7 @@ public readonly struct ObjectiveLayer
         Tag = tag;
         Main = main;
         Sub = sub;
+        Status = status;
         Visible = visible;
     }
 
@@ -477,7 +477,7 @@ public sealed class GameObjectives
         TimerText = text;
         Version++;
         try { Changed?.Invoke(); }
-        catch (Exception error) { Plugin.Error("An objectives listener failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-objectives-listener-failed", "An objectives listener failed: " + error); }
     }
 
     /// <summary>The visible layers, Main first.</summary>
@@ -505,7 +505,7 @@ public sealed class GameObjectives
     /// <summary>Per frame from the driver: reads the texts again twice a second (or at once after a game call).</summary>
     internal void Tick()
     {
-        var now = Time.unscaledTime;
+        var now = ForgeCore.Frame.UnscaledTime;
         if (!_dirty && now < _next) return;
         _dirty = false;
         _next = now + Every;
@@ -545,11 +545,11 @@ public sealed class GameObjectives
                 changed = true;
             }
         }
-        catch (Exception error) { Plugin.Error("Reading the objectives failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-reading-objectives-failed", "Reading the objectives failed: " + error); }
         if (!changed) return;
         Version++;
         try { Changed?.Invoke(); }
-        catch (Exception error) { Plugin.Error("An objectives listener failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-objectives-listener-failed", "An objectives listener failed: " + error); }
     }
 
     private string _mapPrompt = "";
@@ -582,7 +582,7 @@ public sealed class GameObjectives
         try { return text.Invoke() ?? ""; }
         catch (Exception error)
         {
-            Plugin.Error("A game text readout could not be read: " + error);
+            Plugin.Error("ui-game-text-readout", "A game text readout could not be read: " + error);
             return "";
         }
     }
@@ -756,7 +756,7 @@ public sealed class GameInteraction
     {
         Version++;
         try { Changed?.Invoke(); }
-        catch (Exception error) { Plugin.Error("An interaction listener failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-interaction-listener-failed", "An interaction listener failed: " + error); }
     }
 
     /// <summary>After the game's frame, from the driver: what the two pieces show now.</summary>
@@ -778,7 +778,7 @@ public sealed class GameInteraction
             MessageProgress = messageProgress;
             Bump();
         }
-        catch (Exception error) { Plugin.Error("Reading the interaction prompt failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-reading-interaction-prompt-failed", "Reading the interaction prompt failed: " + error); }
     }
 
     /// <summary>The game's interaction layer and its two pieces, looked up again only when the layer is another one (a new level).</summary>
@@ -944,12 +944,8 @@ public sealed class GameScan
     {
         if (_installed) return;
         _installed = true;
-        try
-        {
-            new Harmony(Plugin.Id + ".scan").Patch(AccessTools.Method(typeof(ChainedPuzzles.CP_Bioscan_Hud), nameof(ChainedPuzzles.CP_Bioscan_Hud.Update)),
-                postfix: new HarmonyMethod(typeof(GameScan), nameof(Updated)));
-        }
-        catch (Exception error) { Plugin.Error("The scan readout could not be hooked to the game's scan HUD: " + error); }
+        ForgeCore.Patches.Lazy(Plugin.Id + ".scan", harmony => harmony.Patch(AccessTools.Method(typeof(ChainedPuzzles.CP_Bioscan_Hud), nameof(ChainedPuzzles.CP_Bioscan_Hud.Update)),
+            postfix: new HarmonyMethod(typeof(GameScan), nameof(Updated)))).Ensure();
     }
 
     private static void Updated(ChainedPuzzles.CP_Bioscan_Hud __instance)
@@ -990,14 +986,14 @@ public sealed class GameSubtitles
         text ??= "";
         var speaker = "";
         try { speaker = subtitles.m_header != null ? subtitles.m_header.text ?? "" : ""; }
-        catch (Exception error) { Plugin.Error("The subtitle speaker could not be read: " + error); }
+        catch (Exception error) { Plugin.Error("ui-subtitle-speaker-could-not-be-read", "The subtitle speaker could not be read: " + error); }
         Until = Time.time + Math.Max(0.5f, seconds) * Math.Max(1, lines);
         if (Text == text && Speaker == speaker) return;
         Text = text;
         Speaker = speaker;
         Version++;
         try { Changed?.Invoke(); }
-        catch (Exception error) { Plugin.Error("A subtitles listener failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-subtitles-listener-failed", "A subtitles listener failed: " + error); }
     }
 
     private static int LineCount(string? text)
@@ -1056,7 +1052,7 @@ public sealed class GameWardenIntel
         IsSubObjective = sub;
         Version++;
         try { Changed?.Invoke(); }
-        catch (Exception error) { Plugin.Error("A warden intel listener failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-warden-intel-listener-failed", "A warden intel listener failed: " + error); }
     }
 
     [PatchGroup(PatchGroup.Intel)]
@@ -1132,7 +1128,7 @@ public sealed class GameBoosters
         if (!changed) return;
         Version++;
         try { Changed?.Invoke(); }
-        catch (Exception error) { Plugin.Error("A boosters listener failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-boosters-listener-failed", "A boosters listener failed: " + error); }
     }
 
     private static string NameOf(uint id, string known)
@@ -1140,7 +1136,7 @@ public sealed class GameBoosters
         try { return BoosterImplantTemplateDataBlock.GetPublicName(id) ?? ""; }
         catch (Exception error)
         {
-            Plugin.Error("A booster name could not be read, so the name already known is kept: " + error);
+            Plugin.Error("ui-booster-name-could-not-be-read", "A booster name could not be read, so the name already known is kept: " + error);
             return known;
         }
     }
@@ -1152,7 +1148,7 @@ public sealed class GameBoosters
         private static void Postfix(PUI_BoosterIconActiveDisplay __instance)
         {
             try { UIKit.Boosters.Read(__instance); }
-            catch (Exception error) { Plugin.Error("Reading the boosters failed: " + error); }
+            catch (Exception error) { Plugin.Error("ui-reading-boosters-failed", "Reading the boosters failed: " + error); }
         }
     }
 }
@@ -1187,7 +1183,7 @@ public sealed class GamePickups
     /// <summary>After the game's frame, from the driver.</summary>
     internal void Tick()
     {
-        var now = Time.unscaledTime;
+        var now = ForgeCore.Frame.UnscaledTime;
         if (now < _next) return;
         _next = now + Every;
         try
@@ -1209,8 +1205,8 @@ public sealed class GamePickups
             Count = count;
             Version++;
             try { Changed?.Invoke(); }
-            catch (Exception error) { Plugin.Error("A pick-up listener failed: " + error); }
+            catch (Exception error) { Plugin.Error("ui-pick-up-listener-failed", "A pick-up listener failed: " + error); }
         }
-        catch (Exception error) { Plugin.Error("Reading the pick-up messages failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-reading-pick-up-messages-failed", "Reading the pick-up messages failed: " + error); }
     }
 }

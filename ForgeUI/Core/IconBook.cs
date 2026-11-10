@@ -36,7 +36,7 @@ public static class GameIcons
 }
 
 /// <summary>Icon names: <c>Pack:item</c>. <c>Game:</c> is the game's own catalog (<see cref="GameIcons"/>); no mod registers under it.</summary>
-public static class IconNames
+internal static class IconNames
 {
     /// <summary>The reserved pack of the game's own icons.</summary>
     public const string Game = "Game";
@@ -91,7 +91,7 @@ public sealed record IconEntry(string Name, string Pack, string Owner, string Pa
 /// pack someone else owns, a file that cannot be read, a name nobody registered, a pack whose mod is not installed, a game sprite
 /// that is not loaded) is reported through <c>report</c>, each distinct message once, and never replaced by another picture.
 /// </summary>
-public sealed class IconBook<T> where T : class
+internal sealed class IconBook<T> where T : class
 {
     private readonly Func<string, T?> _load;
     private readonly Func<string, T?> _game;

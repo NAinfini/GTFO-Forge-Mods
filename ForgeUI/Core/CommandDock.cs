@@ -4,7 +4,7 @@ namespace ForgeUI;
 
 /// <summary>Sizes of a command list in its two looks, 1080p pixels: the compact idle rows and the table shown while a code is typed or a
 /// command is armed; in between, sizes blend linearly by <see cref="CommandMotion.Table"/>.</summary>
-public static class CommandGeometry
+internal static class CommandGeometry
 {
     public const float IdleRow = 30f, IdleGap = 4f, TableRow = 38f, TableGap = 5f, Header = 26f, Hint = 28f;
     public const float Pad = 10f, Block = 6f, BlockGap = 8f, NameTail = 16f, IdleCell = 52f, TableCell = 62f, CellInset = 3f, Cut = 8f;
@@ -28,7 +28,7 @@ public static class CommandGeometry
 /// the frame the form changes, so the list's height and width are continuous and the final size is known on that first frame
 /// (<see cref="TargetHeight"/>). The first step after <see cref="Reset"/> lands on the targets at once.
 /// </summary>
-public sealed class CommandMotion
+internal sealed class CommandMotion
 {
     /// <summary>The easing rate (about 95 % of the way in 0.17 s).</summary>
     public const float Rate = 18f;
@@ -131,7 +131,7 @@ public sealed class CommandMotion
 /// whatever stands in the way. <see cref="Centre"/> then keeps the list's middle on the screen's middle unless something below or above
 /// would be overlapped; a list that cannot fit keeps clear of what is below it.
 /// </summary>
-public static class CommandDock
+internal static class CommandDock
 {
     /// <summary>Space kept between the list and anything else.</summary>
     public const float Gap = 12f;

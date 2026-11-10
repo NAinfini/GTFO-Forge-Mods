@@ -406,7 +406,7 @@ public sealed class HudSegmentBar : HudWidget
         }
         catch (Exception error)
         {
-            Plugin.Error("Segment bar '" + Id + "' " + what + " failed: " + error);
+            Plugin.Error("ui-segment-bar-failed", "Segment bar '" + Id + "' " + what + " failed: " + error);
             return signed ? -1f : 0f;
         }
     }
@@ -414,13 +414,13 @@ public sealed class HudSegmentBar : HudWidget
     private bool ReadBool(Func<bool> f)
     {
         try { return f(); }
-        catch (Exception error) { Plugin.Error("Segment bar '" + Id + "' dim check failed: " + error); return false; }
+        catch (Exception error) { Plugin.Error("ui-segment-bar-dim-check-failed", "Segment bar '" + Id + "' dim check failed: " + error); return false; }
     }
 
     private string Text(Func<string> f, string what)
     {
         try { return f() ?? ""; }
-        catch (Exception error) { Plugin.Error("Segment bar '" + Id + "' " + what + " failed: " + error); return ""; }
+        catch (Exception error) { Plugin.Error("ui-segment-bar-failed", "Segment bar '" + Id + "' " + what + " failed: " + error); return ""; }
     }
 }
 
@@ -522,7 +522,7 @@ public sealed class HudArcGauge : HudWidget
         if (Refilling != null)
         {
             try { given = Refilling(); }
-            catch (Exception error) { Plugin.Error("Arc gauge '" + Id + "' refill failed: " + error); Refilling = null; }
+            catch (Exception error) { Plugin.Error("ui-arc-gauge-refill-failed", "Arc gauge '" + Id + "' refill failed: " + error); Refilling = null; }
         }
         if (given >= 0f) value = Ease.Clamp01(given);
         else if (_refillStart >= 0f && now - _refillStart < _refillSeconds) value = GaugeMath.Refill(_refillFrom, (now - _refillStart) / _refillSeconds);
@@ -538,7 +538,7 @@ public sealed class HudArcGauge : HudWidget
         if (Critical != null)
         {
             try { if (Critical()) tone = MeterTone.Critical; }
-            catch (Exception error) { Plugin.Error("Arc gauge '" + Id + "' critical check failed: " + error); Critical = null; }
+            catch (Exception error) { Plugin.Error("ui-arc-gauge-critical-check-failed", "Arc gauge '" + Id + "' critical check failed: " + error); Critical = null; }
         }
         if (tone == MeterTone.Critical) { if (_criticalSince < 0f) _criticalSince = now; }
         else _criticalSince = -1f;
@@ -582,7 +582,7 @@ public sealed class HudArcGauge : HudWidget
         {
             string text;
             try { text = EndReadout() ?? ""; }
-            catch (Exception error) { Plugin.Error("Arc gauge '" + Id + "' readout failed: " + error); EndReadout = null; text = ""; }
+            catch (Exception error) { Plugin.Error("ui-arc-gauge-readout-failed", "Arc gauge '" + Id + "' readout failed: " + error); EndReadout = null; text = ""; }
             if (!ReferenceEquals(text, _readoutRaw)) { _readoutRaw = text; _readoutText = text.Length > 0 ? NumberText.Tabular(text) : ""; }
             if (_readoutText.Length > 0)
             {
@@ -618,7 +618,7 @@ public sealed class HudArcGauge : HudWidget
     private float Read()
     {
         try { return Ease.Clamp01(_value()); }
-        catch (Exception error) { Plugin.Error("Arc gauge '" + Id + "' value failed: " + error); return 0f; }
+        catch (Exception error) { Plugin.Error("ui-arc-gauge-value-failed", "Arc gauge '" + Id + "' value failed: " + error); return 0f; }
     }
 }
 

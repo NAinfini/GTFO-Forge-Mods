@@ -47,7 +47,10 @@ public enum GameHudPart
     /// <summary>The game's version label at the bottom right (the watermark layer's version text, <c>PUI_Watermark.m_watermarkText</c>,
     /// where a modded game reads "MODDED" and a version). The FPS counter and the status notices beside it stay.</summary>
     Watermark = 32768,
-    All = 65535,
+    /// <summary>The curve of the game's helmet glass over its whole HUD layer (<c>UI_Apply</c>'s skewing: straight lines near the screen's
+    /// edges bend). Hidden, the HUD layer, and every panel drawn on it, is flat. Kept by default.</summary>
+    GlassCurve = 65536,
+    All = 131071,
 }
 
 /// <summary>Why the library released a hide or a chat move by itself.</summary>
@@ -68,8 +71,8 @@ public sealed class GameHudClaims
 {
     /// <summary>What a hide keeps unless it says otherwise: what the game draws on the world (navigation markers, pings, name tags,
     /// beacons) and at the crosshair (hit, kill, charge-up, friendly and ping marks), which a HUD of its own does not redraw, and the
-    /// chat. Everything else is the HUD's flat screen layer that a mod redraws in its own style from the readouts.</summary>
-    public const GameHudPart DefaultKeep = GameHudPart.NavMarkers | GameHudPart.Chat | GameHudPart.CrosshairFeedback;
+    /// chat, and the glass curve. Everything else is the HUD's flat screen layer that a mod redraws in its own style from the readouts.</summary>
+    public const GameHudPart DefaultKeep = GameHudPart.NavMarkers | GameHudPart.Chat | GameHudPart.CrosshairFeedback | GameHudPart.GlassCurve;
 
     public sealed class Claim
     {

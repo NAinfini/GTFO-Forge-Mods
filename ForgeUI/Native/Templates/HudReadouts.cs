@@ -442,8 +442,8 @@ public sealed class HudInteraction : HudWidget
     private int _version = -1;
     private string _text = "", _key = "", _message = "", _extra = "";
     private Color _highlight, _warning;
-    private float _gameHeight;
-    private long _gameKey;
+    private float _gameHeight, _messageHeight, _messageStart = float.NaN;
+    private long _gameKey, _messageKey;
 
     internal HudInteraction() { }
 
@@ -466,6 +466,9 @@ public sealed class HudInteraction : HudWidget
     /// <summary>Puts the first line where the game puts its own prompt (its height, read from the game's prompt object when the screen size or the
     /// game's interaction layer changes), instead of at <see cref="Offset"/>; the lines are still drawn by this element. Default false.</summary>
     public bool AtGamePrompt { get; set; }
+    /// <summary>Puts the message line (a scan, a reactor step and its code) where the game puts its own message object, read the same way as
+    /// <see cref="AtGamePrompt"/>, instead of under the prompt. Default false.</summary>
+    public bool AtGameMessage { get; set; }
     /// <summary>Draws the key in a chamfered outline instead of a plain box. Default false.</summary>
     public bool KeyBox { get; set; }
     /// <summary>How a hold in progress is shown; default <see cref="InteractionProgress.Bar"/>.</summary>
@@ -501,28 +504,30 @@ public sealed class HudInteraction : HudWidget
             _extra = RichText.Toned(game.AdditionalText, lit, red);
         }
         var start = -Offset * u;
-        if (AtGamePrompt && GamePromptHeight(hud, out var gameHeight)) start = gameHeight;
+        if (AtGamePrompt && GameHeight(hud, false, out var gameHeight)) start = gameHeight;
         else if (Above) start = Offset * u - Stack(_canvas, false, u, 0f, game);
+        _messageStart = AtGameMessage && GameHeight(hud, true, out var messageHeight) ? messageHeight : float.NaN;
         Stack(_canvas, true, u, start, game);
         _canvas.End();
     }
 
     /// <summary>The height of the game's prompt object in this element's units, read again only when the element's size, its root or the
     /// game's interaction layer is another one (no allocation otherwise); false while the game's prompt does not exist.</summary>
-    private bool GamePromptHeight(HudElement hud, out float height)
+    private bool GameHeight(HudElement hud, bool message, out float height)
     {
-        height = _gameHeight;
+        height = message ? _messageHeight : _gameHeight;
         var layer = GuiManager.InteractionLayer;
-        var prompt = layer != null && !layer.WasCollected ? layer.m_interactPrompt : null;
+        var piece = layer != null && !layer.WasCollected ? (message ? layer.m_message : layer.m_interactPrompt) : null;
         var root = hud.Root;
-        if (prompt == null || prompt.WasCollected || root == null) return _gameKey != 0;
-        var key = (long)prompt.Pointer ^ ((long)root.GetInstanceID() << 20) ^ (long)(hud.HalfHeight * 100f);
-        if (key != _gameKey)
+        var known = message ? _messageKey : _gameKey;
+        if (piece == null || piece.WasCollected || root == null) return known != 0;
+        var key = (long)piece.Pointer ^ ((long)root.GetInstanceID() << 20) ^ (long)(hud.HalfHeight * 100f);
+        if (key != known)
         {
-            _gameKey = key;
-            _gameHeight = root.InverseTransformPoint(prompt.transform.position).y;
+            height = root.InverseTransformPoint(piece.transform.position).y;
+            if (message) { _messageKey = key; _messageHeight = height; }
+            else { _gameKey = key; _gameHeight = height; }
         }
-        height = _gameHeight;
         return true;
     }
 
@@ -591,6 +596,7 @@ public sealed class HudInteraction : HudWidget
         }
         if (game.MessageVisible && (_message.Length > 0 || game.MessageProgress >= 0f))
         {
+            if (!float.IsNaN(_messageStart)) y = _messageStart;
             var colour = game.MessageStyle switch
             {
                 InteractionStyle.Scan => ScanColour,
@@ -832,7 +838,7 @@ public sealed class HudTeammates : HudWidget
             var cy = y - row / 2f;
             Sprite? icon = null;
             try { if (Icon != null) icon = Icon(mate.Player); }
-            catch (Exception error) { Plugin.Error("Teammates '" + Id + "' picture callback failed and is turned off: " + error); Icon = null; }
+            catch (Exception error) { Plugin.Error("ui-teammates-picture-callback-failed-turned-off", "Teammates '" + Id + "' picture callback failed and is turned off: " + error); Icon = null; }
             var trouble = mate.Downed || !mate.Alive || mate.Held == PlayerHold.Grabbed;
             if (trouble) { if (_troubleSince[i] < 0f) _troubleSince[i] = now; }
             else _troubleSince[i] = -1f;
@@ -872,7 +878,7 @@ public sealed class HudTeammates : HudWidget
             for (var t = 0; t < tags.Count; t++)
             {
                 var source = tags[t];
-                _tagShown[t] = source.Read(mate.Player, out _tags[t]);
+                _tagShown[t] = source.Place == TeammateTagPlace.Row && source.Read(mate.Player, out _tags[t]);
                 if (!_tagShown[t]) continue;
                 var tag = _tags[t];
                 var colour = trouble ? main : tag.Colour ?? source.Colour;
@@ -969,7 +975,7 @@ public sealed class HudLabel : HudWidget
         for (var i = 0; i < _lines.Length; i++)
         {
             try { _read[i] = _lines[i]() ?? ""; }
-            catch (Exception error) { Plugin.Error("Label '" + Id + "' line " + i + " failed: " + error); _lines[i] = () => ""; _read[i] = ""; }
+            catch (Exception error) { Plugin.Error("ui-label-line-failed", "Label '" + Id + "' line " + i + " failed: " + error); _lines[i] = () => ""; _read[i] = ""; }
         }
     }
 
@@ -1052,7 +1058,7 @@ public sealed partial class UIKitMod
         var id = Full(name, "HUD element");
         if (id == null) return null;
         for (var i = 0; i < layers.Count; i++)
-            if (layers[i] == null) Plugin.Error("Silhouette '" + id + "': layer " + i + " has no picture; that layer is not drawn.");
+            if (layers[i] == null) Plugin.Error("ui-silhouette-layer-has-no-picture", "Silhouette '" + id + "': layer " + i + " has no picture; that layer is not drawn.");
         return Hud.Add(id, new HudSilhouette(layers), slot ?? new HudSlot(HudRegion.BottomLeft, 0, 170f, 190f));
     }
 

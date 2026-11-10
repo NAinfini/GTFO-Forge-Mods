@@ -52,7 +52,7 @@ internal static class MenuBar
         var problem = Registered.Add(button.Id, button);
         if (problem != null)
         {
-            Plugin.Error("Menu bar button not added: " + problem + ".");
+            Plugin.Error("ui-menu-bar-button-not-added", "Menu bar button not added: " + problem + ".");
             return null;
         }
         _version++;
@@ -91,7 +91,7 @@ internal static class MenuBar
                 entry.Page = null;
                 if (!open) continue;
                 try { Open(bar, entry.Registration, entry); }
-                catch (Exception error) { Plugin.Error("Menu bar page '" + entry.Registration.Id + "' could not be reopened in the new language: " + error); }
+                catch (Exception error) { Plugin.Error("ui-menu-bar-page", "Menu bar page '" + entry.Registration.Id + "' could not be reopened in the new language: " + error); }
             }
         }
     }
@@ -117,7 +117,7 @@ internal static class MenuBar
                     Tooltip(entry);
                 }
             }
-            catch (Exception error) { Plugin.Error("Menu bar buttons failed to update: " + error); }
+            catch (Exception error) { Plugin.Error("ui-menu-bar-buttons-failed-update", "Menu bar buttons failed to update: " + error); }
         }
         foreach (var pointer in Gone)
         {
@@ -269,7 +269,7 @@ internal static class MenuBar
             var x = placed[i];
             if (x == null)
             {
-                Plugin.Error("Menu bar button '" + item.gameObject.name + "' does not fit before the game's status and right-hand buttons and is not shown.");
+                Plugin.Error("ui-menu-bar-button-does-not-fit", "Menu bar button '" + item.gameObject.name + "' does not fit before the game's status and right-hand buttons and is not shown.");
                 entry.Page?.Close();
                 item.SetVisible(false);
                 continue;
@@ -297,13 +297,13 @@ internal static class MenuBar
         if (button.BuildScreen != null)
         {
             Notify(button.Id, button.OnClick);
-            if (!MenuScreens.Open(button)) Plugin.Error("Menu bar screen '" + button.Id + "' could not be opened: the main menu has no settings page.");
+            if (!MenuScreens.Open(button)) Plugin.Error("ui-menu-bar-screen", "Menu bar screen '" + button.Id + "' could not be opened: the main menu has no settings page.");
             return;
         }
         if (button.Build == null)
         {
             try { button.OnClick!(); }
-            catch (Exception error) { Plugin.Error("Menu bar button '" + button.Id + "' click failed: " + error); }
+            catch (Exception error) { Plugin.Error("ui-menu-bar-button-click-failed", "Menu bar button '" + button.Id + "' click failed: " + error); }
             return;
         }
         Notify(button.Id, button.OnClick);
@@ -311,7 +311,7 @@ internal static class MenuBar
         // A click outside an open page closes it before the press reaches this button; that click must not reopen it.
         if (entry.ClosedFrame == Time.frameCount) return;
         try { Open(bar, button, entry); }
-        catch (Exception error) { Plugin.Error("Menu bar page '" + button.Id + "' could not be opened: " + error); }
+        catch (Exception error) { Plugin.Error("ui-menu-bar-menu-bar-page", "Menu bar page '" + button.Id + "' could not be opened: " + error); }
     }
 
     private static void Open(Bar bar, MenuBarButton button, Entry entry)
@@ -324,7 +324,8 @@ internal static class MenuBar
         if (entry.Page == null)
         {
             var page = new MenuBarPage(button.Id, button.Mod.Texts, CreateWindow(native, RichText.Plain(button.ShownTitle), PageSize, out var root, out var size), root, size,
-                () => Closed(entry), button.OnClick) { Bar = native };
+                () => Closed(entry), button.OnClick)
+            { Bar = native };
             try { button.Build!(page); }
             catch
             {
@@ -350,7 +351,7 @@ internal static class MenuBar
         if (!bar.Entries.TryGetValue(button.Id, out var entry)) return false;
         if (entry.Page?.IsOpen == true) return true;
         try { Open(bar, button, entry); return true; }
-        catch (Exception error) { Plugin.Error("Menu bar page '" + button.Id + "' could not be opened: " + error); return false; }
+        catch (Exception error) { Plugin.Error("ui-menu-bar-menu-bar-page", "Menu bar page '" + button.Id + "' could not be opened: " + error); return false; }
     }
 
     /// <summary>A page's own click callback (its button or close box), for the author's click sound.</summary>
@@ -358,7 +359,7 @@ internal static class MenuBar
     {
         if (clicked == null) return;
         try { clicked(); }
-        catch (Exception error) { Plugin.Error("Menu bar page '" + id + "' click callback failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-menu-bar-page-click-callback-failed", "Menu bar page '" + id + "' click callback failed: " + error); }
     }
 
     private static void Closed(Entry entry)
@@ -384,6 +385,18 @@ internal static class MenuBar
                 if (open && entry.Item.m_text != null) entry.Item.m_text.alpha = 1f;
             }
         }
+    }
+
+    /// <summary>No bar is on screen (the player is in play): closes every open bar page and Forge screen.</summary>
+    internal static void Hidden()
+    {
+        MenuScreens.Update();
+        foreach (var bar in Bars.Values)
+            if (bar.Native != null && !bar.Native.WasCollected)
+            {
+                try { CloseAll(bar); }
+                catch (Exception error) { Plugin.Error("ui-closing-menu-bar-pages-failed", "Closing menu bar pages failed: " + error); }
+            }
     }
 
     private static void CloseAll(Bar bar)
@@ -486,7 +499,7 @@ internal static class MenuBar
                 if (Registered.Ordered.Count > 0) Sync(bar);
                 else bar.Version = _version;
             }
-            catch (Exception error) { Plugin.Error("Adding menu bar buttons failed: " + error); }
+            catch (Exception error) { Plugin.Error("ui-adding-menu-bar-buttons-failed", "Adding menu bar buttons failed: " + error); }
         }
     }
 
@@ -505,24 +518,47 @@ internal static class MenuBar
                 if (bar.Version != _version) Sync(bar);
                 else Layout(bar);
             }
-            catch (Exception error) { Plugin.Error("Placing menu bar buttons failed: " + error); }
+            catch (Exception error) { Plugin.Error("ui-placing-menu-bar-buttons-failed", "Placing menu bar buttons failed: " + error); }
         }
     }
 
-    /// <summary>The bar hides its pop-ups (a click outside one, or the game opening another): pages close with them.</summary>
+    /// <summary>The bar hides its pop-ups (a click outside one): pages close with them. The game's only call of the bar's
+    /// <c>SetPopupVisible</c> is <c>CM_PopupOverlay.OnBtnPressAnywhere</c> (to its controller, with false): when the popup is enabled
+    /// and no item under the cursor is the popup or one of its child items (compared by <c>ID</c>), it hands the press to its
+    /// controller. This reads the same condition after the game's body, so a press whose controller is a bar and which the popup
+    /// did not hit is the bar hiding its pop-ups. <c>SetPopupVisible</c> is not patched (its entry starts with a short conditional
+    /// jump, which the detour backend relocates to the wrong target, so ForgeCore refuses it), and neither is
+    /// <c>CM_ScrollWindow.SetVisible</c> (the compiler gave it the same native body as <c>RectTransformComp.SetVisible</c>, so a
+    /// patch there also runs for every other component).</summary>
     [PatchGroup(PatchGroup.MenuBar)]
-    [HarmonyPatch(typeof(CM_MenuBar), nameof(CM_MenuBar.SetPopupVisible))]
+    [HarmonyPatch(typeof(CM_PopupOverlay), nameof(CM_PopupOverlay.OnBtnPressAnywhere))]
     private static class BarPopups
     {
         [HarmonyPostfix]
-        private static void Postfix(CM_MenuBar __instance, bool visible)
+        private static void Postfix(CM_PopupOverlay __instance, Il2CppSystem.Collections.Generic.List<iCellMenuCursorItem> hoverItems)
         {
-            if (visible || _opening) return;
-            try { PopupsHidden?.Invoke(__instance); }
-            catch (Exception error) { Plugin.Error("A window on the menu bar failed to close: " + error); }
-            if (!Bars.TryGetValue(__instance.Pointer, out var bar)) return;
+            var native = __instance.m_controller?.TryCast<CM_MenuBar>();
+            if (native == null || _opening || !PressedOutside(__instance, hoverItems)) return;
+            try { PopupsHidden?.Invoke(native); }
+            catch (Exception error) { Plugin.Error("ui-window-menu-bar-failed-close", "A window on the menu bar failed to close: " + error); }
+            if (!Bars.TryGetValue(native.Pointer, out var bar)) return;
             try { CloseAll(bar); }
-            catch (Exception error) { Plugin.Error("Closing menu bar pages failed: " + error); }
+            catch (Exception error) { Plugin.Error("ui-closing-menu-bar-pages-failed", "Closing menu bar pages failed: " + error); }
+        }
+
+        private static bool PressedOutside(CM_PopupOverlay popup, Il2CppSystem.Collections.Generic.List<iCellMenuCursorItem> hover)
+        {
+            if (!popup.m_enabled || hover == null) return false;
+            var children = popup.m_childItems;
+            for (var i = 0; i < hover.Count; i++)
+            {
+                var id = hover[i].ID;
+                if (id == popup.ID) return false;
+                if (children != null)
+                    foreach (var child in children)
+                        if (child.ID == id) return false;
+            }
+            return true;
         }
     }
 }

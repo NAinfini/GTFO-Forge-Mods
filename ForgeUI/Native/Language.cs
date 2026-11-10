@@ -37,7 +37,7 @@ internal static class Language
     internal static void Update()
     {
         if (!_waitingForGame) return;
-        var now = Time.unscaledTime;
+        var now = ForgeCore.Frame.UnscaledTime;
         if (now < _nextGameRead) return;
         _nextGameRead = now + GameInterval;
         Apply();
@@ -78,7 +78,7 @@ internal static class Language
         }
         catch (Exception error)
         {
-            if (!_gameUnreadable) Plugin.Error("The game's language could not be read; texts stay " + UITexts.Language + ": " + error);
+            if (!_gameUnreadable) Plugin.Error("ui-games-language-could-not-be-read", "The game's language could not be read; texts stay " + UITexts.Language + ": " + error);
             _gameUnreadable = true;
             return false;
         }
@@ -93,9 +93,9 @@ internal static class Language
         if (folder == null)
             return new UITexts(modId, () =>
             {
-                Plugin.Error(modId + ": no loaded plugin has this ID, so its language files cannot be found; texts show their keys. Pass your plugin GUID to UIKit.Mod.");
+                Plugin.Error("ui-no-loaded-plugin-has-this-id", modId + ": no loaded plugin has this ID, so its language files cannot be found; texts show their keys. Pass your plugin GUID to UIKit.Mod.");
                 return Array.Empty<KeyValuePair<string, string>>();
-            }, Plugin.Error);
+            }, message => Plugin.Error("ui-language-file-problem", message));
         return InFolder(modId + " (" + Shown(folder) + ")", folder);
     }
 
@@ -104,15 +104,15 @@ internal static class Language
     {
         var files = new List<KeyValuePair<string, string>>();
         if (!Directory.Exists(folder)) return files;
-        var paths = Directory.GetFiles(folder, "*.json");
+        var paths = Directory.GetFiles(folder, "*.forge");
         Array.Sort(paths, StringComparer.Ordinal);
         foreach (var path in paths)
         {
             try { files.Add(new KeyValuePair<string, string>(Path.GetFileName(path), File.ReadAllText(path))); }
-            catch (Exception error) { Plugin.Error(owner + ": " + Path.GetFileName(path) + " could not be read: " + error); }
+            catch (Exception error) { Plugin.Error("ui-could-not-be-read", owner + ": " + Path.GetFileName(path) + " could not be read: " + error); }
         }
         return files;
-    }, Plugin.Error);
+    }, message => Plugin.Error("ui-language-file-problem", message));
 
     /// <summary>A path relative to the BepInEx folder when inside it.</summary>
     private static string Shown(string path)

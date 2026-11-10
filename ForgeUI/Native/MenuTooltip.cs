@@ -53,7 +53,7 @@ internal sealed class MenuBarTooltip
         var label = item.GetComponentInChildren<TextMeshPro>(true);
         if (sprite == null || label == null)
         {
-            Plugin.Error("Menu bar button '" + item.gameObject.name + "' has no sprite or text to draw a tooltip with; it shows none.");
+            Plugin.Error("ui-menu-bar-button-has-no-sprite", "Menu bar button '" + item.gameObject.name + "' has no sprite or text to draw a tooltip with; it shows none.");
             return null;
         }
         var box = MenuCanvas.BoxIn(item.transform, item.GetComponent<BoxCollider2D>(), new Rect(0f, -20f, 160f, 40f));

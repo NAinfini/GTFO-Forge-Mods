@@ -6,7 +6,7 @@ namespace ForgeUI;
 /// The switches every mod made for one shared feature (enemy health bars, hit feedback). The feature is drawn while any switch is on; the
 /// style is that of the switch turned on most recently.
 /// </summary>
-public sealed class ScopeSwitches<T> where T : class
+internal sealed class ScopeSwitches<T> where T : class
 {
     private readonly List<(T Scope, long Stamp)> _on = new();
     private long _clock;

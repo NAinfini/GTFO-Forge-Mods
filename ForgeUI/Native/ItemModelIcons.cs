@@ -20,6 +20,9 @@ public static class ItemModelIcons
     private const float Margin = 1.1f;
     private static readonly Vector3 Stage = new(4000f, 4000f, 4000f);
     private static readonly Dictionary<uint, Sprite?> Made = new();
+    // Item types whose model was not there yet, and since when: the picture waits for it instead of being given up on the first ask.
+    private static readonly Dictionary<uint, float> Waits = new();
+    private const float ModelWaitSeconds = 10f;
 
     /// <summary>The picture of <paramref name="item"/>'s model, or null when it cannot be had: null while the item is not ready (try again
     /// later), null with one logged error when it has no drawable model or the render failed (that type is not tried again).</summary>
@@ -31,15 +34,43 @@ public static class ItemModelIcons
         var id = block.persistentID;
         if (Made.TryGetValue(id, out var cached) && (cached == null || cached.texture != null)) return cached;
         var name = block.publicName ?? block.name ?? id.ToString();
+        // The game builds an item's model into its holder when it needs it (a consumable still in a backpack may not have one
+        // yet): wait for it, then say it has nothing to draw only after the wait.
+        if (!HasModel(item))
+        {
+            if (!Waits.TryGetValue(id, out var since)) Waits[id] = since = Time.unscaledTime;
+            if (Time.unscaledTime - since < ModelWaitSeconds) return null;
+        }
         Sprite? sprite;
         try { sprite = Build(item, name); }
         catch (Exception error)
         {
-            Plugin.Error("Item model icon of '" + name + "' could not be rendered and is not drawn: " + error + " (" + Renderers(item) + ")");
+            Plugin.Error("ui-item-model-icon", "Item model icon of '" + name + "' could not be rendered and is not drawn: " + error + " (" + Renderers(item) + ")");
             sprite = null;
         }
+        Waits.Remove(id);
         Made[id] = sprite;
         return sprite;
+    }
+
+    /// <summary>True while an item's model is not there yet (no renderer under its holder and no model prefab to take the picture
+    /// from): the asker asks again on its next quiet rebuild.</summary>
+    public static bool Waiting(Item? item)
+    {
+        if (item == null || item.WasCollected || item.ItemDataBlock == null) return false;
+        return !Made.ContainsKey(item.ItemDataBlock.persistentID) && !HasModel(item);
+    }
+
+    private static bool HasModel(Item item)
+    {
+        var holder = item.m_itemModelHolder != null ? item.m_itemModelHolder : item.transform;
+        return HasRenderers(holder) || item.BaseModel != null && item.BaseModel.Prefab != null;
+    }
+
+    private static bool HasRenderers(Transform root)
+    {
+        foreach (var renderer in root.GetComponentsInChildren<Renderer>(true)) if (renderer != null) return true;
+        return false;
     }
 
     /// <summary>What sits under the item's model holder, for the failure line only: each renderer kind with how many are enabled and how
@@ -73,23 +104,37 @@ public static class ItemModelIcons
     {
         var holder = item.m_itemModelHolder != null ? item.m_itemModelHolder : item.transform;
         var stage = new GameObject("ForgeUI item icon stage") { hideFlags = HideFlags.HideAndDontSave };
+        var hold = new GameObject("ForgeUI item icon hold") { hideFlags = HideFlags.HideAndDontSave };
+        hold.SetActive(false);
+        GameObject? prefabModel = null;
         try
         {
             stage.transform.position = Stage;
+            // A model the item holds not built yet (a consumable in a backpack before it is equipped): its own model prefab is
+            // the same model, copied under the inactive hold so no script of it wakes, to take the picture from.
+            var sourceRoot = holder;
+            if (!HasRenderers(holder) && item.BaseModel != null && item.BaseModel.Prefab != null)
+            {
+                prefabModel = UnityEngine.Object.Instantiate(item.BaseModel.Prefab, hold.transform);
+                prefabModel.name = "ForgeUI item icon model " + name;
+                foreach (var script in prefabModel.GetComponentsInChildren<MonoBehaviour>(true)) if (script != null) UnityEngine.Object.DestroyImmediate(script);
+                sourceRoot = prefabModel.transform;
+            }
+            var toStage = prefabModel != null ? stage.transform.worldToLocalMatrix : holder.worldToLocalMatrix;
             var bounds = default(Bounds);
             var parts = 0;
             int shadowOnly = 0, hidden = 0, unfinished = 0;
-            var renderers = holder.GetComponentsInChildren<MeshRenderer>(true);
+            var renderers = sourceRoot.GetComponentsInChildren<MeshRenderer>(true);
             foreach (var source in renderers)
             {
                 if (source == null || !source.enabled) continue;
                 if (source.shadowCastingMode == ShadowCastingMode.ShadowsOnly) { shadowOnly++; continue; }
-                if (!ActiveUnder(source.transform, holder)) { hidden++; continue; }
+                if (!ActiveUnder(source.transform, sourceRoot)) { hidden++; continue; }
                 var filter = source.GetComponent<MeshFilter>();
                 var mesh = filter != null ? filter.sharedMesh : null;
                 if (mesh == null || source.sharedMaterial == null) { unfinished++; continue; }
                 var part = new GameObject("part") { layer = Layer, hideFlags = HideFlags.HideAndDontSave };
-                var local = holder.worldToLocalMatrix * source.transform.localToWorldMatrix;
+                var local = toStage * source.transform.localToWorldMatrix;
                 var t = part.transform;
                 t.SetParent(stage.transform, false);
                 t.localPosition = local.GetColumn(3);
@@ -105,7 +150,11 @@ public static class ItemModelIcons
             if (parts == 0) throw new InvalidOperationException("the item's model has no visible mesh (shadow-only " + shadowOnly + ", switched off " + hidden + ", no mesh or material " + unfinished + ")");
             return Photograph(stage, bounds, name);
         }
-        finally { UnityEngine.Object.DestroyImmediate(stage); }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(hold);
+            UnityEngine.Object.DestroyImmediate(stage);
+        }
     }
 
     private static bool ActiveUnder(Transform t, Transform holder)

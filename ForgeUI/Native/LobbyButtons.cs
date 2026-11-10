@@ -38,7 +38,7 @@ internal static class LobbyButtons
         {
             return button;
         }
-        Plugin.Error("Lobby button not added: " + problem + ".");
+        Plugin.Error("ui-lobby-button-not-added", "Lobby button not added: " + problem + ".");
         return null;
     }
 
@@ -95,7 +95,7 @@ internal static class LobbyButtons
             var bar = bars[i];
             if (bar == null || bar.WasCollected) continue;
             try { Sync(bar); }
-            catch (Exception error) { Plugin.Error("Lobby buttons failed to update: " + error); }
+            catch (Exception error) { Plugin.Error("ui-lobby-buttons-failed-update", "Lobby buttons failed to update: " + error); }
         }
     }
 
@@ -104,7 +104,7 @@ internal static class LobbyButtons
         var clothes = bar.m_clothesButton;
         if (clothes == null || clothes.WasCollected)
         {
-            Plugin.Error("Lobby buttons cannot be shown: a lobby bar has no APPAREL button to copy.");
+            Plugin.Error("ui-lobby-buttons-cannot-be-shown-lobby", "Lobby buttons cannot be shown: a lobby bar has no APPAREL button to copy.");
             return;
         }
         if (!Copies.TryGetValue(bar.Pointer, out var perBar)) Copies[bar.Pointer] = perBar = new Dictionary<string, Copy>();
@@ -120,7 +120,7 @@ internal static class LobbyButtons
             try { visible = shown && (button.Visible?.Invoke(bar) ?? (bar.m_player != null && bar.m_player.IsLocal)); }
             catch (Exception error)
             {
-                Plugin.Error("Lobby button '" + button.Id + "' visibility check failed: " + error);
+                Plugin.Error("ui-lobby-button-visibility-check-failed", "Lobby button '" + button.Id + "' visibility check failed: " + error);
                 visible = false;
             }
             if (!Registered.Contains(button.Id, button)) continue;
@@ -159,7 +159,7 @@ internal static class LobbyButtons
         try { button.NoteValue = button.Note(); }
         catch (Exception error)
         {
-            Plugin.Error("Lobby button '" + button.Id + "' note failed: " + error);
+            Plugin.Error("ui-lobby-button-note-failed", "Lobby button '" + button.Id + "' note failed: " + error);
             button.NoteValue = null;
         }
         return button.NoteValue;
@@ -178,7 +178,7 @@ internal static class LobbyButtons
         copy.Route = Input.Route(item, () =>
         {
             try { button.OnClick(bar); }
-            catch (Exception error) { Plugin.Error("Lobby button '" + button.Id + "' click failed: " + error); }
+            catch (Exception error) { Plugin.Error("ui-lobby-button-click-failed", "Lobby button '" + button.Id + "' click failed: " + error); }
         }, inside => copy.Hover = inside);
         return copy;
     }
@@ -207,7 +207,7 @@ internal sealed class LobbyButtonSkin
         var labels = item.GetComponentsInChildren<TextMeshPro>(true);
         if (sprites.Length == 0 || labels.Length == 0)
         {
-            Plugin.Error("A lobby button copy has no sprite or text to draw with; it shows as the APPAREL button.");
+            Plugin.Error("ui-lobby-button-copy-has-no-sprite", "A lobby button copy has no sprite or text to draw with; it shows as the APPAREL button.");
             return null;
         }
         var order = MenuCanvas.TopOrder(item) + 1;

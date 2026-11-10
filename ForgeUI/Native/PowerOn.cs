@@ -19,7 +19,7 @@ public sealed partial class UIKitMod
         if (spec == null) throw new ArgumentNullException(nameof(spec));
         if (spec.Timeline == null || spec.Timeline.Panels != spec.Panels.Count)
         {
-            Plugin.Error("Power-on '" + name + "' not registered: its timeline must name a block for each of its " + spec.Panels.Count + " panels.");
+            Plugin.Error("ui-power-not-registered-timeline-must-name", "Power-on '" + name + "' not registered: its timeline must name a block for each of its " + spec.Panels.Count + " panels.");
             return null;
         }
         var id = Full(name, "screen layer");
@@ -155,7 +155,9 @@ public sealed class ScreenPowerOn
         var shader = _spec.Shader ?? UIKit.LoadShader(BuiltIn, PowerOnShaderBytes.Read, PowerOnShaderBytes.AssetName);
         _panels = new ScreenPanels(Id, new ScreenPanelsSpec
         {
-            Panels = _spec.Panels, Seams = _spec.Seams, Shader = shader,
+            Panels = _spec.Panels,
+            Seams = _spec.Seams,
+            Shader = shader,
             Colours = new[] { ("_Tint", _spec.Tint), ("_ChannelLeft", _spec.ChannelLeft), ("_ChannelMiddle", _spec.ChannelMiddle), ("_ChannelRight", _spec.ChannelRight) },
         }, _spec.Priority);
         return _panels;

@@ -31,22 +31,22 @@ internal sealed class SliderRows : PageRows
 
     private readonly eSettingsSubMenuId _page;
     private readonly eCellSettingID _template;
-    private readonly string _headingEnglish, _headingChinese;
+    private readonly string _headingKey;
     private readonly IReadOnlyList<SettingsSlider> _sliders;
     private readonly Action? _onPageReset;
     private readonly List<Row> _rows = new();
     private CM_ScrollWindow? _window;
-    private bool _chinese;
+    private int _titlesVersion = -1;
     private float _nextRefresh, _draggedAt = -10f;
 
-    internal SliderRows(string id, eSettingsSubMenuId page, eCellSettingID template, string headingEnglish, string headingChinese,
+    internal SliderRows(string id, eSettingsSubMenuId page, eCellSettingID template, string headingKey,
         IReadOnlyList<SettingsSlider> sliders, Action? onPageReset)
     {
         Id = id;
         _page = page;
         _template = template;
-        _headingEnglish = headingEnglish;
-        _headingChinese = headingChinese;
+        _headingKey = headingKey;
+
         _sliders = sliders;
         _onPageReset = onPageReset;
     }
@@ -56,22 +56,21 @@ internal sealed class SliderRows : PageRows
     internal override eSettingsSubMenuId Page => _page;
     internal override string Owner => "the sliders of " + Id;
 
-    private static bool IsChinese => UITexts.Language.StartsWith("zh", StringComparison.Ordinal);
 
     internal override void Update()
     {
         if (_window == null || _window.WasCollected || _rows.Count == 0) return;
-        var now = Time.unscaledTime;
+        var now = ForgeCore.Frame.UnscaledTime;
         if (now < _nextRefresh) return;
         _nextRefresh = now + RefreshInterval;
         if (!_window.gameObject.activeInHierarchy) return;
         try
         {
-            if (IsChinese != _chinese) { _chinese = IsChinese; Titles(); }
+            if (_titlesVersion != UITexts.Version) Titles();
             // A value changed elsewhere (a config file, the page reset) shows here; not while the player drags.
             if (now - _draggedAt > RefreshInterval) foreach (var row in _rows) Show(row);
         }
-        catch (Exception error) { Plugin.Error("The slider rows of " + Id + " failed to update: " + error); }
+        catch (Exception error) { Plugin.Error("ui-slider-rows-failed-update", "The slider rows of " + Id + " failed to update: " + error); }
     }
 
     internal override void Append(CM_ScrollWindow window, Il2CppSystem.Collections.Generic.List<iScrollWindowContent> content)
@@ -88,11 +87,10 @@ internal sealed class SliderRows : PageRows
         }
         if (template == null)
         {
-            Plugin.Error("The game's " + _page + " settings page has no " + _template + " slider row to add " + Owner + " to.");
+            Plugin.Error("ui-games-settings-page-has-no-slider", "The game's " + _page + " settings page has no " + _template + " slider row to add " + Owner + " to.");
             return;
         }
         _window = window;
-        _chinese = IsChinese;
         SettingsPages.CopyRows(this, template, "ForgeUI.SliderRows." + Id, content, holder =>
         {
             _rows.Add(Copy(template, holder, null));
@@ -175,9 +173,11 @@ internal sealed class SliderRows : PageRows
 
     private void Titles()
     {
+        _titlesVersion = UITexts.Version;
+        var texts = UIKit.Kit.Texts;
         foreach (var row in _rows)
             if (row.Item != null && !row.Item.WasCollected && row.Item.m_title != null)
-                NativeUi.SetText(row.Item.m_title, row.Source == null ? (_chinese ? _headingChinese : _headingEnglish) : (_chinese ? row.Source.Chinese : row.Source.English));
+                NativeUi.SetText(row.Item.m_title, texts.Text(row.Source == null ? _headingKey : row.Source.TextKey));
     }
 
     /// <summary>A drag or step on a copied slider: the handle moves as the game's own slider does and the value follows.</summary>
@@ -193,7 +193,7 @@ internal sealed class SliderRows : PageRows
         var value = SliderMath.ValueAt(position.x, ends.x, ends.y);
         row.Source.Set(value);
         if (slider.m_progress != null) NativeUi.SetText(slider.m_progress, SliderMath.Text(value));
-        _draggedAt = Time.unscaledTime;
+        _draggedAt = ForgeCore.Frame.UnscaledTime;
     }
 
     /// <summary>A drag (<c>ScrollFromHandle</c>) or step (<c>ScrollDelta</c>) on a copied slider: both are one native body that jumps to
@@ -207,7 +207,7 @@ internal sealed class SliderRows : PageRows
         {
             if (!BySlider.TryGetValue(__instance.Pointer, out var row)) return true;
             try { row.Group.Scroll(row, delta); }
-            catch (Exception error) { Plugin.Error("A slider of " + row.Group.Id + " failed: " + error); }
+            catch (Exception error) { Plugin.Error("ui-slider-failed", "A slider of " + row.Group.Id + " failed: " + error); }
             return false;
         }
     }

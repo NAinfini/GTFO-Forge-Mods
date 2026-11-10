@@ -246,7 +246,10 @@ internal static class NativeUi
     {
         var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
         {
-            name = name, filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.HideAndDontSave
+            name = name,
+            filterMode = FilterMode.Bilinear,
+            wrapMode = TextureWrapMode.Clamp,
+            hideFlags = HideFlags.HideAndDontSave
         };
         var pixels = new Color32[width * height];
         for (var y = 0; y < height; y++)
@@ -266,7 +269,10 @@ internal static class NativeUi
     {
         var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
         {
-            name = name, filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.HideAndDontSave
+            name = name,
+            filterMode = FilterMode.Bilinear,
+            wrapMode = TextureWrapMode.Clamp,
+            hideFlags = HideFlags.HideAndDontSave
         };
         var pixels = new Color32[size * size];
         for (var y = 0; y < size; y++)

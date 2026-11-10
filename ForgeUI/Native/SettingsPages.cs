@@ -7,9 +7,9 @@ using Object = UnityEngine.Object;
 
 namespace ForgeUI;
 
-/// <summary>One slider a mod adds to a game settings page: <see cref="Id"/> names it, <see cref="English"/> and <see cref="Chinese"/> are its
-/// labels (the one for the current language is shown), <see cref="Get"/> and <see cref="Set"/> read and write its value, 0 to 1.</summary>
-public sealed record SettingsSlider(string Id, string English, string Chinese, Func<float> Get, Action<float> Set);
+/// <summary>One slider a mod adds to a game settings page: <see cref="Id"/> names it, <see cref="TextKey"/> is the key of its label in
+/// ForgeUI's language files (shown in the current language), <see cref="Get"/> and <see cref="Set"/> read and write its value, 0 to 1.</summary>
+public sealed record SettingsSlider(string Id, string TextKey, Func<float> Get, Action<float> Set);
 
 /// <summary>Which game method builds a settings page: the key pages by <c>CreateKeyMappingSubMenu</c>, every other page by <c>CreateSubmenu</c>.</summary>
 internal enum PageBuilder { KeyMapping, Submenu }
@@ -50,9 +50,9 @@ public static class SettingsPages
     /// rows. The rows are copies of the game's sound-effects slider row (<c>Audio_SFXVolume</c>), so they look, drag and scroll like the
     /// game's. A drag writes through <see cref="SettingsSlider.Set"/> at once; the rows show <see cref="SettingsSlider.Get"/> again when it
     /// changes elsewhere. <paramref name="onPageReset"/> runs when the player resets the page. A <paramref name="sectionId"/> already added
-    /// is ignored, so several packages may add the same section; false (and a logged error) when the game already built the page.</summary>
-    /// <example><c>SettingsPages.AddAudioSliders("ForgeAudio.volumes", AudioVolumes.HeadingEnglish, AudioVolumes.HeadingChinese, rows, AudioVolumes.ResetAll);</c></example>
-    public static bool AddAudioSliders(string sectionId, string headingEnglish, string headingChinese, IReadOnlyList<SettingsSlider> sliders, Action? onPageReset = null)
+    /// is ignored, so several packages may add the same section; false (and a logged error) when the game already built the page. The heading and the labels are keys of ForgeUI's own language files.</summary>
+    /// <example><c>SettingsPages.AddAudioSliders("ForgeAudio.volumes", AudioVolumes.HeadingKey, rows, AudioVolumes.ResetAll);</c></example>
+    public static bool AddAudioSliders(string sectionId, string headingKey, IReadOnlyList<SettingsSlider> sliders, Action? onPageReset = null)
     {
         const eSettingsSubMenuId page = eSettingsSubMenuId.Audio;
         if (string.IsNullOrWhiteSpace(sectionId)) throw new ArgumentException("Name the section.", nameof(sectionId));
@@ -61,11 +61,11 @@ public static class SettingsPages
             if (group is SliderRows existing && existing.Id == sectionId) return false;
         if (Built.Contains((PageBuilder.Submenu, page)))
         {
-            Plugin.Error("The sliders of " + sectionId + " were added after the game built its audio settings page and are not listed there; add them in the package's Load.");
+            Plugin.Error("ui-sliders-were-added-after-game-built", "The sliders of " + sectionId + " were added after the game built its audio settings page and are not listed there; add them in the package's Load.");
             return false;
         }
         PatchGroups.Ensure(PatchGroup.Settings);
-        Groups.Add(new SliderRows(sectionId, page, eCellSettingID.Audio_SFXVolume, headingEnglish, headingChinese, sliders, onPageReset));
+        Groups.Add(new SliderRows(sectionId, page, eCellSettingID.Audio_SFXVolume, headingKey, sliders, onPageReset));
         return true;
     }
 
@@ -108,7 +108,7 @@ public static class SettingsPages
             {
                 if (items[i]?.TryCast<Component>() is not { } component || component == null)
                 {
-                    Plugin.Error("The game's " + group.Page + " settings page holds an empty or destroyed row at " + i + " after laying out " + group.Owner + ".");
+                    Plugin.Error("ui-games-settings-page-holds-empty", "The game's " + group.Page + " settings page holds an empty or destroyed row at " + i + " after laying out " + group.Owner + ".");
                     continue;
                 }
                 foreach (var row in group.Items)
@@ -118,7 +118,7 @@ public static class SettingsPages
         foreach (var row in group.Items)
             if (row.WasCollected || container == null || row.transform.parent != container) misplaced++;
         if (listed != group.Items.Count || misplaced > 0)
-            Plugin.Error("The game's " + group.Page + " settings page laid out " + listed + " of " + group.Items.Count + " rows of " + group.Owner + " (" + misplaced + " outside its content).");
+            Plugin.Error("ui-games-settings-page-laid-out-rows", "The game's " + group.Page + " settings page laid out " + listed + " of " + group.Items.Count + " rows of " + group.Owner + " (" + misplaced + " outside its content).");
     }
 
     /// <summary>Marks the build of a key page (the gamepad page is built by the same method with its own id).</summary>
@@ -167,7 +167,7 @@ public static class SettingsPages
                 if (group.Builder != built.Builder || group.Page != built.Page) continue;
                 group.Items.Clear();
                 try { group.Append(__instance, contentItems); }
-                catch (Exception error) { Plugin.Error("Adding " + group.Owner + " to the game's " + group.Page + " settings page failed: " + error); }
+                catch (Exception error) { Plugin.Error("ui-adding-games-settings-page-failed", "Adding " + group.Owner + " to the game's " + group.Page + " settings page failed: " + error); }
             }
         }
 
@@ -180,7 +180,7 @@ public static class SettingsPages
             {
                 if (group.Builder != built.Builder || group.Page != built.Page || group.Items.Count == 0) continue;
                 try { CheckLaidOut(group, __instance); }
-                catch (Exception error) { Plugin.Error("Checking " + group.Owner + " on the game's " + group.Page + " settings page failed: " + error); }
+                catch (Exception error) { Plugin.Error("ui-checking-games-settings-page-failed", "Checking " + group.Owner + " on the game's " + group.Page + " settings page failed: " + error); }
             }
         }
     }
@@ -197,7 +197,7 @@ public static class SettingsPages
             {
                 if (group.Page != settingsMenuId) continue;
                 try { group.PageReset(); }
-                catch (Exception error) { Plugin.Error("Resetting " + group.Owner + " failed: " + error); }
+                catch (Exception error) { Plugin.Error("ui-resetting-failed", "Resetting " + group.Owner + " failed: " + error); }
             }
         }
     }

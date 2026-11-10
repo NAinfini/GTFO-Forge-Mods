@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace ForgeUI;
 
-/// <summary>One effect on the screen effect stack, pushed by the visor. <c>new ScreenEffectSpec()</c>
+/// <summary>One effect on the screen effect stack (<see cref="UIKitMod.PushScreenEffect"/>). <c>new ScreenEffectSpec()</c>
 /// is a white effect at full strength lasting 0.3 seconds with a 0.25 second fade-out.</summary>
 public struct ScreenEffectSpec
 {
@@ -96,12 +96,31 @@ internal static class ScreenStack
         var c = spec.Colour;
         if (ScreenEffectBook.Problem(channel, spec.Strength, c.r, c.g, c.b, c.a, spec.Seconds, spec.FadeIn, spec.FadeOut, spec.Rate) is { } problem)
         {
-            Plugin.Error(mod + ": screen effect refused: " + problem + ".");
+            Plugin.Error("ui-screen-effect-refused", mod + ": screen effect refused: " + problem + ".");
             return default;
         }
         var slot = Book.Push(channel, spec.Strength, c.r, c.g, c.b, c.a, spec.Seconds, spec.FadeIn, spec.FadeOut, spec.Priority, spec.Rate, Time.time);
         if (slot < 0) return default;
         return new ScreenEffect(slot, Book.Generation(slot));
+    }
+
+    /// <summary>The effects pushed through <see cref="UIKitMod.PushScreenEffect"/> (the visor's own shade and the hit edges are not here): they end with the level.</summary>
+    private static readonly List<ScreenEffect> Owned = new();
+
+    internal static ScreenEffect PushOwned(string mod, ScreenChannel channel, in ScreenEffectSpec spec)
+    {
+        var effect = Push(mod, channel, spec);
+        if (!effect.Active) return effect;
+        for (int i = Owned.Count - 1; i >= 0; i--) if (!Owned[i].Active) Owned.RemoveAt(i);
+        Owned.Add(effect);
+        return effect;
+    }
+
+    /// <summary>Level over: every effect a mod pushed ends at once, however long its hold or fade was.</summary>
+    internal static void LevelEnded()
+    {
+        for (int i = 0; i < Owned.Count; i++) Book.Drop(Owned[i].Slot, Owned[i].Generation - 1);
+        Owned.Clear();
     }
 
     internal static bool Live(in ScreenEffect effect) => Book.Live(effect.Slot, effect.Generation - 1);
@@ -247,13 +266,18 @@ internal static class ScreenStack
         return true;
     }
 
-    /// <summary>The pass is warmed during the elevator ride (or the first level frame) and again after the screen size changed.</summary>
+    private static int _autoGeneration = int.MinValue;
+
+    /// <summary>The pass is warmed once the elevator has stopped (or on the first level frame) and again after the screen size changed. Building it
+    /// (shader, textures, the layer) and drawing it are two steps of ForgeCore <c>LandingWork</c>, a frame apart and apart from the other libraries' warm-ups.</summary>
     private static void AutoWarm()
     {
-        if (_failed || _warmedGeneration == ScreenLayer.Generation && _warmedGeneration >= 0) return;
+        if (_failed || _warmedGeneration == ScreenLayer.Generation && _warmedGeneration >= 0 || _autoGeneration == ScreenLayer.Generation) return;
         var state = GameStateManager.CurrentStateName;
         if (state != eGameStateName.StopElevatorRide && state != eGameStateName.InLevel) return;
-        Warm();
+        _autoGeneration = ScreenLayer.Generation;
+        ForgeCore.LandingWork.Add(Plugin.Id, "screen-effects-build", () => { if (!_failed) Build(); });
+        ForgeCore.LandingWork.Add(Plugin.Id, "screen-effects-draw", () => { if (!_failed) Warm(); });
     }
 
     private static bool Build()
@@ -294,7 +318,7 @@ internal static class ScreenStack
         catch (Exception error)
         {
             _failed = true;
-            Plugin.Error("The screen effect stack could not be built and is off (hit edges, visor shade and glow, pushed screen effects): " + error);
+            Plugin.Error("ui-screen-effect-stack", "The screen effect stack could not be built and is off (hit edges, visor shade and glow, pushed screen effects): " + error);
             return false;
         }
         return true;

@@ -1,9 +1,9 @@
 {
   "kind": "forge-library-manifest",
-  "schemaVersion": 1,
+  "schemaVersion": "1.0.0",
   "library": "ForgeUI",
   "packageName": "NAinfini-ForgeUI",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "groups": [
     {
       "id": "regions",
@@ -214,8 +214,8 @@
           }
         },
         {
-          "id": "AddKeyAction(string, string, string, string, KeyMode, string)",
-          "summary": "Registers a key action the player can rebind in the game's settings (Controls, under your group's heading). Read it every frame through the handle. Keys the player never changed follow defaultKey, also when you change the default in a later version. Two actions on one key in overlapping contexts, or on a key the game itself uses, are shown in the settings and logged; ForgeUI never moves anyone's key. Use the game's own bindings (InputAction) for what the game already has a key for, rather than a second action.",
+          "id": "AddKeyAction(string, string, string, string, KeyMode, string, KeyModes)",
+          "summary": "Registers a key action the player can rebind in the game's settings (Controls, under your group's heading). Read it every frame through the handle. Keys the player never changed follow defaultKey, also when you change the default in a later version; the same goes for the trigger mode, which the player picks from allowed in the same settings row group, together with the action's long-press and double-press times. Two actions whose same press would both fire (same key, overlapping contexts, any modes but a Tap with a Hold of at least its time, or a Tap with a Double), or an action on a key the game itself uses, are shown in the settings and logged; ForgeUI never moves anyone's key. A Tap, Hold or Double action alone on a game button's key hands every press that is not its own to that button (KeyMode; a Double action hands back the first press, the second is its own), so it shares the key without a conflict, unless the player sets it to fire together with the game (the settings' same-key row). All key reading and press timing lives here: a mod only reads the handle. Use the game's own bindings (InputAction) for what the game already has a key for, rather than a second action.",
           "name": "AddKeyAction",
           "parameters": [
             {
@@ -253,6 +253,12 @@
               "type": "string",
               "summary": "",
               "default": "\"\""
+            },
+            {
+              "name": "allowed",
+              "type": "KeyModes",
+              "summary": "",
+              "default": "KeyModes.All"
             }
           ],
           "details": {
@@ -342,7 +348,7 @@
           }
         },
         {
-          "id": "AddTeammateTag(string, Func<SNet_Player, TeammateTag>)",
+          "id": "AddTeammateTag(string, Func<SNet_Player, TeammateTag>, TeammateTagPlace)",
           "summary": "Adds a tag to every teammate row of every teammates panel (HudTeammates, whichever mod made it): per player, a status picture and a short value at the row's right before the health, and a hairline share under the health. read runs once per row per frame while a panel is drawn; return None for a player the tag does not apply to, and the same string while the value is the same. A callback that throws is turned off (logged once).",
           "name": "AddTeammateTag",
           "parameters": [
@@ -357,6 +363,12 @@
               "type": "Func<SNet_Player, TeammateTag>",
               "summary": "",
               "required": true
+            },
+            {
+              "name": "place",
+              "type": "TeammateTagPlace",
+              "summary": "",
+              "default": "TeammateTagPlace.Row"
             }
           ],
           "details": {
@@ -646,6 +658,28 @@
           }
         },
         {
+          "id": "AddWheel(string, KeyAction)",
+          "summary": "A radial wheel opened by key (see HudWheel); give it pages with SetPages and listen to Chosen. Hidden until the key opens it. Register the key with Hold as its default to get \"hold to open, release to choose\".",
+          "name": "AddWheel",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "key",
+              "type": "KeyAction",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "HudWheel"
+          }
+        },
+        {
           "id": "AddBootMessage(string, BootMessageBeats, BootMessageLook, HudSlot?)",
           "summary": "A power-on message with your beats, colours and words (see HudBootMessage). Default slot: the centre banner, priority 100, sized by look.",
           "name": "AddBootMessage",
@@ -841,6 +875,28 @@
           ],
           "details": {
             "returns": "HudHintLine"
+          }
+        },
+        {
+          "id": "AddPlaced(string, HudPlacement)",
+          "summary": "A readout at a place you choose (see HudPlaced): text, a thin bar, a row of cells or a clock in the game's HUD look. It takes no room in any region: it may overlap the game's HUD or other elements.",
+          "name": "AddPlaced",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "summary": "",
+              "required": true
+            },
+            {
+              "name": "placement",
+              "type": "HudPlacement",
+              "summary": "",
+              "required": true
+            }
+          ],
+          "details": {
+            "returns": "HudPlaced"
           }
         },
         {

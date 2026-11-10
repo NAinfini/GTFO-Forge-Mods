@@ -15,13 +15,23 @@ public sealed partial class UIKitMod
     /// </summary>
     /// <param name="name">Unique and stable inside your mod, for example <c>Armour</c>.</param>
     /// <param name="read">The tag for one player.</param>
+    /// <param name="place">Where the tag is drawn: on the player's row of the teammates panel (default), or as one text line above the teammate's own name marker in the world (<see cref="TeammateTagPlace.Overhead"/>: only <see cref="TeammateTag.Text"/> and <see cref="TeammateTag.Colour"/> are used).</param>
     /// <example><c>ui.AddTeammateTag("Armour", p =&gt; Suit(p) is { } s ? new TeammateTag { Bar = s.Armour } : TeammateTag.None);</c></example>
-    public TeammateTagSource? AddTeammateTag(string name, Func<SNet_Player, TeammateTag> read)
+    public TeammateTagSource? AddTeammateTag(string name, Func<SNet_Player, TeammateTag> read, TeammateTagPlace place = TeammateTagPlace.Row)
     {
         if (read == null) throw new ArgumentNullException(nameof(read));
         var id = Full(name, "teammate tag");
-        return id == null ? null : TeammateTags.Add(new TeammateTagSource(id, read));
+        return id == null ? null : TeammateTags.Add(new TeammateTagSource(id, read, place));
     }
+}
+
+/// <summary>Where a teammate tag is drawn.</summary>
+public enum TeammateTagPlace : byte
+{
+    /// <summary>On the player's row of every teammates panel.</summary>
+    Row,
+    /// <summary>One text line above the teammate's own name marker in the world (the game's marker layer; never the local player, who has no marker).</summary>
+    Overhead
 }
 
 /// <summary>What one tag shows on one teammate's row. Unset parts draw nothing.</summary>
@@ -47,7 +57,10 @@ public sealed class TeammateTagSource
 {
     private readonly Func<SNet_Player, TeammateTag> _read;
 
-    internal TeammateTagSource(string id, Func<SNet_Player, TeammateTag> read) { Id = id; _read = read; }
+    internal TeammateTagSource(string id, Func<SNet_Player, TeammateTag> read, TeammateTagPlace place) { Id = id; _read = read; Place = place; }
+
+    /// <summary>Where it is drawn.</summary>
+    public TeammateTagPlace Place { get; }
 
     /// <summary>The full ID, <c>modId/name</c>.</summary>
     public string Id { get; }
@@ -69,7 +82,7 @@ public sealed class TeammateTagSource
         catch (Exception error)
         {
             Enabled = false;
-            Plugin.Error("Teammate tag '" + Id + "' failed and is turned off: " + error);
+            Plugin.Error("ui-teammate-tag-failed-turned-off", "Teammate tag '" + Id + "' failed and is turned off: " + error);
             return false;
         }
         return !tag.IsEmpty;
@@ -81,17 +94,29 @@ internal static class TeammateTags
 {
     internal static readonly List<TeammateTagSource> All = new();
 
+    /// <summary>How many sources draw overhead.</summary>
+    internal static int OverheadCount { get; private set; }
+
     internal static TeammateTagSource? Add(TeammateTagSource source)
     {
         for (var i = 0; i < All.Count; i++)
             if (string.Equals(All[i].Id, source.Id, StringComparison.Ordinal))
             {
-                Plugin.Error(source.Id + ": teammate tag not added: the name is already taken.");
+                Plugin.Error("ui-teammate-tag-not-added-name-already", source.Id + ": teammate tag not added: the name is already taken.");
                 return null;
             }
         All.Add(source);
+        if (source.Place == TeammateTagPlace.Overhead)
+        {
+            OverheadCount++;
+            PatchGroups.Ensure(PatchGroup.Markers);
+        }
         return source;
     }
 
-    internal static void Remove(TeammateTagSource source) => All.Remove(source);
+    internal static void Remove(TeammateTagSource source)
+    {
+        if (!All.Remove(source) || source.Place != TeammateTagPlace.Overhead) return;
+        if (--OverheadCount == 0) TeammateOverheads.Clear();
+    }
 }

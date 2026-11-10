@@ -27,6 +27,14 @@ public sealed partial class UIKitMod
         return edge;
     }
 
+    /// <summary>Puts an effect on the screen effect stack (merged by channel with every other mod's, drawn in one pass): a red flash, a vignette, low-health
+    /// edges, blur, colour split. Effects on one channel merge by priority (only the highest present counts; the strongest of those shows, colours average by
+    /// strength), so two mods asking for the same thing never add up to double. The returned handle is yours: <see cref="ScreenEffect.Withdraw"/> fades it out
+    /// (releases it), <see cref="ScreenEffect.Set"/> changes a held one every frame. A timed effect (<see cref="ScreenEffectSpec.Seconds"/> above 0) releases itself.
+    /// Everything pushed here ends at once when the level ends. An invalid spec or a full stack (64 effects) returns an inactive handle and logs an error.</summary>
+    /// <example><c>var hit = ui.PushScreenEffect(ScreenChannel.Flash, new ScreenEffectSpec { Colour = Color.red, Strength = 0.4f, FadeOut = 0.4f });</c></example>
+    public ScreenEffect PushScreenEffect(ScreenChannel channel, in ScreenEffectSpec spec) => ScreenStack.PushOwned(Id, channel, spec);
+
     /// <summary>A helmet visor over the screen (an overlay layer, see <see cref="Visor"/>). Null (logged) when the name is taken.</summary>
     /// <example><c>var visor = ui.AddVisor("Visor"); visor.Show(new VisorState { Strength = 0.62f });</c></example>
     public Visor? AddVisor(string name)
@@ -92,40 +100,40 @@ internal static class ScreenOverlays
     {
         if (!File.Exists(path))
         {
-            Plugin.Error("Picture " + path + " is missing.");
+            Plugin.Error("ui-picture-missing", "Picture " + path + " is missing.");
             return null;
         }
         try
         {
-            var source = new Texture2D(2, 2, TextureFormat.RGBA32, false) { name = "ForgeUI.Decode." + Path.GetFileName(path), hideFlags = HideFlags.HideAndDontSave };
-            if (!ImageConversion.LoadImage(source, File.ReadAllBytes(path), markNonReadable: false))
-                throw new InvalidDataException("the file is not a PNG the game can decode");
+            var source = ForgeCore.Images.Decode(File.ReadAllBytes(path), out var failure, readable: true) ?? throw new InvalidDataException(failure);
+            source.name = "ForgeUI.Decode." + Path.GetFileName(path);
+            source.hideFlags = HideFlags.HideAndDontSave;
             shrink = Math.Max(1, shrink);
             int sw = source.width, sh = source.height, w = Math.Max(1, sw / shrink), h = Math.Max(1, sh / shrink);
             var from = Il2CppArrays.ToManaged(source.GetPixels32());
             Object.Destroy(source);
             var pixels = new Color32[w * h];
             for (var y = 0; y < h; y++)
-            for (var x = 0; x < w; x++)
-            {
-                int r = 0, g = 0, b = 0, a = 0, n = 0;
-                for (var dy = 0; dy < shrink; dy++)
-                for (var dx = 0; dx < shrink; dx++)
+                for (var x = 0; x < w; x++)
                 {
-                    var sx = x * shrink + dx;
-                    var sy = y * shrink + dy;
-                    if (sx >= sw || sy >= sh) continue;
-                    var p = from[sy * sw + sx];
-                    r += p.r; g += p.g; b += p.b; a += p.a; n++;
+                    int r = 0, g = 0, b = 0, a = 0, n = 0;
+                    for (var dy = 0; dy < shrink; dy++)
+                        for (var dx = 0; dx < shrink; dx++)
+                        {
+                            var sx = x * shrink + dx;
+                            var sy = y * shrink + dy;
+                            if (sx >= sw || sy >= sh) continue;
+                            var p = from[sy * sw + sx];
+                            r += p.r; g += p.g; b += p.b; a += p.a; n++;
+                        }
+                    n = Math.Max(1, n);
+                    pixels[y * w + x] = new Color32((byte)(r / n), (byte)(g / n), (byte)(b / n), (byte)(a / n));
                 }
-                n = Math.Max(1, n);
-                pixels[y * w + x] = new Color32((byte)(r / n), (byte)(g / n), (byte)(b / n), (byte)(a / n));
-            }
             return new Picture { Pixels = pixels, Width = w, Height = h };
         }
         catch (Exception error)
         {
-            Plugin.Error("Picture " + path + " could not be loaded: " + error);
+            Plugin.Error("ui-picture-could-not-be-loaded", "Picture " + path + " could not be loaded: " + error);
             return null;
         }
     }
@@ -136,12 +144,12 @@ internal static class ScreenOverlays
         int w = picture.Width, h = picture.Height;
         var pixels = new Color32[w * h];
         for (var y = 0; y < h; y++)
-        for (var x = 0; x < w; x++)
-        {
-            var p = picture.Pixels[y * w + x];
-            p.a = (byte)(p.a * Ease.Clamp01(mask((x + 0.5f) / w, (y + 0.5f) / h)));
-            pixels[y * w + x] = p;
-        }
+            for (var x = 0; x < w; x++)
+            {
+                var p = picture.Pixels[y * w + x];
+                p.a = (byte)(p.a * Ease.Clamp01(mask((x + 0.5f) / w, (y + 0.5f) / h)));
+                pixels[y * w + x] = p;
+            }
         var texture = new Texture2D(w, h, TextureFormat.RGBA32, false) { name = name, hideFlags = HideFlags.HideAndDontSave };
         Il2CppArrays.Upload(texture, pixels);
         texture.wrapMode = TextureWrapMode.Clamp;
@@ -445,7 +453,7 @@ public sealed class Visor
         catch (Exception error)
         {
             _failed = true;
-            Plugin.Error("Screen layer '" + Id + "' could not be built and is off: " + error);
+            Plugin.Error("ui-screen-layer-could-not-be-built", "Screen layer '" + Id + "' could not be built and is off: " + error);
             return false;
         }
         return true;

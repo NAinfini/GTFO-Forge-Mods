@@ -28,7 +28,7 @@ public enum ScreenChannel : byte
 /// </list>
 /// A slot's generation changes on every reuse, so an old handle never touches a newer effect. Nothing allocates after construction.
 /// </summary>
-public sealed class ScreenEffectBook
+internal sealed class ScreenEffectBook
 {
     /// <summary>Effects held at once, all channels together.</summary>
     public const int Capacity = 64;
@@ -101,6 +101,14 @@ public sealed class ScreenEffectBook
         Settle(slot, now);
         if (_ended[slot]) return false;
         End(slot, now, Rise(slot, now));
+        return true;
+    }
+
+    /// <summary>Ends the effect at once, without a fade (the level ended); its handles go stale. False when it already ended.</summary>
+    public bool Drop(int slot, int generation)
+    {
+        if (!Live(slot, generation)) return false;
+        Free(slot);
         return true;
     }
 
@@ -177,7 +185,7 @@ public sealed class ScreenEffectBook
     public float Rate(ScreenChannel channel) => _mRate[(int)channel];
 
     /// <summary>The low-health pulse at <paramref name="now"/> for <paramref name="rate"/> pulses a second: between 0.6 and 1.</summary>
-    public static float Pulse(float rate, float now) => rate <= 0f ? 1f : 0.6f + 0.4f * (0.5f - 0.5f * MathF.Cos(now * rate * 2f * MathF.PI));
+    public static float Pulse(float rate, float now) => rate <= 0f ? 1f : 0.6f + 0.4f * Ease.Pulse(now, rate);
 
     /// <summary>Ends every effect at once.</summary>
     public void Clear()

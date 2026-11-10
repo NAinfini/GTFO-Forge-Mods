@@ -135,7 +135,7 @@ public sealed class GameInventory
     /// <summary>After the game's frame, from the driver: rebuilds what the game changed and looks at the carried item ten times a second.</summary>
     internal void Tick()
     {
-        var now = Time.unscaledTime;
+        var now = ForgeCore.Frame.UnscaledTime;
         var changed = false;
         try
         {
@@ -154,7 +154,7 @@ public sealed class GameInventory
                 changed |= Rebuild(_names || retry, keys);
             }
         }
-        catch (Exception error) { Plugin.Error("Reading the weapon list failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-reading-weapon-list-failed", "Reading the weapon list failed: " + error); }
         _numbers = _names = false;
         if (changed) Bump();
     }
@@ -163,12 +163,12 @@ public sealed class GameInventory
     {
         Version++;
         try { Changed?.Invoke(); }
-        catch (Exception error) { Plugin.Error("An inventory listener failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-inventory-listener-failed", "An inventory listener failed: " + error); }
     }
 
     private void ReadAim()
     {
-        var agent = PlayerManager.GetLocalPlayerAgent();
+        var agent = ForgeCore.Players.Local;
         var inventory = agent != null && !agent.WasCollected ? agent.Inventory : null;
         var item = inventory != null && !inventory.WasCollected ? inventory.WieldedItem : null;
         Aiming = item != null && !item.WasCollected && item.AimButtonHeld;
@@ -187,7 +187,7 @@ public sealed class GameInventory
 
     private bool ReadCarry()
     {
-        var agent = PlayerManager.GetLocalPlayerAgent();
+        var agent = ForgeCore.Players.Local;
         var inventory = agent != null && !agent.WasCollected ? agent.Inventory : null;
         // The carry slot, not the hand: a heavy object that rides on a suit's back is still carried.
         Item? item = null;
@@ -215,7 +215,7 @@ public sealed class GameInventory
         {
             if (keys) RefreshKeys(ref names);
             // The game's LocalBackpack throws while the level loads and there is no local player yet.
-            var storage = PlayerManager.GetLocalPlayerAgent() != null ? PlayerBackpackManager.LocalBackpack?.AmmoStorage : null;
+            var storage = ForgeCore.Players.Local != null ? PlayerBackpackManager.LocalBackpack?.AmmoStorage : null;
             for (var i = 0; i < order.Length && count < Max; i++)
             {
                 var slot = order[i];
@@ -271,10 +271,11 @@ public sealed class GameInventory
     /// <summary>The slot's item model picture; while the item is not built yet it is null and the next quiet rebuild asks again.</summary>
     private Sprite? ModelIcon(InventorySlot slot)
     {
-        var backpack = PlayerManager.GetLocalPlayerAgent() != null ? PlayerBackpackManager.LocalBackpack : null;
+        var backpack = ForgeCore.Players.Local != null ? PlayerBackpackManager.LocalBackpack : null;
         var instance = backpack != null && backpack.TryGetBackpackItem(slot, out var held) && held != null && held.IsLoaded ? held.Instance : null;
         var picture = ItemModelIcons.Of(instance);
-        if (picture == null && instance == null) _picturePending = true;
+        // The instance may exist before the game has built its model: that is not a failure, and the next quiet rebuild asks again.
+        if (picture == null && (instance == null || ItemModelIcons.Waiting(instance))) _picturePending = true;
         return picture;
     }
 

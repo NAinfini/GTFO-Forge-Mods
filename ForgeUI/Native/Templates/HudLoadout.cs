@@ -303,17 +303,17 @@ public sealed class HudLoadout : HudWidget
                 }
                 break;
             case InventorySlot.ResourcePack:
-            {
-                var rel = Ease.Clamp01(r.ReserveRel);
-                for (var c = 0; c < 5; c++)
                 {
-                    var level = GaugeMath.Segment(rel, c, 5);
-                    _canvas!.Skew(left + c * 11f * u + 4.5f * u, cy, 9f * u, 10f * u, 3f * u, level > 0.5f ? text : UIKitColors.Faded(UIKitColors.Cockpit, 0.13f));
+                    var rel = Ease.Clamp01(r.ReserveRel);
+                    for (var c = 0; c < 5; c++)
+                    {
+                        var level = GaugeMath.Segment(rel, c, 5);
+                        _canvas!.Skew(left + c * 11f * u + 4.5f * u, cy, 9f * u, 10f * u, 3f * u, level > 0.5f ? text : UIKitColors.Faded(UIKitColors.Cockpit, 0.13f));
+                    }
+                    valueRight = left + 55f * u;
+                    if (_percentText[i].Length > 0) valueRight = left + 58f * u + _canvas!.Text(_percentText[i], left + 58f * u, cy, CompactRow.ValuePx, text, HudAlign.Left, true);
+                    break;
                 }
-                valueRight = left + 55f * u;
-                if (_percentText[i].Length > 0) valueRight = left + 58f * u + _canvas!.Text(_percentText[i], left + 58f * u, cy, CompactRow.ValuePx, text, HudAlign.Left, true);
-                break;
-            }
             case InventorySlot.HackingTool:
                 break;
             default:

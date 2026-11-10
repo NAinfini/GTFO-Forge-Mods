@@ -54,7 +54,7 @@ public sealed class GameCompass
         _reading.Begin();
         try
         {
-            var now = Time.unscaledTime;
+            var now = ForgeCore.Frame.UnscaledTime;
             if (now >= _lookupAt || _eye == null || _eye.WasCollected)
             {
                 _lookupAt = now + LookupEvery;
@@ -80,7 +80,7 @@ public sealed class GameCompass
         catch (Exception error)
         {
             _reading.Begin();
-            if (!_failing) Plugin.Error("Reading the game's compass points failed (no points until it reads again): " + error);
+            if (!_failing) Plugin.Error("ui-reading-games-compass-points-failed", "Reading the game's compass points failed (no points until it reads again): " + error);
             _failing = true;
         }
     }
@@ -108,19 +108,18 @@ public sealed class GameCompass
             _locator = Replicator(gui.m_locatorBeacon);
             _terminal = Replicator(gui.m_terminalPing);
         }
-        var agents = PlayerManager.PlayerAgentsInLevel;
-        if (agents != null)
-            for (var i = 0; i < agents.Count && _mateCount < Slots; i++)
-            {
-                var agent = agents[i];
-                if (agent == null || agent.WasCollected || agent.IsLocallyOwned) continue;
-                var owner = agent.Owner;
-                _mates[_mateCount] = agent;
-                _mateSlot[_mateCount] = agent.PlayerSlotIndex;
-                _mateColour[_mateCount] = owner != null ? owner.PlayerColor : Color.white;
-                _mateCount++;
-            }
+        ForgeCore.Players.Each(this, static (self, info) => self.AddMate(info));
         for (var i = _mateCount; i < Slots; i++) _mates[i] = null;
+    }
+
+    private void AddMate(ForgeCore.PlayerInfo info)
+    {
+        if (_mateCount >= Slots || info.IsLocal) return;
+        var owner = info.Agent.Owner;
+        _mates[_mateCount] = info.Agent;
+        _mateSlot[_mateCount] = info.Slot;
+        _mateColour[_mateCount] = owner != null ? owner.PlayerColor : Color.white;
+        _mateCount++;
     }
 
     private static SNet_StateReplicator<pNavMarkerState, pNavMarkerInteraction>? Replicator(SyncedNavMarkerWrapper? wrapper)

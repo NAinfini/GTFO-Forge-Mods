@@ -29,7 +29,7 @@ public readonly record struct HudColour(float R, float G, float B, float A)
 /// edge and a highlight sweeping along it while it runs; on completion the whole bar flashes white for <see cref="FlashSeconds"/>, then
 /// folds away over <see cref="FoldSeconds"/>. <see cref="Build"/> writes the shapes; it allocates nothing.
 /// </summary>
-public static class ProgressBar
+internal static class ProgressBar
 {
     public const float FlashSeconds = 0.15f, FoldSeconds = 0.25f, SweepSeconds = 1.1f;
     /// <summary>Shapes one bar writes at most.</summary>

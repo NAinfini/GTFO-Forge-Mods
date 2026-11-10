@@ -34,7 +34,6 @@ internal sealed class Picker
     private const float Gap = 12f, ContentPadding = 5f, ColumnPadding = 14f, TileGap = 10f, TitleHeight = 52f;
     /// <summary>A slot tile's height: as tall as the column allows, between the APPAREL button's height and this.</summary>
     private const float MaxTile = 140f;
-    private const float TabAllowance = 60f;
     /// <summary>The strip between the list's rows and the details box, where the list's scrollbar runs.</summary>
     private const float ListGap = 30f;
     /// <summary>The picker's window is narrower than the game's (1600): list rows only use the left part of their width, so the room
@@ -93,7 +92,7 @@ internal sealed class Picker
         try { _ = new Picker(bar, source); }
         catch (Exception error)
         {
-            Plugin.Error("The picker could not be opened: " + error);
+            Plugin.Error("ui-picker-could-not-be-opened", "The picker could not be opened: " + error);
             if (request == _openRequest && Current != null) Close();
         }
     }
@@ -103,7 +102,7 @@ internal sealed class Picker
         var picker = Current;
         if (picker == null) return;
         try { picker._bar.HidePopup(); }
-        catch (Exception error) { Plugin.Error("Hiding the picker failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-hiding-picker-failed", "Hiding the picker failed: " + error); }
         picker.TakeDown(true); // the HidePopup postfix normally did this already
     }
 
@@ -123,7 +122,7 @@ internal sealed class Picker
         var current = Current;
         if (current == null || current._disposed || current._opening) return;
         try { current.HoldStill(); }
-        catch (Exception error) { Plugin.Error("Holding the picker in place failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-holding-picker-place-failed", "Holding the picker in place failed: " + error); }
     }
 
     private Picker(CM_PlayerLobbyBar bar, PickerSource source)
@@ -199,16 +198,7 @@ internal sealed class Picker
     /// <summary>How far the page's cursor panning has moved the window's parent from its rest position, in that parent's
     /// units. The page moves <c>m_movingContentHolder</c> to its start offset plus <c>m_localHolderOffset</c>
     /// (<c>CM_PageBase.MoveContentHolder</c>); zero when the window is not under it.</summary>
-    private Vector3 PanOffset(Transform? parent)
-    {
-        var page = CM_PageLoadout.Current;
-        var holder = page?.m_movingContentHolder;
-        if (page == null || holder == null || parent == null || holder.parent == null || !_window.transform.IsChildOf(holder)) return Vector3.zero;
-        var offset = page.m_localHolderOffset;
-        var world = holder.parent.TransformVector(new Vector3(offset.x, offset.y, 0f));
-        var local = parent.InverseTransformVector(world);
-        return new Vector3(local.x, local.y, 0f);
-    }
+    private Vector3 PanOffset(Transform? parent) => parent == null ? Vector3.zero : PagePan.Offset(CM_PageLoadout.Current, _window.transform);
 
     private void HoldStill()
     {
@@ -392,7 +382,7 @@ internal sealed class Picker
             _warning = null;
             Refresh();
         }
-        catch (Exception error) { Plugin.Error("Switching the picker to tab " + tab + " failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-switching-picker-tab-failed", "Switching the picker to tab " + tab + " failed: " + error); }
     }
 
     private CM_LobbyScrollItem Card(Transform parent, string name)
@@ -446,7 +436,7 @@ internal sealed class Picker
                 DrawRows();
                 Info();
             }
-            catch (Exception error) { Plugin.Error("Picker source " + Source.GetType().FullName + " failed to describe its cards: " + error); }
+            catch (Exception error) { Plugin.Error("ui-picker-source-failed-describe-cards", "Picker source " + Source.GetType().FullName + " failed to describe its cards: " + error); }
         });
         _entryCards.Add((card, entry, PickerRowSkin.On(card), route));
     }
@@ -482,7 +472,7 @@ internal sealed class Picker
     {
         if (_disposed) return;
         try { Source.Clicked(click); }
-        catch (Exception error) { Plugin.Error("Picker source " + Source.GetType().FullName + " failed on a " + click + " click: " + error); }
+        catch (Exception error) { Plugin.Error("ui-picker-source-failed-click", "Picker source " + Source.GetType().FullName + " failed on a " + click + " click: " + error); }
     }
 
     private void ChooseSlot(int slot)
@@ -512,7 +502,7 @@ internal sealed class Picker
         }
         catch (Exception error)
         {
-            Plugin.Error("Picker source " + Source.GetType().FullName + " failed to pick: " + error);
+            Plugin.Error("ui-picker-source-failed-pick", "Picker source " + Source.GetType().FullName + " failed to pick: " + error);
             return;
         }
         _focus = entry;
@@ -586,7 +576,7 @@ internal sealed class Picker
             _tabSkin.Draw(_window, _tabs, _tab);
             Info();
         }
-        catch (Exception error) { Plugin.Error("Picker source " + Source.GetType().FullName + " failed to describe its cards: " + error); }
+        catch (Exception error) { Plugin.Error("ui-picker-source-failed-describe-cards", "Picker source " + Source.GetType().FullName + " failed to describe its cards: " + error); }
     }
 
     private void DrawRows() => DrawRows(_tab < 0 ? Array.Empty<PickerCard>() : Source.Entries(_tab), _tab < 0 ? null : Source.ClearCard);
@@ -667,7 +657,7 @@ internal sealed class Picker
                 _window.transform.localPosition = _windowPosition;
             }
         }
-        catch (Exception error) { Plugin.Error("Emptying the pop-up lists after the picker failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-emptying-pop-up-lists-after-picker", "Emptying the pop-up lists after the picker failed: " + error); }
         // The tabs and the details box are the game's and stay: what was drawn on them goes now.
         try
         {
@@ -675,7 +665,7 @@ internal sealed class Picker
             _detail?.Destroy();
             _detail = null;
         }
-        catch (Exception error) { Plugin.Error("Removing the picker's tabs and details failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-removing-pickers-tabs-details-failed", "Removing the picker's tabs and details failed: " + error); }
         foreach (var (item, _, route) in _slots) Release(item, route);
         foreach (var (card, _, _, route) in _entryCards) Release(card, route);
         _slots.Clear();
@@ -687,9 +677,9 @@ internal sealed class Picker
             Dying.Add(_column);
         }
         try { if (closing && _window != null && !_window.WasCollected) _window.ClearContent(); }
-        catch (Exception error) { Plugin.Error("Clearing the pop-up after the picker failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-clearing-pop-up-after-picker-failed", "Clearing the pop-up after the picker failed: " + error); }
         try { Source.Closed(); }
-        catch (Exception error) { Plugin.Error("Picker source " + Source.GetType().FullName + " failed on closing: " + error); }
+        catch (Exception error) { Plugin.Error("ui-picker-source-failed-closing", "Picker source " + Source.GetType().FullName + " failed on closing: " + error); }
     }
 
     /// <summary>The window closed (click outside, close box, page change, or <see cref="Close"/>).</summary>
@@ -730,7 +720,7 @@ internal sealed class Picker
                 if (picker != null && !picker._opening) picker.TakeDown(false);
                 if (__instance.m_popupScrollWindow != null) DropDeadItems(__instance.m_popupScrollWindow);
             }
-            catch (Exception error) { Plugin.Error("Preparing the game's own pop-up failed: " + error); }
+            catch (Exception error) { Plugin.Error("ui-preparing-games-own-pop-up-failed", "Preparing the game's own pop-up failed: " + error); }
         }
     }
 

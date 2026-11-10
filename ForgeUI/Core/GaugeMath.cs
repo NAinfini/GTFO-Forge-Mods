@@ -303,7 +303,7 @@ public struct ArcFlare
 }
 
 /// <summary>The contacts of a <see cref="HudBearingArc"/>: fixed arrays, filled between <see cref="Begin"/> calls, no allocation.</summary>
-public sealed class BearingContacts
+internal sealed class BearingContacts
 {
     private readonly float[] _azimuth, _strength;
     private readonly EnemyAlert[] _state;
@@ -354,7 +354,7 @@ public sealed class BearingContacts
 /// <see cref="IdleSeconds"/> without use or <see cref="UsedDelay"/> after the first use; <see cref="Attention"/> brings it back for
 /// <see cref="AttentionSeconds"/>, holding it keeps it up, and showing it again restarts the clock. No allocation.
 /// </summary>
-public sealed class FamiliarFade
+internal sealed class FamiliarFade
 {
     public const float UsedDelay = 1.5f, AttentionSeconds = 4f, Rate = 4f;
 

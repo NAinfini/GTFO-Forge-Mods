@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
 using Enemies;
-using HarmonyLib;
 using UnityEngine;
 
 namespace ForgeUI;
@@ -25,7 +24,7 @@ public sealed partial class UIKitMod
         if (id == null) return null;
         style ??= new EnemyHealthBarStyle();
         var problem = style.Problem();
-        if (problem != null) { Plugin.Error(id + ": enemy health bars not added: " + problem + "."); return null; }
+        if (problem != null) { Plugin.Error("ui-enemy-health-bars-not-added", id + ": enemy health bars not added: " + problem + "."); return null; }
         return EnemyHealthBars.Add(new EnemyHealthBar(id, style));
     }
 }
@@ -54,7 +53,7 @@ public sealed class EnemyHealthBar
         {
             if (value == null) throw new ArgumentNullException(nameof(value));
             var problem = value.Problem();
-            if (problem != null) { Plugin.Error(Id + ": enemy health bar style refused: " + problem + "."); return; }
+            if (problem != null) { Plugin.Error("ui-enemy-health-bar-style-refused", Id + ": enemy health bar style refused: " + problem + "."); return; }
             _style = value;
         }
     }
@@ -86,16 +85,25 @@ internal static class EnemyHealthBars
     private static EnemyBarsView? _view;
     private static int _sightCursor, _sightMask;
 
+    private static bool _goneHooked;
+
     internal static bool Used { get; private set; }
 
     internal static EnemyHealthBar? Add(EnemyHealthBar bars)
     {
         if (Registered.ContainsKey(bars.Id))
         {
-            Plugin.Error(bars.Id + ": enemy health bars not added: the name is already taken.");
+            Plugin.Error("ui-enemy-health-bars-not-added-name", bars.Id + ": enemy health bars not added: the name is already taken.");
             return null;
         }
-        PatchGroups.Ensure(PatchGroup.EnemyBars);
+        if (!_goneHooked)
+        {
+            // An enemy that dies or leaves ends its bar at once; ForgeCore patches these three game methods once for every package.
+            _goneHooked = true;
+            ForgeCore.GameHooks.EnemyDead.Before(Gone);
+            ForgeCore.GameHooks.EnemyDespawned.Before(Gone);
+            ForgeCore.GameHooks.EnemyDestroyed.Before(Gone);
+        }
         PatchGroups.Ensure(PatchGroup.LocalHits);
         _enabled ??= ForgeCore.Settings.Bind(Plugin.Id, "EnemyHealthBars", "Enabled", true,
             "Draws the enemy health bars that mods such as Forge Frames switch on: only for enemies you hit and can see. Turn off to hide them in every mod.");
@@ -208,7 +216,7 @@ internal static class EnemyHealthBars
         {
             var damage = Damage[i];
             if (damage == null || !Book.Bars[i].Used) continue;
-            var owner = damage.m_CachedPtr == IntPtr.Zero ? null : damage.Owner;
+            var owner = ForgeCore.NativeObjects.Gone(damage) ? null : damage.Owner;
             if (owner != null && owner.Pointer != agent.Pointer) continue;
             Book.Remove(Book.Bars[i].Key);
             Detach(i);
@@ -230,7 +238,7 @@ internal static class EnemyHealthBars
             ref var bar = ref Book.Bars[i];
             var damage = Damage[i];
             if (!bar.Used) { if (damage != null) Detach(i); continue; }
-            if (damage == null || damage.m_CachedPtr == IntPtr.Zero || Body[i] == null || Body[i]!.m_CachedPtr == IntPtr.Zero)
+            if (ForgeCore.NativeObjects.Gone(damage) || ForgeCore.NativeObjects.Gone(Body[i]))
             {
                 Book.Remove(bar.Key);
                 Detach(i);
@@ -269,7 +277,7 @@ internal static class EnemyHealthBars
             for (var i = 0; i < points.Length; i++)
             {
                 var t = points[i];
-                if (t == null || t.m_CachedPtr == IntPtr.Zero) continue;
+                if (ForgeCore.NativeObjects.Gone(t)) continue;
                 var q = EngineCalls.Position(t);
                 if (q.y <= best) continue;
                 best = q.y; p.x = q.x; p.z = q.z;
@@ -283,7 +291,7 @@ internal static class EnemyHealthBars
             for (var i = 0; i < skins.Length; i++)
             {
                 var r = skins[i];
-                if (r == null || r.m_CachedPtr == IntPtr.Zero || !EngineCalls.RendererTop(r, out var y)) continue;
+                if (ForgeCore.NativeObjects.Gone(r) || !EngineCalls.RendererTop(r, out var y)) continue;
                 if (y > top) top = y;
             }
             if (top > float.NegativeInfinity) { p.y = top + HeadClearance * 0.5f * size; return p; }
@@ -293,6 +301,7 @@ internal static class EnemyHealthBars
     }
 
     internal static bool Tracked(int slot) => Body[slot] != null;
+
 }
 
 /// <summary>The kit's own element that draws every enemy health bar.</summary>
@@ -351,19 +360,4 @@ internal sealed class EnemyBarsView : HudWidget
         }
     }
 
-}
-
-/// <summary>An enemy that dies or leaves ends its bar at once.</summary>
-[PatchGroup(PatchGroup.EnemyBars)]
-[HarmonyPatch]
-internal static class EnemyHealthBarsDespawnPatch
-{
-    private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
-    {
-        yield return AccessTools.Method(typeof(EnemyAgent), nameof(EnemyAgent.OnDead));
-        yield return AccessTools.Method(typeof(EnemyAgent), nameof(EnemyAgent.OnDeSpawn));
-        yield return AccessTools.Method(typeof(EnemyAgent), nameof(EnemyAgent.OnDestroy));
-    }
-
-    private static void Prefix(EnemyAgent __instance) => EnemyHealthBars.Gone(__instance);
 }

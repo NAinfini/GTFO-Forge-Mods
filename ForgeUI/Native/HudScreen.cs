@@ -143,24 +143,11 @@ internal static class HudScreen
         var frame = Time.frameCount;
         if (_worldCameraFrame == frame && (_worldCamera == null || !_worldCamera.WasCollected)) return _worldCamera;
         _worldCameraFrame = frame;
-        return _worldCamera = FindWorldCamera();
+        return _worldCamera = ForgeCore.Players.WorldCamera();
     }
 
     private static int _worldCameraFrame = -1;
     private static Camera? _worldCamera;
-
-    private static Camera? FindWorldCamera()
-    {
-        var current = CameraManager.CurrentCam;
-        var camera = current == null || current.WasCollected ? null : current.m_camera;
-        if (camera != null && !camera.WasCollected && camera.enabled) return camera;
-        var player = PlayerManager.GetLocalPlayerAgent();
-        var fps = player == null || player.WasCollected ? null : player.FPSCamera;
-        camera = fps == null || fps.WasCollected ? null : fps.m_camera;
-        if (camera != null && !camera.WasCollected) return camera;
-        camera = UnityEngine.Camera.main;
-        return camera != null && !camera.WasCollected ? camera : null;
-    }
 
     /// <summary>The camera that draws the HUD's layer (perspective or orthographic): one under the game's GUI root first (the game's UI
     /// cameras are disabled and rendered by its own UI pass), else an enabled one.</summary>
@@ -181,7 +168,7 @@ internal static class HudScreen
         if (!_missingLogged)
         {
             _missingLogged = true;
-            Plugin.Error("No camera draws the HUD layer " + list.gameObject.layer + "; HUD elements stay off.");
+            Plugin.Error("ui-no-camera-draws-hud-layer-hud", "No camera draws the HUD layer " + list.gameObject.layer + "; HUD elements stay off.");
         }
         return null;
     }

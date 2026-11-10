@@ -6,7 +6,7 @@ namespace ForgeUI;
 /// <summary>Which icon files of a folder to register, without Unity or the file system: the names asked for (a name, or a prefix ending
 /// in <c>*</c>) against the PNG names the folder holds, and which file each one reads (the <c>@2x</c> picture on a tall screen, else
 /// the plain one, else the other).</summary>
-public static class IconFolder
+internal static class IconFolder
 {
     /// <summary>Screens taller than this many lines use the <c>@2x</c> file.</summary>
     public const int LargeScreenLines = 1440;

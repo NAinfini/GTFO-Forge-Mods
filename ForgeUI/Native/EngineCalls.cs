@@ -65,7 +65,7 @@ internal static class EngineCalls
             _sceneRead = true;
             // Only the fallback for an enemy without limbs needs it, so a build without it keeps the bars (they sit on the eyes then).
             try { _bounds = IL2CPP.ResolveICall<ReadBounds>("UnityEngine.Renderer::get_bounds_Injected"); }
-            catch (Exception error) { _bounds = null; Plugin.Error("The renderer bounds call is missing, so enemy bars without limbs sit on the eyes: " + error); }
+            catch (Exception error) { _bounds = null; Plugin.Error("ui-renderer-bounds-call-missing-so-enemy", "The renderer bounds call is missing, so enemy bars without limbs sit on the eyes: " + error); }
             return true;
         }
         catch (Exception error)

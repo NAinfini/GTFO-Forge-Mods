@@ -13,7 +13,7 @@ internal static class GearIconJob
         try { return !GearIcons.Load(__0); }
         catch (System.Exception error)
         {
-            Plugin.Error("Gear icon job could not be loaded; the game loads it: " + error);
+            Plugin.Error("ui-gear-icon-job", "Gear icon job could not be loaded; the game loads it: " + error);
             return true;
         }
     }

@@ -52,7 +52,7 @@ public static partial class UIKit
     /// picker again. Subscribe when you put texts somewhere ForgeUI does not draw (for example the game's own gear names).</summary>
     public static event Action? LanguageChanged;
 
-    /// <summary>The language files (<c>&lt;code&gt;.json</c>) in <paramref name="folder"/>, for texts that do not belong to a plugin's
+    /// <summary>The language files (<c>&lt;code&gt;.forge</c>) in <paramref name="folder"/>, for texts that do not belong to a plugin's
     /// own <c>lang</c> folder (for example a content pack's). One set per folder; read on first use.</summary>
     public static UITexts Texts(string folder)
     {
@@ -70,18 +70,18 @@ public static partial class UIKit
     internal static void LanguageSwitched()
     {
         try { MenuBar.LanguageChanged(); }
-        catch (Exception error) { Plugin.Error("Menu bar pages could not change language: " + error); }
+        catch (Exception error) { Plugin.Error("ui-menu-bar-pages-could-not-change", "Menu bar pages could not change language: " + error); }
         var listeners = LanguageChanged?.GetInvocationList();
         if (listeners != null)
             foreach (var listener in listeners)
             {
                 try { ((Action)listener)(); }
-                catch (Exception error) { Plugin.Error("A language change listener (" + listener.Method.DeclaringType?.FullName + "." + listener.Method.Name + ") failed: " + error); }
+                catch (Exception error) { Plugin.Error("ui-language-change-listener-failed", "A language change listener (" + listener.Method.DeclaringType?.FullName + "." + listener.Method.Name + ") failed: " + error); }
             }
         try { GearNames.LanguageChanged(); }
-        catch (Exception error) { Plugin.Error("Gear names on screen could not change language: " + error); }
+        catch (Exception error) { Plugin.Error("ui-gear-names-screen-could-not-change", "Gear names on screen could not change language: " + error); }
         try { RefreshPicker(); }
-        catch (Exception error) { Plugin.Error("The picker could not change language: " + error); }
+        catch (Exception error) { Plugin.Error("ui-picker-could-not-change-language", "The picker could not change language: " + error); }
     }
     /// <summary>
     /// What a button that opens a picker should call: closes the picker when <paramref name="source"/> is showing (or was closed
@@ -115,7 +115,7 @@ public sealed partial class UIKitMod
 
     private UITexts? _texts;
 
-    /// <summary>Your language files: <c>lang/&lt;code&gt;.json</c> beside your plugin DLL (so the mod ID must be your plugin GUID),
+    /// <summary>Your language files: <c>lang/&lt;code&gt;.forge</c> beside your plugin DLL (so the mod ID must be your plugin GUID),
     /// read and checked the first time a text is asked for. Every <see cref="UIText.Key"/> you register is looked up here.</summary>
     public UITexts Texts => _texts ??= ForgeUI.Language.ForPlugin(Id);
 
@@ -132,7 +132,7 @@ public sealed partial class UIKitMod
     {
         var problem = ModIds.Problem(name, what + " name");
         if (problem == null) return ModIds.Join(Id, name);
-        Plugin.Error(Id + ": " + what + " not added: " + problem + ".");
+        Plugin.Error("ui-not-added", Id + ": " + what + " not added: " + problem + ".");
         return null;
     }
 
@@ -395,7 +395,7 @@ public sealed partial class MenuBarPage
         _routes.Add(Input.Route(item, () =>
         {
             try { onClick(); }
-            catch (Exception error) { Plugin.Error("Menu bar page '" + Id + "' button failed: " + error); }
+            catch (Exception error) { Plugin.Error("ui-menu-bar-page-button-failed", "Menu bar page '" + Id + "' button failed: " + error); }
         }, null));
         return item;
     }

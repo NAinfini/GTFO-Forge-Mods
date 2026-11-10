@@ -84,7 +84,7 @@ public sealed class EnemyHealthBarStyle
 /// place when they are all in use) and the trailing piece each hit leaves (damage numbers and kill marks are the hit feedback's,
 /// <see cref="HitFeedbackBook"/>). Every array is made once; nothing is allocated per hit or per frame.
 /// </summary>
-public sealed class EnemyBarBook
+internal sealed class EnemyBarBook
 {
     public const int Capacity = 12;
     /// <summary>The lost piece is bright for this long, then shrinks away (<see cref="MeterTrail"/>).</summary>

@@ -25,7 +25,7 @@ internal static class LocalHits
     {
         _hitBase = IntPtr.Zero;
         if (source == null || target == null || !Wanted) return;
-        var local = PlayerManager.GetLocalPlayerAgent();
+        var local = ForgeCore.Players.Local;
         if (local == null || local.Pointer != source.Pointer) return;
         _hitBase = target.Pointer;
         _hitBefore = target._Health_k__BackingField;
@@ -57,13 +57,13 @@ internal static class LocalHits
         private static void Prefix(Dam_EnemyDamageBase __instance, Agent __1)
         {
             try { Before(__instance, __1); }
-            catch (Exception error) { _hitBase = IntPtr.Zero; Plugin.Error("Reading the local player's hit failed: " + error); }
+            catch (Exception error) { _hitBase = IntPtr.Zero; Plugin.Error("ui-reading-local-players-hit-failed", "Reading the local player's hit failed: " + error); }
         }
 
         private static void Postfix(Dam_EnemyDamageBase __instance, Vector3 __2)
         {
             try { After(__instance, __2); }
-            catch (Exception error) { _hitBase = IntPtr.Zero; Plugin.Error("Reading the local player's hit failed: " + error); }
+            catch (Exception error) { _hitBase = IntPtr.Zero; Plugin.Error("ui-reading-local-players-hit-failed", "Reading the local player's hit failed: " + error); }
         }
     }
 
@@ -79,7 +79,7 @@ internal static class LocalHits
                 var target = __instance.m_base;
                 if (target != null) HitFeedbacks.Critical((long)target.Pointer);
             }
-            catch (Exception error) { Plugin.Error("Reading the local player's weak-spot hit failed: " + error); }
+            catch (Exception error) { Plugin.Error("ui-reading-local-players-weak-spot-hit", "Reading the local player's weak-spot hit failed: " + error); }
         }
     }
 

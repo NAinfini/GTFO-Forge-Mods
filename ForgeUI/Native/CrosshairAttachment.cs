@@ -95,7 +95,7 @@ internal static class CrosshairAttachments
     {
         var problem = Registered.Add(attachment.Id, attachment);
         if (problem == null) return true;
-        Plugin.Error("Crosshair attachment not added: " + problem + ".");
+        Plugin.Error("ui-crosshair-attachment-not-added", "Crosshair attachment not added: " + problem + ".");
         return false;
     }
 
@@ -126,7 +126,7 @@ internal static class CrosshairAttachments
             var rect = parent.TryCast<RectTransform>();
             var size = rect != null ? rect.rect.size : new Vector2(1920f, 1080f);
             var unit = size.y > 1f ? size.y / 1080f : 1f;
-            var now = Time.unscaledDeltaTime;
+            var now = ForgeCore.Frame.UnscaledDeltaTime;
             for (var i = 0; i < list.Count; i++)
             {
                 var a = list[i];
@@ -135,7 +135,7 @@ internal static class CrosshairAttachments
                 Place(a, pieces, circle.transform.localPosition, size, unit, now);
             }
         }
-        catch (Exception error) { Plugin.Error("Crosshair attachments failed to update: " + error); }
+        catch (Exception error) { Plugin.Error("ui-crosshair-attachments-failed-update", "Crosshair attachments failed to update: " + error); }
     }
 
     private static Pieces Build(CrosshairAttachment a, Image template, Transform parent)

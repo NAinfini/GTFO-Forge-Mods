@@ -7,7 +7,7 @@ namespace ForgeUI;
 /// that rises quickly and fades. A new hit within <see cref="MergeDegrees"/> of a running one joins it (the stronger
 /// strength, its clock restarted); otherwise it takes a free slot, or the weakest one. No allocation after construction.
 /// </summary>
-public sealed class EdgeFlashes
+internal sealed class EdgeFlashes
 {
     public const int Slots = 6;
     public const float MergeDegrees = 25f, Rise = 0.06f;

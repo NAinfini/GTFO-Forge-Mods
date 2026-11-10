@@ -45,11 +45,13 @@ public static class GameText
     public static bool TryRenderOptional(string literal, GameLanguage language, out string rendered, out bool empty, out Exception? error)
         => TryRender(literal, language, true, out rendered, out empty, out error);
 
-    /// <summary>The native localized literal that carries an already rendered text and no translation id. The
-    /// interop string constructor invokes the value-type constructor on an unallocated wrapper, so only the
-    /// parameterless constructor is used and all three fields are written and read back explicitly.</summary>
+    /// <summary>The native localized literal that carries an already rendered text and, by default, no translation
+    /// id. A caller whose consumer identifies the content by its id alone (a replication packet that carries only
+    /// <c>Id</c>) passes that id; it is written as given and read back. The interop string constructor invokes the
+    /// value-type constructor on an unallocated wrapper, so only the parameterless constructor is used and all
+    /// three fields are written and read back explicitly.</summary>
     /// <exception cref="InvalidOperationException">The native value did not retain the text, naming the phase.</exception>
-    public static LocalizedText Localized(string rendered)
+    public static LocalizedText Localized(string rendered, uint id = 0)
     {
         string phase = "allocate";
         try
@@ -58,11 +60,11 @@ public static class GameText
             phase = "write-text";
             localized.UntranslatedText = rendered;
             phase = "write-ids";
-            localized.Id = 0;
+            localized.Id = id;
             localized.OldId = 0;
             phase = "readback";
-            if (localized.UntranslatedText != rendered || localized.Id != 0 || localized.OldId != 0)
-                throw new InvalidOperationException("The native localized literal did not retain its text and zero translation ids.");
+            if (localized.UntranslatedText != rendered || localized.Id != id || localized.OldId != 0)
+                throw new InvalidOperationException("The native localized literal did not retain its text and translation ids.");
             return localized;
         }
         catch (Exception error)

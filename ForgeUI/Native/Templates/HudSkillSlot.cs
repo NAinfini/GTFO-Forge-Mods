@@ -144,7 +144,7 @@ public sealed class HudSkillSlot : HudWidget
         {
             float value;
             try { value = Progress(); }
-            catch (Exception error) { value = -1f; Plugin.Error("Skill slot '" + Id + "' progress failed: " + error); Progress = null; }
+            catch (Exception error) { value = -1f; Plugin.Error("ui-skill-slot-progress-failed", "Skill slot '" + Id + "' progress failed: " + error); Progress = null; }
             _progress.Fraction(value, now);
             if (_progress.Running)
             {

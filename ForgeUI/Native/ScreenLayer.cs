@@ -27,7 +27,7 @@ public static partial class UIKit
         catch (Exception error)
         {
             shader = null;
-            Plugin.Error("Shader '" + id + "' could not be loaded: " + error);
+            Plugin.Error("ui-shader-could-not-be-loaded", "Shader '" + id + "' could not be loaded: " + error);
         }
         Shaders[id ?? ""] = shader;
         return shader;
@@ -76,13 +76,13 @@ public sealed partial class UIKitMod
         {
             return true;
         }
-        Plugin.Error("Screen layer not registered: " + problem + ".");
+        Plugin.Error("ui-screen-layer-not-registered", "Screen layer not registered: " + problem + ".");
         return false;
     }
 }
 /// <summary>What a <see cref="ScreenPanels"/> overlay is made of. Coordinates are of the screen as a unit square: (0, 0) bottom left,
 /// (1, 1) top right, whatever the aspect.</summary>
-public sealed class ScreenPanelsSpec
+internal sealed class ScreenPanelsSpec
 {
     /// <summary>Each panel a convex polygon, its corners in order as x0, y0, x1, y1, ...</summary>
     public IReadOnlyList<float[]> Panels { get; init; } = Array.Empty<float[]>();
@@ -110,7 +110,7 @@ public sealed class ScreenPanelsSpec
 /// material values, so it can run in any frame without creating anything once <see cref="Warm"/> ran; the pieces are rebuilt when the
 /// screen size changes. While another exclusive layer holds the screen, whatever is switched on is put away again in the same call and
 /// the layer waits (logged once per wait).</summary>
-public sealed class ScreenPanels
+internal sealed class ScreenPanels
 {
     private readonly ScreenPanelsSpec _spec;
     private readonly int _stateId;
@@ -225,7 +225,7 @@ public sealed class ScreenPanels
     private bool Claim()
     {
         var arbiter = ScreenLayer.Arbiter;
-        switch (arbiter.Request(this, Id, Priority, Time.unscaledTime, _preempted))
+        switch (arbiter.Request(this, Id, Priority, ForgeCore.Frame.UnscaledTime, _preempted))
         {
             case ScreenGrant.Waiting:
                 return false;
@@ -249,7 +249,7 @@ public sealed class ScreenPanels
         catch (Exception error)
         {
             _failed = true;
-            Plugin.Error("Screen overlay '" + Id + "' could not be built and is off: " + error);
+            Plugin.Error("ui-screen-overlay-could-not-be-built", "Screen overlay '" + Id + "' could not be built and is off: " + error);
             return false;
         }
         return true;
@@ -401,7 +401,7 @@ internal static class ScreenLayer
         catch (Exception error)
         {
             _unavailable = true;
-            Plugin.Error("The screen overlay layer could not be built; screen overlays are off: " + error);
+            Plugin.Error("ui-screen-overlay-layer", "The screen overlay layer could not be built; screen overlays are off: " + error);
             return false;
         }
         return true;

@@ -6,7 +6,7 @@ using UnityEngine;
 namespace ForgeUI;
 
 /// <summary>The game HUD's look as colours: the text, the accent and the translucent slabs the weapon list is drawn with.</summary>
-public static class UIKitColors
+public static partial class UIKitColors
 {
     /// <summary>Normal text on the HUD.</summary>
     public static readonly Color Text = new(0.871f, 0.886f, 0.875f, 0.92f);
@@ -18,12 +18,12 @@ public static class UIKitColors
     public static readonly Color Accent = new(1f, 0.561f, 0.169f, 1f);
     /// <summary>Text on an <see cref="Accent"/> fill.</summary>
     public static readonly Color OnAccent = new(0.086f, 0.086f, 0.086f, 1f);
-    /// <summary>Caution (a bar running low, a warning).</summary>
-    public static readonly Color Warn = new(0.98f, 0.78f, 0.25f, 1f);
-    /// <summary>Danger (a bar nearly empty, an alert).</summary>
-    public static readonly Color Alert = new(0.92f, 0.27f, 0.22f, 1f);
-    /// <summary>Good news.</summary>
-    public static readonly Color Good = new(0.5f, 0.86f, 0.5f, 1f);
+    /// <summary>Caution (a bar running low, a warning): the game's low-ammunition notice colour once <see cref="Refresh"/> has read it.</summary>
+    public static Color Warn { get; private set; } = new(0.98f, 0.78f, 0.25f, 1f);
+    /// <summary>Danger (a bar nearly empty, an alert): the game's red, #E24851 sampled from the game's chat line.</summary>
+    public static Color Alert { get; private set; } = Hex(0xE24851);
+    /// <summary>Good news (a pickup, a revive): the game's green pop.</summary>
+    public static Color Good { get; private set; } = new(0.5f, 0.86f, 0.5f, 1f);
     /// <summary>The translucent grey behind values.</summary>
     public static readonly Color Slab = new(0.588f, 0.604f, 0.596f, 0.20f);
     /// <summary>Thin lines and outlines.</summary>
@@ -140,9 +140,9 @@ public static class HudDraw
         SetActive(text, true);
         SetText(text, value);
         var size = hud.Px(px);
-        var width = Measure(text, value, size);
-        if (maxWidth > 0f && width > maxWidth) { size *= maxWidth / width; width = maxWidth; }
         if (Math.Abs(text.fontSize - size) > 0.001f) text.fontSize = size;
+        var width = Measure(text, value, size);
+        if (maxWidth > 0f && width > maxWidth) { size *= maxWidth / width; width = maxWidth; text.fontSize = size; }
         // Every HUD text is left-aligned from its left edge; right and centred lines are placed by their measured width.
         if (text.alignment != TextAlignmentOptions.MidlineLeft) text.alignment = TextAlignmentOptions.MidlineLeft;
         if (text.rectTransform.pivot.x != 0f) text.rectTransform.pivot = new Vector2(0f, 0.5f);
@@ -153,12 +153,19 @@ public static class HudDraw
     }
 
     /// <summary>The width of <paramref name="value"/> at font size <paramref name="size"/> in the element's units, measured once per
-    /// text and value.</summary>
+    /// text and value. When the text already shows that value at that size, it is the laid-out text (TMP's preferred width, or the
+    /// glyphs' bounds when they are wider, as the game font's capitals are), so a frame drawn to it holds the text in any language.</summary>
     public static float Measure(TextMeshPro text, string value, float size)
     {
         var key = text.Pointer;
         if (Measured.TryGetValue(key, out var known) && known.Value == value && known.Size == size) return known.Width;
-        var width = text.GetPreferredValues(value, float.PositiveInfinity, float.PositiveInfinity).x * text.transform.localScale.x * (size / Math.Max(text.fontSize, 0.01f));
+        float width;
+        if (text.text == value && Math.Abs(text.fontSize - size) <= 0.001f)
+        {
+            text.ForceMeshUpdate(true, false);
+            width = Math.Max(text.preferredWidth, text.textBounds.size.x) * text.transform.localScale.x;
+        }
+        else width = text.GetPreferredValues(value, float.PositiveInfinity, float.PositiveInfinity).x * text.transform.localScale.x * (size / Math.Max(text.fontSize, 0.01f));
         Measured[key] = (value, size, width);
         return width;
     }

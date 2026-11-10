@@ -23,7 +23,8 @@ internal static class UIKitFonts
     }
 
     private const int Sampling = 48, Padding = 5, Atlas = 1024;
-    private static readonly Dictionary<IntPtr, Set?> ByGameFont = new();
+    /// <summary>By the game font's address; the entry keeps that font so an address a destroyed font left behind is not taken for it.</summary>
+    private static readonly Dictionary<IntPtr, (TMP_FontAsset Game, Set? Set)> ByGameFont = new();
     private static Font? _latin, _latinBold, _symbols, _symbolsBold, _chinese, _chineseBold;
     private static bool _loaded, _missing;
 
@@ -31,7 +32,8 @@ internal static class UIKitFonts
     /// not there (logged once).</summary>
     internal static Set? For(TMP_FontAsset game, Material material)
     {
-        if (ByGameFont.TryGetValue(game.Pointer, out var known)) return known;
+        if (ByGameFont.TryGetValue(game.Pointer, out var known) && known.Game != null
+            && (known.Set == null || known.Set.Regular != null && known.Set.Bold != null)) return known.Set;
         Set? set = null;
         try
         {
@@ -51,9 +53,9 @@ internal static class UIKitFonts
         catch (Exception error)
         {
             set = null;
-            Plugin.Error("Kit fonts could not be made; the game's font is used: " + error);
+            Plugin.Error("ui-kit-fonts-could-not-be-made", "Kit fonts could not be made; the game's font is used: " + error);
         }
-        ByGameFont[game.Pointer] = set;
+        ByGameFont[game.Pointer] = (game, set);
         return set;
     }
 
@@ -65,7 +67,7 @@ internal static class UIKitFonts
         if (!File.Exists(path))
         {
             _missing = true;
-            Plugin.Error("No " + path + "; text that asks for the kit's font uses the game's font.");
+            Plugin.Error("ui-no-text-that-asks-kits-font", "No " + path + "; text that asks for the kit's font uses the game's font.");
             return false;
         }
         var bundle = ForgeCore.Assets.Load(Plugin.Id, path) ?? throw new InvalidOperationException("the font bundle cannot be opened");

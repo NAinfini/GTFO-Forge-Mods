@@ -61,7 +61,7 @@ internal sealed class BannerView : HudWidget
         foreach (var handle in Handles)
             if (handle.Id == id)
             {
-                Plugin.Error("Banner not added: the ID '" + id + "' is already registered.");
+                Plugin.Error("ui-banner-not-added-id-already-registered", "Banner not added: the ID '" + id + "' is already registered.");
                 return null;
             }
         if (_view == null)

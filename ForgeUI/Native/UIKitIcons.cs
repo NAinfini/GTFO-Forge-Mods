@@ -9,34 +9,33 @@ namespace ForgeUI;
 /// <summary>The icon names of every pack and the game's catalog; the rules and the failure messages are in <see cref="IconBook{T}"/>.</summary>
 internal static class UIKitIcons
 {
+    internal static readonly IconBook<Sprite> Book = new(UIKit.LoadIcon, UIKit.GameSprite, message => Plugin.Error("ui-icon-book-problem", message));
+}
+public static partial class UIKit
+{
     /// <summary>How long a game picture that was not found is not searched for again.</summary>
     private const float GameRetrySeconds = 2f;
-
-    internal static readonly IconBook<Sprite> Book = new(UIKit.LoadIcon, GameSprite, Plugin.Error);
     private static readonly Dictionary<string, Sprite> GameFound = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, float> GameMissed = new(StringComparer.Ordinal);
 
-    /// <summary>The loaded <c>Sprite</c> of the game with this name, found among the loaded sprites once and kept; a miss is searched again
-    /// after a short while (the level may not have loaded it yet).</summary>
-    private static Sprite? GameSprite(string item)
+    /// <summary>The loaded <c>Sprite</c> of the game with this name (<c>symbol_hostile</c>), found among the loaded sprites once and kept;
+    /// null while it is not loaded, and a miss is searched again after two seconds (the level may not have loaded it yet).</summary>
+    public static Sprite? GameSprite(string name)
     {
-        if (GameFound.TryGetValue(item, out var known) && known != null) return known;
-        if (GameMissed.TryGetValue(item, out var until) && Time.unscaledTime < until) return null;
+        if (GameFound.TryGetValue(name, out var known) && known != null) return known;
+        if (GameMissed.TryGetValue(name, out var until) && ForgeCore.Frame.UnscaledTime < until) return null;
         foreach (var asset in Resources.FindObjectsOfTypeAll(Il2CppType.Of<Sprite>())) // Resources.FindObjectsOfTypeAll(Type)
         {
             var sprite = asset?.TryCast<Sprite>();
-            if (sprite == null || sprite.name != item) continue;
-            GameFound[item] = sprite;
-            GameMissed.Remove(item);
+            if (sprite == null || sprite.name != name) continue;
+            GameFound[name] = sprite;
+            GameMissed.Remove(name);
             return sprite;
         }
-        GameMissed[item] = Time.unscaledTime + GameRetrySeconds;
+        GameMissed[name] = ForgeCore.Frame.UnscaledTime + GameRetrySeconds;
         return null;
     }
-}
 
-public static partial class UIKit
-{
     /// <summary>The icon called <paramref name="name"/>: <c>Pack:item</c> for one a mod registered (<c>Frames:skill-charge</c>) or
     /// <c>Game:item</c> for one of the game's own (<see cref="GameIcons"/>). Null, with the reason logged once, when the name is not a name,
     /// no such pack is loaded (its mod is not installed), the pack has no such icon or the game has not loaded that picture. Never another
@@ -86,7 +85,7 @@ public sealed class IconPack
             if (!Register(name, Path.Combine(folder, file))) failed.Add(name);
         }
         if (failed.Count > 0)
-            Plugin.Error("Icon folder " + folder + " (pack " + Name + "): not registered " + string.Join(", ", failed) + ".");
+            Plugin.Error("ui-icon-folder-pack-not-registered", "Icon folder " + folder + " (pack " + Name + "): not registered " + string.Join(", ", failed) + ".");
     }
 
     /// <summary>This pack's icon <paramref name="name"/>, or null (logged once, see <see cref="UIKit.Icon"/>).</summary>

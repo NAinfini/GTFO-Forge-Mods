@@ -161,8 +161,8 @@ public sealed class HudWaypoints : HudWidget
         var follow = point.Follow;
         if (follow != null)
         {
-            // A destroyed object keeps its managed wrapper: only the cached native pointer says it is gone.
-            if (follow.WasCollected || follow.m_CachedPtr == IntPtr.Zero) return false;
+            // A destroyed object keeps its managed wrapper: ForgeCore's liveness check reads the native pointer.
+            if (ForgeCore.NativeObjects.Gone(follow)) return false;
             at = EngineCalls.Position(follow);
         }
         at.y += point.Lift;

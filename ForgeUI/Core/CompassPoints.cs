@@ -111,7 +111,7 @@ public static class CompassPoints
 
 /// <summary>The compass points of one moment: world positions added between <see cref="Begin"/> and <see cref="Locate"/>, which turns
 /// them into bearings and distances from the eye. Fixed arrays, no allocation.</summary>
-public sealed class CompassReading
+internal sealed class CompassReading
 {
     private readonly float[] _x, _y, _z, _r, _g, _b;
     private readonly CompassPointKind[] _kind;

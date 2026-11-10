@@ -2,17 +2,15 @@ using System;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Unity.IL2CPP;
-using HarmonyLib;
-using UnityEngine;
 
 namespace ForgeUI;
 
 [BepInPlugin(Id, "Forge UI", Version)]
-[BepInDependency("NAinfini.ForgeCore", ">=0.1.0")]
+[BepInDependency("NAinfini.ForgeCore", ">=1.0.0")]
 internal sealed partial class Plugin : BasePlugin
 {
     internal const string Id = "NAinfini.ForgeUI";
-    internal const string Version = "0.1.0";
+    internal const string Version = "1.0.0"; // package-version: NAinfini-ForgeUI
 
     /// <summary>This library's ForgeCore log.</summary>
     internal static readonly ForgeCore.ModLog Logger = ForgeCore.Log.For(Id);
@@ -39,7 +37,7 @@ internal sealed partial class Plugin : BasePlugin
     private static float ValidateOffset(ConfigEntry<float> entry)
     {
         if (float.IsFinite(entry.Value)) return entry.Value;
-        Error(entry.Definition.Section + " / " + entry.Definition.Key + " must be finite; using 0 instead.");
+        Error("ui-must-be-finite-using-0-instead", entry.Definition.Section + " / " + entry.Definition.Key + " must be finite; using 0 instead.");
         return 0f;
     }
 
@@ -51,11 +49,13 @@ internal sealed partial class Plugin : BasePlugin
         entry.SettingChanged += (_, _) => Read();
     }
 
-    /// <summary>An error is written once per exact text.</summary>
-    internal static void Error(string message) => Logger.ErrorOnce(message);
+    /// <summary>An error with its registered diagnostic code, written once per exact text.</summary>
+    internal static void Error(string code, string detail) => Logger.ErrorOnce(code, detail);
 
     public override void Load()
     {
+        // One startup.timing line per library too, so a slow start can be told apart from the packages that depend on it.
+        using var timing = new ForgeCore.StartupTiming(Id, message => base.Log.LogInfo(message));
         ForgeCore.Settings.Adopt(Id, Config);
         LobbyOffsetX = ForgeCore.Settings.Bind(Id, "Lobby", "ButtonOffsetX", 0f,
             "Moves every lobby button added by mods right (positive) or left, in menu units (about pixels at 1080p). Use it when another mod draws over them.");
@@ -80,6 +80,9 @@ internal sealed partial class Plugin : BasePlugin
         ForgeUI.Language.Bind();
         ForgeCore.GameEvents.LevelEnded += GameHud.LevelEnded;
         ForgeCore.GameEvents.LevelEnded += LocalHits.LevelEnded;
+        ForgeCore.GameEvents.LevelEnded += ScreenStack.LevelEnded;
+        // A checkpoint reload rebuilds the enemies: bars kept for the old ones are dropped, like Audio and Visual drop theirs.
+        ForgeCore.GameEvents.CheckpointReloaded += EnemyHealthBars.Clear;
         KeyBinds.Load(Paths.ConfigPath);
         VisorEntry = ForgeCore.Settings.Bind(Id, "Screen", "Visor", true,
             "Draws the helmet visor overlay some mods show (its frame, shade, cracks and heat glow). Turn it off for a clear screen.");
@@ -94,18 +97,11 @@ internal sealed partial class Plugin : BasePlugin
         fringe.SettingChanged += (_, _) => Fringe = fringe.Value;
         Strength(ForgeCore.Settings.Bind(Id, "Screen", "HitFlashSeconds", 0.3f, "How long a full hit-direction flash lasts, 0.1 to 2 seconds."), v => HitFlashSeconds = Math.Max(0.1f, v), 2f);
         // No game method is patched here: each feature puts its own hooks on the first time it is used (PatchGroups).
-        try
-        {
-            ForgeCore.Frame.OnUpdate(Id, UIKitFrame.Update);
-            ForgeCore.Frame.OnLateUpdate(Id, UIKitFrame.LateUpdate);
-            // The confirmation keys are listed under Controls from the start, so they can be rebound before the first question.
-            ConfirmDialogs.RegisterKeys();
-        }
-        catch (Exception error)
-        {
-            Error("Forge UI initialization failed: " + error);
-            throw;
-        }
+        ForgeCore.Frame.OnUpdate(Id, UIKitFrame.Update);
+        ForgeCore.Frame.OnLateUpdate(Id, UIKitFrame.LateUpdate);
+        // The confirmation keys are listed under Controls from the start, so they can be rebound before the first question.
+        ConfirmDialogs.RegisterKeys();
+        timing.Complete();
     }
 }
 
@@ -113,15 +109,25 @@ internal sealed partial class Plugin : BasePlugin
 /// pieces and holds an open picker still on screen.</summary>
 internal static class UIKitFrame
 {
+    private static bool _playing;
 
+    /// <summary>In a level with the player in control (no menu, map or chat open).</summary>
+    internal static bool InPlay()
+    {
+        try { return GameStateManager.CurrentStateName == eGameStateName.InLevel && FocusStateManager.CurrentState == eFocusState.FPS; }
+        catch (Exception error) { Plugin.Error("ui-forge-ui-could-not-read-game", "Forge UI could not read the game state: " + error); return false; }
+    }
 
     internal static void Update()
     {
         ForgeUI.Language.Update();
         KeyBinds.Update(); SettingsPages.Update();
         Input.PruneDestroyed();
-        LobbyButtons.Update();
-        MenuBar.Update();
+        // In play no lobby or menu bar is on screen: skip their per-frame upkeep and close the bar pages once on the way in.
+        var playing = InPlay();
+        if (!playing) { LobbyButtons.Update(); MenuBar.Update(); }
+        else if (!_playing) MenuBar.Hidden();
+        _playing = playing;
         ConfirmDialogs.Update();
         HudFocus.Update();
         Hud.Update();
@@ -138,9 +144,9 @@ internal static class UIKitFrame
         CrosshairAttachments.LateUpdate();
         // Supplied gear icon jobs wait for their mod's model; with nothing waiting this is one comparison.
         try { GearIcons.Update(); }
-        catch (Exception error) { Plugin.Error("Gear icon update failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-gear-icon-update-failed", "Gear icon update failed: " + error); }
         // After every mod's Update, so an effect pushed or a visor shown this frame shows this frame.
         try { ScreenStack.Tick(); }
-        catch (Exception error) { Plugin.Error("Screen effect stack update failed: " + error); }
+        catch (Exception error) { Plugin.Error("ui-screen-effect-stack-update-failed", "Screen effect stack update failed: " + error); }
     }
 }
