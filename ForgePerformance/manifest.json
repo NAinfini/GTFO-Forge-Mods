@@ -1,0 +1,7 @@
+{
+  "name": "ForgePerformance",
+  "version_number": "1.0.0",
+  "website_url": "https://github.com/NAinfini/GTFO-Forge-Mods",
+  "description": "Optional GTFO frame-rate cuts, each with its own switch: shadows, fog, particles, decals, corpses and more. Two switches on by default change play (corpses stop blocking bullets sooner; far rooms behind a closed door are not drawn).",
+  "dependencies": ["BepInEx-BepInExPack_GTFO-3.2.4", "GTFOModding-GTFO_API-0.6.1"]
+}
