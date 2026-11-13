@@ -138,6 +138,29 @@ public static class StrictJson
         throw new StrictJsonException(prefix + field, "must be a persistentID number or a block name.");
     }
 
+    /// <summary>An ID that starts with its author's namespace: at least <paramref name="minSegments"/> non-empty dot-separated segments of
+    /// ASCII letters, digits, '_' and '-'. <paramref name="strict"/> allows only lowercase letters and makes each segment start with a letter
+    /// or digit. The caller keeps its own length limit and refusal message.</summary>
+    public static bool NamespacedId(string id, int minSegments, bool strict)
+    {
+        var segments = 1;
+        var length = 0;
+        foreach (var c in id)
+        {
+            if (c == '.')
+            {
+                if (length == 0) return false;
+                segments++;
+                length = 0;
+                continue;
+            }
+            var alphanumeric = c is >= 'a' and <= 'z' or >= '0' and <= '9' || !strict && c is >= 'A' and <= 'Z';
+            if (!(alphanumeric || (length > 0 || !strict) && c is '_' or '-')) return false;
+            length++;
+        }
+        return length > 0 && segments >= minSegments;
+    }
+
     private static double InRange(double number, string field, double min, double max)
         => number >= min && number <= max ? number
             : throw new StrictJsonException(field, number.ToString(CultureInfo.InvariantCulture) + " is outside "

@@ -31,6 +31,7 @@ export type BlendMode = NonNullable<LiveryLayer['blend']>;
 export type Finish = NonNullable<MaterialOverride['finish']>;
 export type PlayerColor = NonNullable<NonNullable<SkinDocument['playerColors']>[number]>;
 export type ColorSlot = NonNullable<NonNullable<PlayerColor['slots']>[number]>;
+export type CodeEffect = NonNullable<NonNullable<SkinDocument['codeEffects']>[number]>;
 
 /** Game events in the order the UI lists them; `simulate` ones get a preview button in the 3D view. */
 export const TRIGGERS: { value: Trigger; label: string; simulate?: boolean }[] = [
@@ -51,10 +52,12 @@ export const TRIGGERS: { value: Trigger; label: string; simulate?: boolean }[] =
   { value: 'ammoPickup', get label() { return t('trigger.ammoPickup'); } },
   { value: 'flashlightOn', get label() { return t('trigger.flashlightOn'); } },
   { value: 'flashlightOff', get label() { return t('trigger.flashlightOff'); } },
+  { value: 'downed', get label() { return t('trigger.downed'); } },
+  { value: 'revived', get label() { return t('trigger.revived'); } },
 ];
 
 /** Events a melee weapon raises in the game. */
-const MELEE_TRIGGERS = new Set<Trigger>(['always', 'kill', 'hit', 'fire', 'equip', 'unequip']);
+const MELEE_TRIGGERS = new Set<Trigger>(['always', 'kill', 'hit', 'fire', 'equip', 'unequip', 'downed', 'revived']);
 /** The bio tracker never fires or reloads. */
 const NO_SHOT = new Set<Trigger>(['fire', 'dryFire', 'reloadStart', 'reloadEnd', 'miss']);
 
@@ -64,7 +67,19 @@ const ITEM_TRIGGERS: { value: Trigger; label: string; simulate?: boolean }[] = [
   { value: 'fire', get label() { return t('trigger.use'); }, simulate: true },
   { value: 'equip', get label() { return t('trigger.takeOut'); }, simulate: true },
   { value: 'unequip', get label() { return t('trigger.putAway'); }, simulate: true },
+  { value: 'downed', get label() { return t('trigger.downed'); } },
+  { value: 'revived', get label() { return t('trigger.revived'); } },
 ];
+
+/** One enemy of the installed game, for kill sounds that play only for it: `id` its data block's persistent id (what the
+ *  skin stores), `block` the block's own name, `name` / `nameZh` what players call it (the block name when the game ships no
+ *  name for it). */
+export interface EnemyInfo {
+  id: number;
+  block: string;
+  name: string;
+  nameZh: string;
+}
 
 /** The events that can happen on `item` (all of them when unknown). */
 export function triggersFor(item: { slot: Slot; id: string; itemId?: number | null } | null | undefined) {
@@ -191,6 +206,56 @@ export interface ProjectEntry {
   modified: string;
 }
 
+/** Something a Skins import or export left out or changed; worded by `skinsNote.<kind>` (ui/SkinsReport). */
+export type SkinsNoteKind =
+  // import
+  | 'desc'
+  | 'meshTarget'
+  | 'transformTarget'
+  | 'fpsTarget'
+  | 'noGear'
+  | 'conflict'
+  | 'shader'
+  | 'emptyGear'
+  | 'inverted'
+  | 'rundown'
+  | 'filterType'
+  | 'contradiction'
+  | 'unknownGear'
+  | 'noMaterial'
+  | 'textureOptions'
+  | 'badMacro'
+  | 'missingFile'
+  | 'vector'
+  | 'property'
+  // export
+  | 'itemSkin'
+  | 'unusedMaterials'
+  | 'global'
+  | 'sameMaterial'
+  | 'sharedMaterial'
+  | 'layers'
+  | 'wear'
+  | 'attachments'
+  | 'parts'
+  | 'sounds'
+  | 'playerColors'
+  | 'codeEffects'
+  | 'variants';
+export interface SkinsNote {
+  kind: SkinsNoteKind;
+  skin: string;
+  what: string | null;
+  n: number;
+}
+
+/** What `skins.import` made: one skin per gear, or nothing yet when the group names no gear (`needsTarget`). */
+export interface SkinsImport {
+  skins: { path: string; weapon: string; id: string; name: string }[];
+  notes: SkinsNote[];
+  needsTarget: boolean;
+}
+
 export interface InstalledPack {
   id: string;
   name: string;
@@ -236,6 +301,7 @@ export interface Methods {
   'profiles.add': [{ path: string }, Profile];
   'profiles.remove': [{ path: string }, unknown];
   'catalog.get': [Record<string, never>, { items: CatalogItem[] }];
+  'enemies.list': [Record<string, never>, { enemies: EnemyInfo[] }];
   'preview.weapon': [{ id: string }, WeaponPreview];
   'match.folder': [{ weaponId: string; folder: string }, MatchResult];
   'match.files': [{ weaponId: string; files: string[] }, MatchResult];
@@ -243,17 +309,22 @@ export interface Methods {
   'project.load': [{ path: string }, SkinDocument];
   'project.save': [{ path: string; project: SkinDocument }, { path: string }];
   'project.list': [{ dir: string }, ProjectEntry[]];
+  'project.listAll': [{ root: string }, Record<string, ProjectEntry[]>];
+  'skins.import': [{ manifest: string; root: string; weapon?: string; lang: string }, SkinsImport];
   'project.delete': [{ path: string }, unknown];
   'project.missing': [{ project: SkinDocument }, { files: string[] }];
   'project.files': [{ project: SkinDocument }, { files: string[] }];
   'mesh.import': [{ glb: string }, MeshImport];
   'pack.build': [{ project: SkinDocument; projectPath: string; out: string; sizeMode: SizeMode }, { pack: string; warnings: string[]; memory: number }];
-  'pack.install': [{ pack: string; profile: string; activate: boolean }, unknown];
+  /** `pick`: 应用到游戏 — the skin also goes before the player's in-game picker choice for its gear. */
+  'pack.install': [{ pack: string; profile: string; activate: boolean; pick?: boolean }, unknown];
   'pack.list': [{ profile: string }, InstalledPack[]];
   'assembly.verify': [{ profile: string }, VerifyResult[]];
   'pack.remove': [{ profile: string; skinId: string }, unknown];
   'pack.activate': [{ profile: string; skinId: string; active: boolean }, unknown];
-  'pack.exportMod': [{ packs: string[]; out: string; name: string; version: string; description: string; icon: string; format: 'forgeskin' | 'skins' }, { mod: string; dropped: string[] }];
+  'pack.exportMod': [{ packs: string[]; out: string; name: string; version: string; description: string; icon: string; format: 'forgeskin' | 'skins'; gunPack: boolean },
+    { mod: string; dropped: SkinsNote[] },
+  ];
   'assets.apply': [{ pack: string }, { skin: string; buildId: string; files: string[]; materials: string[]; warnings: string[] }];
   'assets.restore': [{ skinId?: string; discardStale?: boolean }, { restored: string[]; skipped: { file: string; reason: string }[]; stale: StaleAssets[] }];
   'assets.status': [Record<string, never>, AssetStatus];

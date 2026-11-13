@@ -2,7 +2,7 @@
 // Usage: pnpm gen:types            (asks the backend; FORGESKIN_BACKEND_EXE=<exe> picks a specific build)
 //        pnpm gen:types --from x.json  (uses a schema file the backend wrote)
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
@@ -42,5 +42,6 @@ const ts = await compile(typeof schema === 'string' ? JSON.parse(schema) : schem
   strictIndexSignatures: false,
   format: false,
 });
+mkdirSync(dirname(out), { recursive: true }); // absent in a fresh checkout (generated output is not tracked)
 writeFileSync(out, ts);
 console.log(`wrote ${out}`);

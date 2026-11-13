@@ -1,5 +1,5 @@
 #Requires -Version 7
-# Builds ForgeVisual's particle, marker and outline shaders with the game's Unity (2019.4.21f1) writes Assets/Shaders/*.shaderbundle and rewrites Native/ShaderBundle.Generated.cs.
+# Builds ForgeVisual's particle, marker, outline and procedural shaders with the game's Unity (2019.4.21f1), writes Assets/Shaders/forgevisual-shaders.shaderbundle and rewrites Native/ShaderBundle.Generated.cs.
 # Take artifacts/work/unity-lock.txt in the main checkout first. Run from the repository root:
 #   pwsh Mods/ForgeCore/Visual/tools/shaders/build_shaders.ps1 [-Work artifacts/work/forgevisual-shaders/unity]
 param(

@@ -75,6 +75,11 @@ internal sealed class Picker
     private int _entriesTab = -2;
     private bool _hasClear;
     private string? _slotsHeader;
+    /// <summary>The current tab's controls when it is an adjust page (<see cref="PickerSource.Controls"/>), else null; row i is control i.</summary>
+    private IReadOnlyList<UIControl>? _controls;
+    /// <summary>The control row being dragged, -1 for none.</summary>
+    private int _drag = -1;
+    private float _listRight = float.PositiveInfinity;
 
     internal static void Toggle(CM_PlayerLobbyBar bar, PickerSource source)
     {
@@ -171,6 +176,79 @@ internal sealed class Picker
         if (_window == null || _window.WasCollected) { TakeDown(false); return; }
         var shown = _window.gameObject.activeInHierarchy;
         if (!shown) { Close(); return; }
+        if (_controls != null) Adjust();
+        Cull();
+    }
+
+    /// <summary>Per frame: every row is kept inside the list's clip area (<see cref="PickerRowSkin.Cull"/>), whatever the list's scroll; the
+    /// window's own clipping cuts only the game's sprites cleanly, and rows drawn later or texts rebuilt after it took them showed past the
+    /// frame, over the tabs and under the bottom edge.</summary>
+    private void Cull()
+    {
+        var clip = _window.m_clipRect;
+        if (clip == null) return;
+        var r = clip.rect;
+        float a = clip.TransformPoint(new Vector3(r.center.x, r.yMin, 0f)).y, b = clip.TransformPoint(new Vector3(r.center.x, r.yMax, 0f)).y;
+        float bottom = Math.Min(a, b), top = Math.Max(a, b);
+        foreach (var (_, _, skin, _) in _entryCards) skin?.Cull(bottom, top);
+    }
+
+    // ---- adjust pages --------------------------------------------------------------------------------------
+
+    /// <summary>Per frame on an adjust page: a drag follows the menu cursor while the press is held (mouse button or the menu's click,
+    /// which is the gamepad's press); otherwise the control under the cursor takes one-step nudges from the arrow keys and the
+    /// shoulder buttons.</summary>
+    private void Adjust()
+    {
+        try
+        {
+            if (_drag >= 0)
+            {
+                if (Held()) Follow(_drag);
+                else { _drag = -1; DrawControls(); }
+                return;
+            }
+            if (_focus < 0 || _focus >= _controls!.Count) return;
+            var steps = (Down(KeyCode.RightArrow, InputAction.ScrollItemRight) ? 1 : 0) - (Down(KeyCode.LeftArrow, InputAction.ScrollItemLeft) ? 1 : 0);
+            if (steps != 0 && _controls[_focus].Move(steps)) DrawControls();
+        }
+        catch (Exception error) { Plugin.Error("ui-picker-control-failed", "A control of picker source " + Source.GetType().FullName + " failed: " + error); }
+    }
+
+    private static bool Held() =>
+        UnityEngine.Input.GetMouseButton(0) || (InputMapper.GetButton?.Invoke(InputAction.MenuClick, FocusStateManager.CurrentState) ?? false);
+
+    private static bool Down(KeyCode key, InputAction action) =>
+        UnityEngine.Input.GetKeyDown(key) || (InputMapper.GetButtonDown?.Invoke(action, FocusStateManager.CurrentState) ?? false);
+
+    /// <summary>A press on control row <paramref name="entry"/>: the control takes it where the cursor is (a slider then follows the cursor
+    /// while the press is held).</summary>
+    private void Grab(int entry)
+    {
+        if (_controls == null || entry < 0 || entry >= _controls.Count) return;
+        _focus = entry;
+        _warning = null;
+        if (_controls[entry].Drags) _drag = entry;
+        Follow(entry);
+        DrawRows();
+        Info();
+    }
+
+    /// <summary>Presses control row <paramref name="entry"/> where the menu cursor is along its active span.</summary>
+    private void Follow(int entry)
+    {
+        if (_controls == null || entry >= _controls.Count || entry >= _entryCards.Count) return;
+        var control = _controls[entry];
+        var skin = _entryCards[entry].Skin;
+        var page = CM_PageLoadout.Current;
+        var cursor = page == null ? null : page.m_cursor;
+        if (skin == null || cursor == null) return;
+        var track = skin.Active;
+        float from = track.XMin(), width = track.Width();
+        if (width <= 0f) return;
+        var local = skin.Space.InverseTransformPoint(cursor.transform.position);
+        // Only the rows show values; the details box is drawn on presses and hovers, not on every step of a drag.
+        if (control.Press((local.x - from) / width)) DrawControls();
     }
 
     // ---- placement -----------------------------------------------------------------------------------------
@@ -425,10 +503,11 @@ internal sealed class Picker
         var route = Input.Route(card, () =>
         {
             Clicked(PickerClick.Entry);
-            Pick(entry);
+            if (_controls != null) Grab(entry);
+            else Pick(entry);
         }, inside =>
         {
-            if (!inside || _disposed || _focus == entry) return;
+            if (!inside || _disposed || _focus == entry || _drag >= 0) return;
             _focus = entry;
             _warning = null;
             try
@@ -544,16 +623,20 @@ internal sealed class Picker
                 var prefab = _bar.m_clothesButton ?? throw new InvalidOperationException("the bar has no APPAREL button");
                 for (var i = 0; i < slotCount; i++) _slots.Add(SlotButton(prefab, i));
             }
-            var entries = _tab < 0 ? Array.Empty<PickerCard>() : Source.Entries(_slot, _tab);
-            var clear = _tab < 0 ? null : Source.ClearCard;
+            _controls = _tab < 0 || _slot < 0 ? null : Source.Controls(_slot, _tab);
+            var entries = _tab < 0 || _controls != null ? Array.Empty<PickerCard>() : Source.Entries(_slot, _tab);
+            var clear = _tab < 0 || _controls != null ? null : Source.ClearCard;
+            var count = _controls?.Count ?? entries.Count;
             var entriesChanged = tabsChanged || _entriesTab != _tab || _hasClear != (clear != null) ||
-                                 _entryCards.Count != entries.Count + (clear == null ? 0 : 1);
+                                 _entryCards.Count != count + (clear == null ? 0 : 1);
             if (entriesChanged)
             {
                 _focus = -1;
-                BuildEntries(entries.Count, clear != null);
+                _drag = -1;
+                BuildEntries(count, clear != null);
             }
-            if (_slot < 0 || _tab < 0 || _focus < -1 || _focus >= entries.Count) _focus = -1;
+            if (_slot < 0 || _tab < 0 || _focus < -1 || _focus >= count) _focus = -1;
+            if (_drag >= count) _drag = -1;
             var heading = Source.SlotsHeader;
             if (!_opening && (slotsChanged || _slotsHeader != heading))
             {
@@ -566,7 +649,9 @@ internal sealed class Picker
             }
             _slotsHeader = heading;
             if (!_opening) DrawSlots();
-            DrawRows(entries, clear);
+            // An adjust page draws its controls here too: drawn only on a hover, its rows were empty dark cards until the cursor came by.
+            if (_controls != null) DrawRows();
+            else DrawRows(entries, clear);
             if (tabsChanged || entriesChanged || slotsChanged)
             {
                 if (_tab >= 0) _window.SelectHeader(_tab);
@@ -579,7 +664,27 @@ internal sealed class Picker
         catch (Exception error) { Plugin.Error("ui-picker-source-failed-describe-cards", "Picker source " + Source.GetType().FullName + " failed to describe its cards: " + error); }
     }
 
-    private void DrawRows() => DrawRows(_tab < 0 ? Array.Empty<PickerCard>() : Source.Entries(_slot, _tab), _tab < 0 ? null : Source.ClearCard);
+    private void DrawRows()
+    {
+        if (_controls == null) { DrawRows(_tab < 0 ? Array.Empty<PickerCard>() : Source.Entries(_slot, _tab), _tab < 0 ? null : Source.ClearCard); return; }
+        _listRight = ListRight();
+        DrawControls();
+    }
+
+    /// <summary>Draws every control row of an adjust page (each frame of a drag, so it touches nothing else). The list's right edge
+    /// is the one measured by the last full <see cref="DrawRows()"/>: the window is held still on screen.</summary>
+    private void DrawControls()
+    {
+        var grew = false;
+        var listRight = _listRight;
+        foreach (var (_, entry, skin, _) in _entryCards)
+        {
+            if (skin == null || entry < 0 || entry >= _controls!.Count) continue;
+            skin.DrawControl(_controls[entry], entry == _focus, entry == _drag, listRight);
+            grew |= skin.Grew;
+        }
+        if (grew) PickerSkin.Clip(_window);
+    }
 
     /// <summary>Draws every list row, the focused one framed; new pieces are handed to the list's clipping.</summary>
     private void DrawRows(IReadOnlyList<PickerCard> entries, PickerCard? clear)

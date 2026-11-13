@@ -10,7 +10,7 @@ Shader "Forge/TriggerZone"
     SubShader
     {
         Tags { "Queue"="Transparent" "RenderType"="Transparent" }
-        Cull Off
+        Cull Back
         ZWrite Off
         Blend SrcAlpha OneMinusSrcAlpha
         Pass

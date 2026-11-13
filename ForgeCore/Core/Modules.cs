@@ -1,5 +1,3 @@
-using System;
-
 namespace ForgeCore;
 
 /// <summary>The game methods each module patches. A module's patches go on the first time it is used; at startup ForgeCore only

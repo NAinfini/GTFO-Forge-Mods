@@ -1,13 +1,14 @@
 import { ActionIcon, Button, Checkbox, Group, SegmentedControl, Select, Switch, TextInput, Tooltip } from '@mantine/core';
 import { useState } from 'react';
 import { cssFont, DEFAULT_FONT, FONT_GROUPS, isFontFile, loadFont, systemFonts } from '../fonts';
-import { IconArrowsMove, IconDeviceDesktop, IconPalette, IconPlus, IconSparkles, IconTrash, IconWind, IconX } from '@tabler/icons-react';
+import { IconArrowsMove, IconDeviceDesktop, IconPalette, IconPlus, IconRotate, IconRun, IconSparkles, IconTrash, IconWind, IconX } from '@tabler/icons-react';
+import { CHARM_DEFAULTS, MAX_PER_GEAR, MAX_SEGMENTS, type CharmSettings } from '../viewport/charm';
 import { InspectorTabs } from './InspectorTabs';
 import { baseName, triggersFor, type Attachment, type CatalogItem, type Screen, type ScreenSource, type Trigger, type TriggerEffect } from '../protocol';
 import { isBounded, isPercent, screenDigits } from '../frames';
-import { useItem, useStore } from '../store';
+import { newCharm, useItem, useStore } from '../store';
 import { removeEffect } from '../playerColors';
-import { previewEvents } from '../viewport/refs';
+import { previewEvents, type CharmMotion } from '../viewport/refs';
 import { Color, Field, Num, Slider, Vec } from './fields';
 import { SelectionLayout } from './SelectionLayout';
 import { useSoundsTab } from './SkinInspector';
@@ -139,6 +140,86 @@ function Effects({ a }: { a: Attachment }) {
 }
 
 const MM = 1000;
+const CM = 100;
+
+const MOTIONS: { motion: CharmMotion; icon: typeof IconWind }[] = [
+  { motion: 'shake', icon: IconWind },
+  { motion: 'run', icon: IconRun },
+  { motion: 'turn', icon: IconRotate },
+];
+
+/** Charm: a rope or chain from the attachment's origin with the model hanging on its end; the game's rope (charm.ts). */
+function CharmSection({ a }: { a: Attachment }) {
+  const { updateAttachment } = useStore.getState();
+  const charms = useStore((s) => (s.doc.attachments ?? []).filter((x) => x?.charm).length);
+  const c = a.charm;
+  const set = <K extends keyof CharmSettings>(k: K, v: CharmSettings[K], key = true) =>
+    updateAttachment(a.id!, (x) => void (x.charm && (x.charm[k] = v as never)), key ? `${a.id}-charm-${k}` : undefined);
+  const full = !c && charms >= MAX_PER_GEAR;
+  return (
+    <div className="section">
+      <h3>
+        <span>{t('charm.title')}</span>
+        <Info label={full ? t('charm.full', { v0: MAX_PER_GEAR }) : t('charm.info')} />
+        <span className="grow" />
+        <Switch
+          aria-label={t('charm.title')}
+          checked={!!c}
+          disabled={full}
+          onChange={(e) => {
+            const on = e.currentTarget.checked;
+            updateAttachment(a.id!, (x) => void (x.charm = on ? newCharm() : null));
+          }}
+        />
+      </h3>
+      {c && (
+        <>
+          <p className="hint" style={{ marginTop: 0 }}>
+            {t('charm.pointHint')}
+          </p>
+          <SegmentedControl
+            fullWidth
+            size="xs"
+            value={c.style ?? CHARM_DEFAULTS.style}
+            data={(['cord', 'chain', 'beads'] as const).map((v) => ({ value: v, label: t(`charm.${v}`) }))}
+            onChange={(v) => set('style', v as CharmSettings['style'], false)}
+          />
+          <Field label={t('charm.length')}>
+            <Slider value={(c.length ?? CHARM_DEFAULTS.length) * CM} min={0.5} max={30} step={0.1} label={(v) => `${v.toFixed(1)} cm`} onChange={(v) => set('length', v / CM)} />
+          </Field>
+          <Field label={t('charm.thickness')}>
+            <Slider value={(c.thickness ?? CHARM_DEFAULTS.thickness) * MM} min={0.3} max={10} step={0.1} label={(v) => `${v.toFixed(1)} mm`} onChange={(v) => set('thickness', v / MM)} />
+          </Field>
+          <Field label={t('charm.color')}>
+            <Color value={c.color ?? CHARM_DEFAULTS.color} onChange={(v) => set('color', v.slice(0, 3))} />
+          </Field>
+          <Field label={t('charm.weight')}>
+            <Slider value={c.weight ?? CHARM_DEFAULTS.weight} min={0.1} max={3} step={0.05} onChange={(v) => set('weight', v)} />
+          </Field>
+          <Field label={t('charm.damping')}>
+            <Slider value={c.damping ?? CHARM_DEFAULTS.damping} onChange={(v) => set('damping', v)} />
+          </Field>
+          <Field label={t('charm.stiffness')}>
+            <Slider value={c.stiffness ?? CHARM_DEFAULTS.stiffness} onChange={(v) => set('stiffness', v)} />
+          </Field>
+          <Field label={t('charm.segments')}>
+            <Slider value={c.segments ?? CHARM_DEFAULTS.segments} min={1} max={MAX_SEGMENTS} step={1} label={(v) => String(v)} onChange={(v) => set('segments', Math.round(v))} />
+          </Field>
+          <Switch mt="xs" label={t('charm.collide')} checked={c.collide ?? CHARM_DEFAULTS.collide} onChange={(e) => set('collide', e.currentTarget.checked, false)} />
+          <Group gap={6} mt="sm" grow>
+            {MOTIONS.map(({ motion, icon: Icon }) => (
+              <Tooltip key={motion} label={t(`charm.${motion}Info`)}>
+                <Button size="compact-sm" variant="light" leftSection={<Icon size={14} />} onClick={() => void (previewEvents.charm = { motion, at: performance.now() })}>
+                  {t(`charm.${motion}`)}
+                </Button>
+              </Tooltip>
+            ))}
+          </Group>
+        </>
+      )}
+    </div>
+  );
+}
 
 function AttachmentPanel({ a }: { a: Attachment }) {
   const item = useItem();
@@ -147,9 +228,10 @@ function AttachmentPanel({ a }: { a: Attachment }) {
   const upScreen = (fn: (s: Screen) => void, key?: string) => up((x) => void (x.screen && fn(x.screen)), key);
   const s = a.screen;
   const sounds = useSoundsTab();
-  // 位置: where it is mounted and its pose; 外观: shape, hologram, colours; 屏幕: what a screen shows; 特效: events.
+  // 位置: charm first (where and how it hangs), where it is mounted and its pose; 外观: shape, hologram, colours; 屏幕: what a screen shows; 特效: events.
   const place = (
     <>
+      <CharmSection a={a} />
       <div className="section">
         <h3>{t('attachInspector.k21')}</h3>
         <Field label={t('attachInspector.k22')}>
@@ -182,29 +264,6 @@ function AttachmentPanel({ a }: { a: Attachment }) {
           <Field label={t('hologram.flicker')}>
             <Slider value={a.hologram.flicker ?? 0.3} min={0} max={1} onChange={(v) => up((x) => void (x.hologram && (x.hologram.flicker = v)), 'flicker')} />
           </Field>
-        )}
-      </div>
-      <div className="section">
-        <h3>
-          <span>{t('swing.title')}</span>
-          <Info label={t('swing.info')} />
-          <span className="grow" />
-          <Switch checked={!!a.swing} onChange={(e) => {
-            const on = e.currentTarget.checked;
-            up((x) => void (x.swing = on ? { looseness: 0.5 } : null));
-          }} />
-        </h3>
-        {a.swing && (
-          <>
-            <Field label={t('swing.looseness')}>
-              <Slider value={a.swing.looseness ?? 0.5} min={0} max={1} onChange={(v) => up((x) => void (x.swing && (x.swing.looseness = v)), 'looseness')} />
-            </Field>
-            <Tooltip label={t('swing.shakeInfo')}>
-              <Button mt="xs" size="compact-sm" variant="light" leftSection={<IconWind size={14} />} onClick={() => void (previewEvents.shake = performance.now())}>
-                {t('swing.shake')}
-              </Button>
-            </Tooltip>
-          </>
         )}
       </div>
       {s && (

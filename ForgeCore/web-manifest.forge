@@ -3,7 +3,7 @@
   "schemaVersion": "1.0.0",
   "library": "ForgeCore",
   "packageName": "NAinfini-ForgeCore",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "parts": [
     {
       "id": "core",
@@ -1116,7 +1116,7 @@
             },
             {
               "id": "AddLobbyStrip(string, Func<SNet_Player, IReadOnlyList<LobbyStripItem>?>, int)",
-              "summary": "A row of slot cells on every lobby bar with a player (the local one and everyone else's), one button step under the APPAREL button and the lobby buttons and exactly as wide as they are: each cell a chamfered tile in one muted dark tone with a light outline and a light band along its cut corner, the picture in its own colours. items gives each player's cells in slot order (null or empty shows no row); pass Empty for a free slot. Called once per bar per frame; it may return the same list it keeps, and the row is redrawn only when that content changes. Null (logged) when the name cannot be used or is taken.",
+              "summary": "A row of slot cells on every lobby bar with a player (the local one and everyone else's), one button step under the APPAREL button and the lobby buttons under it and exactly as wide as they are: each cell a chamfered tile in one muted dark tone with a light outline and a light band along its cut corner, the picture in its own colours. items gives each player's cells in slot order (null or empty shows no row); pass Empty for a free slot. Called once per bar per frame; it may return the same list it keeps, and the row is redrawn only when that content changes. Null (logged) when the name cannot be used or is taken.",
               "name": "AddLobbyStrip",
               "parameters": [
                 {
@@ -1855,13 +1855,25 @@
               }
             },
             {
-              "id": "AddLobbyButton(string, UIText, Action<CM_PlayerLobbyBar>, Func<string>?, Func<CM_PlayerLobbyBar, bool>?)",
-              "summary": "Adds a button to the lobby player bar, under the game's APPAREL button. Buttons from all mods stack downwards in the order of their full IDs.",
+              "id": "AddLobbyButton(string, LobbyArea, LobbyWidth, UIText, Action<CM_PlayerLobbyBar>, Func<string>?, Func<CM_PlayerLobbyBar, bool>?)",
+              "summary": "Adds a button to the lobby player bar in area: under the game's APPAREL button, right of the player's panel or above it. Buttons from all mods follow each other in their area in the order of their full IDs. An area holds as many as fit on screen; a button with no room in its own area is shown in the first other area with room (Below, Right, Top) and one line is logged, and one with no room anywhere is not shown (logged).",
               "name": "AddLobbyButton",
               "parameters": [
                 {
                   "name": "name",
                   "type": "string",
+                  "summary": "",
+                  "required": true
+                },
+                {
+                  "name": "area",
+                  "type": "LobbyArea",
+                  "summary": "",
+                  "required": true
+                },
+                {
+                  "name": "width",
+                  "type": "LobbyWidth",
                   "summary": "",
                   "required": true
                 },

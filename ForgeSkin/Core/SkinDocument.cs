@@ -24,6 +24,9 @@ public sealed class SkinDocument
     public List<Attachment> Attachments { get; set; } = new();
     public List<PartTransform> Parts { get; set; } = new();
     public List<SkinSound> Sounds { get; set; } = new();
+    // Live code effects (CodeEffect.cs); null: none.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<CodeEffect>? CodeEffects { get; set; }
 
     // Colours the player may change in game (the skin picker's colour controls); null: none. Packs and plugins from
     // before this field neither write nor read it.
@@ -238,6 +241,19 @@ public sealed class LiveryLayer
 
 public sealed class MaterialParams
 {
+    // The game's gear shaders have a large emission gain: an _EmissiveColor of 0.01 shows a linear colour of 1 as itself
+    // (measured in game). A skin's glows (EmissiveColor x EmissiveIntensity here, attachment flashes, unlit pictures) are
+    // in "as itself" units, as the editor previews them, and reach the game's _EmissiveColor times this.
+    public const float EmissionUnit = 0.01f;
+
+    // A game _EmissiveColor (RGB, the game's units) as a skin's glow: the colour with its brightest channel at 1 and the
+    // intensity carrying the rest, so EmissiveColor x EmissiveIntensity x EmissionUnit gives it back.
+    public static (float[] Color, float Intensity) GlowFromGame(float r, float g, float b)
+    {
+        float k = System.Math.Max(r, System.Math.Max(g, b));
+        return k > 0 ? (new[] { r / k, g / k, b / k }, k / EmissionUnit) : (new float[3], 0);
+    }
+
     public bool? EmissiveEnabled { get; set; }
     public float[]? EmissiveColor { get; set; } // linear RGB
     public float? EmissiveIntensity { get; set; }
@@ -286,6 +302,12 @@ public sealed class SkinSound
     public string File { get; set; } = "";             // Ogg Vorbis, mono or stereo, at most 10 seconds
     public float Volume { get; set; } = 1;              // 0-1
     public float LowAmmoFraction { get; set; } = 0.2f;  // LowAmmo: plays when clip / clip size falls below this
+    // The sounds of one event (and, for Kill, one enemy) are a group: each time the event fires one of them plays,
+    // picked at random with chance weight / the group's total, never the one that played last when the group has more.
+    public float Weight { get; set; } = 1;
+    // Kill only: the sound plays for kills of this one enemy, the persistentID of its EnemyDataBlock (any rundown's, a
+    // custom one's too; an id no loaded block has never plays). Null is every kill no group of the killed enemy covers.
+    public uint? EnemyId { get; set; }
 }
 
 // Events of the local player's own gear (PLAN §3.4).
@@ -294,6 +316,8 @@ public enum Trigger
     Always, Kill, Hit, Fire, DryFire, ReloadStart, ReloadEnd, Equip, Unequip, Aim, AimEnd, LowAmmo, Empty, AmmoPickup,
     FlashlightOn, FlashlightOff,
     Miss, // a gun's shot that hit no enemy
+    Downed,  // the local player went down while holding this item (the item held last when going down stowed it)
+    Revived, // the local player's revive completed while this item was theirs to hold
 }
 public enum PlayMode { Loop, Once, LoopFor }
 
@@ -313,7 +337,9 @@ public sealed class LayerAtlas
     public int Columns { get; set; }
     public int FrameWidth { get; set; }
     public int FrameHeight { get; set; }
-    public int[] TargetRect { get; set; } = { 0, 0, 0, 0 }; // x, y, w, h in target texture pixels, top-left image origin; w/h == FrameWidth/FrameHeight
+    // x, y, w, h in target texture pixels, top-left image origin. A frame is the region at w x h, or smaller by one scale for
+    // both sides where the frames would not fit a 4096 atlas; the plugin stretches it back over the region.
+    public int[] TargetRect { get; set; } = { 0, 0, 0, 0 };
 }
 
 public sealed class Attachment
@@ -341,12 +367,25 @@ public sealed class Attachment
     public List<AttachmentEffect> Effects { get; set; } = new();
     // Set: the model and screen are drawn as a glowing, flickering hologram in their own colours.
     public Hologram? Hologram { get; set; }
-    // Set: a charm hanging from its origin, swinging as the gear moves (its -Y is the rest direction).
-    public Swing? Swing { get; set; }
+    // Set: a charm. The attachment's origin is where a rope or chain hangs from (its -Y the rest direction); the model and
+    // screen hang on the rope's end as the pendant (their origin on the rope, their -Y down). CharmRope moves it.
+    public Charm? Charm { get; set; }
 }
-public sealed class Swing
+
+public enum CharmStyle { Cord, Chain, Beads }
+
+// A charm's rope; the defaults are a short silver chain. Ranges are checked by SkinPack.Validate.
+public sealed class Charm
 {
-    public float Looseness { get; set; } = 0.5f; // 0: stiff, barely moves; 1: loose, swings long
+    public float Length { get; set; } = 0.05f; // metres from the hanging point to the pendant, 0.005 to 0.3
+    public int Segments { get; set; } = 6; // how many pieces the rope bends in, 1 to CharmRope.MaxSegments, none shorter than CharmRope.MinPiece
+    public float Weight { get; set; } = 1; // the charm's mass, 0.1 to 3: heavier swings longer, lighter settles sooner
+    public float Damping { get; set; } = 0.3f; // 0: swings long; 1: settles at once
+    public float Stiffness { get; set; } = 0.25f; // 0: limp rope; 1: stiff wire that keeps the attachment's -Y
+    public CharmStyle Style { get; set; } = CharmStyle.Chain;
+    public float Thickness { get; set; } = 0.002f; // metres: a cord's diameter, a chain link's width, a bead's diameter; 0.0003 to 0.01
+    public float[] Color { get; set; } = { 0.8f, 0.8f, 0.82f }; // linear RGB
+    public bool Collide { get; set; } = true; // kept out of the gear's body (boxes from its parts' models)
 }
 
 public sealed class Hologram

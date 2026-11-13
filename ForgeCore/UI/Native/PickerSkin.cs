@@ -58,6 +58,62 @@ internal sealed class PickerRowSkin
 
     internal bool Grew => _canvas.TakeGrown();
 
+    /// <summary>Where the last drawn control takes presses, in the card's own units (empty for a card row).</summary>
+    internal Rect Active { get; private set; }
+
+    internal Transform Space => _card.transform;
+
+    private BoxCollider2D? _box;
+
+    /// <summary>Keeps the row inside the list's visible band (<paramref name="bottom"/> to <paramref name="top"/>, world y): wholly inside it
+    /// shows everything; partly past an edge it shows only its plates (the list's clipping cuts them; texts would show their glyphs past the
+    /// edge); wholly past it shows nothing (<see cref="MenuCanvas.Show"/>).</summary>
+    internal void Cull(float bottom, float top)
+    {
+        if (_box == null || _box.WasCollected) _box = _card.GetComponent<BoxCollider2D>() ?? _card.GetComponentInChildren<BoxCollider2D>(true);
+        if (_box == null) return;
+        var t = _box.transform;
+        float a = t.TransformPoint(new Vector3(0f, _box.offset.y - _box.size.y / 2f, 0f)).y, b = t.TransformPoint(new Vector3(0f, _box.offset.y + _box.size.y / 2f, 0f)).y;
+        float low = Math.Min(a, b), high = Math.Max(a, b), slack = (high - low) * 0.02f;
+        var past = high <= bottom || low >= top;
+        _canvas.Show(!past, !past && low >= bottom - slack && high <= top + slack);
+    }
+
+    /// <summary>Draws the row as a control (an adjust page, <see cref="PickerSource.Controls"/>), with the same plate, frame and edge bar as a
+    /// card row and the right edge held at <paramref name="listRight"/>.</summary>
+    internal void DrawControl(UIControl control, bool focus, bool held, float listRight)
+    {
+        var r = RowBox(listRight);
+        float left = r.XMin(), right = r.XMax(), bottom = r.YMin(), top = r.YMax(), h = top - bottom;
+        var lit = focus || held;
+        var c = _canvas;
+        c.Begin();
+        c.Plate(r, h * 0.12f, lit ? MenuLook.Raised : MenuLook.Panel);
+        c.Frame(r, h * 0.12f, lit ? MenuLook.Line : MenuLook.LineDim);
+        c.Rect(Rect.MinMaxRect(left + 2f, bottom + h * 0.16f, left + (focus ? 6f : 4f), top - h * 0.16f), lit ? MenuLook.Amber : MenuLook.LineDim);
+        var inner = Rect.MinMaxRect(left + 10f, bottom, right - 4f, top);
+        Active = control switch
+        {
+            UISlider slider => MenuControlLook.Slider(c, inner, slider, focus, held),
+            UIToggle toggle => MenuControlLook.Toggle(c, inner, toggle, focus),
+            UIPick pick => MenuControlLook.Pick(c, inner, pick, focus),
+            _ => default,
+        };
+        c.End();
+    }
+
+    /// <summary>The card's box as it is now, its right edge held at <paramref name="listRight"/> (a world x), inset by 2.</summary>
+    private Rect RowBox(float listRight)
+    {
+        var box = PickerSkin.Box(_card, new Rect(-400f, -60f, 800f, 120f));
+        var space = _card.transform;
+        var at = space.position;
+        var edge = space.InverseTransformPoint(new Vector3(listRight, at.y, at.z)).x;
+        float left = box.XMin(), bottom = box.YMin(), top = box.YMax();
+        if (edge < box.XMax()) box = Rect.MinMaxRect(left, bottom, Math.Max(left + top - bottom, edge), top);
+        return MenuCanvas.Inset(box, 2f);
+    }
+
     internal static PickerRowSkin? On(CM_LobbyScrollItem card)
     {
         var like = card.GetComponentInChildren<SpriteRenderer>(true);
@@ -77,10 +133,8 @@ internal sealed class PickerRowSkin
     /// game's full-size list, which would run under the details.</summary>
     internal void Draw(PickerCard data, bool focus, float listRight)
     {
-        var box = PickerSkin.Box(_card, new Rect(-400f, -60f, 800f, 120f));
-        var edge = _card.transform.InverseTransformPoint(new Vector3(listRight, _card.transform.position.y, _card.transform.position.z)).x;
-        if (edge < box.xMax) box = Rect.MinMaxRect(box.xMin, box.yMin, Math.Max(box.xMin + box.height, edge), box.yMax);
-        var r = MenuCanvas.Inset(box, 2f);
+        Active = default;
+        var r = RowBox(listRight);
         var h = r.height;
         var cy = r.center.y;
         var cut = h * 0.12f;
@@ -96,11 +150,21 @@ internal sealed class PickerRowSkin
         c.Plate(bay, h * 0.08f, MenuLook.Bay);
         var picture = PickerSkin.Picture(data.Icon);
         if (picture != null) c.Icon(picture, MenuCanvas.Inset(bay, h * 0.05f), Color.white);
+        else if (data.Swatch is { } swatch)
+        {
+            var tile = MenuCanvas.Inset(bay, h * 0.1f);
+            c.Plate(tile, h * 0.08f, new Color(swatch.r, swatch.g, swatch.b, 1f));
+            c.Frame(tile, h * 0.08f, focus ? MenuLook.Line : MenuLook.LineMid);
+        }
         else c.Rect(new Rect(bay.center.x - bay.width * 0.15f, bay.center.y - 1f, bay.width * 0.3f, 2f), MenuLook.LineDim);
         var x = bay.xMax + h * 0.2f;
         var right = held ? r.xMax - h * 0.95f : r.xMax - h * 0.2f;
         var hasLine = data.Subtitle.Length > 0;
-        c.Text(data.Title, x, hasLine ? cy + h * 0.13f : cy, h * 0.3f, focus || held ? MenuLook.Line : MenuLook.Text, HudAlign.Left, right - x);
+        var titleColour = focus || held ? MenuLook.Line : MenuLook.Text;
+        // A title too long for one line even drawn smaller goes over two lines above the category line, rather than being cut.
+        if (c.TextWidth(data.Title, h * 0.3f) * 0.6f > right - x)
+            c.Paragraph(data.Title, Rect.MinMaxRect(x, hasLine ? cy - h * 0.1f : r.yMin + m, right, r.yMax - m), h * 0.22f, titleColour);
+        else c.Text(data.Title, x, hasLine ? cy + h * 0.13f : cy, h * 0.3f, titleColour, HudAlign.Left, right - x);
         if (hasLine)
         {
             var s = h * 0.085f;
@@ -309,13 +373,23 @@ internal sealed class PickerDetailSkin
         c.Plate(b, 0f, MenuLook.Ink);
         var hero = new Rect(x, b.yMax - p - H * 0.4f, inner, H * 0.4f);
         c.Plate(hero, 14f, MenuLook.Bay);
-        if (info.Accent is { } glow)
+        if (info.Accent is { } glow && info.Swatch == null)
         {
             var side = Math.Min(hero.width, hero.height) * 1.05f;
             c.Picture(UIKitSprites.GlowBlob, new Rect(hero.center.x - side / 2f, hero.center.y - side / 2f, side, side), MenuLook.Faded(glow, 0.3f));
         }
         var picture = PickerSkin.Picture(info.Icon);
-        if (picture != null) c.Icon(picture, MenuCanvas.Inset(hero, H * 0.035f), Color.white);
+        var art = MenuCanvas.Inset(hero, H * 0.035f);
+        if (info.Swatch is { } swatch)
+        {
+            // Alone it fills the box; under a picture it is a band along the box's bottom, the picture above it.
+            var colour = new Color(swatch.r, swatch.g, swatch.b, 1f);
+            var band = picture == null ? art : Rect.MinMaxRect(art.xMin, art.yMin, art.xMax, art.yMin + art.height * 0.22f);
+            c.Plate(band, 12f, colour);
+            c.Frame(band, 12f, MenuLook.LineMid);
+            if (picture != null) art = Rect.MinMaxRect(art.xMin, band.yMax + H * 0.01f, art.xMax, art.yMax);
+        }
+        if (picture != null) c.Icon(picture, art, Color.white);
         Brackets(c, MenuCanvas.Inset(hero, 8f));
         var y = hero.yMin - H * 0.045f;
         if (info.Subtitle.Length > 0)
@@ -326,7 +400,9 @@ internal sealed class PickerDetailSkin
             c.Text(info.Subtitle, x + s * 1.7f, y, H * 0.03f, accent, HudAlign.Left, inner - s * 1.7f);
         }
         y -= H * 0.065f;
-        c.Text(info.Title, x, y, H * 0.065f, MenuLook.Line, HudAlign.Left, inner);
+        // A title too long for one line even drawn smaller takes two smaller lines in the same band, rather than being cut.
+        if (c.TextWidth(info.Title, H * 0.065f) * 0.6f > inner) c.Paragraph(info.Title, Rect.MinMaxRect(x, y - H * 0.05f, x + inner, y + H * 0.035f), H * 0.04f, MenuLook.Line);
+        else c.Text(info.Title, x, y, H * 0.065f, MenuLook.Line, HudAlign.Left, inner);
         y -= H * 0.07f;
         var badges = Math.Min(info.Badges.Count, MaxBadges);
         if (badges > 0)

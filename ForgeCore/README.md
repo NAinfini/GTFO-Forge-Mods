@@ -10,7 +10,7 @@ Report bugs on [GitHub](https://github.com/NAinfini/GTFO-Forge-Mods/issues), or 
 
 ## What mods can add: interface
 
-- Lobby buttons under APPAREL that open loadout-style pickers.
+- Lobby buttons that open loadout-style pickers, in an area and width each mod chooses: under APPAREL, right of the player's panel or above it, a whole row, half or a third of one (up to three to a row). A full area passes its extra buttons to the next one instead of piling them up.
 
   ![A lobby button under APPAREL](https://raw.githubusercontent.com/NAinfini/GTFO-Forge-Mods/main/ForgeCore/docs/images/lobby-button.jpg)
 

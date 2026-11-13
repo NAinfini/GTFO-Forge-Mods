@@ -51,7 +51,7 @@ static class Holograms
         return _source;
     }
 
-    // A hologram surface showing `picture` (white when null) in `colour`, glowing by `gain` (EmissionUnit: as itself).
+    // A hologram surface showing `picture` (white when null) in `colour`, glowing by `gain` (MaterialParams.EmissionUnit: as itself).
     public static Material Surface(SkinnedGear gear, Material template, Texture? picture, Color colour, float gain)
     {
         var source = UseShader ? Source() : null;

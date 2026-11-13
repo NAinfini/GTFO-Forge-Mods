@@ -28,13 +28,16 @@ internal static class ShaderWarm
     {
         GameObject? holder = null;
         RenderTexture? target = null;
-        Material? additive = null, alpha = null;
+        Material? additive = null, alpha = null, procedural = null, proceduralHeld = null;
         try
         {
             var marker = Shaders.Marker();
             additive = Shaders.Make(Texture2D.whiteTexture, FxBlend.Additive, "ForgeVisual warm additive");
             alpha = Shaders.Make(Texture2D.whiteTexture, FxBlend.Alpha, "ForgeVisual warm alpha");
-            if (marker == null || additive == null || alpha == null) return;
+            // The procedural shader's two variants: in the world (also what a painter's UV layout runs) and through the item camera.
+            procedural = Procedural.CreateMaterial(FxBlend.Additive, false, "ForgeVisual warm procedural");
+            proceduralHeld = Procedural.CreateMaterial(FxBlend.Additive, true, "ForgeVisual warm procedural (first person)");
+            if (marker == null || additive == null || alpha == null || procedural == null || proceduralHeld == null) return;
             holder = new GameObject("ForgeVisual shader warm") { hideFlags = HideFlags.HideAndDontSave };
             var camera = holder.AddComponent<Camera>();
             camera.enabled = false;
@@ -53,7 +56,7 @@ internal static class ShaderWarm
             camera.targetTexture = target;
             var quad = Shaders.Quad();
             var at = Matrix4x4.TRS(holder.transform.position + new Vector3(0f, 0f, 2f), Quaternion.Euler(0f, 180f, 0f), Vector3.one);
-            foreach (var material in new[] { marker, additive, alpha })
+            foreach (var material in new[] { marker, additive, alpha, procedural, proceduralHeld })
                 Graphics.DrawMesh(quad, at, material, Layer, camera);
             camera.Render();
             camera.targetTexture = null;
@@ -65,6 +68,8 @@ internal static class ShaderWarm
             if (holder != null) Object.Destroy(holder);
             if (additive != null) Object.Destroy(additive);
             if (alpha != null) Object.Destroy(alpha);
+            if (procedural != null) Object.Destroy(procedural);
+            if (proceduralHeld != null) Object.Destroy(proceduralHeld);
         }
     }
 }

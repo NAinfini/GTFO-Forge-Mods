@@ -76,9 +76,13 @@ public static class Assets
 
     /// <summary>The bytes of a resource embedded in ForgeCore.dll (its shader and effect bundles), read whole into one array; empty when this
     /// build lacks it, which <see cref="LoadBytes"/> reports.</summary>
-    internal static byte[] Embedded(string resource)
+    internal static byte[] Embedded(string resource) => Embedded(typeof(Assets).Assembly, resource);
+
+    /// <summary>The bytes of a resource embedded in <paramref name="assembly"/> (a mod's own bundle written into its DLL), read whole into one
+    /// array of the resource's length, with no copy in between; empty when the assembly lacks it, which <see cref="LoadBytes"/> reports.</summary>
+    public static byte[] Embedded(System.Reflection.Assembly assembly, string resource)
     {
-        using var stream = typeof(Assets).Assembly.GetManifestResourceStream(resource);
+        using var stream = assembly.GetManifestResourceStream(resource);
         if (stream == null) return Array.Empty<byte>();
         var bytes = new byte[stream.Length];
         _ = stream.Read(bytes, 0, bytes.Length); // a manifest resource is in memory and reads whole
@@ -109,14 +113,14 @@ public static class Assets
     }
 
     /// <summary>The bundles the bundle at <paramref name="path"/> depends on, as full paths beside it, from Unity's own manifest: the
-    /// manifest bundle <c>BuildPipeline.BuildAssetBundles</c> writes into its output folder under that folder's name, shipped the same way
-    /// (<c>Models/Models</c> beside <c>Models/gun.bundle</c>). None when the folder has no manifest or it does not list the bundle. Read once
+    /// text file <c>BuildPipeline.BuildAssetBundles</c> writes into its output folder as <c>&lt;folder name&gt;.manifest</c>, shipped the same way
+    /// (<c>Models/Models.manifest</c> beside <c>Models/gun.bundle</c>). None when the folder has no manifest or it does not list the bundle. Read once
     /// per folder. Throws <see cref="InvalidDataException"/> when that file is not a Unity manifest.</summary>
     public static string[] Dependencies(string path)
     {
         var full = Path.GetFullPath(path);
         var folder = Path.GetDirectoryName(full) ?? "";
-        var manifest = Path.Combine(folder, Path.GetFileName(folder));
+        var manifest = Path.Combine(folder, Path.GetFileName(folder) + ".manifest");
         if (!Manifests.TryGetValue(manifest, out var table)) Manifests[manifest] = table = ReadManifest(manifest);
         if (!table.TryGetValue(Path.GetFileName(full), out var names)) return Array.Empty<string>();
         var paths = new string[names.Length];
@@ -138,31 +142,40 @@ public static class Assets
     }
 
     private static readonly Dictionary<string, Dictionary<string, string[]>> Manifests = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, (long Length, DateTime Written, string Hash)> FileHashes = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>The SHA-256 of a file, read once per (path, length, last write time): a bundle shared by several guns, or checked again
+    /// when it loads, is not read twice, and a file replaced since is read again.</summary>
     private static string FileSha256(string path)
     {
-        using var stream = File.OpenRead(path);
-        return Hash.Sha256Hex(stream);
+        var info = new FileInfo(Path.GetFullPath(path));
+        var written = info.LastWriteTimeUtc;
+        if (FileHashes.TryGetValue(info.FullName, out var known) && known.Length == info.Length && known.Written == written) return known.Hash;
+        string hash;
+        using (var stream = info.OpenRead()) hash = Hash.Sha256Hex(stream);
+        FileHashes[info.FullName] = (info.Length, written, hash);
+        return hash;
     }
 
     private static Dictionary<string, string[]> ReadManifest(string file)
     {
         var table = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
         if (!File.Exists(file)) return table;
-        var bundle = AssetBundle.LoadFromFile(file) ?? throw new InvalidDataException("The Unity manifest " + file + " could not be loaded.");
-        try
+        // The game's build has no AssetBundleManifest class, so the manifest bundle cannot be read here; the text file Unity writes
+        // beside it holds the same table: under AssetBundleInfos, one `Name:` per bundle followed by its `Dependency_<n>:` lines.
+        var lines = File.ReadAllLines(file);
+        if (Array.FindIndex(lines, line => line.Trim() == "AssetBundleManifest:") < 0) throw new InvalidDataException(file + " is not a Unity manifest.");
+        List<string>? current = null;
+        string? bundle = null;
+        void Close() { if (bundle != null) table[bundle] = current!.ToArray(); }
+        foreach (var raw in lines)
         {
-            var manifest = bundle.LoadAsset("AssetBundleManifest", Il2CppType.Of<AssetBundleManifest>())?.TryCast<AssetBundleManifest>()
-                ?? throw new InvalidDataException(file + " is not a Unity manifest bundle.");
-            foreach (var name in manifest.GetAllAssetBundles())
-            {
-                var dependencies = manifest.GetAllDependencies(name);
-                var names = new string[dependencies.Length];
-                for (var i = 0; i < names.Length; i++) names[i] = dependencies[i];
-                table[name] = names;
-            }
+            var line = raw.Trim();
+            if (line.StartsWith("Name: ", StringComparison.Ordinal)) { Close(); bundle = line.Substring(6).Trim(); current = new List<string>(); }
+            else if (current != null && line.StartsWith("Dependency_", StringComparison.Ordinal) && line.IndexOf(": ", StringComparison.Ordinal) is var colon and > 0)
+                current.Add(line.Substring(colon + 2).Trim());
         }
-        finally { bundle.Unload(true); }
+        Close();
         return table;
     }
 

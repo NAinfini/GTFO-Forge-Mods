@@ -6,7 +6,7 @@ namespace ForgeCore;
 
 public enum StoreStatus { Missing, Read, Corrupt }
 
-/// <summary>What <see cref="Store.Read{T}"/> found: nothing yet, the value, or a file it could not read (<see cref="Detail"/> says why).</summary>
+/// <summary>What <see cref="Store.Read{T}(string)"/> found: nothing yet, the value, or a file it could not read (<see cref="Detail"/> says why).</summary>
 public readonly record struct StoreRead<T>(StoreStatus Status, T? Value, string Detail);
 
 /// <summary>Local progress, one JSON file per mod. Only read and write: no structure migration. A file that cannot be read is
@@ -25,9 +25,11 @@ public static class Store
         return Path.Combine(Root, modId + ".forge");
     }
 
-    public static StoreRead<T> Read<T>(string modId)
+    public static StoreRead<T> Read<T>(string modId) => Read<T>(modId, PathOf(modId));
+
+    /// <summary><see cref="Read{T}(string)"/> for a file the mod keeps at its own <paramref name="path"/>; <paramref name="modId"/> names the log.</summary>
+    public static StoreRead<T> Read<T>(string modId, string path)
     {
-        var path = PathOf(modId);
         if (!File.Exists(path)) return new(StoreStatus.Missing, default, path);
         try
         {
@@ -68,10 +70,12 @@ public static class Store
     }
 
     /// <summary>Writes the whole value (to a temporary file first, then over the old one). Refuses, with an error in the mod's log,
-    /// when the existing file cannot be read as <typeparamref name="T"/> (the same test as <see cref="Read{T}"/>), so a damaged save is never replaced unseen.</summary>
-    public static bool Write<T>(string modId, T value)
+    /// when the existing file cannot be read as <typeparamref name="T"/> (the same test as <see cref="Read{T}(string)"/>), so a damaged save is never replaced unseen.</summary>
+    public static bool Write<T>(string modId, T value) => Write(modId, PathOf(modId), value);
+
+    /// <summary><see cref="Write{T}(string, T)"/> for a file the mod keeps at its own <paramref name="path"/>; <paramref name="modId"/> names the log.</summary>
+    public static bool Write<T>(string modId, string path, T value)
     {
-        var path = PathOf(modId);
         try
         {
             if (File.Exists(path))

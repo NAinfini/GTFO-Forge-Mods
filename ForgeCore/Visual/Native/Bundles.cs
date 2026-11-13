@@ -10,10 +10,11 @@ namespace ForgeVisual;
 /// <summary>
 /// Asset bundles of models and effects, registered under a pack name: <c>Bundles.Register(modId, "Arsenal", path)</c>, after which
 /// every model in it is <c>Arsenal:prefab</c> to any mod (<see cref="Models.Get"/>). The bundle is loaded through
-/// <c>ForgeCore.Assets</c> (one load per file, shared). A bundle with a model profile (the Forge model pipeline's
-/// <c>ordnance-profile</c>) has its materials rebuilt with the game's gear shader, the way the game's own gear is shaded; that shader
-/// exists once a level has been built, so the rebuild happens on the first spawn (or <see cref="BundleHandle.Prepare"/>) after that.
-/// Names and prefabs can be read before.
+/// <c>ForgeCore.Assets</c> (one load per file, shared). Registering reads only the bundle's names: a model's prefab is loaded the first
+/// time it is read (<see cref="ModelHandle.Prefab"/>), spawned or made ready (<see cref="ModelHandle.Ready"/>, the way to preload it while
+/// a level is built). A bundle with a model profile (the Forge model pipeline's <c>ordnance-profile</c>) has each model's materials rebuilt
+/// with the game's gear shader, the way the game's own gear is shaded; that shader exists once a level has been built, so a model is
+/// dressed on its first spawn or <see cref="ModelHandle.Ready"/> after that, and only the surfaces it uses are made.
 /// </summary>
 public static class Bundles
 {
@@ -106,10 +107,13 @@ public sealed class BundleHandle
     // Unity lowercases the asset paths of a bundle built without addressable names (Assets/X/FramesFx.prefab is listed as
     // assets/x/framesfx.prefab), so a bundle without a profile names its models in lower case; asking by the prefab's own name must find it.
     private readonly Dictionary<string, ModelHandle> _models = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ModelProfile.Prefab> _dressing = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Material> _surfaces = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Texture2D> _textures = new(StringComparer.Ordinal);
-    private bool _prepared, _prepareFailed;
+    private readonly HashSet<string> _textureNames = new(StringComparer.Ordinal);
+    private bool _shaderReady;
 
+    /// <summary>Reads the bundle's names only; no prefab, texture or material is loaded here.</summary>
     internal BundleHandle(string modId, string pack, AssetBundle bundle, string source, ModelProfile? profile)
     {
         ModId = modId;
@@ -121,10 +125,11 @@ public sealed class BundleHandle
         {
             foreach (var p in profile.Prefabs)
             {
-                var prefab = ForgeCore.Assets.Get<GameObject>(modId, bundle, p.name);
-                if (prefab == null) { Failure = "the profile lists the prefab " + p.name + " but the bundle has none"; return; }
-                _models.Add(p.name, new ModelHandle(this, VisualNames.Join(pack, p.name), prefab));
+                if (!bundle.Contains(p.name)) { Failure = "the profile lists the prefab " + p.name + " but the bundle has none"; return; }
+                _models.Add(p.name, new ModelHandle(this, VisualNames.Join(pack, p.name), p.name));
+                _dressing.Add(p.name, p);
             }
+            foreach (var name in profile.Textures) _textureNames.Add(name);
         }
         else
         {
@@ -135,8 +140,7 @@ public sealed class BundleHandle
                 if (extension.Length != 0 && !extension.Equals(".prefab", StringComparison.OrdinalIgnoreCase)) continue;
                 var item = Path.GetFileNameWithoutExtension(asset);
                 if (VisualNames.CheckItem(item) != null || _models.ContainsKey(item)) continue;
-                var prefab = ForgeCore.Assets.Get<GameObject>(modId, bundle, asset);
-                if (prefab != null) _models.Add(item, new ModelHandle(this, VisualNames.Join(pack, item), prefab));
+                _models.Add(item, new ModelHandle(this, VisualNames.Join(pack, item), asset));
             }
         }
     }
@@ -155,8 +159,8 @@ public sealed class BundleHandle
     /// <summary>The model <paramref name="prefab"/> of this bundle (<c>Pack:prefab</c> through <see cref="Models.Get"/> is the same).</summary>
     public bool TryModel(string prefab, out ModelHandle model) => _models.TryGetValue(prefab, out model!);
 
-    /// <summary>A standalone texture the profile lists (effect sprites and atlases), or any texture of a bundle without a profile.
-    /// Shared; do not change it.</summary>
+    /// <summary>A standalone texture the profile lists (effect sprites and atlases), or any texture of a bundle without a profile, loaded
+    /// the first time it is asked for. False (logged once) when the bundle does not have it. Shared; do not change it.</summary>
     public bool TryTexture(string name, out Texture2D texture)
     {
         if (_profile == null)
@@ -164,57 +168,63 @@ public sealed class BundleHandle
             texture = Bundle.Contains(name) ? Get<Texture2D>(name)! : null!;
             return texture != null;
         }
-        Prepare();
-        return _textures.TryGetValue(name, out texture!);
+        if (_textures.TryGetValue(name, out texture!)) return true;
+        if (!_textureNames.Contains(name) || Get<Texture2D>(name) is not { } loaded) return false;
+        _textures[name] = texture = loaded;
+        return true;
     }
 
-    /// <summary>Rebuilds the profile's materials with the game's gear shader and puts them on the prefabs, once. False (logged once)
-    /// before a level has been built, when the gear shader does not exist yet, or when the bundle lacks a listed asset. A bundle
-    /// without a profile is always ready.</summary>
+    /// <summary>Whether this bundle's models can be dressed and spawned: false (logged once) before a level has been built, when the game's
+    /// gear shader does not exist yet. A bundle without a profile is always ready. Each model's materials are made when it is first
+    /// spawned or made ready (<see cref="ModelHandle.Ready"/>).</summary>
     public bool Prepare()
     {
-        if (_prepared) return true;
-        if (_profile == null) return _prepared = true;
-        if (_prepareFailed) return false;
-        if (Shader.Find(LitMaterial.ShaderName) == null)
+        if (_shaderReady || _profile == null) return true;
+        if (Shader.Find(LitMaterial.ShaderName) != null) return _shaderReady = true;
+        ForgeCore.Log.For(ModId).ErrorOnce("visual-pack-games-gear-shader-not-loaded", "ForgeVisual pack " + Pack + ": the game's gear shader is not loaded yet; its models show once a level has been built.");
+        return false;
+    }
+
+    /// <summary>Puts the profile's materials, rebuilt with the game's gear shader, on the prefab of model <paramref name="item"/>; once per
+    /// model, on the prefab, so every instance inherits them. Makes only the surfaces this model uses (each once for the bundle). Throws
+    /// when the bundle lacks a listed renderer or texture. Call after <see cref="Prepare"/>.</summary>
+    internal void Dress(string item, GameObject prefab)
+    {
+        if (!_dressing.TryGetValue(item, out var p)) return;
+        foreach (var r in p.renderers)
         {
-            ForgeCore.Log.For(ModId).ErrorOnce("visual-pack-games-gear-shader-not-loaded", "ForgeVisual pack " + Pack + ": the game's gear shader is not loaded yet; its models show once a level has been built.");
-            return false;
+            var renderer = prefab.transform.Find(r.name)?.GetComponent<Renderer>()
+                ?? throw new InvalidDataException("the prefab " + p.name + " has no renderer " + r.name);
+            var materials = new Material[r.surfaces.Length];
+            for (var i = 0; i < materials.Length; i++) materials[i] = Surface(r.surfaces[i]);
+            renderer.sharedMaterials = new Il2CppReferenceArray<Material>(materials);
         }
-        try
-        {
-            foreach (var s in _profile.Surfaces)
-            {
-                var material = ForgeCore.Assets.Keep(LitMaterial.Create(Pack + " " + s.key, Require<Texture2D>(s.albedo), Require<Texture2D>(s.metallic), false, 0f, out var why)
-                    ?? throw new InvalidOperationException(why));
-                if (s.normal.Length != 0) material.SetTexture(BumpMap, Require<Texture2D>(s.normal));
-                if (s.Emissive)
-                    Glow.Write(material, new Color(s.emissionColor[0], s.emissionColor[1], s.emissionColor[2], 1f), Require<Texture2D>(s.emission));
-                else material.SetFloat(EnableEmissive, 0f);
-                _surfaces[s.key] = material;
-            }
-            foreach (var p in _profile.Prefabs)
-            {
-                var prefab = _models[p.name].Prefab;
-                foreach (var r in p.renderers)
-                {
-                    var renderer = prefab.transform.Find(r.name)?.GetComponent<Renderer>()
-                        ?? throw new InvalidDataException("the prefab " + p.name + " has no renderer " + r.name);
-                    var materials = new Material[r.surfaces.Length];
-                    for (var i = 0; i < materials.Length; i++) materials[i] = _surfaces[r.surfaces[i]];
-                    // Prepared once on the prefab; every instance inherits these shared materials.
-                    renderer.sharedMaterials = new Il2CppReferenceArray<Material>(materials);
-                }
-            }
-            foreach (var name in _profile.Textures) _textures[name] = Require<Texture2D>(name);
-            return _prepared = true;
-        }
-        catch (Exception error)
-        {
-            _prepareFailed = true;
-            ForgeCore.Log.For(ModId).ErrorOnce("visual-pack-could-not-prepare-materials-models", "ForgeVisual pack " + Pack + " could not prepare its materials; its models are not shown: " + error);
-            return false;
-        }
+    }
+
+    /// <summary>Whether the profile lists <paramref name="path"/> (from the prefab's root, '/'-joined) as a renderer or anchor of model
+    /// <paramref name="item"/>: the bundle's own name table, written and checked when it was built. False says nothing (a profile need not
+    /// list every node, and a bundle without one lists none).</summary>
+    internal bool Lists(string item, Func<string, bool> path)
+    {
+        if (!_dressing.TryGetValue(item, out var p)) return false;
+        foreach (var r in p.renderers) if (path(r.name)) return true;
+        foreach (var anchor in p.anchors) if (path(anchor)) return true;
+        return false;
+    }
+
+    private Material Surface(string key)
+    {
+        if (_surfaces.TryGetValue(key, out var made)) return made;
+        ModelProfile.Surface? s = null;
+        foreach (var candidate in _profile!.Surfaces) if (candidate.key == key) { s = candidate; break; }
+        if (s == null) throw new InvalidDataException("the profile has no surface " + key);
+        var material = ForgeCore.Assets.Keep(LitMaterial.Create(Pack + " " + s.key, Require<Texture2D>(s.albedo), Require<Texture2D>(s.metallic), false, 0f, out var why)
+            ?? throw new InvalidOperationException(why));
+        if (s.normal.Length != 0) material.SetTexture(BumpMap, Require<Texture2D>(s.normal));
+        if (s.Emissive)
+            Glow.Write(material, new Color(s.emissionColor[0], s.emissionColor[1], s.emissionColor[2], 1f), Require<Texture2D>(s.emission));
+        else material.SetFloat(EnableEmissive, 0f);
+        return _surfaces[key] = material;
     }
 
     private T Require<T>(string name) where T : Object => ForgeCore.Assets.Keep(Get<T>(name) ?? throw new InvalidDataException("the bundle has no " + typeof(T).Name + " " + name));

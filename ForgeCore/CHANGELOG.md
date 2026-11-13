@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.1
+
+- Interface: `UIKit.AddLobbyButton` takes the button's area (`LobbyArea`: below, right, above) and width (`LobbyWidth`: full, half, third); buttons of one area fill rows in order and move to the next area only when they do not fit. Under APPAREL the buttons' rows and the lobby strips' rows close up and then get lower (not below 0.6 of their height, always as wide as APPAREL) to stay above the screen's bottom before a button moves elsewhere.
+- Added: `Images.Queue` and `Images.QueueRaw` (images decoded and uploaded over several frames within a frame budget, raw DDS-style blocks uploaded directly); `Store.Read` / `Store.Write` with an explicit path, which never overwrite a file they could not read; `StrictJson.NamespacedId`; `ItemModelIcons.Photograph`; `EnemyNames` and `UIKit.EnemyName` (the game's enemy names in English and Chinese).
+- Added: the procedural pattern library (`Procedural`, `ProceduralCatalog`, `ProceduralPainter`, with blend modes and `SetTime`), and the adjust-page controls `UISlider`, `UIToggle`, `UIChoice` and `UISwatches`.
+- Added: `Il2CppArrays.Store` and `Il2CppArrays.ToGameReferences`, which store into the game's arrays of references with the collector's write barrier (ForgeSkin 1.1.0 needs them).
+- Added: `AudioKit.CheckClip`, the container check `AudioKit.Load` applies to each clip, for one clip on any thread (null when it passes, else why not).
+- Added: `PickerCard.Swatch` and `PickerInfo.Swatch` show a colour choice as a tile on the card and large in the details. Picker titles too long for one line take two; an adjust page draws its controls as soon as it opens; list rows never draw past the list's frame.
+- Full-screen lists (`MenuScreen` entries) centre each line of a row in the row's box, and hovering a row no longer scrolls the list.
+- Resource bundles read their dependencies from the text manifest Unity writes (the game build has no `AssetBundleManifest`), so a bundle with dependencies loads in game; bundle digests, module fingerprints and content hashes are computed once, and model bundles load on first use.
+- A grid cell without a room makes the game write `Borken cell` only once per level (`[Logs] BorkenCellOnce`, on by default); the answer for that cell is unchanged.
+- Range rings draw the author's opacity (0 to 1) and glow (0 to 4) without a cap and only their outward faces.
+
 ## 1.0.0
 
 ForgeUI, ForgeAudio and ForgeVisual are now part of ForgeCore: one package (`NAinfini-ForgeCore`), one plugin (`NAinfini.ForgeCore`) and one `ForgeCore.dll`. The three are no longer separate packages; remove them when you update. Their namespaces and settings files (`NAinfini.ForgeUI.cfg`, `NAinfini.ForgeUI.keys.cfg`, `NAinfini.ForgeAudio.cfg`, `NAinfini.ForgeVisual.cfg`) keep their names, so your settings stay. A mod declares only `[BepInDependency("NAinfini.ForgeCore")]` and the dependency `NAinfini-ForgeCore-1.0.0`; `UIKit.PluginId` and `AudioKit.PluginId` are gone. Interface changes: `FxSlots.Find` returns the empty handle (`FxHandle.IsNothing`) instead of null for a slot the table does not list; `GameHooks.SentryGearSpawned`, `SentryDespawned` and `ReloadAnimationStarted` are gone (use `SentryLifecycle`, filtered on the step, and `ReloadTriggered`), and so are `GameContext.Unsubscribe` and `GameSounds.UnsubscribeGameSounds`; types and members nothing outside the library used are now internal. Added: `Vec.Finite`, `Gear.ArchetypeId`, `Ease.Smoothstep`, and `Frame.GameTime`, `ScreenWidth` and `ScreenHeight`.

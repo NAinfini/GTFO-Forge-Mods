@@ -22,6 +22,10 @@ public sealed class PickerCard
 
     /// <summary>The card's picture; null shows none.</summary>
     public Sprite? Icon;
+
+    /// <summary>A colour the card stands for (a colour choice), shown as a filled tile in the picture's place when there is no
+    /// <see cref="Icon"/>; null for none.</summary>
+    public Color? Swatch;
 }
 
 /// <summary>What was pressed, for <see cref="PickerSource.Clicked"/>.</summary>
@@ -48,6 +52,10 @@ public sealed class PickerInfo
     public string Body = "";
 
     public Sprite? Icon;
+
+    /// <summary>A colour the entry stands for, shown large: filling the picture box when there is no <see cref="Icon"/>, else as a band
+    /// along the bottom of the picture box under the picture; null for none.</summary>
+    public Color? Swatch;
 
     /// <summary>Sprites drawn on key caps in a row under the title (for example a key sequence made of
     /// <see cref="UIKitSprites.ArrowGlyph"/>). At most 12 are shown.</summary>
@@ -145,6 +153,12 @@ public abstract class PickerSource
     /// this one.</summary>
     public virtual IReadOnlyList<PickerCard> Entries(int slot, int tab) => Entries(tab);
 
+    /// <summary>An adjust page: the controls <paramref name="tab"/> shows while <paramref name="slot"/> is chosen, one row each, in place of cards
+    /// (no clear card, <see cref="Pick"/> is not called for them; the picker reads and writes each control's value itself, and
+    /// <see cref="Info"/> is still asked with the row's index as the entry). Null (the default) makes the tab an ordinary list of
+    /// <see cref="Entries(int, int)"/>.</summary>
+    public virtual IReadOnlyList<UIControl>? Controls(int slot, int tab) => null;
+
     /// <summary>The first card of every tab, which empties the chosen slot; null leaves it out.</summary>
     public virtual PickerCard? ClearCard => new() { Title = UIKit.Kit.Text("picker.clear") };
 
@@ -154,7 +168,7 @@ public abstract class PickerSource
     {
         var entries = Entries(slot, tab);
         var card = entry >= 0 && entry < entries.Count ? entries[entry] : entry < 0 ? SlotCard(slot, true) : null;
-        return card == null ? new PickerInfo() : new PickerInfo { Title = card.Title, Subtitle = card.Subtitle, Accent = card.Accent, Icon = card.Icon };
+        return card == null ? new PickerInfo() : new PickerInfo { Title = card.Title, Subtitle = card.Subtitle, Accent = card.Accent, Icon = card.Icon, Swatch = card.Swatch };
     }
 
     /// <summary>Puts <paramref name="entry"/> (−1: nothing) into <paramref name="slot"/>. Return null when it was accepted, or

@@ -57,12 +57,17 @@ static class SharedHooks
         // dump.cs 544371: the funnel every hit on an enemy passes on this machine (the shooter's own hits are applied locally
         // too). With the local player as source and the enemy alive before (its health, else -1): dead after is a kill, alive
         // after is a hit; the damage is the health it lost (before minus after, never below 0). The source is compared first (two
-        // pointers), so the host's hits by everybody else read nothing more.
+        // pointers), so the host's hits by everybody else read nothing more. The enemy read before is kept for after; a kill reads
+        // which enemy it was once (its EnemyDataBlock persistentID) for that enemy's kill sounds.
         On(GameHooks.EnemyDamageReceived, () => GameHooks.EnemyDamageReceived.Around(
-            static call => SkinnedGear.IsLocal(call.Source) && NativeObjects.Is<Dam_EnemyDamageBase>(call.Receiver) && call.Receiver.Owner is { } owner && owner.Alive ? call.Receiver.Health : -1f,
+            static call => SkinnedGear.IsLocal(call.Source) && NativeObjects.Is<Dam_EnemyDamageBase>(call.Receiver) && call.Receiver.Owner is { } owner && owner.Alive
+                ? (Health: call.Receiver.Health, Enemy: owner) : (Health: -1f, Enemy: null),
             static (call, before, _) =>
             {
-                if (before >= 0) SkinnedGear.Damaged(!call.Receiver.Owner.Alive, Math.Max(0, before - Math.Max(0, call.Receiver.Health)));
+                if (before.Enemy == null) return;
+                bool killed = !before.Enemy.Alive;
+                uint? enemy = killed && before.Enemy.EnemyData is { } data ? data.persistentID : null;
+                SkinnedGear.Damaged(killed, Math.Max(0, before.Health - Math.Max(0, call.Receiver.Health)), enemy);
             }));
         // dump.cs 565304: a reload starts when the call sets the item's reloading flag (the bracket carries no answer; the flag
         // is what the game's own `true` stands for, and a call while already reloading starts nothing).
@@ -98,6 +103,16 @@ static class SharedHooks
         On(GameHooks.GearSpawnCompleted, () => GameHooks.GearSpawnCompleted.After(static (item, _) => ItemReady(item)));
         On(GameHooks.SyncedGearSpawnCompleted, () => GameHooks.SyncedGearSpawnCompleted.Before(BeforeItemSetup));
         On(GameHooks.SyncedGearSpawnCompleted, () => GameHooks.SyncedGearSpawnCompleted.After(static (item, _) => ItemReady(item)));
+        // The local player goes down (ForgeCore GameEvents.LocalPlayerDown) and their revive completes (GameHooks.PlayerRevived,
+        // filtered to them): states of the player, raised for the item in their hands only.
+        GameEvents.LocalPlayerDown += static () => SkinnedGear.PlayerState(Trigger.Downed);
+        On(GameHooks.PlayerRevived, () => GameHooks.PlayerRevived.After(static (state, ran) =>
+        {
+            if (ran && NativeObjects.Is<PLOC_Downed>(state) && SkinnedGear.IsLocal(state.m_owner)) SkinnedGear.PlayerState(Trigger.Revived);
+        }));
+        // dump.cs 565768: every item the game builds (ItemSpawnManager.SpawnItem: level pickups, container contents, dropped items,
+        // placed mines, held items); a pickup whose item has a skin takes it.
+        On(GameHooks.ItemSpawned, () => GameHooks.ItemSpawned.After(static (call, _) => SkinnedGear.ItemSpawned(call.Item, call.Id, call.Mode)));
         // The game state changes (a level starts generating, the level is entered).
         GameEvents.StateChanged += static () => SkinnedGear.StateChanged(GameStateManager.CurrentStateName);
     }
@@ -148,6 +163,22 @@ static class MeleeAttackHook
 static class MinePlacedHook
 {
     static void Postfix(MineDeployerFirstPerson __instance) => SkinnedGear.Event(__instance.Pointer, Trigger.Fire);
+}
+
+// dump.cs 568906: the placer's callback once the mine it asked for (a deployer's or a consumable mine's) has spawned; only ForgeSkin
+// reads it. A deployed sentry needs no hook: it is a gear of its own, skinned where its parts spawn.
+[HarmonyPatch]
+static class MineSpawnedCallbackHook
+{
+    static IEnumerable<MethodBase> TargetMethods() => new MethodBase?[]
+    {
+        AccessTools.DeclaredMethod(typeof(MineDeployerFirstPerson), nameof(MineDeployerFirstPerson.OnStickyMineSpawned)),
+    }.Where(m => m != null && ForgeCore.Hooks.Unsupported(m) == null)!;
+
+    static void Postfix(MineDeployerFirstPerson __instance, ISyncedItem __0)
+    {
+        if (NativeObjects.Is<MineDeployerFirstPerson>(__instance)) SkinnedGear.Placed(__instance, __0?.TryCast<Item>());
+    }
 }
 
 [HarmonyPatch(typeof(SentryGunFirstPerson), nameof(SentryGunFirstPerson.PlaceOnGround))]

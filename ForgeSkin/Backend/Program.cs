@@ -65,12 +65,13 @@ public static class Paths
 public static class Log
 {
     static readonly Lock Gate = new();
-    public static void Write(string text)
+    // `echo` false keeps the line out of stderr (the editor's log panel): a request error, which the editor reports itself.
+    public static void Write(string text, bool echo = true)
     {
         var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {text}";
         lock (Gate)
         {
-            Console.Error.WriteLine(line);
+            if (echo) Console.Error.WriteLine(line);
             Directory.CreateDirectory(Paths.Logs);
             File.AppendAllText(Path.Combine(Paths.Logs, "backend.log"), line + Environment.NewLine);
         }
@@ -157,7 +158,7 @@ public static class Program
                 _ => ("internal", e.Message),
             };
             if (code == "internal") Log.Write($"error {e}");
-            else Log.Write($"{code}: {message}");
+            else Log.Write($"{code}: {message}", echo: false);
             Send(new { id, error = new { code, message } });
         }
     }

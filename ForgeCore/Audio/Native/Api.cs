@@ -227,6 +227,12 @@ public static partial class AudioKit
     public static AudioLibrary Load(string identity, string cues, System.Collections.Generic.IReadOnlyDictionary<string, byte[]> clips, double maxSeconds = 3600)
         => Assets.Load(identity, "", null, cues ?? throw new ArgumentNullException(nameof(cues)), clips ?? throw new ArgumentNullException(nameof(clips)), maxSeconds);
 
+    /// <summary>The container check <see cref="Load(string, string, System.Collections.Generic.IReadOnlyDictionary{string, byte[]}, double)"/>
+    /// applies to each clip (one Ogg Vorbis stream, mono or stereo, at most <paramref name="maxSeconds"/>): null when the bytes pass,
+    /// else why not. A mod checks its clips one by one with it to name the file that fails in its own words. Any thread.</summary>
+    public static AudioFailure? CheckClip(byte[] bytes, double maxSeconds = 3600)
+        => AssetValidation.Ogg(bytes ?? throw new ArgumentNullException(nameof(bytes)), maxSeconds) is { Success: false } bad ? bad.Error : null;
+
     internal static bool ValidIdentity(string? identity) => identity != null && identity.Length <= 100 && Regex.IsMatch(identity, "^[A-Za-z0-9][A-Za-z0-9_.-]*$");
 }
 

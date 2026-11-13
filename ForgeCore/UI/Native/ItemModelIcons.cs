@@ -100,6 +100,21 @@ public static class ItemModelIcons
         catch (Exception error) { return "renderers unreadable: " + error.GetType().Name; }
     }
 
+    /// <summary>A new picture of whatever <paramref name="model"/> draws right now (its visible mesh renderers with the materials they
+    /// show, framed and lit as <see cref="Of"/> does), for a model whose look changes, so it is not cached: the caller owns the sprite and
+    /// destroys it and its texture. Throws when the model has no visible mesh. One render, on the calling frame.</summary>
+    public static Sprite Photograph(Transform model, string name)
+    {
+        if (model == null) throw new ArgumentNullException(nameof(model));
+        var stage = new GameObject("ForgeUI model picture stage") { hideFlags = HideFlags.HideAndDontSave };
+        try
+        {
+            stage.transform.position = Stage;
+            return CopyAndShoot(model, model.worldToLocalMatrix, stage, name);
+        }
+        finally { UnityEngine.Object.DestroyImmediate(stage); }
+    }
+
     private static Sprite? Build(Item item, string name)
     {
         var holder = item.m_itemModelHolder != null ? item.m_itemModelHolder : item.transform;
@@ -120,41 +135,46 @@ public static class ItemModelIcons
                 foreach (var script in prefabModel.GetComponentsInChildren<MonoBehaviour>(true)) if (script != null) UnityEngine.Object.DestroyImmediate(script);
                 sourceRoot = prefabModel.transform;
             }
-            var toStage = prefabModel != null ? stage.transform.worldToLocalMatrix : holder.worldToLocalMatrix;
-            var bounds = default(Bounds);
-            var parts = 0;
-            int shadowOnly = 0, hidden = 0, unfinished = 0;
-            var renderers = sourceRoot.GetComponentsInChildren<MeshRenderer>(true);
-            foreach (var source in renderers)
-            {
-                if (source == null || !source.enabled) continue;
-                if (source.shadowCastingMode == ShadowCastingMode.ShadowsOnly) { shadowOnly++; continue; }
-                if (!ActiveUnder(source.transform, sourceRoot)) { hidden++; continue; }
-                var filter = source.GetComponent<MeshFilter>();
-                var mesh = filter != null ? filter.sharedMesh : null;
-                if (mesh == null || source.sharedMaterial == null) { unfinished++; continue; }
-                var part = new GameObject("part") { layer = Layer, hideFlags = HideFlags.HideAndDontSave };
-                var local = toStage * source.transform.localToWorldMatrix;
-                var t = part.transform;
-                t.SetParent(stage.transform, false);
-                t.localPosition = local.GetColumn(3);
-                t.localRotation = local.rotation;
-                t.localScale = local.lossyScale;
-                part.AddComponent<MeshFilter>().sharedMesh = mesh;
-                var copy = part.AddComponent<MeshRenderer>();
-                copy.sharedMaterials = source.sharedMaterials;
-                copy.shadowCastingMode = ShadowCastingMode.Off;
-                copy.receiveShadows = false;
-                if (parts++ == 0) bounds = copy.bounds; else bounds.Encapsulate(copy.bounds);
-            }
-            if (parts == 0) throw new InvalidOperationException("the item's model has no visible mesh (shadow-only " + shadowOnly + ", switched off " + hidden + ", no mesh or material " + unfinished + ")");
-            return Photograph(stage, bounds, name);
+            return CopyAndShoot(sourceRoot, prefabModel != null ? stage.transform.worldToLocalMatrix : holder.worldToLocalMatrix, stage, name);
         }
         finally
         {
             UnityEngine.Object.DestroyImmediate(hold);
             UnityEngine.Object.DestroyImmediate(stage);
         }
+    }
+
+    // Copies the visible mesh renderers under `sourceRoot` onto `stage` (`toStage` maps the source's world to the stage) and photographs them.
+    private static Sprite CopyAndShoot(Transform sourceRoot, Matrix4x4 toStage, GameObject stage, string name)
+    {
+        var bounds = default(Bounds);
+        var parts = 0;
+        int shadowOnly = 0, hidden = 0, unfinished = 0;
+        var renderers = sourceRoot.GetComponentsInChildren<MeshRenderer>(true);
+        foreach (var source in renderers)
+        {
+            if (source == null || !source.enabled) continue;
+            if (source.shadowCastingMode == ShadowCastingMode.ShadowsOnly) { shadowOnly++; continue; }
+            if (!ActiveUnder(source.transform, sourceRoot)) { hidden++; continue; }
+            var filter = source.GetComponent<MeshFilter>();
+            var mesh = filter != null ? filter.sharedMesh : null;
+            if (mesh == null || source.sharedMaterial == null) { unfinished++; continue; }
+            var part = new GameObject("part") { layer = Layer, hideFlags = HideFlags.HideAndDontSave };
+            var local = toStage * source.transform.localToWorldMatrix;
+            var t = part.transform;
+            t.SetParent(stage.transform, false);
+            t.localPosition = local.GetColumn(3);
+            t.localRotation = local.rotation;
+            t.localScale = local.lossyScale;
+            part.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var copy = part.AddComponent<MeshRenderer>();
+            copy.sharedMaterials = source.sharedMaterials;
+            copy.shadowCastingMode = ShadowCastingMode.Off;
+            copy.receiveShadows = false;
+            if (parts++ == 0) bounds = copy.bounds; else bounds.Encapsulate(copy.bounds);
+        }
+        if (parts == 0) throw new InvalidOperationException("the model has no visible mesh (shadow-only " + shadowOnly + ", switched off " + hidden + ", no mesh or material " + unfinished + ")");
+        return Photograph(stage, bounds, name);
     }
 
     private static bool ActiveUnder(Transform t, Transform holder)

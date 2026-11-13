@@ -70,6 +70,8 @@
   <ItemGroup>
     <!-- The one gun-holding rule (Visual/Core/GunHold.cs); a website implementation reads the same file. -->
     <EmbeddedResource Include="Visual/Data/gun-hold.json" LogicalName="ForgeVisual.Data.gun-hold.json" />
+    <!-- The drawing programs of the procedural shader (Visual/Data/fx-programs.json): the one catalogue the shader build, the runtime and the editors read. -->
+    <EmbeddedResource Include="Visual/Data/fx-programs.json" LogicalName="ForgeVisual.Data.fx-programs.json" />
     <!-- Forge's effect bundle (CC0, Assets/Vfx/LICENSE.txt): the one copy every Forge mod draws its effects from; local media, not in Git. -->
     <EmbeddedResource Include="$(ForgeModsRoot)ForgeCore/Assets/Vfx/forge-vfx.bundle" LogicalName="ForgeVisual.Vfx.forge-vfx.bundle" />
     <!-- The sights a package may put on its guns (Visual/Data/sights.json; self-made, Assets/Sights/LICENSE.txt): descriptors here; meshes and textures (<id>.t<index>.png, the descriptor's textures in order) local media, not in Git. -->

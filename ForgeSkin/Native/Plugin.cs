@@ -6,8 +6,8 @@ using UnityEngine;
 
 namespace ForgeSkin.Plugin;
 
-[BepInPlugin(Guid, "ForgeSkin", "1.0.3")] // package-version: NAinfini-ForgeSkin
-[BepInDependency("NAinfini.ForgeCore")]
+[BepInPlugin(Guid, "ForgeSkin", "1.1.0")] // package-version: NAinfini-ForgeSkin
+[BepInDependency("NAinfini.ForgeCore", ">=1.0.1")]
 [BepInProcess("GTFO.exe")]
 public sealed class ForgeSkinPlugin : BasePlugin
 {
@@ -23,6 +23,9 @@ public sealed class ForgeSkinPlugin : BasePlugin
     static readonly object OwnLock = new();
 
     internal static void Info(string message) => Own("info", message);
+
+    /// <summary>The author log is open (Development): a caller builds a costly Info line only when this is true.</summary>
+    internal static bool Logging => _own != null;
 
     /// <summary>A skin author's warning that is no error for the player (a fallback taken, a texture left uncompressed): the editor's feed only.</summary>
     internal static void Warn(string message) => Own("warn", message);
@@ -67,11 +70,11 @@ public sealed class ForgeSkinPlugin : BasePlugin
         }
         if (Settings.Bind(Guid, "General", "Readback", false, "Write each assembled gear's vanilla part poses to BepInEx/ForgeSkin/readback/<gearId>.json.").Value)
             Readback.Directory = Path.Combine(Paths.BepInExRootPath, "ForgeSkin", "readback");
+        ForgeSkin.Format.CodeEffects.Catalog = ForgeVisual.Procedural.Catalog; // one catalogue for pack checks and drawing
         var skins = Path.Combine(folder, "skins");
         Skins.Watch(skins, Paths.PluginPath, Path.Combine(Paths.ConfigPath, "ForgeSkin.choices.json"), Path.Combine(Paths.ConfigPath, "ForgeSkin.colours.json"), dev);
         Icons.SkinsChanged(); // the icons the game cached before may show another skin than the one now active
-        Picker.Register(Settings.Bind(Guid, "General", "PickerKey", KeyCode.F8,
-            "The default key that opens and closes the skin picker in the lobby (the SKINS button opens it too); the game's Controls settings can change it. The picks are kept in BepInEx/config/ForgeSkin.choices.json, the colours in ForgeSkin.colours.json.").Value.ToString());
+        Picker.Register(); // picks kept in BepInEx/config/ForgeSkin.choices.json, colours in ForgeSkin.colours.json
         Holograms.UseShader = Settings.Bind(Guid, "General", "HologramShader", true,
             "Draw holograms with the game's hologram shader (Cell/Player/Display_Hologram). Off: the gear shader's plain unlit glow.").Value;
         SharedHooks.Subscribe();
@@ -87,10 +90,9 @@ public sealed class ForgeSkinPlugin : BasePlugin
         Info($"loaded, skins folder {skins}, hot reload {(dev ? "on" : "off")}");
     }
 
-    // Main-thread tick: the picker key, hot reload and picks, pending gear and the live screens and layers.
+    // Main-thread tick: hot reload and picks, pending gear and the live screens and layers.
     static void Update()
     {
-        Picker.Poll();
         SkinnedGear.Tick(Frame.UnscaledTime, Frame.GameTime);
     }
 }

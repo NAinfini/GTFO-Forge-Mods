@@ -170,6 +170,34 @@ internal sealed class MenuCanvas
 
     internal bool Alive => _root != null && !_root.WasCollected;
 
+    private bool _spritesShown = true, _textsShown = true;
+
+    /// <summary>Whether the sprites and the texts drawn are rendered (pieces stay where they are and keep what they show; pieces made later
+    /// follow). For a list row the list's clipping cannot cut cleanly: a row partly past the list's edge keeps its plates, which the clipping
+    /// cuts, and hides its texts, whose glyphs could show past the edge; a row wholly past it hides both. Touches nothing when unchanged.</summary>
+    internal void Show(bool sprites, bool texts)
+    {
+        if (!Alive) return;
+        if (sprites != _spritesShown)
+        {
+            _spritesShown = sprites;
+            foreach (var sprite in _sprites) if (sprite != null && !sprite.WasCollected) sprite.forceRenderingOff = !sprites;
+        }
+        if (texts != _textsShown)
+        {
+            _textsShown = texts;
+            foreach (var text in _texts) HideText(text, !texts);
+        }
+    }
+
+    // The text's renderer and its fallback-font sub-meshes.
+    private static void HideText(TextMeshPro text, bool off)
+    {
+        if (text == null || text.WasCollected) return;
+        foreach (var renderer in text.GetComponentsInChildren<Renderer>(true))
+            if (renderer.forceRenderingOff != off) renderer.forceRenderingOff = off;
+    }
+
     /// <summary>True when pieces were made since the last call (a clipped list must hand new pieces to its clipping).</summary>
     internal bool TakeGrown()
     {
@@ -366,6 +394,7 @@ internal sealed class MenuCanvas
             var made = go.AddComponent<SpriteRenderer>();
             if (_material != null) made.sharedMaterial = _material;
             made.sortingLayerID = _sortingLayer;
+            if (!_spritesShown) made.forceRenderingOff = true;
             _sprites.Add(made);
             _spriteLast.Add(default);
             _grown = true;
@@ -423,6 +452,7 @@ internal sealed class MenuCanvas
             go.transform.localScale = _textScale;
             var renderer = go.GetComponent<MeshRenderer>();
             if (renderer != null) renderer.enabled = true;
+            if (!_textsShown) HideText(made, true);
             _texts.Add(made);
             _textMeshes.Add(0);
             _textLast.Add(default);
@@ -448,5 +478,7 @@ internal sealed class MenuCanvas
         if (meshes <= _textMeshes[index]) return;
         _textMeshes[index] = meshes;
         _grown = true;
+        // A new text or sub-mesh of a canvas whose texts are hidden (Show) stays hidden.
+        if (!_textsShown) HideText(label, true);
     }
 }

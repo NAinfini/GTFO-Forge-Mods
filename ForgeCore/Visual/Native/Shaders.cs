@@ -13,19 +13,20 @@ public enum FxBlend
     Additive,
 }
 
-/// <summary>The library's shaders (particle, marker and outline), loaded once from the bundle embedded
+/// <summary>The library's shaders (particle, marker, outline and procedural), loaded once from the bundle embedded
 /// in this DLL through <c>ForgeCore.Assets</c>, the base textures made in code, and the shared quad meshes. A failure is logged once and
 /// every caller gets null (its drawing is skipped, nothing falls back to another look).</summary>
 internal static class Shaders
 {
     private static readonly int Src = Shader.PropertyToID("_Src"), Dst = Shader.PropertyToID("_Dst"), Additive = Shader.PropertyToID("_Additive");
     private static bool _tried;
-    private static Shader? _particle, _marker, _outline;
+    private static Shader? _particle, _marker, _outline, _procedural;
     private static Material? _markerMaterial;
     private static Mesh? _quad;
 
     internal static Shader? Particle => Load() ? _particle : null;
     internal static Shader? Outline => Load() ? _outline : null;
+    internal static Shader? Procedural => Load() ? _procedural : null;
 
     /// <summary>The one shared material of the marker shader; each renderer sets its own state through a property block.</summary>
     internal static Material? Marker()
@@ -111,7 +112,7 @@ internal static class Shaders
     private static bool Load()
     {
         if (_particle != null && !_particle.WasCollected && _marker != null && !_marker.WasCollected
-            && _outline != null && !_outline.WasCollected) return true;
+            && _outline != null && !_outline.WasCollected && _procedural != null && !_procedural.WasCollected) return true;
         if (_tried) return false;
         _tried = true;
         try
@@ -121,11 +122,12 @@ internal static class Shaders
             _particle = ForgeCore.Assets.Get<Shader>(Plugin.Id, bundle, ShaderBundle.ParticleAsset);
             _marker = ForgeCore.Assets.Get<Shader>(Plugin.Id, bundle, ShaderBundle.MarkerAsset);
             _outline = ForgeCore.Assets.Get<Shader>(Plugin.Id, bundle, ShaderBundle.OutlineAsset);
-            if (_particle == null || _marker == null || _outline == null) { _particle = _marker = _outline = null; return false; }
-            if (!_particle.isSupported || !_marker.isSupported || !_outline.isSupported)
+            _procedural = ForgeCore.Assets.Get<Shader>(Plugin.Id, bundle, ShaderBundle.ProceduralAsset);
+            if (_particle == null || _marker == null || _outline == null || _procedural == null) { _particle = _marker = _outline = _procedural = null; return false; }
+            if (!_particle.isSupported || !_marker.isSupported || !_outline.isSupported || !_procedural.isSupported)
             {
                 Plugin.Logger.Error("visual-forgevisuals-shaders-are-not-supported", "ForgeVisual's shaders are not supported on this device; its sprites, particles, ground marks, beams and outlines are not drawn.");
-                _particle = _marker = _outline = null;
+                _particle = _marker = _outline = _procedural = null;
                 return false;
             }
             return true;
@@ -133,7 +135,7 @@ internal static class Shaders
         catch (Exception error)
         {
             Plugin.Logger.Error("visual-forgevisuals-shaders-could-not-be-loaded", "ForgeVisual's shaders could not be loaded; its sprites, particles, ground marks, beams and outlines are not drawn: " + error);
-            _particle = _marker = _outline = null;
+            _particle = _marker = _outline = _procedural = null;
             return false;
         }
     }

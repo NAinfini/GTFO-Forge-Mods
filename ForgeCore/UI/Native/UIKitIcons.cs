@@ -13,27 +13,23 @@ internal static class UIKitIcons
 }
 public static partial class UIKit
 {
-    /// <summary>How long a game picture that was not found is not searched for again.</summary>
+    /// <summary>How long after a scan of the loaded sprites a name that was not found waits before they are scanned again.</summary>
     private const float GameRetrySeconds = 2f;
-    private static readonly Dictionary<string, Sprite> GameFound = new(StringComparer.Ordinal);
-    private static readonly Dictionary<string, float> GameMissed = new(StringComparer.Ordinal);
+    /// <summary>Every loaded sprite of the game by name, from the last scan (the first of a name wins).</summary>
+    private static readonly Dictionary<string, Sprite> GameSprites = new(StringComparer.Ordinal);
+    private static float _nextGameScan = float.NegativeInfinity;
 
-    /// <summary>The loaded <c>Sprite</c> of the game with this name (<c>symbol_hostile</c>), found among the loaded sprites once and kept;
-    /// null while it is not loaded, and a miss is searched again after two seconds (the level may not have loaded it yet).</summary>
+    /// <summary>The loaded <c>Sprite</c> of the game with this name (<c>symbol_hostile</c>). One scan of the loaded sprites indexes them all by
+    /// name; a name not in the index is null and scans again at most every two seconds (the level may not have loaded it yet).</summary>
     public static Sprite? GameSprite(string name)
     {
-        if (GameFound.TryGetValue(name, out var known) && known != null) return known;
-        if (GameMissed.TryGetValue(name, out var until) && ForgeCore.Frame.UnscaledTime < until) return null;
+        if (GameSprites.TryGetValue(name, out var known) && known != null) return known;
+        if (ForgeCore.Frame.UnscaledTime < _nextGameScan) return null;
+        _nextGameScan = ForgeCore.Frame.UnscaledTime + GameRetrySeconds;
+        GameSprites.Clear();
         foreach (var asset in Resources.FindObjectsOfTypeAll(Il2CppType.Of<Sprite>())) // Resources.FindObjectsOfTypeAll(Type)
-        {
-            var sprite = asset?.TryCast<Sprite>();
-            if (sprite == null || sprite.name != name) continue;
-            GameFound[name] = sprite;
-            GameMissed.Remove(name);
-            return sprite;
-        }
-        GameMissed[name] = ForgeCore.Frame.UnscaledTime + GameRetrySeconds;
-        return null;
+            if (asset?.TryCast<Sprite>() is { } sprite) GameSprites.TryAdd(sprite.name, sprite);
+        return GameSprites.TryGetValue(name, out known) ? known : null;
     }
 
     /// <summary>The icon called <paramref name="name"/>: <c>Pack:item</c> for one a mod registered (<c>Frames:skill-charge</c>) or

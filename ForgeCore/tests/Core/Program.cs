@@ -15,7 +15,9 @@ internal static class Program
         NetChecks.Run(Check, errors);
 
         HookChecks.Run(Check);
+        LobbyChecks.Run(Check);
         AnimationChecks.Run(Check, args);
+        ProceduralChecks.Run(Check);
         Console.WriteLine(passed + " passed, " + failed + " failed");
         return failed == 0 ? 0 : 1;
     }

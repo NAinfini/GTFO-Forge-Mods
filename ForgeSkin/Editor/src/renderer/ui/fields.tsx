@@ -5,9 +5,10 @@ import type { ReactNode } from 'react';
 import type { ColorSlot } from '../protocol';
 import { PlayerToggle } from './PlayerColors';
 
+/** A labelled control; the label also names the group, so assistive tools and AI control find the control by it. */
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="field">
+    <div className="field" role="group" aria-label={label}>
       <Text size="sm" c="dimmed">
         {label}
       </Text>

@@ -242,7 +242,11 @@ public sealed class MenuScreen
         {
             var pan = PagePan.Offset(Page, _rest[0].Piece);
             foreach (var renderer in bar.GetComponentsInChildren<Renderer>(false))
+            {
+                // The bar's pop-ups (exit, return to lobby, quit) hang below it while the pointer rests on their button: the screen goes under the bar itself, never under them.
+                if (renderer.GetComponentInParent<CM_ScrollWindow>() != null) continue;
                 roomTop = Math.Min(roomTop, Holder.InverseTransformPoint(renderer.bounds.min).y + pan.y - EdgeGap);
+            }
         }
         var (s, x, y) = BoxFit.Fit(new HudBox(left, bottom, right, top), new HudBox(-halfW + EdgeGap, -halfH + EdgeGap, halfW - EdgeGap, roomTop));
         _scale = s; _shift = new Vector2(x, y);
@@ -315,6 +319,7 @@ public sealed class MenuScreenWindow
     private readonly Il2CppSystem.Collections.Generic.List<iScrollWindowContent> _rows = new();
     // Each row's height, and the buttons placed under the window (they move up with a window that fits its rows).
     private readonly List<float> _rowHeights = new();
+    private readonly List<CM_SettingsItem> _items = new();
     private readonly List<Transform> _buttons = new();
     private CM_SettingsItem? _lastRow;
     private float[] _stops = Array.Empty<float>();
@@ -344,7 +349,7 @@ public sealed class MenuScreenWindow
     public void AddEntry(IReadOnlyList<MenuLine> lines, Action? onClick = null, bool selected = false)
     {
         var row = Row(onClick, selected, MenuScreen.RowHeight + Math.Max(0, lines.Count - 1) * LineStep);
-        for (var i = 0; i < lines.Count; i++) Cells(row, lines[i].Cells, lines[i].Stops, lines[i].RightAligned, selected && i == 0, -i * LineStep);
+        for (var i = 0; i < lines.Count; i++) Cells(row, lines[i].Cells, lines[i].Stops, lines[i].RightAligned, selected && i == 0, i, lines.Count);
     }
 
     /// <summary>A row like the settings rows with one line of rich text; with <paramref name="onClick"/> it answers the cursor like a
@@ -618,6 +623,7 @@ public sealed class MenuScreenWindow
         if (onClick == null) { if (row.m_collider != null) row.m_collider.enabled = false; }
         else _screen.Routes.Add(Input.Route(row, MenuScreen.Guard(onClick), null));
         _rows.Add(new iScrollWindowContent(row.Pointer));
+        _items.Add(row);
         _rowHeights.Add(height);
         _lastRow = row;
         return row;
@@ -665,16 +671,38 @@ public sealed class MenuScreenWindow
         copy.transform.localPosition = box.transform.localPosition + box.transform.localRotation * (Vector3)move;
     }
 
+    // The row's box from bottom to top, in the row's own units, measured from its sprite as Span and Select do (the box the selection
+    // outlines); null without one.
+    private static (float Bottom, float Top)? Band(CM_SettingsItem row)
+    {
+        var box = row.m_background;
+        if (box == null || box.sprite == null) return null;
+        var scale = box.transform.localScale;
+        var drawn = box.drawMode == SpriteDrawMode.Simple ? (Vector2)box.sprite.bounds.size : box.size;
+        var size = new Vector2(drawn.x * Mathf.Abs(scale.x), drawn.y * Mathf.Abs(scale.y));
+        if (size.y <= 0f) return null;
+        var sprite = box.sprite;
+        var pivot = new Vector2(sprite.pivot.x / sprite.rect.width, sprite.pivot.y / sprite.rect.height);
+        var centre = box.transform.localPosition + box.transform.localRotation * new Vector3((0.5f - pivot.x) * size.x, (0.5f - pivot.y) * size.y, 0f);
+        var parent = box.transform.parent;
+        var a = row.transform.InverseTransformPoint(parent.TransformPoint(centre - box.transform.localRotation * new Vector3(0f, size.y / 2f, 0f))).y;
+        var b = row.transform.InverseTransformPoint(parent.TransformPoint(centre + box.transform.localRotation * new Vector3(0f, size.y / 2f, 0f))).y;
+        return (Math.Min(a, b), Math.Max(a, b));
+    }
+
     // Each cell a copy of the row's own title text, placed in its column of the row's box (<see cref="Span"/>), one line, cut with an
-    // ellipsis; the row's title itself stays empty.
+    // ellipsis; the row's title itself stays empty. Vertically, line <paramref name="line"/> of <paramref name="lines"/> is centred in its
+    // equal share of the box (<see cref="Band"/>), so every column of a line stands at one height and every line inside the box: the title's
+    // own place is not the box's middle, and lines placed from it ran over the box's top edge.
     // Returns the cells made.
-    private List<TMPro.TextMeshPro> Cells(CM_SettingsItem row, IReadOnlyList<string> cells, IReadOnlyList<float> stops, IReadOnlyList<int> right, bool strong = false, float down = 0f)
+    private List<TMPro.TextMeshPro> Cells(CM_SettingsItem row, IReadOnlyList<string> cells, IReadOnlyList<float> stops, IReadOnlyList<int> right, bool strong = false, int line = 0, int lines = 1)
     {
         var made = new List<TMPro.TextMeshPro>();
         var title = row.m_title;
         row.SetText("");
         if (title == null) return made;
         var (left, width) = Span(row);
+        var band = Band(row);
         for (var i = 0; i < cells.Count; i++)
         {
             if (string.IsNullOrEmpty(cells[i])) continue;
@@ -690,11 +718,12 @@ public sealed class MenuScreenWindow
             var scale = cell.transform.localScale.x != 0f ? cell.transform.localScale.x : 1f;
             var columnWidth = (to - from) / 100f * width - (last < cells.Count - 1 ? MenuScreen.CellGap : 0f);
             var rect = cell.rectTransform;
-            // Only the horizontal pivot moves: the row's text keeps its own vertical placement on the row's box.
-            rect.pivot = new Vector2(0.5f, rect.pivot.y);
-            rect.sizeDelta = new Vector2(columnWidth / scale, rect.sizeDelta.y);
             var p = cell.transform.localPosition;
-            cell.transform.localPosition = new Vector3(left + from / 100f * width + columnWidth / 2f, p.y + down, p.z);
+            // Without a measured box the title's own place is kept for the first line and each next one goes a line lower.
+            var y = band is { } b ? b.Top - (b.Top - b.Bottom) * (line + 0.5f) / Math.Max(1, lines) : p.y - line * LineStep + (0.5f - rect.pivot.y) * rect.sizeDelta.y * cell.transform.localScale.y;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(columnWidth / scale, rect.sizeDelta.y);
+            cell.transform.localPosition = new Vector3(left + from / 100f * width + columnWidth / 2f, y, p.z);
             cell.enableWordWrapping = false;
             cell.overflowMode = TMPro.TextOverflowModes.Ellipsis;
             cell.alignment = Contains(right, i) ? TMPro.TextAlignmentOptions.MidlineRight : TMPro.TextAlignmentOptions.MidlineLeft;
@@ -791,6 +820,10 @@ public sealed class MenuScreenWindow
             }
         }
         _window.SetContentItems(_rows, MenuScreen.RowGap);
+        // SetContentItems has the window follow each row's hover (OnHoverUpdateFromContent) and scroll it into view by the place it worked
+        // out from the rows' sizes; rows of different heights were placed off what it worked out, so moving the pointer over the list
+        // scrolled it up and down. A row under the pointer is in view already: hovering only lights it, and the wheel and the bar scroll.
+        foreach (var item in _items) item.OnHoverUpdateFromContent = null;
         _window.SetVisible(true);
     }
 }
@@ -949,8 +982,63 @@ internal static class MenuScreens
         Yield(FocusStateManager.CurrentState == eFocusState.GlobalPopupMessage);
         Hide();
         _open.Hold();
+        Cover(_open);
     }
 
+    // The game's pop-ups of the page's menu bar (exit expedition, return to lobby, quit) open over the page while the pointer rests on their button. The screen's
+    // pieces are copies of the settings page's and may sort above them, so their text showed through the pop-up. On the frame a pop-up opens (and after the screen
+    // is built again under it) its pieces are moved to the layer of the screen's topmost piece, above its order, keeping their order among themselves.
+    private static MenuScreen? _coveredFor;
+    private static int _coveredPopups;
+    private static readonly CM_ScrollWindow?[] Popups = new CM_ScrollWindow?[3];
+
+    private static void Cover(MenuScreen screen)
+    {
+        var bar = screen.Page.GetComponentInChildren<CM_MenuBar>();
+        if (bar == null) return;
+        Popups[0] = bar.m_popupQuit;
+        Popups[1] = bar.m_popupExitLobby;
+        Popups[2] = bar.m_popupReturnToLobby;
+        var up = 0;
+        for (var i = 0; i < Popups.Length; i++)
+            if (Popups[i] is { } window && !window.WasCollected && window.IsVisible) up |= 1 << i;
+        if (up == 0) { _coveredPopups = 0; return; }
+        if (ReferenceEquals(_coveredFor, screen) && _coveredPopups == up) return;
+        _coveredFor = screen;
+        _coveredPopups = up;
+        Raise(screen, up);
+        Array.Clear(Popups, 0, Popups.Length);
+    }
+
+    // Once per pop-up opening, not per frame.
+    private static void Raise(MenuScreen screen, int up)
+    {
+        int layerId = 0, order = int.MinValue, best = int.MinValue;
+        foreach (var go in screen.Created)
+        {
+            if (go == null || go.WasCollected) continue;
+            foreach (var renderer in go.GetComponentsInChildren<Renderer>(false))
+            {
+                var id = renderer.sortingLayerID;
+                var rank = SortingLayer.GetLayerValueFromID(id);
+                if (rank > best) { best = rank; layerId = id; order = renderer.sortingOrder; }
+                else if (rank == best) order = Math.Max(order, renderer.sortingOrder);
+            }
+        }
+        if (best == int.MinValue) return;
+        for (var i = 0; i < Popups.Length; i++)
+        {
+            if ((up & 1 << i) == 0) continue;
+            var pieces = Popups[i]!.GetComponentsInChildren<Renderer>(true);
+            var lowest = int.MaxValue;
+            foreach (var renderer in pieces) lowest = Math.Min(lowest, renderer.sortingOrder);
+            foreach (var renderer in pieces)
+            {
+                renderer.sortingLayerID = layerId;
+                renderer.sortingOrder += order + 1 - lowest;
+            }
+        }
+    }
     // While one of the game's pop-ups (the exit expedition question, a quit confirmation) is up, the screen's pieces are switched off, so
     // the game's pop-up is not drawn over by their text; they are switched on again when it closes, with their windows' state untouched.
     private static readonly List<GameObject> Yielded = new();

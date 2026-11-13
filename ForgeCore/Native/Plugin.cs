@@ -11,7 +11,7 @@ namespace ForgeCore;
 [BepInDependency("dev.gtfomodding.gtfo-api", ">=0.6.1")]
 internal sealed class Plugin : BasePlugin
 {
-    internal const string Id = "NAinfini.ForgeCore", Version = "1.0.0"; // package-version: NAinfini-ForgeCore
+    internal const string Id = "NAinfini.ForgeCore", Version = "1.0.1"; // package-version: NAinfini-ForgeCore
 
     internal static ModLog Logger { get; private set; } = null!;
 
@@ -61,6 +61,7 @@ internal sealed class Plugin : BasePlugin
         }
         catch (Exception error) { Logger.Error("core-items-spawned-hook", "The Items.Spawned hook could not be put on; handlers of Items.Spawned will not run: " + error); }
         ReplicationMisses.Start(message => own.LogInfo(message));
+        BorkenCells.Start();
         // After ForgeCore's own cleanup and recall, so a mod's GameEvents handler sees them done.
         GameEventSources.Start();
         // The UI, audio and visual parts start after the core and before any package that depends on ForgeCore, in this order. Each keeps its

@@ -54,11 +54,19 @@ public static class Install
         if (!Directory.Exists(Path.Combine(profile, "BepInEx"))) throw new BackendException("not-found", $"{profile} has no BepInEx folder");
     }
 
-    public static object Pack(string pack, string profile, bool activate)
+    // `pick` (the editor's 应用到游戏): the skin also goes before the player's in-game picker choice for its target. Written
+    // as a one-shot `<ticks>.pick` file beside active.json ({"target", "skin"}); the plugin applies it to its own choices at
+    // its next reload (at once in a running game with Development on, else at the next launch) and deletes it. Only the
+    // plugin writes ForgeSkin.choices.json, so a choice the player makes meanwhile is never written over.
+    public static object Pack(string pack, string profile, bool activate, bool pick = false)
     {
         RequireProfile(profile);
         SkinDocument doc;
-        using (var p = SkinPack.Open(pack)) doc = p.Manifest;
+        using (var p = SkinPack.Open(pack))
+        {
+            PackBuilder.CheckSounds(p);
+            doc = p.Manifest;
+        }
         var dir = Skins(profile);
         Directory.CreateDirectory(dir);
         var target = Path.Combine(dir, Preview.Safe(doc.Id) + SkinPack.Extension);
@@ -68,6 +76,8 @@ public static class Install
             file.Commit();
         }
         if (activate) SetActive(profile, doc, true);
+        if (pick && doc.Target.Key() is { } key)
+            AtomicFile.WriteText(Path.Combine(dir, $"{DateTime.UtcNow.Ticks}{SkinPack.PickExtension}"), JsonSerializer.Serialize(new { target = key, skin = doc.Id }));
         return new { installed = target, active = activate };
     }
 

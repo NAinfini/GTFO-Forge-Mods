@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using AIGraph;
+using GTFO.API;
 using HarmonyLib;
+using LevelGeneration;
 using UnityEngine;
 
 namespace ForgeCore;
@@ -70,18 +73,92 @@ public static class StackedVolumes
         return volume != null;
     }
 }
+/// <summary>The game's volume lookup writes "ERROR : Borken cell ... grouping or root" (a formatted line with a stack trace) on every call
+/// for a position whose grid cell holds no room; the player's node update and the camera culler call it every frame, so a player outside
+/// the map writes it every frame. On by default (<c>NAinfini.ForgeCore.cfg</c>, [Logs] BorkenCellOnce); off, nothing is patched for it.
+/// On, from build done each such cell is written once per level: the game's body runs and writes the line, and later calls for that cell,
+/// while it still holds no room, get the body's own answer for it (no volume, false) without the body. Every other call runs the body.</summary>
+internal static class BorkenCells
+{
+    private static readonly Dictionary<eDimensionIndex, LG_Grid> Grids = new();
+    private static readonly HashSet<IntPtr> Written = new();
+    private static bool _live;
+
+    internal static void Start()
+    {
+        if (!Settings.Bind(Plugin.Id, "Logs", "BorkenCellOnce", true,
+                "Writes the game's \"Borken cell\" error once per grid cell and level instead of every frame while a player stands outside the rooms.").Value) return;
+        LevelAPI.OnBuildStart += Forget;
+        LevelAPI.OnLevelCleanup += Forget;
+        LevelAPI.OnBuildDone += static () =>
+        {
+            try { Patches.Ensure(Modules.StackedVolumes, typeof(GeomorphVolumeLookupHook)); _live = true; }
+            catch (Exception error) { Plugin.Logger.ErrorOnce("core-borken-cell-hook-failed", "The Borken cell line stays every frame: " + error); }
+        };
+    }
+
+    private static void Forget()
+    {
+        _live = false;
+        Written.Clear();
+        Grids.Clear();
+    }
+
+    /// <summary>The game has written this position's cell already and the cell still holds no room.</summary>
+    internal static bool AlreadyWritten(eDimensionIndex dimension, Vector3 pos)
+        => Written.Count != 0 && Grids.TryGetValue(dimension, out var grid) && grid.GetCell(pos, out var cell) && cell != null
+           && Written.Contains(cell.Pointer) && Roomless(cell);
+
+    /// <summary>The game's body answered false: when that was a cell with no room (its line was just written), remember the cell.</summary>
+    internal static void Refused(eDimensionIndex dimension, Vector3 pos)
+    {
+        if (!_live || Builder.CurrentFloor is not { } floor || !floor.GetDimension(dimension, out var native) || native?.Grid is not { } grid) return;
+        if (!grid.GetCell(pos, out var cell) || cell == null || !Roomless(cell)) return;
+        Written.Add(cell.Pointer);
+        Grids[dimension] = grid;
+    }
+
+    // The body's own test: no grouping, or a grouping without a live root geomorph.
+    private static bool Roomless(LG_Cell cell) => cell.m_grouping is not { } tile || tile.m_geoRoot == null;
+}
+
 /// <summary>The one patch on <c>AIG_GeomorphNodeVolume.TryGetGeomorphVolume</c>: a position inside a registered room's extent is answered
-/// with that room's volume (<see cref="StackedVolumes"/>) and the game's body is skipped. It is a prefix because the game's own body
-/// logs "Borken cell ... grouping or root" for every cell it cannot match, and a postfix would only fix the answer after that log.</summary>
+/// with that room's volume (<see cref="StackedVolumes"/>) and the game's body is skipped; a cell whose "Borken cell" line was already
+/// written is answered as the body answers it (<see cref="BorkenCells"/>). It is a prefix because the game's own body logs "Borken cell ...
+/// grouping or root" for every cell it cannot match, and a postfix would only fix the answer after that log.</summary>
 internal static class GeomorphVolumeLookupHook
 {
     [HarmonyPatch(typeof(AIG_GeomorphNodeVolume), nameof(AIG_GeomorphNodeVolume.TryGetGeomorphVolume))]
     [HarmonyPrefix, HarmonyPriority(Priority.First)]
-    private static bool Prefix(eDimensionIndex dimensionIndex, Vector3 pos, ref AIG_GeomorphNodeVolume resultingGeoVolume, ref bool __result)
+    private static bool Prefix(eDimensionIndex dimensionIndex, Vector3 pos, ref AIG_GeomorphNodeVolume resultingGeoVolume, ref bool __result, out bool __state)
     {
-        if (!StackedVolumes.TryPick(dimensionIndex, pos, out var volume)) return true;
-        resultingGeoVolume = volume!;
-        __result = true;
-        return false;
+        __state = true;
+        if (StackedVolumes.TryPick(dimensionIndex, pos, out var volume))
+        {
+            resultingGeoVolume = volume!;
+            __result = true;
+            return false;
+        }
+        try
+        {
+            if (BorkenCells.AlreadyWritten(dimensionIndex, pos))
+            {
+                resultingGeoVolume = null!;
+                __result = false;
+                return false;
+            }
+        }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("core-borken-cell-check-failed", "Checking a Borken cell failed: " + error); }
+        __state = false;
+        return true;
+    }
+
+    [HarmonyPatch(typeof(AIG_GeomorphNodeVolume), nameof(AIG_GeomorphNodeVolume.TryGetGeomorphVolume))]
+    [HarmonyPostfix]
+    private static void Postfix(eDimensionIndex dimensionIndex, Vector3 pos, bool __result, bool __state, bool __runOriginal)
+    {
+        if (__state || __result || !__runOriginal) return;
+        try { BorkenCells.Refused(dimensionIndex, pos); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("core-borken-cell-check-failed", "Checking a Borken cell failed: " + error); }
     }
 }

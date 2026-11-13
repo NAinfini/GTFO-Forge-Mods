@@ -39,6 +39,10 @@ public static partial class UIKit
     /// <summary>The kit's own handle, for the shared banner and notices elements and the picker's own words.</summary>
     internal static UIKitMod Kit => Mod(Plugin.Id);
 
+    /// <summary>What players call the enemy whose <c>EnemyDataBlock</c> is named <paramref name="blockName"/>, in the current language
+    /// (<see cref="ForgeCore.EnemyNames"/>: Striker, Shooter…); null for a block the game does not ship (a custom rundown's).</summary>
+    public static string? EnemyName(string? blockName) => ForgeCore.EnemyNames.Key(blockName) is { } key ? Kit.Text(key) : null;
+
     private static readonly Dictionary<string, UITexts> Folders = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The current language code (for example <c>zh</c> or <c>en</c>): the player's <c>Language</c> setting, or the game's
@@ -134,20 +138,26 @@ public sealed partial class UIKitMod
     }
 
     /// <summary>
-    /// Adds a button to the lobby player bar, under the game's APPAREL button. Buttons from all mods stack downwards in the order
-    /// of their full IDs.
+    /// Adds a button to the lobby player bar in <paramref name="area"/>: under the game's APPAREL button, right of the player's panel
+    /// or above it. Buttons from all mods follow each other in their area in the order of their full IDs. An area holds as many as fit
+    /// on screen; a button with no room in its own area is shown in the first other area with room (Below, Right, Top) and one line
+    /// is logged, and one with no room anywhere is not shown (logged).
     /// </summary>
     /// <param name="name">Unique and stable inside your mod, for example <c>Loadout</c>.</param>
+    /// <param name="area">Where the button goes; there is no default.</param>
+    /// <param name="width">A whole row (the APPAREL button's width), half or a third of one; there is no default. Buttons of an area fill its rows left to right in order, up to three to a row.</param>
     /// <param name="title">Shown on the button, upper case to match the game; a plain string or a <see cref="UIText.Key"/>.</param>
     /// <param name="onClick">Called with the bar whose button was pressed.</param>
     /// <param name="note">Optional small grey text after the title (for example <c>2/4</c>); read every frame while shown.</param>
     /// <param name="visible">Optional; by default the button shows only on the local player's own bar.</param>
-    public LobbyButton? AddLobbyButton(string name, UIText title, Action<CM_PlayerLobbyBar> onClick, Func<string>? note = null,
+    public LobbyButton? AddLobbyButton(string name, LobbyArea area, LobbyWidth width, UIText title, Action<CM_PlayerLobbyBar> onClick, Func<string>? note = null,
         Func<CM_PlayerLobbyBar, bool>? visible = null)
     {
         if (onClick == null) throw new ArgumentNullException(nameof(onClick));
+        if (!Enum.IsDefined(typeof(LobbyArea), area)) throw new ArgumentOutOfRangeException(nameof(area));
+        if (!Enum.IsDefined(typeof(LobbyWidth), width)) throw new ArgumentOutOfRangeException(nameof(width));
         var id = Full(name, "lobby button");
-        return id == null ? null : LobbyButtons.Add(new LobbyButton(id, this, title ?? UIText.Empty, onClick, note, visible));
+        return id == null ? null : LobbyButtons.Add(new LobbyButton(id, this, area, width, title ?? UIText.Empty, onClick, note, visible));
     }
 
     /// <summary>
@@ -216,10 +226,12 @@ public sealed class LobbyButton
 {
     private UIText _title;
 
-    internal LobbyButton(string id, UIKitMod mod, UIText title, Action<CM_PlayerLobbyBar> onClick, Func<string>? note, Func<CM_PlayerLobbyBar, bool>? visible)
+    internal LobbyButton(string id, UIKitMod mod, LobbyArea area, LobbyWidth width, UIText title, Action<CM_PlayerLobbyBar> onClick, Func<string>? note, Func<CM_PlayerLobbyBar, bool>? visible)
     {
         Id = id;
         Mod = mod;
+        Area = area;
+        Width = width;
         _title = title;
         OnClick = onClick;
         Note = note;
@@ -227,6 +239,12 @@ public sealed class LobbyButton
     }
 
     public string Id { get; }
+
+    /// <summary>The area it was added to (it shows in another only while that one has no room).</summary>
+    public LobbyArea Area { get; }
+
+    /// <summary>The width it was added with.</summary>
+    public LobbyWidth Width { get; }
 
     /// <summary>Can be changed at any time; the bars follow on the next frame.</summary>
     public UIText Title

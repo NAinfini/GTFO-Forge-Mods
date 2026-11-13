@@ -22,10 +22,11 @@ var broken = new Scanner(interop, new ReaderParameters { AssemblyResolver = reso
 broken.Scan(fixture);
 File.Delete(fixture);
 if (broken.Direct.Count != 1 || !broken.Direct.Keys.Single().Contains(Fixture.Missing)
-    || broken.Indirect.Count != 2 || !broken.Indirect.Keys.Any(k => k.Contains("get_loop"))
-    || !broken.Indirect.Keys.Any(k => k.Contains("icall " + Fixture.Icall)))
+    || broken.Indirect.Count != 3 || !broken.Indirect.Keys.Any(k => k.Contains("get_loop"))
+    || !broken.Indirect.Keys.Any(k => k.Contains("icall " + Fixture.Icall))
+    || !broken.Indirect.Keys.Any(k => k.Contains("Vector3.ToString") && k.Contains("System.Single::ToString")))
 {
-    Console.WriteLine("FAIL detection: the broken fixture gave " + broken.Direct.Count + " direct and " + broken.Indirect.Count + " indirect, expected one direct, the stripped get_loop and the absent engine call.");
+    Console.WriteLine("FAIL detection: the broken fixture gave " + broken.Direct.Count + " direct and " + broken.Indirect.Count + " indirect, expected one direct, the stripped get_loop, the absent engine call and Vector3.ToString(string) reaching a standard library method with a game type.");
     return 2;
 }
 var patchFixture = PatchFixture.Write(interop, resolver);
@@ -39,7 +40,7 @@ if (brokenPatches.Findings.Count != 3 || !brokenPatches.Findings.Keys.Any(k => k
     return 2;
 }
 Console.WriteLine("detection: the broken patch fixture is caught (a parameter name the target lacks, an overloaded target without argument types, an absent target; the correct patch not reported)");
-Console.WriteLine("detection: the broken fixture is caught (a missing member, a stripped body, an engine call the player lacks; the valid and standard library calls not reported)");
+Console.WriteLine("detection: the broken fixture is caught (a missing member, a stripped body, an engine call the player lacks, a standard library call with a game type; the valid and standard library calls not reported)");
 if (player == null) Console.WriteLine("engine call names not checked: no UnityPlayer.dll given");
 
 foreach (var dll in args.Skip(2)) scanner.Scan(dll);
@@ -122,7 +123,14 @@ internal sealed class Scanner
         {
             if (instruction.Operand is not (MethodReference or FieldReference)) continue;
             var member = (MemberReference)instruction.Operand;
-            if (member.DeclaringType == null || !IsInterop(member.DeclaringType)) continue;
+            if (member.DeclaringType == null) continue;
+            if (!IsInterop(member.DeclaringType))
+            {
+                // A standard library method whose signature names a game type cannot exist (Vector3.ToString(string) calls Single.ToString(string, Il2CppSystem.IFormatProvider)).
+                if (member is MethodReference standard && IsStandardLibrary(ScopeName(member.DeclaringType)) && (IsInterop(standard.ReturnType) || standard.Parameters.Any(p => IsInterop(p.ParameterType))))
+                    found.Add(member.FullName);
+                continue;
+            }
             var resolved = Resolve(member);
             if (resolved == null) found.Add(member.FullName);
             else if (resolved is MethodDefinition next) found.AddRange(Walk(next));
@@ -165,14 +173,20 @@ internal sealed class Scanner
         if (type is ArrayType) return false;
         while (type is TypeSpecification specification) type = specification.ElementType;
         if (type.IsGenericParameter) return false;
-        var name = type.Scope is ModuleDefinition module ? module.Assembly.Name.Name : type.Scope is AssemblyNameReference reference ? reference.Name : null;
+        var name = ScopeName(type);
         return name != null && _interop.Contains(name) && !IsStandardLibrary(name);
+    }
+
+    private static string? ScopeName(TypeReference type)
+    {
+        while (type is TypeSpecification specification) type = specification.ElementType;
+        return type.Scope is ModuleDefinition module ? module.Assembly.Name.Name : type.Scope is AssemblyNameReference reference ? reference.Name : null;
     }
 
     /// <summary>A plain library compiled against .NET (NVorbis) names the real standard library. The interop folder's netstandard.dll has the same name and only the game's few forwards,
     /// so its members look missing; the game's own runtime library is Il2Cppmscorlib, which stays checked.</summary>
-    private static bool IsStandardLibrary(string assembly)
-        => assembly is "netstandard" or "mscorlib" or "System" || assembly.StartsWith("System.", StringComparison.Ordinal);
+    private static bool IsStandardLibrary(string? assembly)
+        => assembly is "netstandard" or "mscorlib" or "System" || assembly?.StartsWith("System.", StringComparison.Ordinal) == true;
 
     private static IMetadataTokenProvider? Resolve(MemberReference member)
     {
@@ -206,7 +220,8 @@ internal sealed class Scanner
 }
 
 /// <summary>A small assembly that makes the mistakes this check exists for: a call of the stripped ParticleSystem.loop (its interop body names a MainModule method that does not exist),
-/// a call of a method the interop does not have at all, a call whose engine name the player lacks (scanned against an empty player), and a valid call and a standard library call that must not be reported.</summary>
+/// a call of a method the interop does not have at all, a call whose engine name the player lacks (scanned against an empty player), a call of Vector3.ToString(string) (its body calls a
+/// Single.ToString that takes Il2CppSystem.IFormatProvider, which no standard library has), and a valid call and a standard library call that must not be reported.</summary>
 internal static class Fixture
 {
     internal const string Missing = "get_doesNotExist";
@@ -227,8 +242,10 @@ internal static class Fixture
         var netstandard = new AssemblyNameReference("netstandard", new Version(2, 1, 0, 0));
         module.AssemblyReferences.Add(netstandard);
         var standard = new MethodReference("ToString", module.TypeSystem.String, new TypeReference("System", "NotThere", module, netstandard)) { HasThis = true };
+        using var core = AssemblyDefinition.ReadAssembly(Path.Combine(interop, "UnityEngine.CoreModule.dll"), new ReaderParameters { AssemblyResolver = resolver });
+        var formatted = core.MainModule.GetType("UnityEngine.Vector3").Methods.First(m => m.Name == "ToString" && m.Parameters.Count == 1 && m.Parameters[0].ParameterType.FullName == "System.String");
         var index = 0;
-        foreach (var call in new[] { module.ImportReference(stripped), module.ImportReference(valid), absent, module.ImportReference(engine), standard })
+        foreach (var call in new[] { module.ImportReference(stripped), module.ImportReference(valid), absent, module.ImportReference(engine), standard, module.ImportReference(formatted) })
         {
             var method = new MethodDefinition("Call" + index++, MethodAttributes.Public | MethodAttributes.Static, module.TypeSystem.Void);
             var il = method.Body.GetILProcessor();

@@ -393,15 +393,20 @@ public static class Models
     internal static float SafeInverse(float v) => Math.Abs(v) < 1e-4f ? 1f : 1f / v;
 }
 
-/// <summary>A registered model. <see cref="Prefab"/> is readable as soon as its pack is registered (to check its parts); spawning
-/// waits until its materials are ready (the game's gear shader exists once a level is built).</summary>
+/// <summary>A registered model: a name in its pack until it is used. <see cref="Prefab"/> loads the prefab from the bundle the first time it
+/// is read; spawning also waits until its materials are ready (the game's gear shader exists once a level is built). To have the first
+/// spawn cost nothing, read <see cref="Ready"/> while a level is built.</summary>
 public sealed class ModelHandle
 {
-    internal ModelHandle(BundleHandle bundle, string name, GameObject prefab)
+    private readonly string _asset;
+    private GameObject? _prefab;
+    private bool _dressed, _failed;
+
+    internal ModelHandle(BundleHandle bundle, string name, string asset)
     {
         Bundle = bundle;
         Name = name;
-        Prefab = prefab;
+        _asset = asset;
         Seen = ForgeCore.RecordingNames.Of(name);
     }
 
@@ -410,11 +415,51 @@ public sealed class ModelHandle
     /// <summary><c>Pack:prefab</c>.</summary>
     public string Name { get; }
 
-    /// <summary>The bundle's prefab. Do not change it; spawn instances.</summary>
-    public GameObject Prefab { get; }
+    /// <summary>The bundle's prefab, loaded on the frame it is first read and kept. Do not change it; spawn instances. Throws
+    /// <see cref="InvalidDataException"/> (the reason logged once) when the bundle cannot give a prefab of that name.</summary>
+    public GameObject Prefab => _prefab ??= ForgeCore.Assets.Get<GameObject>(Bundle.ModId, Bundle.Bundle, _asset)
+        ?? throw new InvalidDataException("ForgeVisual model " + Name + " has no prefab in its bundle.");
 
-    /// <summary>True once instances can be spawned with their materials.</summary>
-    public bool Ready => Bundle.Prepare();
+    /// <summary>Whether the model has a node whose path from the prefab's root ('/'-joined, as <c>Transform.Find</c> takes it) satisfies
+    /// <paramref name="path"/>: answered from the bundle profile's renderer and anchor names without loading the prefab when one of them
+    /// does, else from the prefab itself (loading it). For checking a model's parts when it is registered or named by a definition.</summary>
+    public bool HasNode(Func<string, bool> path)
+    {
+        if (path == null) throw new ArgumentNullException(nameof(path));
+        if (Bundle.Lists(_asset, path)) return true;
+        var root = Prefab.transform;
+        foreach (var node in root.GetComponentsInChildren<Transform>(true))
+        {
+            if (node.Pointer == root.Pointer) continue;
+            var name = node.name;
+            for (var up = node.parent; up != null && up.Pointer != root.Pointer; up = up.parent) name = up.name + "/" + name;
+            if (path(name)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>True once instances can be spawned with their materials: loads the prefab and, for a bundle with a profile, puts its
+    /// game-shaded materials on it (after a level has been built). False (logged once) before that, or for good when the prefab or its
+    /// materials cannot be made.</summary>
+    public bool Ready
+    {
+        get
+        {
+            if (_dressed) return true;
+            if (_failed || !Bundle.Prepare()) return false;
+            try
+            {
+                Bundle.Dress(_asset, Prefab);
+                return _dressed = true;
+            }
+            catch (Exception error)
+            {
+                _failed = true;
+                ForgeCore.Log.For(Bundle.ModId).ErrorOnce("visual-model-could-not-prepare-materials", "ForgeVisual model " + Name + " could not be prepared; it is not shown: " + error);
+                return false;
+            }
+        }
+    }
 
     /// <summary>A new instance at the given world pose under <paramref name="parent"/> (or none), or null (logged once) when the
     /// materials cannot be prepared yet.</summary>
@@ -429,7 +474,7 @@ public sealed class ModelHandle
     /// and the first-person wear, which report what they are themselves.</summary>
     internal GameObject? Make(Vector3 position, Quaternion rotation, Transform? parent = null)
     {
-        if (!Bundle.Prepare()) return null;
+        if (!Ready) return null;
         return parent == null ? Object.Instantiate(Prefab, position, rotation) : Object.Instantiate(Prefab, position, rotation, parent);
     }
 

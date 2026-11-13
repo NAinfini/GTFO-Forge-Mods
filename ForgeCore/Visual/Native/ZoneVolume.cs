@@ -11,7 +11,8 @@ public enum ZoneShape { Box, Sphere, Cylinder, Capsule }
 /// <summary>How a zone volume is drawn: wire lines, a see-through solid, or the solid plus a pulsing disc on the floor.</summary>
 public enum ZoneStyle { Outline, Solid, Sensor }
 
-/// <summary>The colour and strength of a drawn zone. Opacity and glow are used as given; the shader saturates them.</summary>
+/// <summary>The colour and strength of a drawn zone. Opacity is drawn as given from 0 to 1 and Glow from 0 to <see cref="ZoneVolume.GlowCeiling"/>;
+/// values outside are held at the nearest end.</summary>
 public readonly record struct ZoneLook(ZoneStyle Style, float Red, float Green, float Blue, float Opacity, float Glow);
 
 /// <summary>One zone drawn with the library's own geometry and shader (independent of any game material). The vertex buffers
@@ -20,6 +21,12 @@ public readonly record struct ZoneLook(ZoneStyle Style, float Red, float Green, 
 public sealed class ZoneVolume : IDisposable
 {
     public const float LineWidth = 0.04f;
+    /// <summary>How a zone's strength is drawn, the one place it is set: the caller's opacity is used as given (kept to 0 to 1) and its
+    /// glow too (kept to 0 to <see cref="GlowCeiling"/>; the shader multiplies the colour by 1 + glow). Only a sensor's walls and caps
+    /// (seen from inside as well) are drawn at <see cref="SensorBodyShare"/> of the opacity, so the column never hides what is behind it
+    /// and the floor disc carries the boundary; the other styles use the full value. The website's map editor preview draws the same
+    /// numbers (<c>triggerZoneLook</c> in <c>map-trigger-zone.ts</c>).</summary>
+    public const float GlowCeiling = 4f, SensorBodyShare = 0.25f;
     private static readonly int OpacityId = Shader.PropertyToID("_Opacity"), GlowId = Shader.PropertyToID("_Glow"), PulseId = Shader.PropertyToID("_Pulse");
     private static bool _shaderTried;
     private static Shader? _shader;
@@ -28,7 +35,7 @@ public sealed class ZoneVolume : IDisposable
     private readonly GameObject _root, _body;
     private readonly Transform _rootTransform, _bodyTransform;
     private readonly GameObject? _discObject;
-    private readonly Material? _material;
+    private readonly Material? _material, _discMaterial;
     private readonly ZoneMesh? _volume, _disc;
     private readonly List<(LineRenderer Line, Point[] Points)> _lines = new();
     private readonly bool _sensor;
@@ -50,8 +57,9 @@ public sealed class ZoneVolume : IDisposable
             if (look is { } appearance)
             {
                 _material = new Material(LoadShader()) { name = "ForgeVisual zone appearance", color = new Color(appearance.Red, appearance.Green, appearance.Blue, 1) };
-                _material.SetFloat(OpacityId, Math.Clamp(appearance.Opacity, 0, 1));
-                _material.SetFloat(GlowId, Math.Max(appearance.Glow, 0));
+                var opacity = Math.Clamp(appearance.Opacity, 0, 1);
+                _material.SetFloat(OpacityId, opacity);
+                _material.SetFloat(GlowId, Math.Clamp(appearance.Glow, 0, GlowCeiling));
                 _material.SetFloat(PulseId, 1);
                 _sensor = appearance.Style == ZoneStyle.Sensor;
                 if (appearance.Style == ZoneStyle.Outline) BuildLines();
@@ -59,6 +67,13 @@ public sealed class ZoneVolume : IDisposable
                 {
                     _volume = ZoneMesh.Create(shape);
                     _body.AddComponent<MeshFilter>().sharedMesh = _volume.Mesh;
+                    if (_sensor)
+                    {
+                        // The disc keeps the full opacity; the walls get a copy at a fraction of it.
+                        _discMaterial = _material;
+                        _material = new Material(_discMaterial) { name = "ForgeVisual zone body" };
+                        _material.SetFloat(OpacityId, opacity * SensorBodyShare);
+                    }
                     _body.AddComponent<MeshRenderer>().sharedMaterial = _material;
                     if (_sensor)
                     {
@@ -66,7 +81,7 @@ public sealed class ZoneVolume : IDisposable
                         _discObject = new GameObject("ground disc"); _discObject.transform.SetParent(_root.transform, false);
                         _discObject.transform.localPosition = new Vector3(0, 0.01f, 0);
                         _discObject.AddComponent<MeshFilter>().sharedMesh = _disc.Mesh;
-                        _discObject.AddComponent<MeshRenderer>().sharedMaterial = _material;
+                        _discObject.AddComponent<MeshRenderer>().sharedMaterial = _discMaterial;
                     }
                 }
             }
@@ -77,6 +92,7 @@ public sealed class ZoneVolume : IDisposable
             // A half-built volume would stay in the scene with no owner to destroy it.
             _volume?.Dispose(); _disc?.Dispose();
             if (_material != null) UnityEngine.Object.Destroy(_material);
+            if (_discMaterial != null) UnityEngine.Object.Destroy(_discMaterial);
             UnityEngine.Object.Destroy(_root);
             throw;
         }
@@ -122,13 +138,16 @@ public sealed class ZoneVolume : IDisposable
     /// <summary>A sensor's breathing: brightness and opacity follow a one-second sine of <paramref name="seconds"/>. Other styles ignore it.</summary>
     public void Pulse(double seconds)
     {
-        if (_sensor && _material != null) _material.SetFloat(PulseId, (float)(0.75 + 0.25 * Math.Sin(seconds * Math.PI * 2)));
+        if (!_sensor || _material == null || _discMaterial == null) return;
+        var pulse = (float)(0.75 + 0.25 * Math.Sin(seconds * Math.PI * 2));
+        _material.SetFloat(PulseId, pulse); _discMaterial.SetFloat(PulseId, pulse);
     }
 
     public void Dispose()
     {
         UnityEngine.Object.Destroy(_root); _volume?.Dispose(); _disc?.Dispose();
         if (_material != null) UnityEngine.Object.Destroy(_material);
+        if (_discMaterial != null) UnityEngine.Object.Destroy(_discMaterial);
     }
 
     private bool Gone() => _root == null || _root.WasCollected || _rootTransform == null || _rootTransform.WasCollected

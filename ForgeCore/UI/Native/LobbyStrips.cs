@@ -41,7 +41,7 @@ public readonly struct LobbyStripItem
 public sealed partial class UIKitMod
 {
     /// <summary>A row of slot cells on every lobby bar with a player (the local one and everyone else's), one button step under the
-    /// APPAREL button and the lobby buttons and exactly as wide as they are: each cell a chamfered tile in one muted dark tone with a
+    /// APPAREL button and the lobby buttons under it and exactly as wide as they are: each cell a chamfered tile in one muted dark tone with a
     /// light outline and a light band along its cut corner, the picture in its own colours. <paramref name="items"/> gives each player's
     /// cells in slot order (null or empty shows no row); pass <see cref="LobbyStripItem.Empty"/> for a free slot. Called once per bar per
     /// frame; it may return the same list it keeps, and the row is redrawn only when that content changes. Null (logged) when the name
@@ -78,8 +78,9 @@ public sealed class LobbyStrip
 
 /// <summary>
 /// Draws every <see cref="LobbyStrip"/> on every lobby bar with a <see cref="MenuCanvas"/> on the APPAREL button's parent (the button's
-/// sprite material and sorting, a copy of its label for text cells). A row sits one button step under the last lobby button shown on that
-/// bar, spans the APPAREL button's clickable width and is as tall as it; cells share that width (<see cref="LobbyStripLayout"/>). Pictures
+/// sprite material and sorting, a copy of its label for text cells). A row takes the next row under APPAREL after the lobby buttons shown there
+/// on that bar (<see cref="LobbyArea.Below"/>, <see cref="LobbyLayout.Below"/>: the buttons' and strips' rows close up and get lower together
+/// to fit above the screen's bottom), spans the APPAREL button's clickable width and is as tall as the row (pictures keep their shape); cells share that width (<see cref="LobbyStripLayout"/>). Pictures
 /// are cropped copies in their own colours (<see cref="IconSilhouette.Trimmed"/>). A row is redrawn only when its content or the button's
 /// size changed.
 /// </summary>
@@ -93,7 +94,6 @@ internal static class LobbyStrips
     private static readonly Registry<LobbyStrip> Registered = new();
     private static readonly Dictionary<IntPtr, Dictionary<string, Row>> Rows = new();
     private static readonly List<IntPtr> Gone = new();
-    private static (float Left, float Width, float Height) _box;
 
     private sealed class Row
     {
@@ -103,6 +103,8 @@ internal static class LobbyStrips
         internal bool[] Free = null!;
         internal int Count = -1;
         internal float Left, Width, Height;
+        /// <summary>The scale the root was last given (the canvas starts it at 1).</summary>
+        internal float Scale = 1f;
     }
 
     internal static bool Add(LobbyStrip strip)
@@ -155,7 +157,7 @@ internal static class LobbyStrips
         if (!Rows.TryGetValue(bar.Pointer, out var perBar)) Rows[bar.Pointer] = perBar = new Dictionary<string, Row>();
         var player = bar.m_player;
         var show = player != null && bar.gameObject.activeInHierarchy;
-        var index = LobbyButtons.ShownOn(bar.Pointer);
+        var (spots, index) = LobbyButtons.StripRows(bar.Pointer);
         var origin = clothes.transform.localPosition;
         var strips = Registered.Ordered;
         for (var s = 0; s < strips.Count; s++)
@@ -170,7 +172,7 @@ internal static class LobbyStrips
             if (!Registered.Contains(strip.Id, strip)) continue;
             var count = items == null ? 0 : Math.Min(items.Count, strip.Max);
             perBar.TryGetValue(strip.Id, out var row);
-            if (count == 0 || !ButtonBox(clothes, origin, out var left, out var width, out var height))
+            if (count == 0 || !LobbyButtons.ButtonBox(clothes, origin, out var box))
             {
                 if (row != null && row.Canvas.Alive && row.Canvas.Root.activeSelf) row.Canvas.Root.SetActive(false);
                 continue;
@@ -183,34 +185,28 @@ internal static class LobbyStrips
             }
             var root = row.Canvas.Root;
             if (!root.activeSelf) root.SetActive(true);
-            var (x, y) = LobbyLayout.Offset(index++, Plugin.OffsetX, Plugin.OffsetY);
-            var target = new Vector3(origin.x + x, origin.y + y, origin.z);
-            if (root.transform.localPosition != target) root.transform.localPosition = target;
-            if (Changed(row, strip, items!, count, left, width, height)) Draw(row, count);
+            // The row is drawn about its middle: the pivot's spot plus the APPAREL box's middle.
+            var (x, y) = spots.At(index++, 0f);
+            var target = new Vector3(origin.x + x + Plugin.OffsetX, origin.y + y + (box.Bottom + box.Top) / 2f + Plugin.OffsetY, origin.z);
+            var t = root.transform;
+            if (t.localPosition != target) t.localPosition = target;
+            if (row.Scale != spots.Scale)
+            {
+                row.Scale = spots.Scale;
+                t.localScale = new Vector3(row.Scale, row.Scale, 1f);
+            }
+            if (Changed(row, strip, items!, count, box.Left, box.Width, box.Height * spots.Squash)) Draw(row, count);
         }
     }
 
-    /// <summary>The APPAREL button's clickable box in its parent's units: its left edge relative to the button's own position, its
-    /// width and height. Every bar is the same prefab, so the box measured on a bar whose button is shown (the local player's) is
-    /// used on bars whose button is hidden (other players'). False until one has been measured.</summary>
-    private static bool ButtonBox(CM_LobbyScrollItem clothes, Vector3 origin, out float left, out float width, out float height)
+    /// <summary>How many strip rows the bar showed last frame (the lobby buttons keep that many rows under APPAREL free for them).</summary>
+    internal static int ShownOn(IntPtr bar)
     {
-        var collider = clothes.m_collider;
-        if (collider != null && collider.enabled && clothes.gameObject.activeInHierarchy)
-        {
-            var parent = clothes.transform.parent;
-            var bounds = collider.bounds;
-            var min = parent.InverseTransformPoint(bounds.min);
-            var max = parent.InverseTransformPoint(bounds.max);
-            var w = Math.Abs(max.x - min.x);
-            var h = Math.Abs(max.y - min.y);
-            if (w > 1f && h > 1f)
-            {
-                _box = (Math.Min(min.x, max.x) - origin.x, w, h);
-            }
-        }
-        (left, width, height) = _box;
-        return width > 1f;
+        if (!Rows.TryGetValue(bar, out var perBar)) return 0;
+        var shown = 0;
+        foreach (var row in perBar.Values)
+            if (row.Canvas.Alive && row.Canvas.Root.activeSelf) shown++;
+        return shown;
     }
 
     /// <summary>Takes in this frame's cells; true when anything shown differs from what was drawn.</summary>

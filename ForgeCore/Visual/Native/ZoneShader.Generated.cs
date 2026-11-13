@@ -2,6 +2,6 @@
 namespace ForgeVisual;
 internal static class ZoneShaderBytes
 {
-    internal const string SourceSha256 = "3d170406b270f2e42b91e9135a33da408de5458401c2d5249b2348bb91116290";
+    internal const string SourceSha256 = "3fc32557cbc0fd2bf470c6077fee8c9990b57206d33e294f8246364a8245e4d5";
     internal static byte[] Read() => ForgeCore.Assets.Embedded("ForgeCore.Shaders.forgevisual-zone-shader.shaderbundle");
 }

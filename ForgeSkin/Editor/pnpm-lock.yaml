@@ -89,6 +89,9 @@ importers:
       konva:
         specifier: ^10.9.1
         version: 10.9.1
+      marked:
+        specifier: ^18.2.0
+        version: 18.2.0
       postprocessing:
         specifier: ^6.39.6
         version: 6.39.6(three@0.187.0)
@@ -1571,6 +1574,11 @@ packages:
     peerDependencies:
       '@types/three': '>=0.134.0'
       three: '>=0.134.0'
+
+  marked@18.2.0:
+    resolution: {integrity: sha512-KaeL+tAbtvI930q7HE2PN5lYXYdT8EiSmxHlN6F3rsfb57wd5mp5W5TLazpdj4inTQBJdgjYwbs40W/0VUGU+Q==}
+    engines: {node: '>= 20'}
+    hasBin: true
 
   meshline@3.3.1:
     resolution: {integrity: sha512-/TQj+JdZkeSUOl5Mk2J7eLcYTLiQm2IDzmlSvYm7ov15anEcDJ92GHqqazxTSreeNgfnYu24kiEvvv0WlbCdFQ==}
@@ -3824,6 +3832,8 @@ snapshots:
     dependencies:
       '@types/three': 0.187.0
       three: 0.187.0
+
+  marked@18.2.0: {}
 
   meshline@3.3.1(three@0.187.0):
     dependencies:

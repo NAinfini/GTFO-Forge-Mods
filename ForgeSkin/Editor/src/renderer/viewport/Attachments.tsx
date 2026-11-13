@@ -3,26 +3,30 @@ import { createPortal, useFrame, type ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AdditiveBlending,
+  Box3,
+  BufferAttribute,
+  BufferGeometry,
   CanvasTexture,
   Color,
   DoubleSide,
   Group,
+  Matrix4,
   MeshBasicMaterial,
   Quaternion,
   SRGBColorSpace,
   Vector3,
-  type Camera,
   type Material,
   type Mesh,
   type MeshStandardMaterial,
   type Object3D,
 } from 'three';
+import { CHARM_DEFAULTS, charmMetallic, charmSmoothness, CharmRope, MAX_BOXES, type CharmSettings } from './charm';
 import { borderCanvas, glyphCanvas, GLYPHS, isAmmo, isBounded, isPercent, screenDigits, screenTextCanvas } from '../frames';
 import { loadFont } from '../fonts';
 import { fileUrl, type Attachment, type Screen, type TriggerEffect } from '../protocol';
 import { unityToThree } from '../space';
 import { useItem, useStore } from '../store';
-import { anchorObject, previewEvents, quiet, SCENE_EVENT, viewRefs } from './refs';
+import { anchorObject, ATTACHMENT_EVENT, partBox, previewEvents, quiet, SCENE_EVENT, viewRefs } from './refs';
 import { t } from '../i18n';
 
 const rgb = (c?: number[] | null) => `rgb(${(c?.[0] ?? 1) * 255},${(c?.[1] ?? 1) * 255},${(c?.[2] ?? 1) * 255})`;
@@ -73,8 +77,11 @@ function ScreenMesh({ screen, hologram, selected, onPick }: { screen: Screen; ho
   // low-ammo colour (text and glow) shows too.
   const draw = (shown: number) => {
     const px = 512;
+    const height = Math.max(8, Math.round((px * h) / w));
+    // A new aspect needs a new GPU texture: an upload into the old allocation leaves stale rows of the previous face.
+    if (canvas.height !== height) texture.dispose();
     canvas.width = px;
-    canvas.height = Math.max(8, Math.round((px * h) / w));
+    canvas.height = height;
     const ctx = canvas.getContext('2d')!;
     const H = canvas.height;
     const unit = px / w; // canvas pixels per metre
@@ -248,53 +255,132 @@ function playEffects(g: Group, a: Attachment) {
   });
 }
 
-// Charm swing (Attachment.Swing), Native/Effects.cs `Pendulum` with the same formula and constants: a tip SWING_LENGTH
-// below the origin, kept velocity and pull back to the rest pose set per frame by looseness, gravity, all in world space;
-// the attachment turns from its rest pose to point at the tip. The rest pose is the group's (the inspector's pose); the
-// swing turns the body inside it. Driven by the gear's motion in the 3D view (moving the attachment or its part) and by
-// 晃一下, which jolts the tip sideways.
-const SWING_LENGTH = 0.05; // Pendulum.Length
-const GRAVITY = new Vector3(0, -9.81, 0); // Unity's default Physics.gravity
-const KICK = 0.01; // 晃一下: metres the tip is thrown sideways in one frame
-const DOWN = new Vector3(0, -1, 0);
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+// Charm (Attachment.charm): the rope of charm.ts, the game's algorithm, in world space. The preview motions move the whole
+// gear through a motion matrix the view does not show: the rope is simulated in that moving space and drawn back in the
+// still one, so the gun stays put on screen while the charm swings as it does in a first-person view.
+const SHAKE_SECONDS = 0.6, RUN_SECONDS = 2.6, TURN_SECONDS = 2.0;
+const RUN_SPEED = 4, RUN_RAMP = 0.3; // m/s, s to reach it and to stop
+const TURN_RADIUS = 0.4; // m from the turning player's body to the gun
+const smooth = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 
-class Pendulum {
-  private tip = new Vector3();
-  private last = new Vector3();
-  private started = false;
-  private shake = previewEvents.shake;
-  private pivot = new Vector3();
-  private rest = new Quaternion();
-  private v = new Vector3();
+/** Distance run after `t` seconds: speed up over RUN_RAMP, hold, slow down over RUN_RAMP before RUN_SECONDS - 0.3. */
+function runDistance(t: number) {
+  const a = RUN_SPEED / RUN_RAMP, stop = RUN_SECONDS - 0.3, hold = stop - RUN_RAMP;
+  const d1 = 0.5 * a * RUN_RAMP * RUN_RAMP, d2 = d1 + RUN_SPEED * (hold - RUN_RAMP);
+  if (t < RUN_RAMP) return 0.5 * a * t * t;
+  if (t < hold) return d1 + RUN_SPEED * (t - RUN_RAMP);
+  const u = Math.min(t, stop) - hold;
+  return d2 + RUN_SPEED * u - 0.5 * a * u * u;
+}
 
-  update(group: Group, body: Group, looseness: number, delta: number, camera: Camera) {
-    const stiffness = lerp(0.2, 0.01, looseness);
-    const keep = lerp(0.85, 0.985, looseness);
-    group.getWorldPosition(this.pivot);
-    group.getWorldQuaternion(this.rest);
-    const restDown = DOWN.clone().applyQuaternion(this.rest);
-    const restTip = this.pivot.clone().addScaledVector(restDown, SWING_LENGTH);
-    if (!this.started) {
-      this.tip.copy(restTip);
-      this.last.copy(restTip);
-      this.started = true;
+const mx = new Matrix4(), my = new Matrix4(), fwd = new Vector3(), side = new Vector3(), up = new Vector3(0, 1, 0), pivot = new Vector3();
+
+/** The motion matrix of the playing preview motion (identity when none plays), around the gear's root; `body` gets the
+ * player's own move in it (the run's, without the step bob and sway; a turn and a jolt move only the gun). */
+function motionMatrix(out: Matrix4, root: Object3D | null, body: Float64Array) {
+  out.identity();
+  body.fill(0);
+  const { motion, at } = previewEvents.charm;
+  const t = (performance.now() - at) / 1000;
+  if (!root || t < 0) return out;
+  // The gun's barrel is Unity +Z, three -Z (space.ts); flattened, it is where the player runs.
+  root.updateWorldMatrix(true, false);
+  fwd.setFromMatrixColumn(root.matrixWorld, 2).negate().setY(0);
+  if (fwd.lengthSq() < 1e-8) fwd.set(0, 0, -1);
+  fwd.normalize();
+  side.crossVectors(fwd, up).normalize();
+  if (motion === 'shake' && t < SHAKE_SECONDS) {
+    // A jolt to the side and back, then a smaller one.
+    const x = 0.05 * Math.sin((Math.PI * t) / 0.12) * (t < 0.12 ? 1 : t < 0.24 ? -0.4 : 0);
+    out.makeTranslation(side.x * x, side.y * x, side.z * x);
+  } else if (motion === 'run' && t < RUN_SECONDS) {
+    const env = smooth(t / RUN_RAMP) * smooth((RUN_SECONDS - 0.3 - t) / RUN_RAMP);
+    const d = runDistance(t), bob = 0.02 * Math.sin(2 * Math.PI * 2.6 * t) * env, sway = 0.012 * Math.sin(2 * Math.PI * 1.3 * t) * env;
+    out.makeTranslation(fwd.x * d + side.x * sway, bob, fwd.z * d + side.z * sway);
+    body[0] = fwd.x * d;
+    body[2] = fwd.z * d;
+  } else if (motion === 'turn' && t < TURN_SECONDS) {
+    // Half a turn about the player behind the gun, a pause, and back.
+    const angle = Math.PI * (smooth(t / 0.5) - smooth((t - 1.1) / 0.5));
+    root.getWorldPosition(pivot).addScaledVector(fwd, -TURN_RADIUS);
+    out.makeTranslation(pivot.x, pivot.y, pivot.z).multiply(my.makeRotationY(angle)).multiply(mx.makeTranslation(-pivot.x, -pivot.y, -pivot.z));
+  }
+  return out;
+}
+
+/** The gear's body as charm.ts takes it: per part, the box (in the gear root's frame) around its models' geometry, leaving
+ * out other parts' nodes, attachments and models the game does not show; at most MAX_BOXES, largest first. */
+function bodyBoxes(): { min: number[]; max: number[] }[] {
+  const root = viewRefs.root;
+  if (!root) return [];
+  const out: { min: number[]; max: number[] }[] = [];
+  for (const part of viewRefs.partNodes.keys()) {
+    const box = partBox(part, root);
+    if (!box.isEmpty()) out.push({ min: box.min.toArray(), max: box.max.toArray() });
+  }
+  const volume = (b: { min: number[]; max: number[] }) => (b.max[0] - b.min[0]) * (b.max[1] - b.min[1]) * (b.max[2] - b.min[2]);
+  return out.sort((a, b) => volume(b) - volume(a)).slice(0, MAX_BOXES);
+}
+
+/** The pendant's centre below its origin, as the plugin takes it from the model's bounds (a screen hangs by its middle). */
+function pendantArm(body: Group, scaleY: number): number {
+  const box = new Box3(), m = new Matrix4(), inv = new Matrix4().copy(body.matrixWorld).invert();
+  body.traverse((o) => {
+    const mesh = o as Mesh;
+    if (!mesh.isMesh || !mesh.geometry) return;
+    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+    box.union(mesh.geometry.boundingBox!.clone().applyMatrix4(m.multiplyMatrices(inv, mesh.matrixWorld)));
+  });
+  const arm = box.isEmpty() ? 0 : (-(box.min.y + box.max.y) / 2) * Math.abs(scaleY);
+  return Math.min(Math.max(arm, 0.004), 0.1);
+}
+
+/** One charm's preview: its rope, the geometry it fills and the key it was built for. */
+class CharmPreview {
+  readonly rope: CharmRope;
+  readonly geometry = new BufferGeometry();
+  private readonly positions: Float32Array;
+  private readonly normals: Float32Array;
+  private readonly pose = new Float64Array(7);
+  private readonly sim = new Matrix4();
+  private readonly motion = new Matrix4();
+  private readonly body = new Float64Array(3);
+  private readonly v = new Vector3();
+  private readonly q = new Quaternion();
+  private readonly s = new Vector3();
+  private readonly aq = new Quaternion();
+
+  readonly key: string;
+
+  constructor(key: string, charm: CharmSettings, arm: number, group: Group) {
+    this.key = key;
+    this.rope = new CharmRope(charm, arm);
+    if (charm.collide ?? CHARM_DEFAULTS.collide) {
+      group.updateWorldMatrix(true, false);
+      const gear = viewRefs.root?.matrixWorld.elements;
+      if (gear) for (const b of bodyBoxes()) this.rope.addBox(group.matrixWorld.elements, gear, b.min, b.max);
     }
-    if (previewEvents.shake !== this.shake) {
-      this.shake = previewEvents.shake;
-      this.last.addScaledVector(this.v.setFromMatrixColumn(camera.matrixWorld, 0).normalize(), KICK);
-    }
-    const dt = Math.min(delta, 0.05);
-    const next = this.tip
-      .clone()
-      .addScaledVector(this.v.subVectors(this.tip, this.last), keep)
-      .addScaledVector(GRAVITY, dt * dt)
-      .addScaledVector(restTip.sub(this.tip), stiffness);
-    this.last.copy(this.tip);
-    this.tip.copy(this.pivot).addScaledVector(next.sub(this.pivot).normalize(), SWING_LENGTH);
-    // World: FromToRotation(restDown, tip - pivot) * rest; the body sits under the group, so in its space.
-    const turn = new Quaternion().setFromUnitVectors(restDown, this.v.subVectors(this.tip, this.pivot).normalize());
-    body.quaternion.copy(this.rest).invert().multiply(turn).multiply(this.rest);
+    const n = this.rope.vertexCount * 3;
+    this.positions = new Float32Array(n);
+    this.normals = new Float32Array(n);
+    this.geometry.setAttribute('position', new BufferAttribute(this.positions, 3));
+    this.geometry.setAttribute('normal', new BufferAttribute(this.normals, 3));
+    this.geometry.setIndex(this.rope.triangles());
+  }
+
+  update(group: Group, body: Group) {
+    group.updateWorldMatrix(true, false);
+    this.sim.multiplyMatrices(motionMatrix(this.motion, viewRefs.root, this.body), group.matrixWorld);
+    const e = this.sim.elements;
+    this.rope.update(performance.now() / 1000, e, this.body);
+    // Vertices relative to the moving hanging point are relative to the still group too.
+    this.rope.mesh(e, this.positions, this.normals);
+    this.geometry.attributes.position.needsUpdate = true;
+    this.geometry.attributes.normal.needsUpdate = true;
+    this.rope.pendant(this.pose);
+    this.sim.decompose(this.v, this.aq, this.s);
+    body.position.set(this.pose[0], this.pose[1], this.pose[2]).applyMatrix4(this.sim.invert());
+    body.quaternion.copy(this.aq.invert()).multiply(this.q.set(this.pose[3], this.pose[4], this.pose[5], this.pose[6]));
   }
 }
 
@@ -333,8 +419,10 @@ function AttachmentNode({ a, anchor }: { a: Attachment; anchor: Object3D }) {
     g.quaternion.copy(pose.quaternion);
     g.scale.copy(pose.scale);
   });
-  const pendulum = useRef<Pendulum | null>(null);
-  useFrame(({ camera }, delta) => {
+  const charm = useRef<CharmPreview | null>(null);
+  const rope = useRef<Mesh>(null);
+  useEffect(() => () => charm.current?.geometry.dispose(), []);
+  useFrame(({ camera }) => {
     const g = group.current;
     if (!g) return;
     if (a.faceCamera) g.lookAt(camera.position); // visible face (three +Z) toward camera
@@ -342,16 +430,31 @@ function AttachmentNode({ a, anchor }: { a: Attachment; anchor: Object3D }) {
     if (body.current) {
       if (a.hologram?.flicker) flicker(body.current, a.hologram.flicker, flick.current, performance.now() / 1000);
       else body.current.visible = true;
-      if (a.swing) (pendulum.current ??= new Pendulum()).update(g, body.current, a.swing.looseness ?? 0.5, delta, camera);
-      else if (pendulum.current) {
-        pendulum.current = null;
+      if (a.charm && rope.current) {
+        // Built again when its settings, the pendant's model or the body it keeps out of change.
+        const arm = pendantArm(body.current, a.scale?.[1] ?? 1);
+        const key = JSON.stringify([a.charm, arm.toFixed(4), a.part, a.transform, a.position, a.rotation, a.scale, viewRefs.partNodes.size]);
+        if (charm.current?.key !== key) {
+          charm.current?.geometry.dispose();
+          charm.current = new CharmPreview(key, a.charm, arm, g);
+          rope.current.geometry = charm.current.geometry;
+        }
+        charm.current.update(g, body.current);
+      } else if (charm.current) {
+        charm.current.geometry.dispose();
+        charm.current = null;
+        body.current.position.set(0, 0, 0);
         body.current.quaternion.identity();
       }
     }
   });
+  const c = a.charm;
+  const ropeColor = useMemo(() => new Color().setRGB(c?.color?.[0] ?? 0.8, c?.color?.[1] ?? 0.8, c?.color?.[2] ?? 0.82), [c?.color]);
+  const style = c?.style ?? CHARM_DEFAULTS.style;
   useEffect(() => {
     const g = group.current;
     if (g) viewRefs.attachments.set(a.id!, g);
+    window.dispatchEvent(new Event(ATTACHMENT_EVENT));
     return () => void viewRefs.attachments.delete(a.id!);
   }, [a.id]);
 
@@ -369,6 +472,18 @@ function AttachmentNode({ a, anchor }: { a: Attachment; anchor: Object3D }) {
         {a.screen && <ScreenMesh screen={a.screen} hologram={!!a.hologram} selected={selected} onPick={onPick} />}
         {glb && <MeshModel glb={glb} attachment={a} onPick={onPick} />}
       </group>
+      {c && (
+        <mesh ref={rope} frustumCulled={false}>
+          <meshStandardMaterial color={ropeColor} metalness={charmMetallic(style)} roughness={1 - charmSmoothness(style)} />
+        </mesh>
+      )}
+      {c && (
+        // The hanging point, drawn over the gun (editor only): select it and drag the gizmo to move where the rope starts.
+        <mesh renderOrder={10} onClick={onPick}>
+          <sphereGeometry args={[selected ? 0.003 : 0.002, 16, 8]} />
+          <meshBasicMaterial color="#ff7a2f" depthTest={false} depthWrite={false} transparent toneMapped={false} />
+        </mesh>
+      )}
     </group>,
     anchor,
   );
