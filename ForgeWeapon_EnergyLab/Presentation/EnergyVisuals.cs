@@ -21,7 +21,7 @@ internal sealed class EnergyVisuals : IDisposable
     internal EnergyLook Look { get; set; } = EnergyLook.Default;
 
     /// <summary>The held beam this frame with the glow at its muzzle; the burn where it lands, with its light, shows only while it hits something.</summary>
-    public void Beam(Vector3 start, Vector3 end, bool hit, float now)
+    public void Beam(Vector3 start, Vector3 end, bool hit)
     {
         if (_disposed) return;
         _segments = 0;
@@ -49,7 +49,7 @@ internal sealed class EnergyVisuals : IDisposable
     }
 
     /// <summary>A Blast Gun shot: only the muzzle flashes; the explosion appears at the impact with no line between.</summary>
-    public void Blast(Vector3 start, Vector3 direction, float now)
+    public void Blast(Vector3 start, Vector3 direction)
     {
         if (_disposed) return;
         Hide();

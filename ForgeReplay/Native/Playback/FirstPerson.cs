@@ -20,8 +20,6 @@ internal static class FirstPerson
 
     private enum Move { None, Idle, Walk, Run }
 
-    // The four gear lines of a loadout (standard, special, melee, tool) and the slots they fill.
-    private static readonly InventorySlot[] EquipSlots = { InventorySlot.GearStandard, InventorySlot.GearSpecial, InventorySlot.GearMelee, InventorySlot.GearClass };
     // The level's items a player holds in the hands (resource pack, consumable, a big carried item) are not gear: the game puts one in a backpack slot when it is picked up
     // and brings up its first-person model from there. The replay does the same for the observer's backpack for as long as the recording holds that slot: the game's own
     // store (PlayerBackpack.SpawnAndEquipItem, the call its pickup path ends in) with no pickup, no packet and no pickup prompt, and the game's own clear when the slot is let go.
@@ -35,7 +33,6 @@ internal static class FirstPerson
     private static Vector3 _eye;
     private static Quaternion _rotation;
     private static int _wanted = -1, _lastWield = -1, _equipFor = -1, _lastLocomotion = -1, _swing;
-    internal const int GearLines = 4;
     private const float GiveUpSeconds = 20f;
     private static string[] _loadout = Array.Empty<string>();
     private static string _keptFrom = "";
@@ -94,8 +91,9 @@ internal static class FirstPerson
         var owner = holder.m_owner;
         if (owner == null || !owner.IsLocallyOwned) return;
         // This frame's eye: the camera may be placed only after this update (a frame behind, the arms and what follows them trail every turn).
-        if (ReplayCamera.EyePose(out var eye, out var look)) holder.transform.SetPositionAndRotation(eye, look);
-        else holder.transform.SetPositionAndRotation(_eye, _rotation);
+        var place = holder.transform;
+        if (ReplayCamera.EyePose(out var eye, out var look)) place.SetPositionAndRotation(eye, look);
+        else place.SetPositionAndRotation(_eye, _rotation);
         // The force, not only the trigger: the holder rewrites its own trigger from the observer's input in UpdateAimInput, so the force is
         // put there again after the holder has run. ItemAimTrigger is written as well because the state machine (FPIS_Hip.Update /
         // FPIS_Aim.Update) reads that in the next Update, before the next LateUpdate: without it the first read after this update still
@@ -104,15 +102,16 @@ internal static class FirstPerson
         if (!_aiming) holder.ItemAimTrigger = false;
         else if (holder.WieldedItem is { } item && item.AimingAllowed) holder.ItemAimTrigger = true;
         Inertia(holder);
-        if (owner.FPSCamera != null) owner.FPSCamera.m_lookInputMouse = _lookInput;
+        var camera = owner.FPSCamera;
+        if (camera != null) camera.m_lookInputMouse = _lookInput;
     }
 
-    /// <summary>The arms hold the slot the recording says and the item in that slot is the viewed player's, not the observer's own or a piece
+    /// <summary>The arms (the local player's <paramref name="inventory"/>) hold the slot the recording says and the item in that slot is the viewed player's, not the observer's own or a piece
     /// still being built. The other three pieces do not hold the picture back.</summary>
-    internal static bool HoldsRecorded(PlayerAgent local)
+    internal static bool HoldsRecorded(PlayerInventoryBase inventory)
     {
-        if ((int)local.Inventory.WieldedSlot != _wanted) return false;
-        var line = Array.IndexOf(EquipSlots, (InventorySlot)_wanted);
+        if ((int)inventory.WieldedSlot != _wanted) return false;
+        var line = Puppeteer.LineIndex(_wanted);
         if (line >= 0) return line < _on.Length && _on[line];
         var item = Array.IndexOf(ItemSlots, (InventorySlot)_wanted);
         return item >= 0 && _placed[item] != 0;
@@ -122,13 +121,12 @@ internal static class FirstPerson
     internal static void Reset()
     {
         _settleUntil = 0f; _have = false; _wanted = -1; _lastWield = -1; _lastLocomotion = -1; _move = Move.None; _speed = 0f; _swing = 0; _charge = Charging.None; _cancelAtMs = -1; LetGo(); ClearItems();
-        _walkInertia = 0f; _runInertia = 0f; _lookKnown = false; _lookInput = Vector2.zero;
-        var rest = Players.Local?.TryCast<PlayerAgent>()?.FPItemHolder;
-        if (rest != null && !rest.WasCollected) Inertia(rest);
+        _walkInertia = 0f; _runInertia = 0f; _lookKnown = false; _lookInput = default;
+        var holder = Players.Local?.TryCast<PlayerAgent>()?.FPItemHolder;
+        if (holder != null && !holder.WasCollected) Inertia(holder);
         if (_aiming)
         {
             _aiming = false;
-            var holder = Players.Local?.TryCast<PlayerAgent>()?.FPItemHolder;
             if (holder != null && !holder.WasCollected) { holder.ForceAimTrigger = false; holder.ItemAimTrigger = false; }
         }
         if (!_lamp) return;
@@ -151,14 +149,14 @@ internal static class FirstPerson
         muzzle = default;
         if (!Active || (slot & 3) != (Replayer.Follow & 3)) return false;
         var local = Players.Local?.TryCast<PlayerAgent>();
-        if (local == null || local.WasCollected || !HoldsRecorded(local)) return false;
-        var weapon = local.Inventory?.WieldedItem?.TryCast<Weapon>();
+        if (local == null || local.WasCollected || local.Inventory is not { } inventory || !HoldsRecorded(inventory)) return false;
+        var weapon = inventory.WieldedItem?.TryCast<Weapon>();
         if (weapon == null || weapon.MuzzleAlign == null) return false;
         muzzle = weapon.MuzzleAlign.position;
         return true;
     }
 
-    /// <summary>How many of the followed player's gear lines are on the observer, of <see cref="GearLines"/>.</summary>
+    /// <summary>How many of the followed player's gear lines are on the observer, of <see cref="Puppeteer.GearLines"/>.</summary>
     internal static int GearDone
     {
         get
@@ -194,8 +192,10 @@ internal static class FirstPerson
         _wanted = wield;
         // The game brings each new piece up when it is built (PlayerBackpackManager.EquipLocalGear's callback), and the slot may not be allowed
         // yet: ask again for the recorded slot until the arms hold it.
-        Items(local, state.PlayerKits[follow & 3], wield);
-        if (wield > 0 && (int)local.Inventory.WieldedSlot != wield && (Array.IndexOf(EquipSlots, (InventorySlot)wield) >= 0 || ItemIn(wield)) && ForgeCore.Frame.UnscaledTime >= _nextWield)
+        // The observer's own inventory: read once a frame and handed to everything below.
+        var inventory = local.Inventory;
+        Items(local, inventory, state.PlayerKits[follow & 3], wield);
+        if (wield > 0 && (int)inventory.WieldedSlot != wield && (Puppeteer.LineIndex(wield) >= 0 || ItemIn(wield)) && ForgeCore.Frame.UnscaledTime >= _nextWield)
         { _nextWield = ForgeCore.Frame.UnscaledTime + 0.1f; _lastWield = -1; }
         if (wield >= 0 && wield != _lastWield && !ItemMissing(wield))
         {
@@ -204,24 +204,25 @@ internal static class FirstPerson
             try { local.Sync.WantsToWieldSlot((InventorySlot)wield, false); }
             catch (Exception error) { Plugin.Logger.ErrorOnce("The first-person view could not wield slot " + wield + ": " + error.Message); }
         }
-        SwitchNote(local, wield);
+        SwitchNote(inventory, wield);
         // The lamp the viewed player had on: in these levels most of what a player saw is what it lit. It goes with the view (CameraLease.Look).
-        if (state.PlayerKits[follow & 3] is { Known: true } kit && local.Inventory.FlashlightEnabled != kit.Flashlight)
+        if (state.PlayerKits[follow & 3] is { Known: true } kit && inventory.FlashlightEnabled != kit.Flashlight)
         {
-            try { local.Inventory.SetFlashlightEnabled(kit.Flashlight, true, false); _lamp = kit.Flashlight; }
+            try { inventory.SetFlashlightEnabled(kit.Flashlight, true, false); _lamp = kit.Flashlight; }
             catch (Exception error) { Plugin.Logger.ErrorOnce("The first-person flashlight could not be set: " + error.Message); }
         }
         Sway(local, state, follow, nowMs, locomotion, seconds);
-        try { Charge(local, state, follow, nowMs); }
+        try { Charge(inventory, state, follow, nowMs); }
         catch (Exception error) { Plugin.Logger.ErrorOnce("The first-person melee charge could not be shown: " + error.Message); }
     }
 
     // Diagnostic for the slow switch into the eyes (a one-time check, at most 6 lines a replay): when the arms hold the recorded slot, seconds after the ask.
-    private static void SwitchNote(PlayerAgent local, int wield)
+    private static void SwitchNote(PlayerInventoryBase inventory, int wield)
     {
         if (_settleUntil == 0f || _switchNotes >= 6 || wield <= 0 || _switchFrom == 0f) return;
         var now = ForgeCore.Frame.UnscaledTime;
-        if ((int)local.Inventory.WieldedSlot != wield || local.Inventory.WieldedItem is not { } item || item.WasCollected) { if (now - _switchFrom > 6f) { _switchNotes++; _switchFrom = 0f; Plugin.Diagnostic.LogDebug("First-person switch: after 6 s the arms still do not hold slot " + wield + " (hold " + local.Inventory.WieldedSlot + ", placed " + string.Join("/", _placed) + ", time scale " + Time.timeScale + ")."); } return; }
+        var held = inventory.WieldedSlot;
+        if ((int)held != wield || inventory.WieldedItem is not { } item || item.WasCollected) { if (now - _switchFrom > 6f) { _switchNotes++; _switchFrom = 0f; Plugin.Diagnostic.LogDebug("First-person switch: after 6 s the arms still do not hold slot " + wield + " (hold " + held + ", placed " + string.Join("/", _placed) + ", time scale " + Time.timeScale + ")."); } return; }
         _switchNotes++;
         Plugin.Diagnostic.LogDebug("First-person switch: slot " + wield + " (" + item.name + ") in the arms " + (now - _switchFrom).ToString("0.00") + " s after the ask, time scale " + Time.timeScale + ", settling " + (now < _settleUntil) + ".");
         _switchFrom = 0f;
@@ -240,10 +241,11 @@ internal static class FirstPerson
         var forward = look * Vec.Forward;
         var yaw = Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg;
         var pitch = -Mathf.Asin(Mathf.Clamp(forward.y, -1f, 1f)) * Mathf.Rad2Deg;
-        var turn = _lookKnown ? new Vector2(Mathf.DeltaAngle(_lastYaw, yaw), -(pitch - _lastPitch)) : Vector2.zero;
-        _lookInput = Mathf.Abs(turn.x) > LookJumpDegrees || Mathf.Abs(turn.y) > LookJumpDegrees ? Vector2.zero : turn;
+        var turn = _lookKnown ? new Vector2(Mathf.DeltaAngle(_lastYaw, yaw), -(pitch - _lastPitch)) : default;
+        _lookInput = Mathf.Abs(turn.x) > LookJumpDegrees || Mathf.Abs(turn.y) > LookJumpDegrees ? default : turn;
         _lastYaw = yaw; _lastPitch = pitch; _lookKnown = true;
-        if (local.FPSCamera != null) local.FPSCamera.m_lookInputMouse = _lookInput;
+        var camera = local.FPSCamera;
+        if (camera != null) camera.m_lookInputMouse = _lookInput;
     }
 
     private const float WalkFullSpeed = 2f;
@@ -266,7 +268,7 @@ internal static class FirstPerson
         if (aiming != _aiming) _aiming = aiming;
         var holder = local.FPItemHolder;
         if (holder == null || holder.WasCollected) return;
-        _speed = Mathf.Lerp(_speed, Puppeteer.Velocity(state, follow & 3, nowMs).magnitude, 1f - Mathf.Exp(-seconds / 0.12f));
+        _speed = Mathf.Lerp(_speed, Vec.Length(Puppeteer.Velocity(state, follow & 3, nowMs)), 1f - Mathf.Exp(-seconds / 0.12f));
         var move = locomotion == PlayerLocomotion.PLOC_State.Run || _speed >= RunSpeed ? Move.Run : _speed >= WalkSpeed ? Move.Walk : Move.Idle;
         if (locomotion is PlayerLocomotion.PLOC_State.Jump or PlayerLocomotion.PLOC_State.Fall or PlayerLocomotion.PLOC_State.Land or PlayerLocomotion.PLOC_State.Downed) move = Move.Idle;
         // The walk and run bob: the holder's update eases its walk and run weights towards these two targets (0..1, UpdateCommonWeights), which
@@ -293,7 +295,7 @@ internal static class FirstPerson
 
     // The item the recording has in the hands, in the observer's backpack slot for it: put in when the recorded wield is that slot (the kit says which item), taken out once the
     // recording holds something else (the arms are asked to leave it first) and when the eyes mode ends. A piece the game cannot make in first person is said once and left out.
-    private static void Items(PlayerAgent local, PlayerKit kit, int wield)
+    private static void Items(PlayerAgent local, PlayerInventoryBase inventory, PlayerKit kit, int wield)
     {
         var backpack = PlayerBackpackManager.LocalBackpack;
         if (backpack == null) return;
@@ -306,7 +308,7 @@ internal static class FirstPerson
             if (_placed[i] != 0)
             {
                 if (_outAt[i] == 0f) _outAt[i] = clock;
-                if (want == 0 && local.Inventory.WieldedSlot == slot && clock - _outAt[i] < ItemLetGoSeconds) continue;
+                if (want == 0 && inventory.WieldedSlot == slot && clock - _outAt[i] < ItemLetGoSeconds) continue;
                 ClearItem(i);
                 if (want == 0) continue;
             }
@@ -375,12 +377,12 @@ internal static class FirstPerson
             var samePlayer = _equipFor == follow;
             if (!samePlayer)
             {
-                _lastWield = -1; _asked = new float[GearLines]; _on = new bool[GearLines];
-                _loadout = new string[GearLines];
+                _lastWield = -1; _asked = new float[Puppeteer.GearLines]; _on = new bool[Puppeteer.GearLines];
+                _loadout = new string[Puppeteer.GearLines];
             }
             _equipFor = follow; _keptFrom = wearing;
             var lines = wearing.Split('\n');
-            for (var i = 0; i < GearLines; i++)
+            for (var i = 0; i < Puppeteer.GearLines; i++)
             {
                 var line = i < lines.Length ? Canonical(lines[i]) : "";
                 if (samePlayer && line == _loadout[i]) continue;
@@ -389,23 +391,23 @@ internal static class FirstPerson
         }
         // Every missing line is checked each frame, so the one in the hands is wielded the frame it is built (the 11-06 replays waited a frame per line).
         var clock = ForgeCore.Frame.UnscaledTime;
-        for (var check = 0; check < GearLines; check++)
+        for (var check = 0; check < Puppeteer.GearLines; check++)
         {
             if (_on[check]) continue;
             var worn = Worn(check);
             if (!worn && _asked[check] > 0f && clock - _asked[check] > GiveUpSeconds)
             {
-                Skipped.Note("the first-person view's gear did not arrive in " + GiveUpSeconds + " s", "slot " + EquipSlots[check]);
+                Skipped.Note("the first-person view's gear did not arrive in " + GiveUpSeconds + " s", "slot " + Puppeteer.GearSlots[check]);
                 worn = true;
             }
-            if (worn) { _on[check] = true; Puppeteer.RecheckGear(); if (_lastWield == (int)EquipSlots[check]) _lastWield = -1; }
+            if (worn) { _on[check] = true; Puppeteer.RecheckGear(); if (_lastWield == (int)Puppeteer.GearSlots[check]) _lastWield = -1; }
         }
         if (clock < _nextEquip) return;
         var first = -1;
         var status = state.PlayerStatus[follow & 3];
-        if (status != null) { var read = PayloadReader.Over(status); read.U(); read.U(); first = Array.IndexOf(EquipSlots, (InventorySlot)read.U()); }
+        if (status != null) { var read = PayloadReader.Over(status); read.U(); read.U(); first = Puppeteer.LineIndex((int)read.U()); }
         // Every line whose parts are loaded is asked for at once (the one in the hands first): the game builds each slot on its own.
-        for (var i = -1; i < GearLines; i++)
+        for (var i = -1; i < Puppeteer.GearLines; i++)
         {
             var line = i < 0 ? first : i;
             if (line < 0 || _on[line] || _asked[line] > 0f) continue;
@@ -414,7 +416,7 @@ internal static class FirstPerson
             {
                 var reading = ForgeCore.Gear.EquipLocal(new GearIDRange(_loadout[line]));
                 if (reading.Status == ForgeCore.GearAssetStatus.Ready) _asked[line] = clock;
-                else if (reading.Status != ForgeCore.GearAssetStatus.Loading) { Skipped.Note("the first-person view could not equip gear", "slot " + EquipSlots[line] + " of player " + follow + ": " + reading.Detail); _on[line] = true; }
+                else if (reading.Status != ForgeCore.GearAssetStatus.Loading) { Skipped.Note("the first-person view could not equip gear", "slot " + Puppeteer.GearSlots[line] + " of player " + follow + ": " + reading.Detail); _on[line] = true; }
             }
             catch (Exception error) { Plugin.Logger.ErrorOnce("The first-person view could not read a loadout line: " + error.Message); _on[line] = true; }
         }
@@ -431,8 +433,8 @@ internal static class FirstPerson
     private static bool Worn(int line)
     {
         var backpack = PlayerBackpackManager.LocalBackpack;
-        return backpack != null && backpack.TryGetBackpackItem(EquipSlots[line], out var item) && item != null && item.Instance != null && item.GearIDRange != null
-            && item.GearIDRange.ToJSON().Replace("\n", " ") == _loadout[line];
+        return backpack != null && backpack.TryGetBackpackItem(Puppeteer.GearSlots[line], out var item) && item != null && item.Instance != null && item.GearIDRange is { } gear
+            && gear.ToJSON().Replace("\n", " ") == _loadout[line];
     }
 
     /// <summary>A recorded event of the viewed player plays the game's first-person animation of the item in the hands.</summary>
@@ -445,9 +447,10 @@ internal static class FirstPerson
         try
         {
             var local = Players.Local?.TryCast<PlayerAgent>();
-            var item = local?.Inventory?.WieldedItem;
+            var inventory = local?.Inventory;
+            var item = inventory?.WieldedItem;
             // Not what the recording holds yet: its animation would play on a hidden item and still be running when the right one comes up.
-            if (item == null || !HoldsRecorded(local!)) return;
+            if (item == null || !HoldsRecorded(inventory!)) return;
             switch (record.EventType)
             {
                 case EventKind.Shot:
@@ -520,10 +523,10 @@ internal static class FirstPerson
 
     // The recorded charge (MeleeCharge) of the weapon in the hands: the game's charge state, with the fire button held for it, since the charge
     // state lets go by itself the moment the button is up. Its release is the heavy swing; a charge that ends without one goes back to idle.
-    private static void Charge(PlayerAgent local, WorldState state, int follow, uint nowMs)
+    private static void Charge(PlayerInventoryBase inventory, WorldState state, int follow, uint nowMs)
     {
         var charging = ReplayExtras.MeleeCharging(state, follow & 3);
-        var melee = HoldsRecorded(local) ? local.Inventory.WieldedItem?.TryCast<MeleeWeaponFirstPerson>() : null;
+        var melee = HoldsRecorded(inventory) ? inventory.WieldedItem?.TryCast<MeleeWeaponFirstPerson>() : null;
         if (melee == null) { _charge = Charging.None; _cancelAtMs = -1; LetGo(); return; }
         if (charging && _charge == Charging.None)
         {

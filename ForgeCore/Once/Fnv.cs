@@ -48,9 +48,9 @@ public static class Fnv
     public static uint MixUtf8(uint hash, string text)
     {
         Span<byte> buffer = stackalloc byte[4];
-        for (var i = 0; i < text.Length;)
+        foreach (var rune in text.EnumerateRunes())
         {
-            var count = Utf8At(text, ref i, buffer);
+            var count = rune.EncodeToUtf8(buffer);
             for (var b = 0; b < count; b++) hash = Mix32(hash, buffer[b]);
         }
         return hash;
@@ -60,30 +60,12 @@ public static class Fnv
     public static ulong MixUtf8(ulong hash, string text)
     {
         Span<byte> buffer = stackalloc byte[4];
-        for (var i = 0; i < text.Length;)
+        foreach (var rune in text.EnumerateRunes())
         {
-            var count = Utf8At(text, ref i, buffer);
+            var count = rune.EncodeToUtf8(buffer);
             for (var b = 0; b < count; b++) hash = Mix64(hash, buffer[b]);
         }
         return hash;
-    }
-
-    private static int Utf8At(string text, ref int index, Span<byte> buffer)
-    {
-        int code = text[index++];
-        if (char.IsHighSurrogate((char)code) && index < text.Length && char.IsLowSurrogate(text[index]))
-            code = char.ConvertToUtf32((char)code, text[index++]);
-        else if (code is >= 0xD800 and <= 0xDFFF) code = 0xFFFD;
-        if (code < 0x80) { buffer[0] = (byte)code; return 1; }
-        if (code < 0x800) { buffer[0] = (byte)(0xC0 | code >> 6); buffer[1] = (byte)(0x80 | code & 0x3F); return 2; }
-        if (code < 0x10000)
-        {
-            buffer[0] = (byte)(0xE0 | code >> 12); buffer[1] = (byte)(0x80 | code >> 6 & 0x3F); buffer[2] = (byte)(0x80 | code & 0x3F);
-            return 3;
-        }
-        buffer[0] = (byte)(0xF0 | code >> 18); buffer[1] = (byte)(0x80 | code >> 12 & 0x3F);
-        buffer[2] = (byte)(0x80 | code >> 6 & 0x3F); buffer[3] = (byte)(0x80 | code & 0x3F);
-        return 4;
     }
 
     public static uint Hash32(ReadOnlySpan<byte> bytes)

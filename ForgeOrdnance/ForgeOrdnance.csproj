@@ -21,10 +21,11 @@
   </Target>
   <ItemGroup>
     <ProjectReference Include="../ForgeCore/ForgeCore.csproj" Private="false" />
-    <ProjectReference Include="../ForgeUI/ForgeUI.csproj" Private="false" />
-    <ProjectReference Include="../ForgeAudio/ForgeAudio.csproj" Private="false" />
-    <ProjectReference Include="../ForgeVisual/ForgeVisual.csproj" Private="false" />
-    <Compile Include="Core/*.cs;Native/**/*.cs" />
+    <!-- Unity's vector constants and lengths as managed values (each is a native call in the interop): every source names them `Vec`. -->
+    <Using Include="ForgeCore.Vec" Alias="Vec" />
+    <Compile Include="Plugin.cs;Carrier/Core/*.cs;Carrier/Native/**/*.cs;Arsenal/Core/*.cs;Arsenal/Native/**/*.cs;Frames/Core/*.cs;Frames/Native/**/*.cs" />
+    <EmbeddedResource Include="Arsenal/Data/gun-grips.json" LogicalName="ForgeOrdnance.Arsenal.Data.gun-grips.json" />
+    <EmbeddedResource Include="Arsenal/Data/gun-sights.json" LogicalName="ForgeOrdnance.Arsenal.Data.gun-sights.json" />
     <Reference Include="BepInEx.Core" HintPath="$(GTFOBepInExPath)/core/BepInEx.Core.dll" Private="false" />
     <Reference Include="GTFO-API" HintPath="$(GTFOApiPath)" Private="false" />
     <Reference Include="MTFO" HintPath="$(GTFOBepInExPath)/plugins/dakkhuza-MTFO/MTFO.dll" Private="false" />

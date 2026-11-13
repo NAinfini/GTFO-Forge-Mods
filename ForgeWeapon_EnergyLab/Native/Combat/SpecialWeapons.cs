@@ -240,9 +240,9 @@ internal sealed class SpecialWeapons : IDisposable
         // A stalled frame never tunnels through an unchecked remainder after exhausting ricochets.
         for (var step = 0; step < 4 && distance > 0.001f; step++)
         {
-            DiscOverlap(disc, now);
+            DiscOverlap(disc);
             // A door may close around a flying disc between frames. Do not escape through it.
-            if (MuzzleBlocked(disc.Position, 0.02f)) { Visuals.Sparks(disc.Position, -disc.Direction, now); SettleDisc(index, now); return; }
+            if (MuzzleBlocked(disc.Position, 0.02f)) { Visuals.Sparks(disc.Position, -disc.Direction); SettleDisc(index, now); return; }
             var count = _sweep.Cast(disc.Position, disc.Gear.Numbers.BodyRadius, disc.Direction, distance);
             var stop = _sweep.Nearest(count, disc.Owner, SweepPass.Agents);
             var limit = stop < 0 ? distance : _sweep[stop].distance;
@@ -251,12 +251,12 @@ internal sealed class SpecialWeapons : IDisposable
                 var collision = _sweep[row];
                 if (collision.collider == null || collision.distance > limit) continue;
                 if (collision.distance <= 0f) collision = NativeShot.OverlapContact(collision.collider, disc.Position, disc.Direction);
-                DiscContact(disc, collision, now);
+                DiscContact(disc, collision);
             }
             disc.Position += disc.Direction * MathF.Max(0f, limit - (stop >= 0 ? 0.01f : 0f));
             if (stop < 0) break;
             var hit = _sweep[stop];
-            Visuals.Sparks(disc.Position, hit.normal, now);
+            Visuals.Sparks(disc.Position, hit.normal);
             if (++disc.Bounces > disc.Gear.Numbers.Bounces) { SettleDisc(index, now); return; }
             disc.Direction = U(SpecialWeaponMath.Reflect(N(disc.Direction), N(hit.normal)));
             disc.Contacts.Reset();
@@ -273,7 +273,7 @@ internal sealed class SpecialWeapons : IDisposable
         return count;
     }
 
-    private void DiscOverlap(Disc disc, float now)
+    private void DiscOverlap(Disc disc)
     {
         var count = Overlap(disc.Position, disc.Gear.Numbers.BodyRadius);
         for (var row = 0; row < count; row++)
@@ -281,20 +281,19 @@ internal sealed class SpecialWeapons : IDisposable
             var collider = _overlap[row];
             // Only a receiver can be hit, so the level's own (possibly non-convex) colliders never reach ClosestPoint or the blocking query.
             if (collider == null || !ForgeCore.Combat.DirectReceiver(disc.Owner!, collider, out _) || Blocked(disc.Position, collider.ClosestPoint(disc.Position))) continue;
-            DiscContact(disc, NativeShot.OverlapContact(collider, disc.Position, disc.Direction), now);
+            DiscContact(disc, NativeShot.OverlapContact(collider, disc.Position, disc.Direction));
         }
     }
 
-    private void DiscContact(Disc disc, RaycastHit collision, float now)
+    private void DiscContact(Disc disc, RaycastHit collision)
     {
         if (!_hit.ContactTarget(disc.Position, disc.Direction, collision, out collision)
             || !ForgeCore.Combat.DirectReceiver(disc.Owner!, collision.collider, out var identity)
             || !disc.Contacts.Remember(identity)) return;
         _hit.ResolveHit(disc.Owner!, disc.Gear.Numbers.Shot with { Damage = disc.Gear.Numbers.Shot.Damage * disc.Scale }, disc.Position, disc.Direction, collision);
         if (_damageEnabled) _hit.Apply();
-        Visuals.DiscImpact(collision.point, disc.Direction, now);
+        Visuals.DiscImpact(collision.point, disc.Direction);
     }
-
 
     internal float FlameRange(EnergyGear gear, Vector3 start, Vector3 direction)
         => MuzzleBlocked(start, 0.025f) ? 0f : Physics.Raycast(start, direction, out var hit, gear.Numbers.Shot.Range,
@@ -404,7 +403,7 @@ internal sealed class SpecialWeapons : IDisposable
         for (var row = 0; row < count; row++)
         {
             var collider = _overlap[row];
-            var enemy = collider == null ? null : VisibleEnemies.SelectEnemy(_holeOwner!, collider, TargetRelationFilter.Enemies);
+            var enemy = collider == null ? null : ForgeCore.Enemies.FromCollider(collider, _holeOwner!);
             if (enemy == null) continue;
             var point = collider!.ClosestPoint(_holePosition);
             var distance = (point - _holePosition).magnitude;

@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace ForgeReplay;
 
-// The recorder hooks of PLAN 4.2 that came after the first set (Hooks.cs): reload and tool use, throws, sentries and mines, tongues and
+// More recorder hooks of PLAN 4.2: reload and tool use, throws, sentries and mines, tongues and
 // projectiles, screams and scout detection, noise, pings, resource boxes, the reactor, light and fog, joins, host changes and the game log.
 // Same rules as Hooks.cs: each feature is put on separately (a Harmony class, or a subscription to a ForgeCore bracket where other packages
 // patch the same method), nothing ever throws into the game.
@@ -18,15 +18,14 @@ internal static partial class Hooks
 {
     private static void InstallMoreBrackets()
     {
-        Subscribe("Sentry.Placed", () => ForgeCore.GameHooks.SentryGearSpawned.After((sentry, _) => Sentry.Placed(sentry)));
+        Subscribe("Sentry.Placed", () => ForgeCore.GameHooks.SentryLifecycle.After((call, _) => { if (call.Step == ForgeCore.SentryStep.GearSpawnComplete) Sentry.Placed(call.Sentry); }));
         Subscribe("Sentry.Shot", () => ForgeCore.GameHooks.SentryFired.Before(Sentry.Fired));
-        Subscribe("Sentry.Removed", () => ForgeCore.GameHooks.SentryDespawned.After((sentry, _) => Sentry.Removed(sentry)));
-        // Picked up by a player, the sentry goes to the backpack without a despawn.
-        Subscribe("Sentry.PickedUp", () => ForgeCore.GameHooks.SentryLifecycle.After((call, _) => { if (call.Step is ForgeCore.SentryStep.PickUp or ForgeCore.SentryStep.SyncedPickup) Sentry.Removed(call.Sentry); }));
+        // Despawned, or picked up by a player (the sentry goes to the backpack without a despawn).
+        Subscribe("Sentry.Removed", () => ForgeCore.GameHooks.SentryLifecycle.After((call, _) => { if (call.Step is ForgeCore.SentryStep.Despawn or ForgeCore.SentryStep.PickUp or ForgeCore.SentryStep.SyncedPickup) Sentry.Removed(call.Sentry); }));
         Subscribe("Mine.Placed", () => ForgeCore.GameHooks.MineSpawned.After((mine, _) => Mine.Placed(mine)));
         Subscribe("Mine.PickedUp", () => ForgeCore.GameHooks.MinePickedUp.After((call, _) => Mine.PickedUp(call.Mine)));
         Subscribe("Scream.Scouted", () => ForgeCore.GameHooks.ScoutScreamActivated.After((scream, _) => Scream.Scouted(scream)));
-        Subscribe("Reload", () => ForgeCore.GameHooks.ReloadAnimationStarted.After((item, _) => Reloaded(item)));
+        Subscribe("Reload", () => ForgeCore.GameHooks.ReloadTriggered.After((item, _) => Reloaded(item)));
         Subscribe("Scream", () => { ForgeCore.GameHooks.EnemyScreamStarted.After((scream, _) => Scream.Screamed(scream)); ForgeCore.GameHooks.EnemyScreamed.After((scream, _) => Scream.Screamed(scream)); });
         Subscribe("EnemyAttack", () => ForgeCore.GameHooks.EnemyAttackStarted.After((call, _) => EnemyAct.Attack(call.State, call.Target, call.AnimIndex)));
         Subscribe("EnemyHitreact", () => ForgeCore.GameHooks.EnemyHitreacted.After((state, _) => EnemyAct.Hitreact(state)));
@@ -34,7 +33,7 @@ internal static partial class Hooks
         Subscribe("Noise.Made", () => ForgeCore.GameHooks.NoiseMade.Before(Noise.Made));
         Subscribe("ResourceBox", () => ForgeCore.GameHooks.ResourceContainerState.After((call, _) =>
         {
-            try { WorldAt(EventKind.ResourceBox, call.Container.gameObject, Rec.Key(call.Container), (ulong)(int)call.New.status); } catch (Exception e) { Rec.Fail("resource-box", e); }
+            try { World(EventKind.ResourceBox, call.Container, Rec.Key(call.Container), (ulong)(int)call.New.status); } catch (Exception e) { Rec.Fail("resource-box", e); }
         }));
         Subscribe("Reactor", () => ForgeCore.GameHooks.ReactorState.After((call, _) =>
         {
@@ -80,14 +79,6 @@ internal static partial class Hooks
         Rec.Begin().U(key).U((ulong)(int)state.status).U((ulong)Mathf.RoundToInt(Mathf.Clamp01(state.stateProgress) * 100f)).Pos(p.x, p.y, p.z)
             .U((ulong)Math.Max(0, state.stateCount)).U(state.verifyFailed ? 1UL : 0UL).Text(reactor.CurrentStateOverrideCode);
         Rec.EmitState(EventKind.Reactor, key);
-    }
-
-    private static void WorldAt(ushort kind, GameObject? thing, ulong key, ulong state, ulong extra = 0)
-    {
-        if (thing == null || !Rec.On) return;
-        var p = thing.transform.position;
-        Rec.Begin().U(key).U(state).U(extra).Pos(p.x, p.y, p.z);
-        Rec.EmitState(kind, key);
     }
 
     // The same call seen twice: a bot's or the host's interaction goes through both the send and the receive method; the two screams hooks
@@ -268,7 +259,7 @@ internal static partial class Hooks
         private static void Ammo(SentryGunInstance sentry)
         {
             var cost = sentry.CostOfBullet;
-            var bullets = cost > 0f ? (ulong)Mathf.Max(0, Mathf.RoundToInt(sentry.Ammo / cost)) : 0UL;
+            var bullets = cost > 0f ? Pack(sentry.Ammo / cost, 1f) : 0UL;
             var key = Rec.Key(sentry);
             if (Shown.TryGetValue(key, out var last) && last == bullets) return;
             Shown[key] = bullets;
@@ -289,10 +280,12 @@ internal static partial class Hooks
             try
             {
                 var gun = __instance.gameObject;
-                var p = gun.transform.position;
+                var place = gun.transform;
+                var p = place.position;
                 // Then U the key of the sentry's state event, Pos the direction of the muzzle.
                 var sentry = __instance.GetComponentInParent<SentryGunInstance>();
-                var aim = __instance.MuzzleAlign != null ? __instance.MuzzleAlign.forward : gun.transform.forward;
+                var muzzle = __instance.MuzzleAlign;
+                var aim = muzzle != null ? muzzle.forward : place.forward;
                 // Then U the weapon audio data block id of this sentry's gun (0 unknown) and U its fire mode (eWeaponFireMode), which the replay's shot sound is chosen from.
                 var audio = __instance.m_audioData;
                 Rec.Begin().U(Rec.Key(gun)).Pos(p.x, p.y, p.z).U(sentry == null ? 0UL : Rec.Key(sentry)).Pos(aim.x, aim.y, aim.z)
@@ -317,21 +310,17 @@ internal static partial class Hooks
 
         internal static ulong LastExploder() => PlayerRecorder.Now - _explodedAt <= ExplosionHurtMs ? _exploder : 255UL;
 
-        internal static void Placed(MineDeployerInstance __instance)
-        {
-            try { Deployed(EventKind.Mine, __instance, Rec.Key(__instance), 0, __instance.ItemDataBlock == null ? 0UL : __instance.ItemDataBlock.persistentID); } catch (Exception e) { Rec.Fail("mine", e); }
-        }
+        internal static void Placed(MineDeployerInstance __instance) => State(__instance, 0);
 
         [HarmonyPatch(typeof(MineDeployerInstance), nameof(MineDeployerInstance.SyncedTrigger))]
         [HarmonyPostfix]
-        private static void Triggered(MineDeployerInstance __instance)
-        {
-            try { Deployed(EventKind.Mine, __instance, Rec.Key(__instance), 1, __instance.ItemDataBlock == null ? 0UL : __instance.ItemDataBlock.persistentID); } catch (Exception e) { Rec.Fail("mine", e); }
-        }
+        private static void Triggered(MineDeployerInstance __instance) => State(__instance, 1);
 
-        internal static void PickedUp(MineDeployerInstance __instance)
+        internal static void PickedUp(MineDeployerInstance __instance) => State(__instance, 2);
+
+        private static void State(MineDeployerInstance mine, ulong state)
         {
-            try { Deployed(EventKind.Mine, __instance, Rec.Key(__instance), 2, __instance.ItemDataBlock == null ? 0UL : __instance.ItemDataBlock.persistentID); } catch (Exception e) { Rec.Fail("mine", e); }
+            try { Deployed(EventKind.Mine, mine, Rec.Key(mine), state, mine.ItemDataBlock == null ? 0UL : mine.ItemDataBlock.persistentID); } catch (Exception e) { Rec.Fail("mine", e); }
         }
 
         [HarmonyPatch(typeof(MineDeployerInstance_Detonate_Explosive), nameof(MineDeployerInstance_Detonate_Explosive.DoExplode))]
@@ -396,7 +385,7 @@ internal static partial class Hooks
                 var index = 0;
                 for (var i = 0; i < all.Length; i++) if (all[i].Pointer == tentacle.Pointer) { index = i; break; }
                 var target = tentacle.PlayerTarget;
-                var p = tentacle.m_hasStaticTargetPos ? tentacle.m_staticTargetPos : target != null ? target.Position : tentacle.transform.position;
+                var p = Reach(tentacle, target);
                 Rec.Begin().U((ulong)entity).U(2).Pos(p.x, p.y, p.z).U(target == null ? 0UL : (ulong)target.PlayerSlotIndex + 1).U((ulong)index);
                 Rec.Emit(EventKind.Tongue);
             }
@@ -418,14 +407,17 @@ internal static partial class Hooks
             {
                 var entity = EnemyRecorder.Entity(tentacle.m_owner);
                 if (entity < 0) return;
-                // m_localSpaceTargetPos is relative to the target: the target's own place is the world position.
                 var target = tentacle.PlayerTarget;
-                var p = tentacle.m_hasStaticTargetPos ? tentacle.m_staticTargetPos : target != null ? target.Position : tentacle.transform.position;
+                var p = Reach(tentacle, target);
                 Rec.Begin().U((ulong)entity).U(phase).Pos(p.x, p.y, p.z).U(target == null ? 0UL : (ulong)target.PlayerSlotIndex + 1);
                 Rec.Emit(EventKind.Tongue);
             }
             catch (Exception e) { Rec.Fail("tongue", e); }
         }
+
+        // Where the tongue reaches, in the world: m_localSpaceTargetPos is relative to the target, so the target's own place stands for it.
+        private static Vector3 Reach(MovingEnemyTentacleBase tentacle, PlayerAgent? target)
+            => tentacle.m_hasStaticTargetPos ? tentacle.m_staticTargetPos : target != null ? target.Position : tentacle.transform.position;
     }
 
     // U kind (0 spitter ball or other aimed projectile fired, 1 foam fired, 2 foam destroyed, 3 an aimed projectile in flight, 4 one whose
@@ -743,7 +735,7 @@ internal static partial class Hooks
                 var from = HandedBy.Remove(enemy.Pointer, out var by) ? by : -1;
                 var target = enemy.AI?.Target;
                 var player = _hearing ? _noiseMaker : target?.m_agent?.TryCast<PlayerAgent>() is { } agent ? agent.PlayerSlotIndex : -1;
-                Rec.Begin().U((ulong)entity).U(isPropagatedWakeup ? 1UL : 0UL).U((ulong)Mathf.Max(0, Mathf.RoundToInt(distance * 10f))).U((ulong)Mathf.Max(0, Mathf.RoundToInt(delay * 1000f)))
+                Rec.Begin().U((ulong)entity).U(isPropagatedWakeup ? 1UL : 0UL).U(Pack(distance, 10f)).U(Pack(delay, 1000f))
                     .U(isPropagatedWakeup && from >= 0 ? (ulong)from + 1 : 0UL)
                     .U(target == null ? 255UL : (ulong)target.m_detectionType).U(_hearing ? 1UL : 0UL).U(player < 0 ? 0UL : (ulong)player + 1)
                     .U(target == null ? 0UL : (ulong)target.noiseType);
@@ -770,7 +762,7 @@ internal static partial class Hooks
                 var entity = EnemyRecorder.Entity(__instance.m_enemyAgent);
                 if (entity < 0) return;
                 EnemyRecorder.Hot(entity);
-                Rec.Begin().U((ulong)entity).U(turn ? 1UL : 0UL).U((ulong)Math.Max(0, index)).U((ulong)Mathf.Max(0, Mathf.RoundToInt(delay * 1000f))).U(isPropagatedWakeup ? 1UL : 0UL);
+                Rec.Begin().U((ulong)entity).U(turn ? 1UL : 0UL).U((ulong)Math.Max(0, index)).U(Pack(delay, 1000f)).U(isPropagatedWakeup ? 1UL : 0UL);
                 Rec.Emit(EventKind.WakeUp);
             }
             catch (Exception e) { Rec.Fail("wake-up", e); }
@@ -846,7 +838,7 @@ internal static partial class Hooks
 
         private static void Write(ulong slot, ulong type, Vector3 p, float radius)
         {
-            Rec.Begin().U(slot).U(type).Pos(p.x, p.y, p.z).U((ulong)Mathf.Max(0, Mathf.RoundToInt(radius * 10f)));
+            Rec.Begin().U(slot).U(type).Pos(p.x, p.y, p.z).U(Pack(radius, 10f));
             Rec.Emit(EventKind.Noise);
         }
     }
@@ -1000,10 +992,10 @@ internal static partial class Hooks
     private static int _lastMusic = -1;
     internal static void PollMusic()
     {
-        if (!Rec.On || MusicManager.Machine == null) return;
+        if (!Rec.On || MusicManager.Machine is not { } machine) return;
         try
         {
-            var now = (int)MusicManager.Machine.CurrentState;
+            var now = (int)machine.CurrentState;
             if (now == _lastMusic) return;
             _lastMusic = now;
             Rec.Begin().U(0).U((ulong)now).U(0).Pos(0f, 0f, 0f);

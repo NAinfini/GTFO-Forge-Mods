@@ -44,7 +44,7 @@ public sealed class BackpackDeploy
 
 public static partial class GameHooks
 {
-    // ---- Weapons and gear: the hit entry, wield and unwield, the empty-clip paths, gear assembly, the reload start, the deployed marker and the sentry spawn.
+    // ---- Weapons and gear: the hit entry, wield and unwield, the empty-clip paths, gear assembly, the reload start, the deployed marker, the sentry spawn, the item unwield, the attached light, the C-foam burst and the throw.
     public static readonly Bracket<BulletHitCall> BulletHit = new("GameHooks.BulletHit", typeof(BulletHitHook));
     public static readonly Bracket<BulletWeapon> BulletWeaponWielded = new("GameHooks.BulletWeaponWielded", typeof(BulletWeaponWieldedHook));
     public static readonly Bracket<BulletWeapon> BulletWeaponUnwielded = new("GameHooks.BulletWeaponUnwielded", typeof(BulletWeaponUnwieldedHook));
@@ -63,6 +63,16 @@ public static partial class GameHooks
     /// <summary><c>ResourcePackFirstPerson.ApplyPack</c>: a resource pack (ammo, health, tool refill, disinfection) takes effect, which its timed hold reaches only when it completes.</summary>
     public static readonly Bracket<ResourcePackFirstPerson> ResourcePackApplied = new("GameHooks.ResourcePackApplied", typeof(ResourcePackAppliedHook));
     public static readonly Bracket<(SentryGunInstance Sentry, pGearSpawnData Data)> SentrySpawned = new("GameHooks.SentrySpawned", typeof(SentrySpawnedHook));
+    /// <summary><c>ItemEquippable.OnUnWield</c>, the base unwield body. An override is its own method and reaches it only when it calls the base; the gun's is <see cref="BulletWeaponUnwielded"/>.</summary>
+    public static readonly Bracket<ItemEquippable> ItemUnwielded = new("GameHooks.ItemUnwielded", typeof(ItemUnwieldedHook));
+    /// <summary><c>BulletWeaponSynced.OnGearSpawnComplete</c>: a gun held by another player or a bot has built its gear (its own override of <see cref="GearSpawnCompleted"/>).</summary>
+    public static readonly Bracket<BulletWeaponSynced> SyncedGearSpawnCompleted = new("GameHooks.SyncedGearSpawnCompleted", typeof(SyncedGearSpawnCompletedHook));
+    /// <summary><c>ItemEquippable.SetAttachedFlashlightEnabled(bool)</c>: the item's attached light is told on or off, also when it already was.</summary>
+    public static readonly Bracket<(ItemEquippable Item, bool Enabled)> FlashlightSet = new("GameHooks.FlashlightSet", typeof(FlashlightSetHook));
+    /// <summary><c>GlueGun.FireBurst</c>: the C-foam launcher fires a burst.</summary>
+    public static readonly Bracket<GlueGun> GlueBurstFired = new("GameHooks.GlueBurstFired", typeof(GlueBurstFiredHook));
+    /// <summary><c>ThrowingWeapon.Throw(float)</c>: a throwable (glow stick, grenade, fog repeller) leaves the hand; a <c>Before</c> runs ahead of the throw sound and the item's replication.</summary>
+    public static readonly Bracket<ThrowingWeapon> ThrowableThrown = new("GameHooks.ThrowableThrown", typeof(ThrowableThrownHook));
 }
 
 [HarmonyPatch(typeof(BulletWeapon), nameof(BulletWeapon.BulletHit))]
@@ -238,4 +248,60 @@ internal static class SentrySpawnedHook
     private static void After((SentryGunInstance Sentry, pGearSpawnData Data) __state, bool __runOriginal) => GameHooks.SentrySpawned.RunAfter(__state, __runOriginal);
     [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
     private static Exception? Faulted(Exception? __exception, (SentryGunInstance Sentry, pGearSpawnData Data) __state) { if (__exception != null) GameHooks.SentrySpawned.RunFaulted(__state, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(ItemEquippable), nameof(ItemEquippable.OnUnWield))]
+internal static class ItemUnwieldedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(ItemEquippable __instance) => GameHooks.ItemUnwielded.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(ItemEquippable __instance, bool __runOriginal) => GameHooks.ItemUnwielded.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, ItemEquippable __instance) { if (__exception != null) GameHooks.ItemUnwielded.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(BulletWeaponSynced), nameof(BulletWeaponSynced.OnGearSpawnComplete))]
+internal static class SyncedGearSpawnCompletedHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(BulletWeaponSynced __instance) => GameHooks.SyncedGearSpawnCompleted.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(BulletWeaponSynced __instance, bool __runOriginal) => GameHooks.SyncedGearSpawnCompleted.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, BulletWeaponSynced __instance) { if (__exception != null) GameHooks.SyncedGearSpawnCompleted.RunFaulted(__instance, __exception); return __exception; }
+}
+
+// The one parameter is injected by position: neither truth source names it.
+[HarmonyPatch(typeof(ItemEquippable), nameof(ItemEquippable.SetAttachedFlashlightEnabled))]
+internal static class FlashlightSetHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(ItemEquippable __instance, bool __0) => GameHooks.FlashlightSet.RunBefore((__instance, __0));
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(ItemEquippable __instance, bool __0, bool __runOriginal) => GameHooks.FlashlightSet.RunAfter((__instance, __0), __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, ItemEquippable __instance, bool __0) { if (__exception != null) GameHooks.FlashlightSet.RunFaulted((__instance, __0), __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(GlueGun), nameof(GlueGun.FireBurst))]
+internal static class GlueBurstFiredHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(GlueGun __instance) => GameHooks.GlueBurstFired.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(GlueGun __instance, bool __runOriginal) => GameHooks.GlueBurstFired.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, GlueGun __instance) { if (__exception != null) GameHooks.GlueBurstFired.RunFaulted(__instance, __exception); return __exception; }
+}
+
+[HarmonyPatch(typeof(ThrowingWeapon), nameof(ThrowingWeapon.Throw), new[] { typeof(float) })]
+internal static class ThrowableThrownHook
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Before(ThrowingWeapon __instance) => GameHooks.ThrowableThrown.RunBefore(__instance);
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void After(ThrowingWeapon __instance, bool __runOriginal) => GameHooks.ThrowableThrown.RunAfter(__instance, __runOriginal);
+    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
+    private static Exception? Faulted(Exception? __exception, ThrowingWeapon __instance) { if (__exception != null) GameHooks.ThrowableThrown.RunFaulted(__instance, __exception); return __exception; }
 }

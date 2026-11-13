@@ -16,7 +16,7 @@ namespace ForgeVfx.EditorTools
     /// to the far end. A sustained member loops at its root while its player keeps it alive and is stopped (emission
     /// off, live particles finish) when the player lets it go; every other member is one-shot.
     ///
-    /// <see cref="Members"/> mirrors the mod's member table (`Mods/ForgeMap/EffectMembers.cs`, sustain in
+    /// <see cref="Members"/> mirrors the mod's member table (`Mods/ForgeEngine/GameBindings/Presentation/EffectMembers.cs`, sustain in
     /// `VfxBundle.cs`); the manifest records these facts per effect and the mod's tests hold the two sides together.</summary>
     internal static class ForgeVfxProject
     {

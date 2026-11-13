@@ -20,9 +20,6 @@
   <ItemGroup>
     <Compile Include="Core/*.cs;Native/**/*.cs" />
     <ProjectReference Include="../ForgeCore/ForgeCore.csproj" Private="false" />
-    <ProjectReference Include="../ForgeAudio/ForgeAudio.csproj" Private="false" />
-    <ProjectReference Include="../ForgeUI/ForgeUI.csproj" Private="false" />
-    <ProjectReference Include="../ForgeVisual/ForgeVisual.csproj" Private="false" />
     <Reference Include="BepInEx.Core" HintPath="$(GTFOBepInExPath)/core/BepInEx.Core.dll" Private="false" />
     <Reference Include="GTFO-API" HintPath="$(GTFOApiPath)" Private="false" />
     <Reference Include="BepInEx.Unity.IL2CPP" HintPath="$(GTFOBepInExPath)/core/BepInEx.Unity.IL2CPP.dll" Private="false" />

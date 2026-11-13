@@ -108,15 +108,7 @@ public static partial class Players
     public static event Action<SessionPlayer>? Left { add => _left += value; remove => _left -= value; }
 
     internal static void NoteSession(SessionPlayer player, bool added)
-    {
-        var handlers = added ? _joined : _left;
-        if (handlers == null) return;
-        foreach (var handler in handlers.GetInvocationList())
-        {
-            try { ((Action<SessionPlayer>)handler).Invoke(player); }
-            catch (Exception error) { Log.For("ForgeCore").ErrorOnce("core-player-joined-left-handler-failed", "A player " + (added ? "joined" : "left") + " handler failed: " + error); }
-        }
-    }
+        => Log.For("ForgeCore").RaiseEach(added ? _joined : _left, player, "core-player-joined-left-handler-failed", added ? "player joined" : "player left");
 
     /// <summary>What <paramref name="agent"/>'s body is doing now (the local player and remote ones alike); <see cref="PlayerMotion.Empty"/> when it has no locomotion.</summary>
     public static PlayerMotion Motion(PlayerAgent agent)

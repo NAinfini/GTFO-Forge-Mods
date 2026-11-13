@@ -85,6 +85,18 @@ internal sealed class PayloadWriter
     }
 }
 
+/// <summary>One <see cref="EventKind.EnemyHurt"/> payload by field name, in the order Hooks.EnemyDamage writes it. LimbId is the limb hit,
+/// LimbType the limb's kind (0 normal, 1 weak spot, 2 armour); Damage, Taken and Overkill are in health, Multiplier is the limb's, Metres the distance from the attacker.</summary>
+internal readonly record struct EnemyHurtEvent(int Entity, int Kind, float Damage, ulong Attacker, ulong LimbId, bool Settled, float Taken, bool Lethal,
+    float Overkill, int LimbType, float Multiplier, bool Behind, ulong Gear, float Metres)
+{
+    internal bool Weak => LimbType == 1;
+
+    internal static EnemyHurtEvent Read(PayloadReader read)
+        => new((int)read.U(), (int)read.U(), read.U() / 10f, read.U(), read.U(), read.U() == 1, read.U() / 10f, read.U() == 1,
+            read.U() / 10f, (int)read.U(), read.U() / 100f, read.U() == 1, read.U(), read.U() / 100f);
+}
+
 /// <summary>Reads a payload written by <see cref="PayloadWriter"/>, for tests and the file dump. Anything cut off throws <see cref="FormatException"/>.</summary>
 internal sealed class PayloadReader
 {
@@ -97,12 +109,11 @@ internal sealed class PayloadReader
     /// <summary>A reader over <paramref name="bytes"/> that makes nothing: one per thread, aimed at the bytes (not copied) and valid until
     /// the next <see cref="Over"/> on the same thread. For the reads a replay makes every frame; a reader that is kept, handed on or used
     /// across another read takes <c>new PayloadReader(bytes)</c>.</summary>
-    internal static PayloadReader Over(byte[] bytes)
-    {
-        var reader = _over ??= new PayloadReader(bytes);
-        reader._bytes = bytes; reader._length = bytes.Length; reader._at = 0;
-        return reader;
-    }
+    internal static PayloadReader Over(byte[] bytes) => (_over ??= new PayloadReader(bytes)).On(bytes);
+
+    /// <summary>This reader aimed at <paramref name="bytes"/> (not copied) from their start: a reader of its own that a caller keeps
+    /// for reads that must not share <see cref="Over"/>'s (one inside another).</summary>
+    internal PayloadReader On(byte[] bytes) { _bytes = bytes; _length = bytes.Length; _at = 0; return this; }
 
     /// <summary>A reader that is loaded again and again, so reading events as they are written allocates nothing.</summary>
     internal PayloadReader() : this(new byte[PayloadWriter.Capacity]) { _length = 0; }

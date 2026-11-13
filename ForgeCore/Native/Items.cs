@@ -41,15 +41,7 @@ public static class Items
     public static event Action<pItemSpawnData, ItemReplicator>? Spawned { add => _spawned += value; remove => _spawned -= value; }
 
     internal static void RaiseSpawned(pItemSpawnData data, ItemReplicator replicator)
-    {
-        var handlers = _spawned;
-        if (handlers == null) return;
-        foreach (var handler in handlers.GetInvocationList())
-        {
-            try { ((Action<pItemSpawnData, ItemReplicator>)handler)(data, replicator); }
-            catch (Exception error) { Plugin.Logger.ErrorOnce("core-items-spawned-handler-failed", "An Items.Spawned handler failed: " + error); }
-        }
-    }
+        => Plugin.Logger.RaiseEach(_spawned, data, replicator, "core-items-spawned-handler-failed", "Items.Spawned");
 
     /// <summary>Spawns item <paramref name="itemId"/> in <paramref name="slot"/> at a pose inside <paramref name="node"/> (the origin
     /// node the game assigns); <paramref name="custom"/> is the item's custom state, if it has one. Returns the spawned instance, or

@@ -155,11 +155,11 @@ def main() -> None:
     known = set(runtime)
     manifest_path = OUT / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    # Cues copied unchanged from ForgeOrdnance_Arsenal (manifest entries carry "external"): never regenerated or deleted here.
+    # Cues copied unchanged from ForgeOrdnance (manifest entries carry "external"): never regenerated or deleted here.
     external = {entry["cue"]: entry for entry in manifest["outputs"] if "external" in entry}
     kept_files = {file.split("/")[-1] for entry in external.values() for file in entry["files"]}
     for cue in recordings:
-        if cue in external: raise ValueError(f"{cue} comes from ForgeOrdnance_Arsenal; remove its recording")
+        if cue in external: raise ValueError(f"{cue} comes from ForgeOrdnance; remove its recording")
     outputs = {entry["cue"]: entry for entry in manifest["outputs"] if entry["cue"] in known}
     for entry in outputs.values(): entry.pop("source", None)
     qa = json.loads(qa_path.read_text(encoding="utf-8")) if qa_path.is_file() else {}
@@ -197,7 +197,7 @@ def main() -> None:
     manifest = {
         "format": "Ogg Vorbis (libvorbis quality 7) mono 48000 Hz, one recording per runtime cue; played through ForgeAudio with audio/cues.forge",
         "generator": "tools/import_audio.py",
-        "source": "Adobe Firefly sound effects (commercial use permitted), not published; cues listed in cues.md. The blast-fire and blast-explode cues are copied from ForgeOrdnance_Arsenal",
+        "source": "Adobe Firefly sound effects (commercial use permitted), not published; cues listed in cues.md. The blast-fire and blast-explode cues are copied from ForgeOrdnance",
         "rights": "Adobe Firefly output, commercial use permitted; MIT, copyright 2026 NAinfini. blast-fire and blast-explode: see LICENSE.txt",
         "pendingFromOldLibrary": old,
         "outputs": ordered,

@@ -10,7 +10,7 @@ namespace ForgeCore;
 /// <summary>A stable fingerprint over labelled values: the same values added in the same order give the same hex on every machine.
 /// Each entry is hashed as a type tag, the UTF-8 byte length and bytes of the label, then the byte length (-1 for null) and bytes of the
 /// value (numbers in invariant culture), so no text can run one entry into the next (SHA-256, first 16 bytes as 32 hex characters). Floats are rounded to the precision the caller states, so the same level read twice gives one fingerprint.</summary>
-public sealed class Fingerprint
+internal sealed class Fingerprint
 {
     private readonly IncrementalHash _hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
 

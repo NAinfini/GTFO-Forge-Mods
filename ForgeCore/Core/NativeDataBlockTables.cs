@@ -555,43 +555,4 @@ public static partial class NativeDataBlockTables
         return method.Invoke(null, new[] { (object)json, Get(cellJson, "JSONSettings_GameData") })
             ?? throw new InvalidOperationException("Native block deserialization returned null.");
     }
-    private static MethodInfo? _serializer;
-    /// <summary>The block as the game's own CellJSON writes it with its data-block settings (the inverse of <see cref="Deserialize"/>).
-    /// Private caches the game fills in are not written, but public state fields are: see <see cref="WithoutRuntimeState"/>.</summary>
-    internal static string Serialize(object block)
-    {
-        var cellJson = NativeType("CellJSON");
-        _serializer ??= cellJson.GetMethods(Members).Single(candidate => candidate.Name == "SerializeNoFormatting"
-            && !candidate.IsGenericMethodDefinition && candidate.GetParameters().Length == 2);
-        return _serializer.Invoke(null, new[] { block, Get(cellJson, "JSONSettings_GameData") }) as string
-            ?? throw new InvalidOperationException("Native block serialization returned null.");
-    }
-
-    /// <summary>Public fields of a block type's objects that the game itself writes while it plays and CellJSON still writes out, by block
-    /// type. MusicStateDataBlock: every timed music entry (MusicDataTimed in m_EventsOnTime, m_SwitchesOnTime and the Inactive lists)
-    /// carries the music machine's own timer, which MUS_Base.ResetTimedData and CheckTimedData set on every state change in a level, so
-    /// the block reads differently after each level although no file changed.</summary>
-    private static readonly Dictionary<string, HashSet<string>> RuntimeState = new(StringComparer.Ordinal)
-    {
-        ["MusicStateDataBlock"] = new(StringComparer.OrdinalIgnoreCase) { "active", "nextTrigger", "timeIsClockRelative" },
-    };
-
-    /// <summary>A block's serialized text (<see cref="Serialize"/>) without the state fields the game writes into a block of that type while
-    /// it plays (<see cref="RuntimeState"/>), at any depth; every other field, and the text of a type with no such fields, is left as is.</summary>
-    internal static string WithoutRuntimeState(string blockType, string json)
-    {
-        if (!RuntimeState.TryGetValue(blockType, out var names)) return json;
-        var root = System.Text.Json.Nodes.JsonNode.Parse(json);
-        Strip(root, names);
-        return root?.ToJsonString() ?? json;
-    }
-    private static void Strip(System.Text.Json.Nodes.JsonNode? node, HashSet<string> names)
-    {
-        if (node is System.Text.Json.Nodes.JsonObject obj)
-        {
-            foreach (var key in obj.Select(pair => pair.Key).Where(names.Contains).ToList()) obj.Remove(key);
-            foreach (var pair in obj) Strip(pair.Value, names);
-        }
-        else if (node is System.Text.Json.Nodes.JsonArray array) foreach (var item in array) Strip(item, names);
-    }
 }

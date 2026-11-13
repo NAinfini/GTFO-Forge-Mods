@@ -1,0 +1,15 @@
+Third-party effect textures in forge-ordnance.bundle. The summoning ball, the drop pod and the turret shell were generated for this project by its owner with a paid Tripo subscription (commercial use included) and repaired for the game. The turret looks live in the Arsenal package.
+
+Landing effect textures (Creative Commons Zero / public domain dedication):
+- vfx-mist: "Smoke Particles" by Kenney, https://kenney.nl/assets/smoke-particles, CC0. Packed into a 2x2 atlas.
+- vfx-spark: "Particle Pack" by Kenney, https://kenney.nl/assets/particle-pack, CC0. Converted to white-on-alpha.
+- vfx-flare: "Particle Pack" by Kenney, https://kenney.nl/assets/particle-pack, CC0. Whitened (colour channel set to white, alpha kept).
+- vfx-flame: "Free VFX image sequences and flipbooks" by Unity Technologies (Unity Labs),
+  https://unity.com/blog/engine-platform/free-vfx-image-sequences-flipbooks, released under CC0 (https://creativecommons.org/publicdomain/zero/1.0/).
+  Flame02 (every second frame, cells centred on squares), from the official TGA flipbook download.
+
+Landing effect textures from free Unity Asset Store packs (standard Unity Asset Store EULA: commercial use is allowed and the textures may ship inside a built product):
+- vfx-smoke: "Particle Pack Starter Assets" by Unity Technologies, https://assetstore.unity.com/ (free pack).
+  SmokePuff01 (white colour, alpha from the source brightness, blurred).
+- vfx-rock: drawn for this mod by `tools/Carrier/make_rocks.py` (original work, no third-party source).
+- vfx-ring: "Free Quick Effects Vol 1" by Gabriel Aguiar Prod, https://assetstore.unity.com/ (free pack). Circle01_v1 (colour set to white, alpha kept).

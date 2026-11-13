@@ -23,6 +23,9 @@ namespace ForgeReplay;
 /// </summary>
 internal static partial class ReplayScreen
 {
+    /// <summary>Unity's <c>Color.white</c> and <c>Color.black</c> as plain values: in the game's interop each read of those is a native call.</summary>
+    internal static readonly Color White = new(1f, 1f, 1f, 1f), Black = new(0f, 0f, 0f, 1f);
+
     /// <summary>The colour of a player's card, name and outline: the game's colour of the slot.</summary>
     internal static Color SlotColour(int slot) => UIKit.PlayerColour(slot);
 
@@ -91,10 +94,13 @@ internal static partial class ReplayScreen
     // Per player card, rebuilt only when the recorded status changes.
     private static readonly byte[]?[] CardStatus = new byte[]?[4];
     private static readonly int[] CardHealth = { -1, -1, -1, -1 }, CardMove = new int[4];
-    // What the player has, one row an item: its name, what is left of it, and the inventory slot it is in, to mark the one in the hands.
-    // Share: how full it is (0 to 1) when Count is a percent, else below 0.
-    private readonly record struct CardRow(string Name, string Count, InventorySlot Slot, float Share = -1f);
-    private static readonly List<CardRow>[] CardRows = { new(), new(), new(), new() };
+    // What the player has, a block each in a fixed order (BlockSlots): its name and what is left of it; an empty name is an empty slot.
+    // Share: how full it is (0 to 1) when Count is a percent, else below 0. What is carried in the arms is not a block: the card's top line says so.
+    private readonly record struct CardBlock(string Name, string Count, float Share = -1f);
+    private static readonly CardBlock NoBlock = new("", "");
+    private static readonly InventorySlot[] BlockSlots = { InventorySlot.GearStandard, InventorySlot.GearSpecial, InventorySlot.GearMelee, InventorySlot.GearClass, InventorySlot.Consumable, InventorySlot.ResourcePack };
+    private static readonly CardBlock[,] Blocks = new CardBlock[4, 6];
+    private static readonly string[] CarryNames = { "", "", "", "" };
     private static readonly Analysis?[] CardReport = new Analysis?[4];
     private static readonly PlayerKit[] CardKit = new PlayerKit[4];
     private static readonly InventorySlot[] CardHeld = new InventorySlot[4];
@@ -290,14 +296,14 @@ internal static partial class ReplayScreen
             var x = (left + right) / 2f;
             var y = (bottom + top) / 2f;
             _hints?.Hide(); // what the keys do comes when the replay has started
-            c.Rect(x, y, right - left, top - bottom, Color.black);
+            c.Rect(x, y, right - left, top - bottom, ReplayScreen.Black);
             var p = Replayer.PrepareProgress();
-            var total = 1 + p.BodiesWanted + FirstPerson.GearLines;
+            var total = 1 + p.BodiesWanted + Puppeteer.GearLines;
             var done = (p.Landed ? 1 : 0) + Math.Min(p.Bodies, p.BodiesWanted) + p.Gear;
             var share = Math.Clamp(done / (float)total, 0f, 1f);
             const float barWidth = 480f;
             c.Text(_ui.Text("screen.preparing"), x, y + 58f, 22f, UIKitColors.MenuOver, HudAlign.Centre, bold: true);
-            c.Text(_ui.Text(p.Landed ? "prepare.waiting" : "prepare.landing", p.Bodies, p.BodiesWanted, p.Gear, FirstPerson.GearLines), x, y + 24f, 16f, UIKitColors.GameText, HudAlign.Centre);
+            c.Text(_ui.Text(p.Landed ? "prepare.waiting" : "prepare.landing", p.Bodies, p.BodiesWanted, p.Gear, Puppeteer.GearLines), x, y + 24f, 16f, UIKitColors.GameText, HudAlign.Centre);
             c.Rect(x, y - 4f, barWidth, 8f, Fade(UIKitColors.GameText, 0.15f));
             if (share > 0f) c.Rect(x - barWidth / 2f + barWidth * share / 2f, y - 4f, barWidth * share, 8f, UIKitColors.MenuOver);
             c.Text(_ui.Text("prepare.skip", Math.Min(p.Waited, p.Limit).ToString("0", CultureInfo.InvariantCulture), p.Limit.ToString("0", CultureInfo.InvariantCulture), ReplayKeys.Name(ReplayKeys.Play)), x, y - 32f, 14f, Fade(UIKitColors.GameText, 0.7f), HudAlign.Centre);
@@ -370,12 +376,12 @@ internal static partial class ReplayScreen
     private static void On(ReplayEntry entry)
     {
         _on = true;
-        Array.Clear(RowsReserved); _statsWidth = _feedWidth = _hintsWidth = 0f;
+        _statsWidth = _feedWidth = 0f;
         _header = entry.Header!;
         UIKitColors.Refresh();
         _title = ReplayList.LevelName(entry);
         _subtitle = (entry.Start == default ? "" : entry.Start.ToString("MM-dd HH:mm", CultureInfo.InvariantCulture) + "   ") + (string.IsNullOrEmpty(_header.RecorderName) ? "" : _ui.Text("screen.recorder", PlayerName.Plain(_header.RecorderName), _ui.Text(_header.RecorderIsHost ? "list.host" : "list.client")));
-        _hidden = false; _scroll = 0; _closeFrom = -1f; Array.Clear(NoAimTold); _skippedTold = 0; _skippedNext = 0; for (var i = 0; i < 4; i++) CardCounts[i] = "";
+        _hidden = false; _scroll = 0; _closeFrom = -1f; Array.Clear(NoAimTold); _skippedTold = 0; _skippedNext = 0;
         Notices.Clear(); _missionFull = 0f;
         for (var r = 0; r < ReplayFeed.Rows.Length; r++) RowTitles[r] = _ui.Text(ReplayFeed.Key(ReplayFeed.Rows[r]));
         _topWeaponTitle = _ui.Text("stats.topweapon"); _topEnemyTitle = _ui.Text("stats.topenemy");
@@ -390,7 +396,7 @@ internal static partial class ReplayScreen
         _page = StatsPage.Team;
         ChatRows.Clear();
         if (_hud != null) _hud.Visible = true;
-        if (_bar != null) { _bar.Visible = true; _bar.Colour = UIKitColors.GameText; _bar.Backing = Plate(); }
+        if (_bar != null) { _bar.Visible = true; _bar.Colour = UIKitColors.GameText; _bar.Backing = Plate(); _bar.Bare = true; }
         ReplayCamera.On();
         if (_hide != null) _hide.Active = true;
         _ui.HudAlone = true;
@@ -636,8 +642,6 @@ internal static partial class ReplayScreen
         HowTexts.Clear();
         var why = ReplayList.EstimateWhy(guessedKills, guessedRest);
         if (why.Length > 0) HowTexts.AddRange(why.Split('\n'));
-        var kills = Array.IndexOf(ReplayFeed.Rows, StatRow.Kills); var downs = Array.IndexOf(ReplayFeed.Rows, StatRow.Downs);
-        for (var slot = 0; slot < 4; slot++) { CardCounts[slot] = _ui.Text("card.counts", _stats[kills, slot].Text, _stats[downs, slot].Text); CardEstimate[slot] = _stats[kills, slot].Quality == StatQuality.Estimate; }
         for (var slot = 0; slot < 4; slot++)
         {
             var weapons = new Dictionary<string, int>(); var enemies = new Dictionary<string, int>();
@@ -654,10 +658,6 @@ internal static partial class ReplayScreen
         BuildTeamTable();
     }
 
-    // Each card's kills and downs up to the moment on the bar (the kills in the warning colour when estimated).
-    private static readonly string[] CardCounts = { "", "", "", "" };
-    private static readonly bool[] CardEstimate = new bool[4];
-
     private static string Top(Dictionary<string, int> counts)
     {
         string best = ""; var most = 0;
@@ -673,7 +673,7 @@ internal static partial class ReplayScreen
     {
         const float least = 0.45f;
         var light = 0.3f * c.r + 0.59f * c.g + 0.11f * c.b;
-        return light >= least ? c : Color.Lerp(c, Color.white, (least - light) / (1f - light));
+        return light >= least ? c : Color.Lerp(c, ReplayScreen.White, (least - light) / (1f - light));
     }
 
     // Esc held: how far it is to leaving the replay, in the middle (letting go before it fills cancels).
@@ -688,97 +688,81 @@ internal static partial class ReplayScreen
         if (share > 0f) c.Rect(x - (width - 40f) / 2f + (width - 40f) * share / 2f, y - 14f, (width - 40f) * share, 6f, UIKitColors.Alert);
     }
 
-    private const float PlateWidth = 700f, PlateHeight = 76f, NameRoom = 160f, CountRoom = 84f;
-    private static float _hintsWidth;
     private static readonly string[] HintNames = { "", "", "" };
     private static bool _hintUi, _hintSet;
-    private static string _foeText = "", _foeClose = "";
-    private static ulong _foeData = ulong.MaxValue;
 
-    /// <summary>Bottom middle: who is watched (the name in the slot's colour, under it what is in the hands, its ammunition and the health),
-    /// the views as buttons (the one shown lit; the views behind or at a player unavailable while nobody can be watched), the automatic
-    /// camera's switch, and the keys for what is done most, by their current names. The plate is as wide as its wider line needs (key names
-    /// and words differ by language and binding; the key line is measured as last drawn), at least <see cref="PlateWidth"/> and at most
-    /// <paramref name="room"/>, the space between the tabs and the buttons beside it.</summary>
-    private static void Watched(HudCanvas c, WorldState state, float cx, float cy, float room)
+    /// <summary>A HUD text made again only when what it shows (or the language) changes, not every frame.</summary>
+    private sealed class Shown<T> where T : IEquatable<T>
     {
+        private T _value = default!;
+        private int _version = -1;
+        private string _text = "";
+
+        internal string Of(T value, Func<T, string> make)
+        {
+            if (_version != UITexts.Version || !_value.Equals(value)) { _value = value; _version = UITexts.Version; _text = make(value); }
+            return _text;
+        }
+    }
+
+    private static readonly Shown<(ulong Data, string Close)> FoeTitle = new();
+    private static readonly Shown<(int Left, int Full, bool About)> FoeHealth = new();
+    private static readonly Shown<(string Name, string Count)> HeldLine = new();
+    private static readonly Shown<int> HealthLine = new();
+    private static readonly Shown<(string First, string Last)> WatchKeys = new();
+
+    /// <summary>The views as buttons (orbit, chase, first person, free; the one shown lit; the views behind or at a player unavailable while nobody
+    /// can be watched) and the automatic camera's switch, centred on <paramref name="centre"/> but kept between <paramref name="from"/> and
+    /// <paramref name="to"/>.</summary>
+    private static void CameraButtons(HudCanvas c, float centre, float from, float to, float y)
+    {
+        var player = Replayer.Follow is >= 0 and <= 3;
+        var mode = ReplayCamera.Mode;
+        var width = c.ButtonWidth(_ui.Text("cam.auto")) + c.ButtonWidth(_ui.Text("cam.free")) + c.ButtonWidth(_ui.Text("cam.eyes"))
+            + c.ButtonWidth(_ui.Text("cam.chase")) + c.ButtonWidth(_ui.Text("cam.orbit")) + 4f * 10f + 12f;
+        var x = Math.Clamp(centre + width / 2f, from + width, Math.Max(from + width, to));
+        if (c.Button(ref x, y, _ui.Text("cam.auto"), _auto, Lit)) ToggleAuto();
+        x -= 12f;
+        if (c.Button(ref x, y, _ui.Text("cam.free"), mode == ViewMode.Free, Lit)) ReplayCamera.SetMode(ViewMode.Free);
+        if (c.Button(ref x, y, _ui.Text("cam.eyes"), mode == ViewMode.Eye, Lit, player)) ReplayCamera.SetMode(ViewMode.Eye);
+        if (c.Button(ref x, y, _ui.Text("cam.chase"), mode == ViewMode.Follow, Lit, player)) ReplayCamera.SetMode(ViewMode.Follow);
+        if (c.Button(ref x, y, _ui.Text("cam.orbit"), mode == ViewMode.Orbit, Lit, player)) ReplayCamera.SetMode(ViewMode.Orbit);
+    }
+
+    /// <summary>The thin line along the top of the bottom panel: on the left who is watched (the name in the slot's colour), what is in the hands
+    /// with what is left of it, the health and, in the eyes of a player without recorded aiming, NO AIM DATA (a notice too, once per player and
+    /// replay); watching an enemy, its name in the alert colour and its health. On the right the keys for what is done most, by their current
+    /// names (left out when they do not fit). The left part is cut with "…" to the room the keys leave.</summary>
+    private static void InfoLine(HudCanvas c, WorldState state, float left, float right, float y)
+    {
+        const float px = 16f;
         var follow = Replayer.Follow;
         var player = follow is >= 0 and <= 3;
-        var views = c.ButtonWidth(_ui.Text("cam.auto")) + c.ButtonWidth(_ui.Text("cam.free")) + c.ButtonWidth(_ui.Text("cam.eyes"))
-            + c.ButtonWidth(_ui.Text("cam.chase")) + c.ButtonWidth(_ui.Text("cam.orbit")) + 5f * 10f + 8f;
-        var mode = ReplayCamera.Mode;
-        var noAim = player && mode == ViewMode.Eye && !ReplayExtras.Aim(state, follow, out _) && !ReplayExtras.Gun(state, follow, out _);
-        if (noAim && !NoAimTold[follow]) { NoAimTold[follow] = true; Notices.Push(_ui.Text("toast.noaim", Names[follow]), NoticeTone.Warn, 6f, ForgeCore.Frame.UnscaledTime); }
-        var tag = noAim ? _ui.Text("plate.noaim") : "";
-        // Watching an enemy: its name in the alert colour, how to go back to the player, and the health line that shares the second line.
-        // The health is measured before the plate so its column can be as wide as the value (the player's "Health 80%" is short and keeps
-        // its fixed column; an enemy's "Health about 1129 / 2500" does not fit there and ran out of the plate's left edge).
+        var keys = Hints(right, y, (right - left) / 2f);
+        var x = left;
+        var end = right - (keys > 0f ? keys + 24f : 0f);
+        void Part(string text, Color ink, bool bold)
+        {
+            if (text.Length == 0 || end - x < 24f) return;
+            var shown = c.FitText(text, px, bold, end - x);
+            if (shown.Length > 0) x += c.Text(shown, x, y, px, ink, HudAlign.Left, bold) + 20f;
+        }
         var enemy = ReplayCamera.Enemy;
-        string? foe = null;
-        var foeHealth = "";
-        var foeEstimated = false;
         if (enemy >= 0 && state.Enemies.TryGetValue(enemy, out var foeData))
         {
-            var close = ReplayKeys.Name(ReplayKeys.Close);
-            if (foeData.DataId != _foeData || close != _foeClose) { _foeData = foeData.DataId; _foeClose = close; _foeText = _ui.Text("plate.enemy", EnemyName(foeData.DataId), close); }
-            foe = _foeText;
-            (foeHealth, foeEstimated) = EnemyHealthText(state, enemy);
-        }
-        var foeWidth = foeHealth.Length > 0 ? c.TextWidth(foeHealth, 16f, true) : 0f;
-        // The plate's width is set by the view buttons alone: what the second line holds (the hands, the health, the keys) changes with play and must not move the plate or the buttons on it.
-        var width = Math.Min(Math.Max(Math.Max(PlateWidth, views + NameRoom + 32f), foeWidth + 64f), room);
-        var healthRoom = Math.Max(130f, foeWidth + 8f);
-        var left = cx - width / 2f; var right = cx + width / 2f;
-        c.Plate(cx, cy, width, PlateHeight, Cut, Plate());
-        var top = cy + 17f; var under = cy - 20f;
-        // The views, from the right: the automatic switch, then free, eyes, chase, orbit.
-        var x = right - 10f;
-        if (c.Button(ref x, top, _ui.Text("cam.auto"), _auto, UIKitColors.Alert)) ToggleAuto();
-        x -= 8f;
-        if (c.Button(ref x, top, _ui.Text("cam.free"), mode == ViewMode.Free, Lit)) ReplayCamera.SetMode(ViewMode.Free);
-        if (c.Button(ref x, top, _ui.Text("cam.eyes"), mode == ViewMode.Eye, Lit, player)) ReplayCamera.SetMode(ViewMode.Eye);
-        if (c.Button(ref x, top, _ui.Text("cam.chase"), mode == ViewMode.Follow, Lit, player)) ReplayCamera.SetMode(ViewMode.Follow);
-        if (c.Button(ref x, top, _ui.Text("cam.orbit"), mode == ViewMode.Orbit, Lit, player)) ReplayCamera.SetMode(ViewMode.Orbit);
-        // The name has the whole first line up to the view buttons.
-        var name = c.FitText(foe ?? (player ? Names[follow] : _ui.Text("cam.nobody")), 20f, true, x - left - 24f);
-        c.Text(name, left + 16f, top, 20f, foe != null ? UIKitColors.Alert : player ? NameColour(follow, SlotColour(follow)) : UIKitColors.MenuOver, HudAlign.Left, bold: true);
-        // The keys on the right of the second line (left out when the plate is too narrow for them); left of them why first person shows no
-        // aim (in words, in the warning colour), then what the hands hold, each cut with "…" to the room left before the keys.
-        var hintsRoom = width - 32f - healthRoom - 48f;
-        Hints(right - 16f, under, hintsRoom);
-        // The columns stand where the widest key line seen so far would leave them, so the key line changing with Ctrl (or a rebinding) does not move the health or the hands.
-        var hintsW = Math.Min(_hintsWidth, hintsRoom);
-        // The second line is in columns of fixed places: what is held on the left, the health right-aligned in a column of its own, the keys at the right end.
-        var keysLeft = right - 16f - (hintsW > 0f ? hintsW + 16f : 0f);
-        var healthRight = keysLeft - 8f;
-        if (foe != null)
-        {
-            if (foeHealth.Length > 0)
-            {
-                // The column reserved above leaves the value's whole width inside the plate; the shrink is only for a plate forced narrower
-                // than the recording's text (the room between the tabs and the buttons), so no digit is ever cut.
-                var px = 16f;
-                var healthWidth = Math.Max(1f, healthRight - (left + 16f));
-                while (px > 11f && c.TextWidth(foeHealth, px, true) > healthWidth) px -= 1f;
-                c.Text(foeHealth, healthRight, under, px, foeEstimated ? UIKitColors.Warn : UIKitColors.GameText, HudAlign.Right, bold: true);
-            }
+            Part(FoeTitle.Of((foeData.DataId, ReplayKeys.Name(ReplayKeys.Close)), static v => _ui.Text("plate.enemy", EnemyName(v.Data), v.Close)), UIKitColors.Alert, true);
+            var (foeHealth, foeEstimated) = EnemyHealthText(state, enemy);
+            Part(foeHealth, foeEstimated ? UIKitColors.Warn : UIKitColors.GameText, true);
             return;
         }
-        if (!player) return;
-        var held = left + 16f;
-        var healthLeft = healthRight - healthRoom;
-        if (noAim && healthLeft > held)
-        {
-            var shown = c.FitText(tag, 16f, true, healthLeft - held);
-            if (shown.Length > 0) held += c.Text(shown, held, under, 16f, UIKitColors.Warn, HudAlign.Left, bold: true) + 16f;
-        }
-        // What is held: the name on the left, the count (ammunition or uses; empty for a hammer or a knife, the column stays) right-aligned in a column of its own before the health.
+        if (!player) { Part(_ui.Text("cam.nobody"), UIKitColors.MenuOver, true); return; }
+        Part(Names[follow], NameColour(follow, SlotColour(follow)), true);
         var (heldName, heldCount) = HeldText(follow);
-        var countRight = healthLeft - 12f;
-        if (countRight - CountRoom > held) c.Text(c.FitText(heldName, 16f, false, countRight - CountRoom - held - 12f), held, under, 16f, UIKitColors.GameText);
-        if (heldCount.Length > 0 && countRight - CountRoom > held) c.Text(c.FitText(heldCount, 16f, false, CountRoom), countRight, under, 16f, UIKitColors.GameText, HudAlign.Right);
-        var health = CardHealth[follow] < 0 ? 0 : CardHealth[follow] * 100 / 127;
-        c.Text(_ui.Text("plate.health", health), healthRight, under, 16f, UIKitColors.GameText, HudAlign.Right, bold: true);
+        Part(HeldLine.Of((heldName, heldCount), static v => v.Count.Length > 0 ? v.Name + "  " + v.Count : v.Name), UIKitColors.GameText, false);
+        Part(HealthLine.Of(CardHealth[follow] < 0 ? 0 : CardHealth[follow] * 100 / 127, static share => _ui.Text("plate.health", share)), UIKitColors.GameText, true);
+        var noAim = ReplayCamera.Mode == ViewMode.Eye && !ReplayExtras.Aim(state, follow, out _) && !ReplayExtras.Gun(state, follow, out _);
+        if (noAim && !NoAimTold[follow]) { NoAimTold[follow] = true; Notices.Push(_ui.Text("toast.noaim", Names[follow]), NoticeTone.Warn, 6f, ForgeCore.Frame.UnscaledTime); }
+        if (noAim) Part(_ui.Text("plate.noaim"), UIKitColors.Warn, true);
     }
 
     // The watched enemy's health: the full health and what is left. What is left is exact where the host synced its losses (the recording holds the health after each), else
@@ -787,22 +771,26 @@ internal static partial class ReplayScreen
     {
         if (!state.Enemies.TryGetValue(enemy, out var data) || !(data.FullHealth > 0f)) return ("", false);
         var now = Replayer.Clock?.PositionMs ?? 0u;
+        var full = (int)MathF.Round(data.FullHealth);
         if (_marked?.HealthTrack.At(enemy, now, out var exact) == true)
-            return (_ui.Text("plate.foehealth", Whole(Math.Max(0f, exact)), Whole(data.FullHealth)), false);
+            return (FoeHealth.Of(((int)MathF.Round(Math.Max(0f, exact)), full, false), static v => FoeHealthText(v)), false);
         var share = (state.Poses[enemy].State >> 2) / 31f;
-        return (_ui.Text("plate.foehealthabout", Whole(share * data.FullHealth), Whole(data.FullHealth)), true);
+        return (FoeHealth.Of(((int)MathF.Round(share * data.FullHealth), full, true), static v => FoeHealthText(v)), true);
     }
+
+    private static string FoeHealthText((int Left, int Full, bool About) v)
+        => _ui.Text(v.About ? "plate.foehealthabout" : "plate.foehealth", Whole(v.Left), Whole(v.Full));
 
     // What the watched player holds and has left, made again only when it changes.
     private static (string Name, string Count) HeldText(int slot)
     {
-        foreach (var row in CardRows[slot])
-            if (row.Slot == CardHeld[slot]) return (row.Name, row.Count);
-        return ("", "");
+        if (CardHeld[slot] == InventorySlot.InLevelCarry) return (CarryNames[slot], "");
+        var block = Array.IndexOf(BlockSlots, CardHeld[slot]);
+        return block < 0 ? ("", "") : (Blocks[slot, block].Name ?? "", Blocks[slot, block].Count ?? "");
     }
 
     // The hint line: watching, the mouse buttons and the numbers; using the screen, how to go back. Set again only when it or a key changes.
-    // Wider than max, it is not shown (returns 0; its width is still kept in _hintsWidth for the plate's next layout).
+    // Wider than max, it is not shown (returns 0).
     private static float Hints(float right, float y, float max)
     {
         var hints = _hints;
@@ -810,7 +798,7 @@ internal static partial class ReplayScreen
         var ui = ReplayCamera.Ui;
         var a = ui ? "Ctrl" : ReplayKeys.Name(ReplayKeys.CameraNext);
         var b = ui ? ReplayKeys.Name(ReplayKeys.Close) : ReplayKeys.Name(ReplayKeys.PlayerNext);
-        var n = ReplayKeys.Name(ReplayKeys.Watch[0]) + "–" + ReplayKeys.Name(ReplayKeys.Watch[3]);
+        var n = WatchKeys.Of((ReplayKeys.Name(ReplayKeys.Watch[0]), ReplayKeys.Name(ReplayKeys.Watch[3])), static v => v.First + "–" + v.Last);
         if (!_hintSet || ui != _hintUi || a != HintNames[0] || b != HintNames[1] || n != HintNames[2])
         {
             _hintSet = true; _hintUi = ui; HintNames[0] = a; HintNames[1] = b; HintNames[2] = n;
@@ -819,9 +807,7 @@ internal static partial class ReplayScreen
                 HintPart.Key(n, true), HintPart.Word(_ui.Text("hint.watch")), HintPart.Key("Ctrl", true), HintPart.Word(_ui.Text("hint.mouse")));
         }
         var width = hints.Place(right, y);
-        _hintsWidth = Math.Max(_hintsWidth, width);
-        // The plate is sized to the line's width, so max equals it up to rounding: a bare comparison could flip between frames.
-        if (width <= max + 0.5f) return width;
+        if (width <= max) return width;
         hints.Hide();
         return 0f;
     }
@@ -855,18 +841,18 @@ internal static partial class ReplayScreen
         return Percents[whole] ??= whole.ToString(CultureInfo.InvariantCulture) + "%";
     }
 
-    // A gear's row: what is left of a full pack as a percent, the full pack by the game's data for this gear or, where that says nothing or too
+    // A gear's block: what is left of a full pack as a percent, the full pack by the game's data for this gear or, where that says nothing or too
     // little (ammunition boosters are not recorded), the most this recording shows. Nothing known yet: no number rather than a wrong one.
-    private static void AmmoRow(List<CardRow> rows, string loadout, int slot, int line, int ammo, ulong now, InventorySlot item)
+    private static CardBlock AmmoBlock(string loadout, int slot, int line, int ammo, ulong now)
     {
         var name = GearTypeNames.Name(loadout, line);
-        if (name.Length == 0) return;
+        if (name.Length == 0) return NoBlock;
         var lines = loadout.Split('\n');
         var peak = Replayer.Report?.AmmoPeak[slot, ammo] ?? 0UL;
         var full = Math.Max(peak, AmmoCaps.Bullets(line < lines.Length ? lines[line] : "", line));
-        if (full == 0UL) { rows.Add(new CardRow(name, "", item)); return; }
+        if (full == 0UL) return new CardBlock(name, "");
         var share = Math.Min(1f, now / (float)full);
-        rows.Add(new CardRow(name, PercentText(share), item, share));
+        return new CardBlock(name, PercentText(share), share);
     }
 
     /// <summary>Rebuilds a card's texts when the recorded status or kit changed: PlayerStatus is U slot, locomotion, wielded slot,
@@ -877,8 +863,8 @@ internal static partial class ReplayScreen
         var report = Replayer.Report;
         if (ReferenceEquals(status, CardStatus[slot]) && kit == CardKit[slot] && ReferenceEquals(report, CardReport[slot])) return;
         CardStatus[slot] = status; CardKit[slot] = kit; CardReport[slot] = report;
-        var rows = CardRows[slot];
-        rows.Clear();
+        for (var b = 0; b < BlockSlots.Length; b++) Blocks[slot, b] = NoBlock;
+        CarryNames[slot] = "";
         if (status == null) { CardDown[slot] = false; CardInfection[slot] = 0f; CardMove[slot] = 0; CardHeld[slot] = InventorySlot.None; return; }
         var read = new PayloadReader(status);
         read.U();
@@ -888,15 +874,14 @@ internal static partial class ReplayScreen
         var standard = read.U(); var special = read.U(); var tool = read.U();
         CardDown[slot] = read.U() == 1;
         var loadout = Loadouts[slot];
-        void Add(string name, string count, InventorySlot item) { if (name.Length > 0) rows.Add(new CardRow(name, count, item)); }
-        AmmoRow(rows, loadout, slot, 0, 0, standard, InventorySlot.GearStandard);
-        AmmoRow(rows, loadout, slot, 1, 1, special, InventorySlot.GearSpecial);
-        Add(GearTypeNames.Name(loadout, 2), "", InventorySlot.GearMelee);
-        AmmoRow(rows, loadout, slot, 3, 2, tool, InventorySlot.GearClass);
+        Blocks[slot, 0] = AmmoBlock(loadout, slot, 0, 0, standard);
+        Blocks[slot, 1] = AmmoBlock(loadout, slot, 1, 1, special);
+        Blocks[slot, 2] = new CardBlock(GearTypeNames.Name(loadout, 2), "");
+        Blocks[slot, 3] = AmmoBlock(loadout, slot, 3, 2, tool);
         if (!kit.Known) return;
-        if (kit.PackItem != 0) Add(ItemNames.Name(kit.PackItem), kit.PackCount.ToString(CultureInfo.InvariantCulture), InventorySlot.ResourcePack);
-        if (kit.ConsumableItem != 0) Add(ItemNames.Name(kit.ConsumableItem), kit.ConsumableCount.ToString(CultureInfo.InvariantCulture), InventorySlot.Consumable);
-        if (kit.CarryItem != 0) Add(ItemNames.Name(kit.CarryItem), "", InventorySlot.InLevelCarry);
+        if (kit.ConsumableItem != 0) Blocks[slot, 4] = new CardBlock(ItemNames.Name(kit.ConsumableItem), kit.ConsumableCount.ToString(CultureInfo.InvariantCulture));
+        if (kit.PackItem != 0) Blocks[slot, 5] = new CardBlock(ItemNames.Name(kit.PackItem), kit.PackCount.ToString(CultureInfo.InvariantCulture));
+        if (kit.CarryItem != 0) CarryNames[slot] = ItemNames.Name(kit.CarryItem);
     }
 
     // The killing blow of a swing names the melee weapon the loadout carries.
@@ -904,14 +889,7 @@ internal static partial class ReplayScreen
 
     private static string Weapon(string loadout, int wielded)
     {
-        var line = (InventorySlot)wielded switch
-        {
-            InventorySlot.GearStandard => 0,
-            InventorySlot.GearSpecial => 1,
-            InventorySlot.GearMelee => 2,
-            InventorySlot.GearClass => 3,
-            _ => -1,
-        };
+        var line = Puppeteer.LineIndex(wielded);
         return line < 0 ? "" : GearTypeNames.Name(loadout, line);
     }
 
@@ -920,7 +898,7 @@ internal static partial class ReplayScreen
     {
         string? name;
         try { name = GameData.EnemyDataBlock.GetBlock((uint)dataId)?.name; }
-        catch (Exception) { name = null; }
+        catch (Exception) { name = null; } // a block this game build cannot read: the feed's plain word stands in
         if (name == null) return _ui.Text("feed.enemy");
         var key = EnemyNames.Key(name);
         return key != null ? _ui.Text(key) : name.Replace('_', ' ');
@@ -1128,15 +1106,6 @@ internal static partial class ReplayScreen
         c.Text(c.FitText(_typedLine, 16f, true, wide - 32f), x, y, 16f, UIKitColors.MenuOver, HudAlign.Left, bold: true);
     }
 
-    // Which zone a player is in, as the door signs call it (recorded every half second).
-    private static readonly Dictionary<int, string> ZoneTexts = new();
-    private static string ZoneText(WorldState state, int slot)
-    {
-        if (!ReplayExtras.Place(state, slot, out var place) || place.Zone < 0) return "";
-        if (!ZoneTexts.TryGetValue(place.Zone, out var text)) ZoneTexts[place.Zone] = text = _ui.Text("player.zone", place.Zone);
-        return text;
-    }
-
     private static (string Head, string Body) ObjectiveLine(int layer, ulong status, ulong extra)
     {
         var name = _ui.Text("objective.layer" + layer);
@@ -1148,8 +1117,7 @@ internal static partial class ReplayScreen
             if (WardenObjectiveManager.TryGetWardenObjectiveDataForLayer(lg, chain, out var data) && data?.MainObjective is { } objective)
             {
                 // The words carry fragments such as [ITEM_SERIAL] that the game fills in with the level's own item names and zones: ask the game's own replacement, as its objective screen does.
-                var raw = objective.Id != 0 ? Localization.Text.Get(objective.Id) : objective.UntranslatedText;
-                text = Analysis.Untagged(WardenObjectiveManager.ReplaceFragmentsInString(lg, chain, raw ?? "", false) ?? "");
+                text = Analysis.Untagged(WardenObjectiveManager.ReplaceFragmentsInString(lg, chain, GearTypeNames.Text(objective), false) ?? "");
             }
         }
         catch (Exception error) { Skipped.Note("the text of a recorded objective could not be read", error.Message); }

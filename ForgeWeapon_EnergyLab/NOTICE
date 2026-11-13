@@ -9,7 +9,7 @@ The shared effect bundle (forge-vfx.bundle, CC0 1.0) comes with ForgeVisual.
 
 Sound effects (audio/*.ogg):
 - Generated with Adobe Firefly, whose output may be used commercially; shared here under MIT. The record of every file (source name and SHA-256) is kept in the source repository.
-- blast-fire and blast-explode, and the grenade-launcher clips weapon.grenade_*, are copied unchanged from ForgeOrdnance_Arsenal:
+- blast-fire and blast-explode, and the grenade-launcher clips weapon.grenade_*, are copied unchanged from ForgeOrdnance:
   - "Sci-fi Grenade Launcher" by ValhallaProject, https://freesound.org/people/ValhallaProject/sounds/771167/, CC BY 4.0
     (https://creativecommons.org/licenses/by/4.0/); converted and trimmed for game use.
   - "2 High Quality Explosions (explode.wav)" by Michel Baradari (apollo-music.de), https://opengameart.org/content/2-high-quality-explosions,

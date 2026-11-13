@@ -26,7 +26,7 @@ namespace ForgeVfx.EditorTools
     /// on the beam and the flame; `open` and `collapse` on the black hole). Playing the member never shows them; the
     /// energy weapons activate one for a phase of a shot. Particle lights are authored here at the brightness the
     /// effect's light should have; the energy weapons switch them off and light the scene with the game's own effect
-    /// lights at the same colour, range and timing (`Mods/ForgeVisual/Native/PointLights.cs`).
+    /// lights at the same colour, range and timing (`Mods/ForgeCore/Visual/Native/PointLights.cs`).
     ///
     /// Budgets (particle caps per instance, every state included; what is live at once is lower): sparks 63, flame
     /// impact 20, explosion 131, plasma explosion 101, flame 153, beam 132, lightning arc 74 per hop, plasma discharge
@@ -41,7 +41,7 @@ namespace ForgeVfx.EditorTools
 
         // ---- shared resources ---------------------------------------------------------------------------------
 
-        private static Material _glow, _beam, _flow, _trail, _disc, _ringThin, _shockRing, _flash, _bolt, _crackle, _spiral, _plasma;
+        private static Material _glow, _beam, _flow, _trail, _disc, _ringThin, _shockRing, _flash, _bolt, _boltTile, _crackle, _spiral, _plasma, _lens;
         private static Material _smoke, _debris, _fire, _fireAdditive;
         private static Mesh _line;
         private static readonly HashSet<string> Written = new HashSet<string>(StringComparer.Ordinal);
@@ -59,12 +59,14 @@ namespace ForgeVfx.EditorTools
             _glow = WriteMaterial("glow_additive", additive, WriteTexture("glow", 128, 128, Square(128, GlowPixel)), 2f);
             _beam = WriteMaterial("beam_additive", additive, WriteTexture("beam_soft", 64, 64, Square(64, BeamPixel)), 2f);
             _trail = WriteMaterial("trail_additive", additive, WriteTexture("trail_soft", 64, 64, Square(64, (u, v) => BeamPixel(v, u))), 1.8f);
+            WriteMaterial("strip_additive", additive, WriteTexture("strip_soft", 64, 64, Square(64, (u, v) => StripPixel(v))), 1.8f);
             _flow = WriteMaterial("flow_additive", additive, WriteTexture("beam_flow_sheet", 256, 256, FlowPixel), 1.6f);
             _disc = WriteMaterial("disc_alpha", blended, WriteTexture("disc", 128, 128, Square(128, DiscPixel)), 1f);
             _ringThin = WriteMaterial("ring_thin_additive", additive, WriteTexture("ring_thin", 256, 256, Square(256, RingPixel)), 2f);
             _shockRing = WriteMaterial("shock_ring_additive", additive, WriteTexture("shock_ring", 256, 256, Square(256, ShockRingPixel)), 1.6f);
             _flash = WriteMaterial("flash_additive", additive, WriteTexture("flash_sheet", 512, 512, Sheet(2, 256, FlashPixel)), 2f);
             _bolt = WriteMaterial("bolt_additive", additive, WriteTexture("bolt_sheet", 512, 512, BoltSheet()), 1.8f);
+            _boltTile = WriteMaterial("bolt_tile_additive", additive, WriteTexture("bolt_tile", 2048, 512, BoltTile(), repeat: true), 1.8f);
             _crackle = WriteMaterial("crackle_additive", additive, WriteTexture("crackle_sheet", 512, 512, CrackleSheet()), 1.6f);
             _spiral = WriteMaterial("spiral_additive", additive, WriteTexture("spiral", 256, 256, Square(256, SpiralPixel)), 1.4f);
             _plasma = WriteMaterial("plasma_additive", additive, WriteTexture("plasma_sheet", 512, 512, Sheet(4, 128, PlasmaPixel)), 1.5f);
@@ -73,6 +75,14 @@ namespace ForgeVfx.EditorTools
             var fire = WriteTexture("fire_sheet", 512, 512, Sheet(4, 128, FirePixel));
             _fire = WriteMaterial("fire_premultiplied", premultiplied, fire, 1.4f);
             _fireAdditive = WriteMaterial("fire_additive", additive, fire, 1.2f);
+            // Bent light round the black hole: the shape is an annulus (strongest just outside the core), the bend a swirl about the centre,
+            // read linear (a normal-like map) so mid-grey bends nothing.
+            _lens = WriteMaterial("lens_distort", "ForgeVfx/Particles Distort", WriteTexture("lens_mask", 128, 128, Square(128, LensMaskPixel)), 1f);
+            _lens.SetTexture("_DistortTex", Linear(WriteTexture("lens_swirl", 128, 128, Square(128, LensSwirlPixel))));
+            _lens.SetFloat("_Strength", 0.06f);
+            _lens.SetColor("_TintColor", new Color(0.6f, 0.45f, 1f, 0.3f));
+            _lens.SetVector("_Scroll", Vector4.zero);
+            EditorUtility.SetDirty(_lens);
             _line = WriteLineMesh();
             DeleteUnwritten("Textures", ".png");
             DeleteUnwritten("Materials", ".mat");
@@ -285,30 +295,37 @@ namespace ForgeVfx.EditorTools
 
         /// <summary>A black hole of 8 m pull radius: a black event horizon with a dark shadow round it, drawn over a thin
         /// hot photon ring that carries the violet light; a tilted accretion disc spiralling in, a faint spiral of glowing
-        /// gas, violet streaks and dark dust pulled in from 4.5 m, occasional crackles near the horizon and orbiting motes.
+        /// gas, violet streaks and dark dust pulled in from 4.5 m and occasional crackles near the horizon.
         /// The inactive `open` child is the well opening (a flash, light and expanding ring at full size whatever the
         /// well's scale) and `collapse` its end (an inward ring and glow, then a flash, light, debris and sparks thrown
         /// out as it vanishes 0.28 s later).</summary>
         private static void BlackHole(GameObject root)
         {
-            new Layer(root, _disc, 1f, 8, loop: true).Local().Rate(25f).Life(0.2f, 0.2f).Size(0.62f, 0.62f).Colors(new Color(0f, 0f, 0f, 1f))
+            // A gravitational singularity with volume, round from every side: the black core sits inside a band of bent light (a screen-space warp),
+            // under a violet-white event-horizon rim and a soft violet corona; two crossed accretion rings orbit it, streaks and dark dust spiral in from
+            // 4.5 m and stretch as they fall, and crackles flicker at the horizon. No gold, no flat decal: every layer is a billboard or a 3D orbit.
+            new Layer(root, _disc, 1f, 8, loop: true).Local().Rate(25f).Life(0.2f, 0.2f).Size(0.6f, 0.6f).Colors(new Color(0f, 0f, 0f, 1f))
                 .Over(Hold(Color.white)).Fudge(-100f);
-            new Layer(Child(root, "shadow"), _disc, 1f, 6, loop: true).Local().Rate(20f).Life(0.25f, 0.25f).Size(0.95f, 0.95f).Colors(new Color(0f, 0f, 0f, 0.4f))
+            new Layer(Child(root, "lens"), _lens, 1f, 4, loop: true).Local().Rate(12f).Life(0.4f, 0.4f).Size(1.6f, 1.7f).Spin().Turn(0.6f, 1f)
+                .Colors(Color.white).Over(Hold(Color.white)).Fudge(-110f);
+            new Layer(Child(root, "shadow"), _disc, 1f, 6, loop: true).Local().Rate(20f).Life(0.25f, 0.25f).Size(0.9f, 0.9f).Colors(new Color(0f, 0f, 0f, 0.35f))
                 .Over(Hold(Color.white)).Fudge(-90f);
-            new Layer(Child(root, "photon_ring"), _ringThin, 1f, 8, loop: true).Local().Rate(20f).Life(0.25f, 0.25f).Size(0.72f, 0.78f).Spin()
-                .Colors(new Color(1f, 0.75f, 0.45f, 0.8f)).Over(Hold(Color.white)).Light(new Color(0.55f, 0.15f, 1f), 6f, 2f);
-            new Layer(Child(root, "swirl"), _spiral, 1f, 10, loop: true).Local().Rate(6f).Life(1.2f, 1.5f).Size(1.8f, 2.2f).Spin().Turn(1.2f, 2f)
-                .Colors(new Color(1f, 0.55f, 0.18f), Violet).Over(Hold(Color.white, 0.07f));
+            new Layer(Child(root, "horizon"), _ringThin, 1f, 8, loop: true).Local().Rate(20f).Life(0.25f, 0.25f).Size(0.66f, 0.7f).Spin()
+                .Colors(new Color(0.85f, 0.75f, 1f, 0.9f)).Over(Hold(Color.white)).Light(new Color(0.55f, 0.15f, 1f), 6f, 2f);
+            new Layer(Child(root, "corona"), _glow, 1f, 6, loop: true).Local().Rate(12f).Life(0.5f, 0.5f).Size(1.5f, 1.7f)
+                .Colors(new Color(0.5f, 0.2f, 1f, 0.22f)).Over(Hold(Color.white)).Fudge(10f);
+            new Layer(Child(root, "swirl"), _spiral, 1f, 10, loop: true).Local().Rate(6f).Life(1.2f, 1.5f).Size(1.6f, 2f).Spin().Turn(1.6f, 2.4f)
+                .Colors(new Color(0.75f, 0.45f, 1f), Violet).Over(Hold(Color.white, 0.09f));
             new Layer(Child(root, "accretion", Vector3.zero, new Vector3(70f, 0f, 0f)), _glow, 1f, 150, loop: true).Local().Rate(90f).Life(1.2f, 1.6f)
-                .Size(0.06f, 0.12f).Circle(1.9f, 0.5f).Orbit(0f, 0f, 2.4f, -0.9f).Colors(new Color(1f, 0.65f, 0.25f), new Color(0.6f, 0.2f, 1f)).Over(Hold(Color.white));
-            new Layer(Child(root, "infall"), _glow, 1f, 44, loop: true).Local().Rate(30f).Life(1f, 1.3f).Size(0.02f, 0.04f).Sphere(4.5f, 0f)
-                .Orbit(0f, 0f, 0f, -4.5f).Colors(new Color(Violet.r, Violet.g, Violet.b, 0.6f)).Over(Hold(Color.white, 0.8f)).Stretch(0.08f, 1f);
+                .Size(0.05f, 0.1f).Circle(0.75f, 0.5f).Orbit(0f, 0f, 4f, -0.25f).Colors(new Color(0.9f, 0.8f, 1f), new Color(0.6f, 0.2f, 1f)).Over(Hold(Color.white));
+            new Layer(Child(root, "accretion_cross", Vector3.zero, new Vector3(-35f, 60f, 0f)), _glow, 1f, 90, loop: true).Local().Rate(55f).Life(1f, 1.4f)
+                .Size(0.035f, 0.07f).Circle(0.6f, 0.4f).Orbit(0f, 0f, -4.5f, -0.2f).Colors(new Color(0.7f, 0.5f, 1f), new Color(0.35f, 0.15f, 0.9f)).Over(Hold(Color.white));
+            new Layer(Child(root, "infall"), _glow, 1f, 60, loop: true).Local().Rate(40f).Life(1f, 1.3f).Size(0.02f, 0.035f).Sphere(4.5f, 0f)
+                .Orbit(0.8f, 0.8f, 0f, -4.2f).Colors(new Color(0.75f, 0.6f, 1f, 0.7f)).Over(Hold(Color.white, 0.8f)).Stretch(0.12f, 1f);
             new Layer(Child(root, "dust"), _debris, 1f, 30, loop: true).Local().Rate(20f).Life(1f, 1.3f).Size(0.03f, 0.06f).Spin().Turn(4f).Frames(16)
                 .Sphere(4f, 0f).Orbit(0.4f, 0.4f, 0f, -3.5f).Colors(new Color(0.25f, 0.22f, 0.3f, 0.9f)).Over(Hold(Color.white));
-            new Layer(Child(root, "arcs"), _crackle, 1f, 4, loop: true).Local().Rate(5f).Life(0.04f, 0.06f).Size(0.8f, 1.1f).Spin().Frames(16)
+            new Layer(Child(root, "arcs"), _crackle, 1f, 4, loop: true).Local().Rate(5f).Life(0.04f, 0.06f).Size(0.7f, 0.9f).Spin().Frames(16)
                 .Colors(new Color(0.75f, 0.55f, 1f, 0.6f));
-            new Layer(Child(root, "motes"), _glow, 1f, 40, loop: true).Local().Rate(25f).Life(1.2f, 1.6f).Size(0.04f, 0.04f).Sphere(2.8f)
-                .Orbit(0f, 1.5f, 0f, -1.2f).Colors(Violet, new Color(1f, 0.6f, 0.15f)).Over(Hold(Color.white));
 
             var open = Child(root, "open");
             new Layer(open, _glow, 0.1f, 2).Keep().Life(0.12f, 0.12f).Size(3f, 3f).Colors(new Color(0.75f, 0.55f, 1f, 0.7f)).Burst(0f, 1, 1).Over(Flash(Violet));
@@ -458,35 +475,41 @@ namespace ForgeVfx.EditorTools
             ignite.SetActive(false);
         }
 
-        /// <summary>A chain-lightning strike: jagged bolts re-striking along the line in two thicknesses, a faint blue
-        /// glow, forked side branches, ionised motes left hanging along the path; at the far end (named `end*`, off when
-        /// the arc hits nothing) a flash, a light, crackles, blue-white sparks that fall and bounce, and a wisp of smoke;
-        /// a small flash and crackle at the start.</summary>
+        /// <summary>A chain-lightning strike, played as a laser line (slot <c>laser</c>: head <c>end</c>, bodies <c>bolts</c> and <c>bolts_thin</c>,
+        /// <c>tile</c> 8): the bodies repeat <see cref="BoltTile"/> every eight metres, so the bolt keeps its corners (one every 12-60 cm,
+        /// wandering up to about 60 cm off the line, 1.7 m across the main bolt) at any length instead of being stretched straight; re-struck five times
+        /// in 0.2 s, each strike a random one of eight bolt shapes, of varying thickness, with forks. At the far end
+        /// (the head, hidden when the arc hits nothing) a flash, crackles, blue-white sparks that fall and bounce, and a wisp of
+        /// smoke (no light of its own: the caller flashes one at each hop); a small flash and crackle at the start.</summary>
         private static void LightningArc(GameObject root)
         {
-            new Layer(root, _bolt, 0.22f, 8).Line(_line).Burst(0f, 2, 2).Burst(0.05f, 2, 2).Burst(0.1f, 1, 1).Burst(0.16f, 1, 1)
-                .Life(0.04f, 0.07f).Size3(0.18f, 0.24f).Roll().Frames(8).Colors(new Color(0.8f, 0.9f, 1f));
-            new Layer(Child(root, "bolts_thin"), _bolt, 0.22f, 6).Line(_line).Burst(0.025f, 1, 1).Burst(0.075f, 1, 1).Burst(0.13f, 1, 1).Burst(0.19f, 1, 1)
-                .Life(0.04f, 0.06f).Size3(0.1f, 0.14f).Roll().Frames(8).Colors(new Color(0.6f, 0.8f, 1f, 0.8f));
-            new Layer(Child(root, "glow"), _beam, 0.22f, 2).Line(_line).Burst(0f, 1, 1).Life(0.22f, 0.22f).Size3(0.3f, 0.3f)
-                .Colors(new Color(Electric.r, Electric.g, Electric.b, 0.22f)).Over(Ramp(new[] { (0f, Color.white), (1f, Color.white) }, new[] { (0f, 1f), (0.5f, 0.6f), (1f, 0f) }));
-            new Layer(Child(root, "branches"), _bolt, 0.22f, 12).Line(_line).Along().Burst(0f, 3, 4).Burst(0.05f, 2, 3).Burst(0.1f, 2, 2).Life(0.04f, 0.07f)
-                .Size3(0.08f, 0.1f, 0.6f).Splay(0.9f).Frames(8).Colors(new Color(0.6f, 0.85f, 1f, 0.8f));
-            new Layer(Child(root, "ions"), _glow, 0.1f, 14).Along().Delay(0.03f).Burst(0f, 8, 12).Life(0.3f, 0.6f).Speed(0.1f, 0.4f).Size(0.012f, 0.02f)
-                .Noise(0.5f, 2f).Colors(new Color(0.6f, 0.8f, 1f, 0.7f)).Over(Hold(Color.white));
-            new Layer(Child(root, "end_flash", Vector3.forward), _glow, 0.1f, 2).Local().Keep().Burst(0f, 1, 1).Life(0.1f, 0.1f).Size(0.45f, 0.5f)
-                .Colors(new Color(0.5f, 0.8f, 1f)).Over(Flash(Electric));
-            LightCarrier(Child(root, "end_light", Vector3.forward), null, 0.18f, new Color(0.3f, 0.6f, 1f), 5f, 3f, keep: true);
-            new Layer(Child(root, "end_crackle", Vector3.forward), _crackle, 0.15f, 4).Local().Keep().Burst(0f, 1, 1).Burst(0.06f, 1, 1).Burst(0.12f, 1, 1)
-                .Life(0.05f, 0.08f).Size(0.35f, 0.5f).Spin().Frames(16).Colors(new Color(0.6f, 0.9f, 1f, 0.7f));
-            new Layer(Child(root, "end_sparks", Vector3.forward), _glow, 0.1f, 18).Keep().Burst(0f, 12, 16).Life(0.15f, 0.4f).Speed(2f, 6f)
+            // the bodies are stretched billboards along the line (they always face the camera, so the bolt never turns edge-on into a straight
+            // line); one particle drifts along +Z, so its length is its size times the length scale, which the laser line scales with its length
+            new Layer(Child(root, "bolts"), _boltTile, 0.22f, 8).Local().Burst(0f, 1, 1).Burst(0.05f, 1, 1).Burst(0.1f, 1, 1).Burst(0.15f, 1, 1).Burst(0.19f, 1, 1)
+                .Life(0.035f, 0.06f).Speed(0.001f, 0.001f).Size(1.7f, 1.7f).Stretch(0f, 1f / 1.7f).Sheet(1, 8, animate: false).Colors(new Color(0.85f, 0.93f, 1f));
+            new Layer(Child(root, "bolts_thin"), _boltTile, 0.22f, 6).Local().Burst(0.025f, 1, 1).Burst(0.08f, 1, 1).Burst(0.13f, 1, 1)
+                .Life(0.03f, 0.05f).Speed(0.001f, 0.001f).Size(1f, 1f).Stretch(0f, 1f).Sheet(1, 8, animate: false).Colors(new Color(0.55f, 0.78f, 1f, 0.75f));
+            // a luminous channel round the bolt, held through the strikes: seen from behind the gun the arc is a bright streak from the muzzle
+            // to the target, not a few thin lines collapsing towards the crosshair
+            new Layer(Child(root, "channel"), _beam, 0.22f, 2).Local().Burst(0f, 1, 1).Life(0.24f, 0.24f).Speed(0.001f, 0.001f).Size(0.32f, 0.32f)
+                .Stretch(0f, 1f / 0.32f).Colors(new Color(0.45f, 0.7f, 1f, 0.5f)).Over(Ramp(new[] { (0f, Color.white), (1f, Color.white) }, new[] { (0f, 1f), (0.5f, 0.7f), (1f, 0f) }));
+            var end = Child(root, "end", Vector3.forward);
+            new Layer(Child(end, "end_flash"), _glow, 0.1f, 2).Local().Keep().Burst(0f, 1, 1).Life(0.12f, 0.12f).Size(0.6f, 0.65f)
+                .Colors(new Color(0.55f, 0.82f, 1f)).Over(Flash(Electric));
+            new Layer(Child(end, "end_core"), _glow, 0.1f, 2).Local().Keep().Burst(0f, 1, 1).Life(0.07f, 0.07f).Size(0.18f, 0.2f)
+                .Colors(Color.white).Over(Fade());
+            // the strike splashes over the target: jagged bolts thrown out in every direction (stretched along their flight, so never a flat star)
+            new Layer(Child(end, "end_splash"), _bolt, 0.15f, 12).Keep().Burst(0f, 5, 6).Burst(0.06f, 3, 4).Burst(0.12f, 2, 3).Life(0.04f, 0.07f)
+                .Speed(5f, 9f).Size(0.05f, 0.08f).Sphere(0.05f).Frames(8).Stretch(0.06f, 2f).Colors(new Color(0.65f, 0.88f, 1f, 0.9f));
+            new Layer(Child(end, "end_sparks"), _glow, 0.1f, 18).Keep().Burst(0f, 12, 16).Life(0.15f, 0.4f).Speed(2f, 6f)
                 .Size(0.01f, 0.02f).Sphere(0.05f).Gravity(0.7f).Over(Arcing()).Collide(0.3f, 0.5f, 0.3f).Stretch(0.03f, 1f);
-            new Layer(Child(root, "end_smoke", Vector3.forward), _smoke, 0.1f, 3).Keep().Burst(0f, 1, 2).Life(0.7f, 1f).Speed(0.2f, 0.4f).Size(0.15f, 0.22f)
+            new Layer(Child(end, "end_smoke"), _smoke, 0.1f, 3).Keep().Burst(0f, 1, 2).Life(0.7f, 1f).Speed(0.2f, 0.4f).Size(0.15f, 0.22f)
                 .Spin().Frames(16).Sphere(0.04f).Over(Soot(0.25f, 0.12f)).SizeOver(1f, 2.5f).Gravity(-0.1f).Fudge(10f);
-            new Layer(Child(root, "start_flash", Vector3.zero), _glow, 0.1f, 2).Local().Keep().Burst(0f, 1, 1).Life(0.06f, 0.06f).Size(0.22f, 0.22f)
+            // at the muzzle, half a metre from the eye: a small glow and short bolts licking forward along the shot, nothing that fills the view
+            new Layer(root, _glow, 0.1f, 2).Local().Keep().Burst(0f, 1, 1).Life(0.06f, 0.06f).Size(0.08f, 0.08f)
                 .Colors(new Color(0.5f, 0.8f, 1f, 0.8f)).Over(Flash(Electric));
-            new Layer(Child(root, "start_crackle", Vector3.zero), _crackle, 0.1f, 2).Local().Keep().Burst(0f, 1, 1).Life(0.04f, 0.05f).Size(0.25f, 0.3f)
-                .Spin().Frames(16).Colors(new Color(0.6f, 0.85f, 1f, 0.8f));
+            new Layer(Child(root, "start_spray", Vector3.zero), _bolt, 0.1f, 6).Keep().Burst(0f, 3, 4).Burst(0.05f, 2, 2).Life(0.03f, 0.05f).Speed(3f, 5f)
+                .Size(0.025f, 0.035f).Cone(28f, 0.005f).Frames(8).Stretch(0.04f, 2f).Colors(new Color(0.65f, 0.88f, 1f, 0.9f));
         }
 
         /// <summary>A plasma discharge from an orb: thinner violet-blue bolts than the lightning arc, a faint glow along
@@ -533,6 +556,134 @@ namespace ForgeVfx.EditorTools
 
         /// <summary>A light that is not seen, only cast: one invisible particle that carries a particle light and fades it
         /// out over <paramref name="life"/> seconds (full at once, a third left by a fifth of its life). A one-shot.</summary>
+        // ---- effects declared as data (Tools/Vfx/FxLibrary/fx-own.json) ---------------------------------------
+
+#pragma warning disable 0649 // JsonUtility fills these fields.
+        /// <summary>An own effect as data: its layers, each a child of the root (the converter gives the root the silent system the game plays), so every layer has its own
+        /// <c>position</c> and can be left out by name. Read by ForgeVfxConvert from the manifest fx_import.py writes.</summary>
+        [Serializable] internal sealed class Recipe { public RecipeLayer[] layers; }
+
+        /// <summary>A key of a colour/alpha (<c>c</c> "#rrggbb", <c>a</c>) or size (<c>v</c>) curve at life fraction <c>t</c>.</summary>
+        [Serializable] internal sealed class RecipeKey { public float t, a = 1f, v = 1f; public string c; }
+
+        [Serializable] internal sealed class RecipeBurst { public float t; public int min = 1, max; }
+
+        /// <summary>One particle layer. <c>material</c> "own:&lt;Own/Materials name&gt;" or <c>texture</c> (a staged library texture) with <c>blend</c> and <c>tint</c>;
+        /// <c>grid</c> [columns, rows] with <c>animate</c> (play the frames) or a random frame; <c>render</c> billboard | stretch (<c>length</c>, <c>velocity</c>) | horizontal;
+        /// <c>life</c>, <c>size</c>, <c>speed</c> [min, max]; <c>shape</c> point | sphere | hemisphere | cone (<c>angle</c>) | circle with <c>radius</c>; <c>colour</c> and
+        /// <c>sizeCurve</c> keys; <c>spin</c> degrees a second; <c>position</c> of the layer; <c>rotation</c> (degrees) turns a cone (+Z by default) or a circle (in the XY plane by default).</summary>
+        [Serializable]
+        internal sealed class RecipeLayer
+        {
+            public string name, material, texture, blend, render, shape, start;
+            public int[] grid;
+            public bool animate, loop, local, randomRotation;
+            public int max;
+            public float duration, delay, gravity, drag, rate, radius, angle, length = 1f, velocity, spin, tint;
+            public float[] life, size, speed, position, rotation, noise;
+            public RecipeBurst[] bursts;
+            public RecipeKey[] colour, sizeCurve;
+        }
+#pragma warning restore 0649
+
+        /// <summary>The effect a recipe declares, built with the same layer tools as the hand-written own effects. <paramref name="material"/> gives each layer's material.</summary>
+        internal static GameObject FromRecipe(string name, Recipe recipe, Func<RecipeLayer, int, Material> material)
+        {
+            var root = new GameObject(name);
+            for (var i = 0; i < recipe.layers.Length; i++)
+            {
+                var l = recipe.layers[i];
+                var go = Child(root, string.IsNullOrEmpty(l.name) ? "layer" + i : l.name, V3(l.position));
+                if (l.render == "line")
+                {
+                    RecipeLine(go, material(l, i), l);
+                    continue;
+                }
+                var layer = new Layer(go, material(l, i), l.duration > 0f ? l.duration : 1f, l.max > 0 ? l.max : 64, l.loop);
+                layer.Life(Lo(l.life, 1f), Hi(l.life, 1f)).Size(Lo(l.size, 1f), Hi(l.size, 1f)).Speed(Lo(l.speed, 0f), Hi(l.speed, 0f)).Gravity(l.gravity);
+                if (!string.IsNullOrEmpty(l.start) && ColorUtility.TryParseHtmlString(l.start, out var start)) layer.Colors(start);
+                if (l.delay > 0f) layer.Delay(l.delay);
+                if (l.local) layer.Local();
+                if (l.rate > 0f) layer.Rate(l.rate);
+                foreach (var b in l.bursts ?? new RecipeBurst[0]) layer.Burst(b.t, (short)b.min, (short)Mathf.Max(b.min, b.max));
+                switch (l.shape)
+                {
+                    case null: case "": case "point": break;
+                    case "sphere": layer.Sphere(Mathf.Max(0.0001f, l.radius)); break;
+                    case "hemisphere": layer.Sphere(Mathf.Max(0.0001f, l.radius)).Shape(ParticleSystemShapeType.Hemisphere); break;
+                    case "cone": layer.Cone(l.angle, Mathf.Max(0.0001f, l.radius), V3(l.rotation)); break;
+                    case "circle": layer.Circle(Mathf.Max(0.0001f, l.radius), 1f, V3(l.rotation)); break;
+                    default: throw new InvalidOperationException("recipe layer " + l.name + " has an unknown shape " + l.shape);
+                }
+                if (l.colour != null && l.colour.Length > 0)
+                {
+                    var colours = new List<(float, Color)>();
+                    var alphas = new List<(float, float)>();
+                    foreach (var k in l.colour)
+                    {
+                        if (!string.IsNullOrEmpty(k.c) && ColorUtility.TryParseHtmlString(k.c, out var c)) colours.Add((k.t, c));
+                        alphas.Add((k.t, k.a));
+                    }
+                    if (colours.Count == 0) colours.Add((0f, Color.white));
+                    layer.Over(Ramp(colours.ToArray(), alphas.ToArray()));
+                }
+                if (l.sizeCurve != null && l.sizeCurve.Length > 0)
+                {
+                    var curve = new AnimationCurve();
+                    foreach (var k in l.sizeCurve) curve.AddKey(k.t, k.v);
+                    layer.SizeCurve(curve);
+                }
+                if (l.randomRotation) layer.Spin();
+                if (Mathf.Abs(l.spin) > 0f) layer.Turn(Mathf.Abs(l.spin) * Mathf.Deg2Rad);
+                if (l.drag > 0f) layer.Drag(l.drag);
+                if (l.noise != null && l.noise.Length == 2) layer.Noise(l.noise[0], l.noise[1]);
+                if (l.grid != null && l.grid.Length == 2) layer.Sheet(l.grid[0], l.grid[1], l.animate);
+                switch (l.render)
+                {
+                    case null: case "": case "billboard": break;
+                    case "stretch": layer.Stretch(l.velocity, l.length); break;
+                    case "horizontal": layer.Align(ParticleSystemRenderMode.HorizontalBillboard); break;
+                    default: throw new InvalidOperationException("recipe layer " + l.name + " has an unknown render " + l.render);
+                }
+            }
+            return root;
+        }
+
+        /// <summary>`render: line`: a camera-facing strip from z = 0 to z = 1 (a LineRenderer in local space), so a line effect stretched along +Z is a ribbon that
+        /// never shows its edge or a crossing, and is culled by the whole line's bounds. <c>size</c> [start, end] is its width in metres (ForgeVisual widens it by the
+        /// copy's scale), <c>colour</c> keys run along it, <c>start</c> tints it.</summary>
+        private static void RecipeLine(GameObject go, Material material, RecipeLayer l)
+        {
+            var line = go.AddComponent<LineRenderer>();
+            line.sharedMaterial = material;
+            line.useWorldSpace = false;
+            line.positionCount = 2;
+            line.SetPositions(new[] { Vector3.zero, Vector3.forward });
+            line.alignment = LineAlignment.View;
+            line.textureMode = LineTextureMode.Stretch;
+            line.widthMultiplier = 1f;
+            line.widthCurve = AnimationCurve.Linear(0f, Lo(l.size, 0.1f), 1f, Hi(l.size, 0.1f));
+            var colours = new List<GradientColorKey>();
+            var alphas = new List<GradientAlphaKey>();
+            foreach (var k in l.colour ?? new RecipeKey[0])
+            {
+                if (!string.IsNullOrEmpty(k.c) && ColorUtility.TryParseHtmlString(k.c, out var c)) colours.Add(new GradientColorKey(c, k.t));
+                alphas.Add(new GradientAlphaKey(k.a, k.t));
+            }
+            var tint = !string.IsNullOrEmpty(l.start) && ColorUtility.TryParseHtmlString(l.start, out var s) ? s : Color.white;
+            if (colours.Count == 0) colours.Add(new GradientColorKey(tint, 0f));
+            if (alphas.Count == 0) alphas.Add(new GradientAlphaKey(1f, 0f));
+            line.colorGradient = new Gradient { colorKeys = colours.ToArray(), alphaKeys = alphas.ToArray() };
+            line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            line.receiveShadows = false;
+            line.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
+            line.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+        }
+
+        private static float Lo(float[] range, float fallback) => range == null || range.Length == 0 ? fallback : range[0];
+        private static float Hi(float[] range, float fallback) => range == null || range.Length == 0 ? fallback : range[range.Length - 1];
+        private static Vector3 V3(float[] v) => v != null && v.Length == 3 ? new Vector3(v[0], v[1], v[2]) : Vector3.zero;
+
         private static void LightCarrier(GameObject parent, string name, float life, Color color, float range, float intensity, bool keep = false, float delay = 0f)
         {
             var go = name == null ? parent : Child(parent, name);
@@ -667,13 +818,14 @@ namespace ForgeVfx.EditorTools
                 return this;
             }
 
-            internal Layer Circle(float radius, float thickness)
+            internal Layer Circle(float radius, float thickness, Vector3 rotation = default)
             {
                 var shape = _system.shape;
                 shape.enabled = true;
                 shape.shapeType = ParticleSystemShapeType.Circle;
                 shape.radius = radius;
                 shape.radiusThickness = thickness;
+                shape.rotation = rotation;
                 return this;
             }
 
@@ -835,6 +987,10 @@ namespace ForgeVfx.EditorTools
 
             internal Layer Fudge(float fudge) { _renderer.sortingFudge = fudge; return this; }
 
+            internal Layer Shape(ParticleSystemShapeType type) { var shape = _system.shape; shape.shapeType = type; return this; }
+
+            internal Layer Align(ParticleSystemRenderMode mode) { _renderer.renderMode = mode; return this; }
+
             /// <summary>A particle light: a disabled Light template under this layer that the lights module copies onto
             /// its first particle; the light fades with the particle's alpha.</summary>
             internal Layer Light(Color color, float range, float intensity)
@@ -932,7 +1088,7 @@ namespace ForgeVfx.EditorTools
             return AssetDatabase.LoadAssetAtPath<Mesh>(path);
         }
 
-        private static Texture2D WriteTexture(string name, int width, int height, Func<int, int, Color> pixel)
+        private static Texture2D WriteTexture(string name, int width, int height, Func<int, int, Color> pixel, bool repeat = false)
         {
             var path = Own + "Textures/" + name + ".png";
             var texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
@@ -949,10 +1105,10 @@ namespace ForgeVfx.EditorTools
             finally { UnityEngine.Object.DestroyImmediate(texture); }
             AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
             Written.Add(path);
-            return Configure(path, alphaFromGray: false);
+            return Configure(path, alphaFromGray: false, repeat);
         }
 
-        private static Texture2D Configure(string path, bool alphaFromGray)
+        private static Texture2D Configure(string path, bool alphaFromGray, bool repeat = false)
         {
             var importer = AssetImporter.GetAtPath(path) as TextureImporter
                 ?? throw new InvalidOperationException(path + " is not an imported texture.");
@@ -960,7 +1116,8 @@ namespace ForgeVfx.EditorTools
             importer.alphaSource = alphaFromGray ? TextureImporterAlphaSource.FromGrayScale : TextureImporterAlphaSource.FromInput;
             importer.alphaIsTransparency = true;
             importer.sRGBTexture = true;
-            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.wrapModeU = repeat ? TextureWrapMode.Repeat : TextureWrapMode.Clamp;
+            importer.wrapModeV = TextureWrapMode.Clamp;
             importer.mipmapEnabled = true;
             importer.textureCompression = TextureImporterCompression.Compressed;
             importer.SaveAndReimport();
@@ -998,6 +1155,14 @@ namespace ForgeVfx.EditorTools
             return new Color(1f, 1f, 1f, Mathf.Clamp01(alpha * (1f - Edge(0.85f, 1f, Mathf.Abs(u)))));
         }
 
+        /// <summary>A strip soft across <paramref name="v"/> and the same all along: a core and a halo that both reach nothing with no slope at the edge, so a wide
+        /// additive strip (a `render: line` recipe layer) shows no edge even in linear colour, where a faint tail cut off reads as a box.</summary>
+        private static Color StripPixel(float v)
+        {
+            var c = Mathf.Cos(Mathf.Clamp01(Mathf.Abs(v)) * Mathf.PI * 0.5f);
+            return new Color(1f, 1f, 1f, Mathf.Clamp01(0.6f * Mathf.Exp(-(v / 0.2f) * (v / 0.2f)) + 0.4f * Mathf.Pow(c, 6f)));
+        }
+
         private static Color DiscPixel(float u, float v)
         {
             var d = Mathf.Sqrt(u * u + v * v);
@@ -1005,6 +1170,34 @@ namespace ForgeVfx.EditorTools
         }
 
         /// <summary>A thin soft ring at nine tenths of the radius, its brightness wavering round it.</summary>
+        /// <summary>The black hole's lens: an annulus from the core's edge outwards, strongest at 0.45 of the radius, gone at the rim.</summary>
+        private static Color LensMaskPixel(float u, float v)
+        {
+            var d = Mathf.Sqrt(u * u + v * v);
+            var a = Edge(0.3f, 0.45f, d) * (1f - Edge(0.45f, 1f, d));
+            return new Color(1f, 1f, 1f, a);
+        }
+
+        /// <summary>A swirl about the centre (RG round the tangent with a little pull inwards), 0.5 = no bend.</summary>
+        private static Color LensSwirlPixel(float u, float v)
+        {
+            var d = Mathf.Max(0.0001f, Mathf.Sqrt(u * u + v * v));
+            var tx = -v / d * 0.8f - u / d * 0.45f;
+            var ty = u / d * 0.8f - v / d * 0.45f;
+            return new Color(0.5f + 0.5f * tx, 0.5f + 0.5f * ty, 0.5f, 1f);
+        }
+
+        private static Texture2D Linear(Texture2D texture)
+        {
+            var path = AssetDatabase.GetAssetPath(texture);
+            var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            importer.sRGBTexture = false;
+            importer.alphaIsTransparency = false;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.SaveAndReimport();
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        }
+
         private static Color RingPixel(float u, float v)
         {
             var angle = Mathf.Atan2(v, u);
@@ -1218,6 +1411,97 @@ namespace ForgeVfx.EditorTools
                 }
                 var edge = 1f - Edge(26f, 32f, Mathf.Abs(p.x - 32f));
                 return new Color(1f, 1f, 1f, Mathf.Clamp01(core + glow * 0.45f) * edge);
+            };
+        }
+
+        private sealed class BoltSegment
+        {
+            internal Vector2 A, B;
+            internal float Sigma, Weight;
+        }
+
+        /// <summary>Eight tiling lightning bolts stacked across (2048 along u x 64 across each), the laser bodies of
+        /// <see cref="LightningArc"/>: each row's path starts and ends on the centre line, so it repeats along u without a seam,
+        /// and zigzags off it at irregular corners on a slow wander, its core thickening and thinning along the way,
+        /// with three forks drifting off to either side and fading.</summary>
+        private static Func<int, int, Color> BoltTile()
+        {
+            const int width = 2048, rows = 8, rowHeight = 64, corners = 64, step = width / corners;
+            var buckets = new List<BoltSegment>[rows, corners];
+            for (var row = 0; row < rows; row++)
+            {
+                for (var b = 0; b < corners; b++) buckets[row, b] = new List<BoltSegment>();
+                var random = new System.Random(9301 + row);
+                // corners one to five steps apart, mostly turning back to the other side by a random amount (sometimes going on the
+                // same way), on a slow two-wave wander over the whole tile, with a small jitter between; the last corner is the first,
+                // so the row repeats without a seam
+                var main = new float[corners + 1];
+                var cornerAt = new List<int> { 0 };
+                while (cornerAt[cornerAt.Count - 1] < corners - 2) cornerAt.Add(Mathf.Min(corners - 1, cornerAt[cornerAt.Count - 1] + 1 + random.Next(5)));
+                cornerAt.Add(corners);
+                var heading = 1f;
+                var turn = new float[cornerAt.Count];
+                for (var k = 0; k < cornerAt.Count - 1; k++)
+                {
+                    if (random.NextDouble() < 0.75) heading = -heading;
+                    turn[k] = heading * (0.08f + (float)random.NextDouble() * 0.42f);
+                }
+                turn[cornerAt.Count - 1] = turn[0];
+                float phase1 = (float)random.NextDouble() * Mathf.PI * 2f, phase2 = (float)random.NextDouble() * Mathf.PI * 2f;
+                for (var k = 0; k < cornerAt.Count - 1; k++)
+                    for (var i = cornerAt[k]; i <= cornerAt[k + 1]; i++)
+                    {
+                        var t = (i - cornerAt[k]) / (float)(cornerAt[k + 1] - cornerAt[k]);
+                        var jitter = t <= 0f || t >= 1f ? 0f : ((float)random.NextDouble() * 2f - 1f) * 0.05f;
+                        var wander = 0.3f * Mathf.Sin(phase1 + i * Mathf.PI * 2f / corners) + 0.18f * Mathf.Sin(phase2 + i * Mathf.PI * 4f / corners);
+                        main[i] = Mathf.Lerp(turn[k], turn[k + 1], t) + wander + jitter;
+                    }
+                var thick = new float[corners + 1];
+                for (var i = 0; i <= corners; i++) thick[i] = 0.7f + (float)random.NextDouble() * 1.1f;
+                Vector2 At(int i, float lateral) => new Vector2(i * step, rowHeight / 2f + Mathf.Clamp(lateral, -1f, 1f) * 23f);
+                void Add(Vector2 a, Vector2 b, float sigma, float weight)
+                {
+                    var segment = new BoltSegment { A = a, B = b, Sigma = sigma, Weight = weight };
+                    var from = Mathf.Clamp(Mathf.FloorToInt(Mathf.Min(a.x, b.x) / step), 0, corners - 1);
+                    var to = Mathf.Clamp(Mathf.FloorToInt(Mathf.Max(a.x, b.x) / step), 0, corners - 1);
+                    for (var bucket = from; bucket <= to; bucket++) buckets[row, bucket].Add(segment);
+                }
+                for (var i = 0; i < corners; i++)
+                    Add(At(i, main[i]), At(i + 1, main[i + 1]), 0.5f * (thick[i] + thick[i + 1]), 1f);
+                for (var fork = 0; fork < 3; fork++)
+                {
+                    var from = 2 + random.Next(corners - 12);
+                    var length = 3 + random.Next(5);
+                    var side = random.NextDouble() < 0.5 ? -1f : 1f;
+                    var drift = Displace(random, 9, 0f, side * (0.35f + (float)random.NextDouble() * 0.3f), 0.15f);
+                    for (var k = 0; k < length; k++)
+                    {
+                        var fade = 1f - 0.6f * k / length;
+                        Add(At(from + k, main[from] + drift[k * 8 / length]), At(from + k + 1, main[from] + drift[(k + 1) * 8 / length]), 0.6f * fade, 0.75f * fade);
+                    }
+                }
+            }
+            return (x, y) =>
+            {
+                var row = y / rowHeight;
+                var p = new Vector2(x + 0.5f, y % rowHeight + 0.5f);
+                var bucket = x / step;
+                var core = 0f;
+                var glow = 0f;
+                for (var near = bucket - 1; near <= bucket + 1; near++)
+                {
+                    // the row repeats along u: the buckets past either end are those of the other end, a tile away
+                    var wrapped = (near + corners) % corners;
+                    var at = new Vector2(p.x + (near < 0 ? width : near >= corners ? -width : 0f), p.y);
+                    foreach (var segment in buckets[row, wrapped])
+                    {
+                        var d = SegmentDistance(at, segment.A, segment.B);
+                        core = Mathf.Max(core, segment.Weight * Mathf.Exp(-Mathf.Pow(d / segment.Sigma, 2f)));
+                        glow = Mathf.Max(glow, segment.Weight * Mathf.Exp(-Mathf.Pow(d / 3f, 2f)));
+                    }
+                }
+                var edge = 1f - Edge(26f, 32f, Mathf.Abs(p.y - rowHeight / 2f));
+                return new Color(1f, 1f, 1f, Mathf.Clamp01(core + glow * 0.3f) * edge);
             };
         }
 

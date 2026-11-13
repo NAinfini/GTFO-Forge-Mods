@@ -7,9 +7,6 @@
     "BepInEx-BepInExPack_GTFO-3.2.4",
     "GTFOModding-GTFO_API-0.6.1",
     "dakkhuza-MTFO-4.6.3",
-    "NAinfini-ForgeCore-1.0.0",
-    "NAinfini-ForgeUI-1.0.0",
-    "NAinfini-ForgeAudio-1.0.0",
-    "NAinfini-ForgeVisual-1.0.0"
+    "NAinfini-ForgeCore-1.0.0"
   ]
 }

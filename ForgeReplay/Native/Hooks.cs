@@ -216,11 +216,12 @@ internal static partial class Hooks
         {
             var end = data.rayHit.point;
             var what = result ? HitKind(data) : 0UL;
-            Rec.Begin().U((ulong)shooter.PlayerSlotIndex).U(ShooterGun).Pos(originPos.x, originPos.y, originPos.z)
+            var slot = shooter.PlayerSlotIndex;
+            Rec.Begin().U((ulong)slot).U(ShooterGun).Pos(originPos.x, originPos.y, originPos.z)
                 .Pos(end.x, end.y, end.z).U(result ? 1UL : 0UL).U(what);
             Rec.Emit(EventKind.Shot);
             // A shot fired on the host's machine (its own player and the bots): a client has no Shot event for it.
-            if (HostSync.Sending && shooter.IsLocallyOwned) HostSync.Ray(shooter.PlayerSlotIndex, what == 2);
+            if (HostSync.Sending && shooter.IsLocallyOwned) HostSync.Ray(slot, what == 2);
         }
         catch (Exception e) { Rec.Fail("shot", e); }
     }
@@ -293,23 +294,22 @@ internal static partial class Hooks
     private static void EnemyDamage(Dam_EnemyDamageBase damage, ulong kind, float amount, ulong attacker, int limbId, bool settled, float taken, bool lethal,
         float overkill, bool behind, uint gear, float distance)
     {
-        var entity = EnemyRecorder.Entity(damage.Owner);
+        var enemy = damage.Owner;
+        var entity = EnemyRecorder.Entity(enemy);
         if (entity < 0) return;
         EnemyRecorder.Hot(entity); // a hit may move or wake a sleeper: its place is read at once
         var limb = Limb(damage, limbId);
         var type = limb == null ? 0 : (int)limb.m_type;
         var multiplier = limb == null ? 1f : type == 1 ? limb.m_weakspotDamageMulti : type == 2 ? limb.m_armorDamageMulti : 1f;
-        Rec.Begin().U((ulong)entity).U(kind).U(Tenths(amount)).U(attacker).U((ulong)Mathf.Max(0, limbId))
-            .U(settled ? 1UL : 0UL).U(Tenths(taken)).U(lethal ? 1UL : 0UL).U(Tenths(overkill))
-            .U((ulong)Mathf.Clamp(type, 0, 2)).U((ulong)Mathf.Max(0, Mathf.RoundToInt(multiplier * 100f))).U(behind ? 1UL : 0UL).U(gear)
-            .U((ulong)Mathf.Max(0, Mathf.RoundToInt(distance * 100f)));
+        Rec.Begin().U((ulong)entity).U(kind).U(Pack(amount, 10f)).U(attacker).U((ulong)Mathf.Max(0, limbId))
+            .U(settled ? 1UL : 0UL).U(Pack(taken, 10f)).U(lethal ? 1UL : 0UL).U(Pack(overkill, 10f))
+            .U((ulong)Mathf.Clamp(type, 0, 2)).U(Pack(multiplier, 100f)).U(behind ? 1UL : 0UL).U(gear)
+            .U(Pack(distance, 100f));
         Rec.Emit(EventKind.EnemyHurt);
         // The host tells the clients that run the same mod what it settled (HostSync); attacker 255 is nobody's hit.
-        if (settled && attacker < 4 && HostSync.Sending && damage.Owner is { } owner)
+        if (settled && attacker < 4 && HostSync.Sending && enemy is { } owner)
             HostSync.Hit(owner, (int)kind, (int)attacker, Mathf.Clamp(type, 0, 2), lethal, behind, taken, gear, distance);
     }
-
-    private static ulong Tenths(float value) => (ulong)Mathf.Max(0, Mathf.RoundToInt(value * 10f));
 
     // A set-health receive (the host's value arriving on a client, and on the host its own after every hit), with the health before and
     // after it: the only exact health a client has of an enemy, and of another player.
@@ -322,14 +322,14 @@ internal static partial class Hooks
             {
                 var entity = EnemyRecorder.Entity(enemy.Owner);
                 if (entity < 0) return;
-                Rec.Begin().U((ulong)entity).U(Tenths(before)).U(Tenths(enemy.Health));
+                Rec.Begin().U((ulong)entity).U(Pack(before, 10f)).U(Pack(enemy.Health, 10f));
                 Rec.Emit(EventKind.EnemyHealth);
             }
             else if (receiver.TryCast<Dam_PlayerDamageBase>() is { } player)
             {
                 var slot = player.Owner?.PlayerSlotIndex ?? -1;
                 if (slot < 0) return;
-                Rec.Begin().U((ulong)slot).U(Tenths(before)).U(Tenths(player.Health));
+                Rec.Begin().U((ulong)slot).U(Pack(before, 10f)).U(Pack(player.Health, 10f));
                 Rec.Emit(EventKind.PlayerHealth);
             }
         }
@@ -340,7 +340,7 @@ internal static partial class Hooks
     {
         var slot = damage.Owner?.PlayerSlotIndex ?? -1;
         if (slot < 0) return;
-        Rec.Begin().U((ulong)slot).U(kind).U((ulong)Mathf.Max(0, Mathf.RoundToInt(amount * 10f))).U(attacker).U(fromPlayer);
+        Rec.Begin().U((ulong)slot).U(kind).U(Pack(amount, 10f)).U(attacker).U(fromPlayer);
         Rec.Emit(EventKind.PlayerHurt);
     }
 
@@ -357,7 +357,6 @@ internal static partial class Hooks
         }
         catch (Exception e) { Rec.Fail("enemy-limb", e); }
     }
-
 
     // A client's own hits: the host settles every hit (the funnel never runs here), so on a client the local player's hit is read where the
     // limb takes it, with the limb's weak spot and armour, the bonus from behind and a swing's back and sleeper multipliers. The host may still refuse it; the health the
@@ -404,10 +403,8 @@ internal static partial class Hooks
         private static void Heavy(MWS_AttackHeavy __instance) => Melee.Swing(__instance.m_weapon.Owner, 1);
     }
 
-    internal static void SettleMelee() => Melee.Settle();
-
     [HarmonyPatch]
-    private static class Melee
+    internal static class Melee
     {
         // The game's light attack state is the press: held on, the same press becomes a charge. The swing is written once the game has decided,
         // so playback never has to wait to tell a tap from a charge: a light swing when the button is up first (or the state moves on to

@@ -8,13 +8,13 @@ This mod holds content and rules only. Clip playback, the first-person arms and 
 dotnet build Mods/ForgeEmote/ForgeEmote.csproj -c Release --artifacts-path artifacts/dotnet -p:GTFOBepInExPath=<profile>/BepInEx
 ```
 
-Clips and icons are local media under `Mods/ForgeEmote/Assets`. The build places them beside the definitions in the output's `ForgeEmote` folder. Each clip `<id>.clip.json` made by the tool below ships as `<id>.clip.forge` (r2modman lists `.json` files as config files). Clips are made from `Assets/Clips/sources.json`:
+Clips and icons are local media under `Mods/ForgeEmote/Assets`. The build places them beside the definitions in the output's `ForgeEmote` folder. Each clip `<id>.glb` (a Forge animation file, read by the Visual part of ForgeCore with `JointClip.Read`) made by the tool below ships as it is. Clips are made from `Assets/Clips/sources.json`:
 
 ```
 pnpm ts Tools/Models/build-joint-clips.ts --sources Mods/ForgeEmote/Assets/Clips/sources.json --blender <blender.exe>
 ```
 
-How to read that tool's previews is in `Mods/ForgeVisual/DEVELOPERS.md`, "Binding a skeleton".
+How to read that tool's previews is in `Mods/ForgeCore/DEVELOPERS.md` (Visual), "Binding a skeleton".
 
 Sounds are local media too: `Assets/Audio/*.ogg` beside `Assets/Audio/cues.forge` (in Git with `Assets/Audio/LICENSE.forge`), converted with ForgeAudio's `tools/convert_audio.py convert <sources> Mods/ForgeEmote/Assets/Audio` and checked with its `validate`; the build puts them in the output's `ForgeEmote/audio`.
 
@@ -45,7 +45,7 @@ Every folder called `ForgeEmote` under the plugins tree is scanned for `*.emote.
 | `Ping` | Places the player marker at the crosshair. | false |
 | `Sound` | ForgeAudio cue in the `audio` folder beside the file (its `cues.forge` and `.ogg` files, ForgeAudio's own format; one library per folder). Heard from the body, started where the action is, so every screen hears the same moment: a loop (for a looping action) joins where it is, a one-shot only within 0.5 s of the start, so a late joiner sees the rest without it (a `Pair` action counts its start from when the hand goes out, not from `PairHold` into the clip). Ends with the action; keep a one-shot no longer than its clip. | none |
 
-Clip format and how to make one: `Docs/forge-emote/PLAN.md` §5 and `Mods/ForgeVisual/DEVELOPERS.md`.
+Clip format and how to make one: `Docs/forge-emote/PLAN.md` §5 and `Mods/ForgeCore/DEVELOPERS.md` (Visual).
 
 ## The player's wheel file
 

@@ -19,7 +19,6 @@ internal static class Puppeteer
     // from every viewer cannot be seen anyway. One is made within SpawnRadius of the followed player and parked beyond DropRadius.
     private const float SpawnRadius = 70f, DropRadius = 100f;
     private const int SpawnsPerFrame = 4;
-    // A sample that is not repeated means the entity did not move; one older than this is standing still.
     private sealed class Foe
     {
         internal EnemyAgent Agent = null!;
@@ -73,7 +72,7 @@ internal static class Puppeteer
         if (SpawnFailures.Remove(entity, out var failed)) NoteUnshown(entity, failed.Why, failed.Data);
         if (!Foes.TryGetValue(entity, out var foe)) return;
         // A puppet that is not held cannot die (Die does nothing): the enemy would stay standing where it was last put, so it is taken out instead.
-        if (died && foe.Puppet is { Held: true } puppet && !foe.Parked && puppet.Die()) Corpses.Add(foe.Agent, Time.unscaledTime);
+        if (died && foe.Puppet is { Held: true } puppet && !foe.Parked && puppet.Die()) Corpses.Add(foe.Agent, ForgeCore.Frame.UnscaledTime);
         else Park(foe, true);
         Foes.Remove(entity);
     }
@@ -183,7 +182,6 @@ internal static class Puppeteer
         return true;
     }
 
-    /// <summary>The player puppet of a recorded player slot, if one exists.</summary>
     /// <summary>The root of a recorded enemy's live puppet, or null (parked, not made yet or ended): where a model or an effect of the recording is hung.</summary>
     internal static Transform? EnemyRoot(int entity) => Live(entity)?.Agent.transform;
 
@@ -196,14 +194,17 @@ internal static class Puppeteer
     internal static CosmeticPlayer? CosmeticOf(int slot) => Cosmetics.TryGetValue(slot & 3, out var cosmetic) && cosmetic.Held ? cosmetic : null;
 
     /// <summary>The gear line of the weapon held in <paramref name="wield"/>: the loadout's lines are standard, special, melee, tool.</summary>
-    private static string GearLineOf(string loadout, int wield)
+    internal static string GearLineOf(string loadout, int wield)
     {
         var line = LineIndex(wield);
         var lines = loadout.Split('\n');
         return line >= 0 && line < lines.Length ? lines[line].Trim() : "";
     }
 
-    private static int LineIndex(int wield) => wield switch { (int)InventorySlot.GearStandard => 0, (int)InventorySlot.GearSpecial => 1, (int)InventorySlot.GearMelee => 2, (int)InventorySlot.GearClass => 3, _ => -1 };
+    /// <summary>The loadout line of the inventory slot <paramref name="wield"/> (<see cref="GearSlots"/>), -1 for a slot that is not gear.</summary>
+    internal static int LineIndex(int wield) => Array.IndexOf(GearSlots, (InventorySlot)wield);
+
+    /// <summary>The player puppet of a recorded player slot, if one exists.</summary>
     internal static PlayerPuppet? PlayerOf(int slot) => Players.TryGetValue(slot & 3, out var puppet) && puppet.Held ? puppet : null;
 
     /// <summary>The animator of a recorded player's puppet or cosmetic copy; null when the player has none.</summary>
@@ -222,8 +223,9 @@ internal static class Puppeteer
     {
         foreach (var agent in PlayerManager.PlayerAgentsInLevel)
         {
-            if (agent == null || agent.WasCollected || agent.IsLocallyOwned && agent.Owner != null && !agent.Owner.IsBot) continue;
-            if (Related(rig, agent.AnimatorBody != null ? agent.AnimatorBody.transform : null) || Related(rig, agent.transform)) return true;
+            if (agent == null || agent.WasCollected || agent.IsLocallyOwned && agent.Owner is { } owner && owner != null && !owner.IsBot) continue;
+            var body = agent.AnimatorBody;
+            if (Related(rig, body != null ? body.transform : null) || Related(rig, agent.transform)) return true;
         }
         foreach (var cosmetic in Cosmetics.Values)
             if (cosmetic.Held && Related(rig, cosmetic.Body != null ? cosmetic.Body.transform : null)) return true;
@@ -299,7 +301,7 @@ internal static class Puppeteer
             if (restored > 0 && RestoreNotes < 4) NoteRestore(was, restored);
         }
         if (slot < 0 || !refresh && !changed) return;
-        var now = Time.unscaledTime;
+        var now = ForgeCore.Frame.UnscaledTime;
         if (!changed && now < _hideAt) return;
         _hideAt = now + HideEvery;
         var turn = changed ? -1 : _hideTurn++ % 3;
@@ -307,7 +309,7 @@ internal static class Puppeteer
         if (turn is -1 or 0) Hide(body);
         // The body model and the weapon in its hands do not hang under the agent's own object on every player.
         if (PlayerOf(slot) is not { } puppet) return;
-        if (turn is -1 or 1 && puppet.Agent.AnimatorBody != null) Hide(puppet.Agent.AnimatorBody.gameObject);
+        if (turn is -1 or 1 && puppet.Agent.AnimatorBody is { } model && model != null) Hide(model.gameObject);
         if (turn is -1 or 2 && puppet.Agent.Inventory?.WieldedItem is { } held) Hide(held.gameObject);
     }
 
@@ -336,7 +338,7 @@ internal static class Puppeteer
     internal static void Sync(WorldState state, uint nowMs, int follow, Vector3? view, float rate, float seconds, IReadOnlyList<PlayerEntry> recorded)
     {
         ReadHolders(nowMs, recorded);
-        Corpses.Due(Time.unscaledTime, HideCorpse);
+        Corpses.Due(ForgeCore.Frame.UnscaledTime, HideCorpse);
         SyncEnemies(state, nowMs, follow, view, rate, seconds);
         SyncPlayers(state, nowMs, follow, rate, recorded);
         Deployables.Frame(nowMs);
@@ -486,7 +488,7 @@ internal static class Puppeteer
     private static void SyncPlayers(WorldState state, uint nowMs, int follow, float rate, IReadOnlyList<PlayerEntry> recorded)
     {
         var bots = PlayerManager.PlayerAgentsInLevel;
-        var clock = Time.realtimeSinceStartup;
+        var clock = ForgeCore.Frame.UnscaledTime;
         // The bots arrive one by one after the level is entered. A player is not held until the ones asked for are here and have had a moment to
         // put their clothes on: the bot taken as it appeared never drew its body (its gear hung in the air), and the players after it became copies.
         if (_botsReadyAt < 0f)
@@ -545,17 +547,14 @@ internal static class Puppeteer
                 puppet.Rate = rate;
                 var status = state.PlayerStatus[slot];
                 var crouch = 0f;
-                if (status != null)
+                if (StanceOf(status) is { } stance)
                 {
-                    var read = PayloadReader.Over(status);
-                    read.U();
-                    var stance = (PlayerLocomotion.PLOC_State)read.U();
                     crouch = stance == PlayerLocomotion.PLOC_State.Crouch ? 1f : 0f;
                     // The air, the floor, a terminal, a ladder and a tank's tentacle are the game's own states; everything else is walking, driven below.
                     // A trap's or a pouncer's hold is not entered: those states read the holder, which the replay has no such thing as.
                     puppet.State(stance is PlayerLocomotion.PLOC_State.Jump or PlayerLocomotion.PLOC_State.Fall or PlayerLocomotion.PLOC_State.Land or PlayerLocomotion.PLOC_State.Downed
                         or PlayerLocomotion.PLOC_State.OnTerminal or PlayerLocomotion.PLOC_State.ClimbLadder or PlayerLocomotion.PLOC_State.GrabbedByTank ? stance : PlayerLocomotion.PLOC_State.Stand);
-                    if (NoteWield(slot, status)) { puppet.Wield((InventorySlot)Wielded[slot]); EquipUntil[slot] = Time.unscaledTime + EquipSeconds; }
+                    if (NoteWield(slot, status)) { puppet.Wield((InventorySlot)Wielded[slot]); EquipUntil[slot] = ForgeCore.Frame.UnscaledTime + EquipSeconds; }
                 }
                 // A charge begins while the button is held; its release is the Melee event.
                 var charging = ReplayExtras.MeleeCharging(state, slot);
@@ -587,8 +586,9 @@ internal static class Puppeteer
         {
             var agent = bots[i];
             if (agent == null || agent.IsLocallyOwned || Refused.Contains(agent.Pointer) || Taken(agent)) continue;
-            if (agent.PlayerSlotIndex == slot) return agent;
-            if (spare == null && !(ReplayFeed.EverHeld(agent.PlayerSlotIndex, recorded, Lines) && !Players.ContainsKey(agent.PlayerSlotIndex & 3) && !Cosmetics.ContainsKey(agent.PlayerSlotIndex & 3))) spare = agent;
+            var seat = agent.PlayerSlotIndex;
+            if (seat == slot) return agent;
+            if (spare == null && !(ReplayFeed.EverHeld(seat, recorded, Lines) && !Players.ContainsKey(seat & 3) && !Cosmetics.ContainsKey(seat & 3))) spare = agent;
         }
         return spare;
     }
@@ -626,10 +626,11 @@ internal static class Puppeteer
         _spareAt = clock + 1f;
         foreach (var agent in bots)
         {
-            if (agent == null || agent.WasCollected || Taken(agent) || agent.Owner != null && agent.Owner.IsLocal && !agent.Owner.IsBot) continue;
+            if (agent == null || agent.WasCollected || Taken(agent) || agent.Owner is { } owner && owner != null && owner.IsLocal && !owner.IsBot) continue;
             foreach (var renderer in agent.GetComponentsInChildren<Renderer>(false)) if (renderer != null && renderer.enabled) { renderer.enabled = false; SpareBodies.Add(renderer); }
-            if (agent.AnimatorBody != null)
-                foreach (var renderer in agent.AnimatorBody.GetComponentsInChildren<Renderer>(false)) if (renderer != null && renderer.enabled) { renderer.enabled = false; SpareBodies.Add(renderer); }
+            var body = agent.AnimatorBody;
+            if (body != null)
+                foreach (var renderer in body.GetComponentsInChildren<Renderer>(false)) if (renderer != null && renderer.enabled) { renderer.enabled = false; SpareBodies.Add(renderer); }
         }
     }
 
@@ -653,7 +654,7 @@ internal static class Puppeteer
     {
         var ik = puppet.Agent.SyncIK;
         if (ik != null && !ik.WasCollected) { ik.m_aimWeight = ik.m_aimWeightTarget; ik.m_lookWeight = ik.m_lookWeightTarget; ik.m_leftArmWeight = ik.m_leftArmWeightTarget; }
-        if (Time.unscaledTime < EquipUntil[slot]) puppet.FinishEquip();
+        if (ForgeCore.Frame.UnscaledTime < EquipUntil[slot]) puppet.FinishEquip();
     }
 
     private const float EquipSeconds = 3f;
@@ -667,14 +668,14 @@ internal static class Puppeteer
     private static void HandCheck(int slot, PlayerPuppet puppet, float rate)
     {
         if (HandSaid[slot] || rate <= 0f || Time.timeScale == 0f || puppet.IsEquipping || HandAway(puppet) is not { } away || away < 0.45f) { HandFarSince[slot] = 0f; return; }
-        var now = Time.unscaledTime;
+        var now = ForgeCore.Frame.UnscaledTime;
         if (HandFarSince[slot] == 0f) { HandFarSince[slot] = now; return; }
         if (now - HandFarSince[slot] < 3f) return;
         HandSaid[slot] = true;
-        var agent = puppet.Agent; var item = agent.Inventory!.WieldedItem; var ik = agent.SyncIK;
+        var agent = puppet.Agent; var inventory = agent.Inventory!; var item = inventory.WieldedItem; var ik = agent.SyncIK;
         var chain = new System.Text.StringBuilder();
         for (var node = item.transform; node != null && chain.Length < 240; node = node.parent) chain.Append(node.name).Append('<');
-        Plugin.Logger.Error("Held item off the hand, player " + (slot + 1) + ": " + item.name + " is " + away.ToString("0.00") + " m from the right hand, wielded slot " + agent.Inventory.WieldedSlot + ", asked " + Wielded[slot]
+        Plugin.Logger.Error("Held item off the hand, player " + (slot + 1) + ": " + item.name + " is " + away.ToString("0.00") + " m from the right hand, wielded slot " + inventory.WieldedSlot + ", asked " + Wielded[slot]
             + ", left arm weight " + (ik != null ? ik.m_leftArmWeight + " of " + ik.m_leftArmWeightTarget : "no IK") + ", chain " + chain);
     }
 
@@ -703,12 +704,13 @@ internal static class Puppeteer
 
     private static void GearNote(int slot, PlayerPuppet puppet)
     {
-        if (_gearNotes >= 12 || DressStep[slot] <= GearLines || Time.unscaledTime < EquipUntil[slot] || Wielded[slot] <= 0 || puppet.Agent.Inventory?.WieldedItem is not { } held || held.WasCollected) return;
-        var key = Wielded[slot] + "|" + held.name;
+        if (_gearNotes >= 12 || DressStep[slot] <= GearLines || ForgeCore.Frame.UnscaledTime < EquipUntil[slot] || Wielded[slot] <= 0 || puppet.Agent.Inventory is not { } inventory || inventory.WieldedItem is not { } held || held.WasCollected) return;
+        var name = held.name;
+        var key = Wielded[slot] + "|" + name;
         if (GearNoted[slot] == key) return;
         GearNoted[slot] = key; _gearNotes++;
         var index = LineIndex(Wielded[slot]);
-        Plugin.Diagnostic.LogDebug("Body gear, player " + (slot + 1) + ": wielded slot " + puppet.Agent.Inventory.WieldedSlot + " (asked " + Wielded[slot] + "), item " + held.name + ", the recording's " + (index >= 0 ? ReplayFeed.GearName(Holders[slot].Loadout, index) : "?")
+        Plugin.Diagnostic.LogDebug("Body gear, player " + (slot + 1) + ": wielded slot " + inventory.WieldedSlot + " (asked " + Wielded[slot] + "), item " + name + ", the recording's " + (index >= 0 ? ReplayFeed.GearName(Holders[slot].Loadout, index) : "?")
             + ", " + (HandAway(puppet) is { } away ? away.ToString("0.00") + " m from the right hand" : "no hand") + ".");
     }
 
@@ -719,12 +721,13 @@ internal static class Puppeteer
 
     private static void KeepDrawn(int slot, PlayerPuppet puppet)
     {
-        if (slot == _hiddenSlot || Time.unscaledTime < DrawnCheckAt[slot] || puppet.Agent.AnimatorBody == null) return;
-        DrawnCheckAt[slot] = Time.unscaledTime + DrawnCheckSeconds;
-        var skins = puppet.Agent.AnimatorBody.GetComponentsInChildren<SkinnedMeshRenderer>(false);
+        var now = ForgeCore.Frame.UnscaledTime;
+        if (slot == _hiddenSlot || now < DrawnCheckAt[slot] || puppet.Agent.AnimatorBody is not { } body || body == null) return;
+        DrawnCheckAt[slot] = now + DrawnCheckSeconds;
+        var skins = body.GetComponentsInChildren<SkinnedMeshRenderer>(false);
         foreach (var skin in skins) if (skin.enabled) return;
         foreach (var skin in skins) skin.enabled = true;
-        Plugin.Logger.ErrorOnce("Player " + (slot + 1) + " had no body drawn while present: " + skins.Length + " skinned meshes were off and turned on, body active " + puppet.Agent.AnimatorBody.gameObject.activeInHierarchy + ", " + (skins.Length > 0 ? "layer " + skins[0].gameObject.layer : "nothing to draw"));
+        Plugin.Logger.ErrorOnce("Player " + (slot + 1) + " had no body drawn while present: " + skins.Length + " skinned meshes were off and turned on, body active " + body.gameObject.activeInHierarchy + ", " + (skins.Length > 0 ? "layer " + skins[0].gameObject.layer : "nothing to draw"));
     }
 
     // Who holds each slot now: the file header's player, then the Presence lines up to this moment (a join, a leave, a changed loadout). Read again when a line passes.
@@ -764,8 +767,9 @@ internal static class Puppeteer
             return;
         }
         Away[slot] = true;
-        if (Time.unscaledTime < AwayCheckAt[slot] || BodyOf(slot) is not { } body) return;
-        AwayCheckAt[slot] = Time.unscaledTime + AwayCheckSeconds;
+        var now = ForgeCore.Frame.UnscaledTime;
+        if (now < AwayCheckAt[slot] || BodyOf(slot) is not { } body) return;
+        AwayCheckAt[slot] = now + AwayCheckSeconds;
         foreach (var renderer in body.GetComponentsInChildren<Renderer>(true))
             if (renderer != null && renderer.enabled) { renderer.enabled = false; AwayBody[slot].Add(renderer); }
     }
@@ -802,7 +806,9 @@ internal static class Puppeteer
     // The recorded player's four gear lines on the bot that plays them, one a frame, or again a little later while its assets load.
     private static readonly int[] DressStep = new int[4];
     private static readonly float[] DressAt = new float[4];
-    private const int GearLines = 4;
+    /// <summary>The gear lines of a loadout (standard, special, melee, tool), and the inventory slots they fill in that order.</summary>
+    internal const int GearLines = 4;
+    internal static readonly InventorySlot[] GearSlots = { InventorySlot.GearStandard, InventorySlot.GearSpecial, InventorySlot.GearMelee, InventorySlot.GearClass };
     // What each body wears, line by line, and the loadout it was last asked to wear: a later Presence line (a tool changed in the level) changes only what differs.
     private static readonly string?[][] WornLines = { new string?[GearLines], new string?[GearLines], new string?[GearLines], new string?[GearLines] };
     private static readonly string?[] DressedFor = new string?[4];
@@ -818,14 +824,15 @@ internal static class Puppeteer
             DressedFor[slot] = loadout;
             DressStep[slot] = 0;
         }
-        if (DressStep[slot] > GearLines || Time.unscaledTime < DressAt[slot]) return;
+        var now = ForgeCore.Frame.UnscaledTime;
+        if (DressStep[slot] > GearLines || now < DressAt[slot]) return;
         var lines = loadout.Split('\n');
         while (DressStep[slot] < GearLines && (DressStep[slot] >= lines.Length || lines[DressStep[slot]].Trim().Length == 0 || lines[DressStep[slot]].Trim() == WornLines[slot][DressStep[slot]])) DressStep[slot]++;
         if (DressStep[slot] >= GearLines)
         {
             // The hands went on holding what was replaced, or what the game brought up with the last line it put on (the tool): asked again
             // once, after the first dressing too.
-            if (Wielded[slot] >= 0) { puppet.Wield((InventorySlot)Wielded[slot]); EquipUntil[slot] = Time.unscaledTime + EquipSeconds; }
+            if (Wielded[slot] >= 0) { puppet.Wield((InventorySlot)Wielded[slot]); EquipUntil[slot] = now + EquipSeconds; }
             Redressed[slot] = false;
             DressStep[slot] = GearLines + 1;
             return;
@@ -834,7 +841,7 @@ internal static class Puppeteer
         try
         {
             var reading = ForgeCore.Gear.EquipBot(puppet.Agent.Owner, new global::Gear.GearIDRange(line));
-            if (reading.Status == GearAssetStatus.Loading) { DressAt[slot] = Time.unscaledTime + 0.25f; return; }
+            if (reading.Status == GearAssetStatus.Loading) { DressAt[slot] = now + 0.25f; return; }
             if (reading.Status == GearAssetStatus.Failed) { Skipped.Note("a player puppet could not take its gear", "line " + DressStep[slot] + ": " + reading.Detail); CannotWear[slot][DressStep[slot]] = line; }
         }
         catch (Exception error) { Skipped.Note("a player puppet could not take its gear", error.Message); CannotWear[slot][DressStep[slot]] = line; }
@@ -850,20 +857,21 @@ internal static class Puppeteer
     /// <summary>The first-person view just put a gear line on the local player: the bots are checked at once, not at the next two-second turn, so a bot that took the observer's
     /// new gear along (the game's copy to a bot) is dressed again before it is seen holding it.</summary>
     internal static void RecheckGear() => Array.Clear(VerifyAt, 0, 4);
-    private static readonly InventorySlot[] GearSlots = { InventorySlot.GearStandard, InventorySlot.GearSpecial, InventorySlot.GearMelee, InventorySlot.GearClass };
     private static readonly global::Gear.eGearComponent[] GearComponents = Enum.GetValues<global::Gear.eGearComponent>();
 
     private static void VerifyWorn(int slot, PlayerPuppet puppet, string loadout)
     {
-        if (DressStep[slot] <= GearLines || Time.unscaledTime < VerifyAt[slot]) return;
-        VerifyAt[slot] = Time.unscaledTime + VerifySeconds;
-        if (puppet.Agent.Owner == null || !PlayerBackpackManager.TryGetBackpack(puppet.Agent.Owner, out var backpack) || backpack?.Slots == null) return;
+        var now = ForgeCore.Frame.UnscaledTime;
+        if (DressStep[slot] <= GearLines || now < VerifyAt[slot]) return;
+        VerifyAt[slot] = now + VerifySeconds;
+        var owner = puppet.Agent.Owner;
+        if (owner == null || !PlayerBackpackManager.TryGetBackpack(owner, out var backpack) || backpack?.Slots is not { } slots) return;
         var lines = loadout.Split('\n');
         for (var line = 0; line < GearLines && line < lines.Length; line++)
         {
             var wanted = lines[line].Trim();
             var index = (int)GearSlots[line];
-            if (wanted.Length == 0 || WornLines[slot][line] != wanted || CannotWear[slot][line] == wanted || index >= backpack.Slots.Length || backpack.Slots[index]?.GearIDRange is not { } worn) continue;
+            if (wanted.Length == 0 || WornLines[slot][line] != wanted || CannotWear[slot][line] == wanted || index >= slots.Length || slots[index]?.GearIDRange is not { } worn) continue;
             global::Gear.GearIDRange want;
             try { want = new global::Gear.GearIDRange(wanted); }
             catch (Exception error) { CannotWear[slot][line] = wanted; Skipped.Note("a player puppet's gear line cannot be read", error.Message); continue; }
@@ -888,22 +896,19 @@ internal static class Puppeteer
         return true;
     }
 
-    // 1 while the recorded locomotion state of a PlayerStatus payload is crouching.
-    private static float CrouchOf(byte[]? status)
+    // The recorded locomotion state of a PlayerStatus payload, null without one.
+    private static PlayerLocomotion.PLOC_State? StanceOf(byte[]? status)
     {
-        if (status == null) return 0f;
+        if (status == null) return null;
         var read = PayloadReader.Over(status);
         read.U();
-        return (PlayerLocomotion.PLOC_State)read.U() == PlayerLocomotion.PLOC_State.Crouch ? 1f : 0f;
+        return (PlayerLocomotion.PLOC_State)read.U();
     }
 
-    private static bool DownedOf(byte[]? status)
-    {
-        if (status == null) return false;
-        var read = PayloadReader.Over(status);
-        read.U();
-        return (PlayerLocomotion.PLOC_State)read.U() == PlayerLocomotion.PLOC_State.Downed;
-    }
+    // 1 while the recorded locomotion state is crouching.
+    private static float CrouchOf(byte[]? status) => StanceOf(status) == PlayerLocomotion.PLOC_State.Crouch ? 1f : 0f;
+
+    private static bool DownedOf(byte[]? status) => StanceOf(status) == PlayerLocomotion.PLOC_State.Downed;
 
     private static bool Taken(PlayerAgent agent)
     {

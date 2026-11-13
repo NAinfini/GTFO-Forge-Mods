@@ -48,7 +48,7 @@ internal sealed class EnergyExplosion
             for (var index = 0; index < count; index++)
             {
                 var collider = _overlap[index];
-                var enemy = collider == null ? null : VisibleEnemies.SelectEnemy(owner, collider, TargetRelationFilter.Enemies);
+                var enemy = collider == null ? null : ForgeCore.Enemies.FromCollider(collider, owner);
                 if (enemy == null) continue;
                 var receiver = collider!.GetComponent<IDamageable>();
                 if (receiver?.TryCast<Dam_EnemyDamageLimb>() == null) continue;

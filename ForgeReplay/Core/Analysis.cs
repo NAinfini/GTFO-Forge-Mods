@@ -643,9 +643,9 @@ internal sealed class Analysis
                 }
             case EventKind.EnemyHurt:
                 {
-                    var entity = (int)read.U(); var kind = (int)read.U(); var damage = read.U() / 10f; var attacker = read.U(); read.U();
-                    var settled = read.U() == 1; var taken = read.U() / 10f; var lethal = read.U() == 1; read.U();
-                    var limb = (int)read.U(); var weak = limb == 1; read.U(); var behind = read.U() == 1;
+                    var hurt = EnemyHurtEvent.Read(read);
+                    var (entity, kind, damage, attacker, settled, lethal, behind) = (hurt.Entity, hurt.Kind, hurt.Damage, hurt.Attacker, hurt.Settled, hurt.Lethal, hurt.Behind);
+                    var limb = hurt.LimbType; var weak = hurt.Weak; var taken = hurt.Taken;
                     Busied(timeMs);
                     if (attacker > 3) break;
                     var slot = (int)attacker;

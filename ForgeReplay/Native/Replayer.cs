@@ -210,12 +210,12 @@ internal static class Replayer
         if (!_leftElevator)
         {
             var local = Players.Local?.TryCast<PlayerAgent>();
-            var riding = local == null || local.Locomotion == null || local.Locomotion.m_currentStateEnum == PlayerLocomotion.PLOC_State.InElevator;
+            var locomotion = local == null ? null : local.Locomotion;
+            var riding = locomotion == null || locomotion.m_currentStateEnum == PlayerLocomotion.PLOC_State.InElevator;
             if (riding && waited < MaxElevatorSeconds) return;
             if (riding) Plugin.Logger.Error("The observer was still in the elevator after " + MaxElevatorSeconds + " s; the replay goes on.");
-            _leftElevator = true; _prepareFrom = ForgeCore.Frame.UnscaledTime;
-            try { ElevatorRide.DropinElevatorExit(); }
-            catch (Exception error) { Plugin.Logger.Error("The elevator could not be sent away: " + error.Message); }
+            _prepareFrom = ForgeCore.Frame.UnscaledTime;
+            LeaveElevator();
             return;
         }
         var ready = Puppeteer.AllHeld(_timeline!.State, Pending!.Header!.Players) && FirstPerson.GearOn;
@@ -238,14 +238,16 @@ internal static class Replayer
     internal static void SkipPreparing()
     {
         if (!_preparing || _analysing != null) return;
-        if (!_leftElevator)
-        {
-            _leftElevator = true;
-            try { ElevatorRide.DropinElevatorExit(); }
-            catch (Exception error) { Plugin.Logger.Error("The elevator could not be sent away: " + error.Message); }
-        }
+        if (!_leftElevator) LeaveElevator();
         _preparing = false;
         _clock!.Play();
+    }
+
+    private static void LeaveElevator()
+    {
+        _leftElevator = true;
+        try { ElevatorRide.DropinElevatorExit(); }
+        catch (Exception error) { Plugin.Logger.Error("The elevator could not be sent away: " + error.Message); }
     }
 
     // A kill is worth a mark on the bar when the game's own data makes the enemy a scout or a boss (ReplayFeed.NotableKill); a level has thousands of others.
@@ -344,7 +346,8 @@ internal static class Replayer
         {
             if (frozen)
             {
-                _scaleBefore = Time.timeScale > 0f ? Time.timeScale : 1f;
+                var scale = Time.timeScale;
+                _scaleBefore = scale > 0f ? scale : 1f;
                 Time.timeScale = 0f;
                 AkSoundEngine.Suspend(false);
             }
@@ -434,9 +437,9 @@ internal static class Replayer
     private static void HideObserver(bool eyes)
     {
         var local = Players.Local?.TryCast<PlayerAgent>();
-        if (local == null || local.WasCollected || local.FPItemHolder == null) return;
+        if (local == null || local.WasCollected || local.FPItemHolder is not { } arms || arms == null) return;
         var now = ForgeCore.Frame.UnscaledTime;
-        var holder = local.FPItemHolder.transform;
+        var holder = arms.transform;
         if (now >= _nextBody)
         {
             _nextBody = now + 1f;
@@ -457,18 +460,19 @@ internal static class Replayer
         }
         // The arms and what they hold show at the eyes, and only while it is what the recording says: not while the viewed player's gear is being put on
         // one piece at a time, and not when the player's hands are empty or hold what the observer cannot (a resource pack: the recording does not say which).
-        if (eyes && FirstPerson.HoldsRecorded(local)) { Restore(HiddenHeld); return; }
+        if (eyes && FirstPerson.HoldsRecorded(local.Inventory)) { Restore(HiddenHeld); return; }
         // At the eyes the held pieces are looked at every 0.1 s only for a second after the observer changed weapon (the new one comes up piece
         // by piece); otherwise once a second.
         if (now >= _nextWield)
         {
             _nextWield = now + 0.2f;
-            var wielded = local.Inventory == null ? -1 : (int)local.Inventory.WieldedSlot;
+            var inventory = local.Inventory;
+            var wielded = inventory == null ? -1 : (int)inventory.WieldedSlot;
             if (wielded != _wielded) { _wielded = wielded; _heldHotUntil = now + 1f; _nextHeld = 0f; }
         }
         if (now < _nextHeld) return;
         _nextHeld = now + (eyes && now < _heldHotUntil ? 0.1f : 1f);
-        Hide(local.FPItemHolder.GetComponentsInChildren<Renderer>(false), HiddenHeld);
+        Hide(arms.GetComponentsInChildren<Renderer>(false), HiddenHeld);
     }
 
     private static void Hide(Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppArrayBase<Renderer> renderers, List<Renderer> into)

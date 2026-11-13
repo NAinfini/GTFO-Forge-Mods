@@ -48,7 +48,8 @@ internal sealed class WeaponPresentation
 
 internal sealed class PresentationContract
 {
-    internal const int CurrentFormat = 4;
+    // 5: a texture set may sit in a bundle this one depends on through Unity's manifest (one copy of a set several guns share).
+    internal const int CurrentFormat = 5;
     private static readonly string[] RequiredParts = { "Receiver", "Rail", "Front", "Stock", "Magazine", "Sight" };
     public int Format { get; set; }
     public WeaponPresentation[] Weapons { get; set; } = Array.Empty<WeaponPresentation>();

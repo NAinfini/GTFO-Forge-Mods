@@ -348,10 +348,12 @@ internal static class Deployables
     }
 
     // The course node a placed thing is spawned in. A mine sits on a wall and a sentry at a room's edge, where the point itself is in no node: the node beside it, else its owner's, else the observer's.
+    private static readonly Vector3 Right = Vec.Of(1f, 0f, 0f);
+
     private static AIGraph.AIG_CourseNode? NodeNear(Vector3 at, Quaternion rotation, int owner)
     {
         if (Dimension.TryGetCourseNodeFromPos(at, out var node) && node != null) return node;
-        var directions = new[] { rotation * Vec.Forward, rotation * Vec.Up, rotation * Vector3.right, Vec.Up };
+        var directions = new[] { rotation * Vec.Forward, rotation * Vec.Up, rotation * Right, Vec.Up };
         foreach (var distance in new[] { 0.25f, 0.5f, 1f })
             foreach (var direction in directions)
             {
@@ -389,7 +391,7 @@ internal static class Deployables
         }
         mine.m_detectionEnabled = false;
         mine.enabled = false;
-        if (mine.m_interactPickup != null) HoldPoint.Disable(mine.m_interactPickup);
+        if (mine.m_interactPickup is { } pickup && pickup != null) HoldPoint.Disable(pickup);
         piece.Mine = mine;
         piece.LaserSet = false;
     }
@@ -405,6 +407,8 @@ internal static class Deployables
         laser.UpdateDetectionRange(length);
     }
 
+    private static int _foamPasses;
+
     private static void KeepFoam()
     {
         var manager = ProjectileManager.Current;
@@ -412,7 +416,8 @@ internal static class Deployables
         BlobGone.Clear();
         // One foam gun makes hundreds of blobs: a blob with nothing to do asks the game nothing, only now and then whether a landed one is still there.
         var all = manager.m_glueGunProjectiles;
-        var recheck = Time.frameCount % 30 == 0;
+        // Every 30th pass (this runs once a frame while there is foam).
+        var recheck = ++_foamPasses % 30 == 0;
         foreach (var (id, blob) in Blobs)
         {
             try
@@ -467,6 +472,8 @@ internal static class Deployables
         internal float AskAt, FirstAsk = -1f;
         internal SNetwork.IReplicator? Replicator;
         internal GameObject? Body;
+        // Body's transform, read once when it is made: an object keeps its transform for its whole life, and Body is checked for that life first.
+        internal Transform? Place;
         internal FogRepeller_Sphere? Repeller;
         internal GlowstickInstance? Glow;
     }
@@ -533,8 +540,9 @@ internal static class Deployables
             if (!flying.Made && !MakeThrown(flying, thrown, now)) continue;
             if (flying.Body == null || flying.Body.WasCollected) continue;
             var target = new Vector3(thrown.X, thrown.Y, thrown.Z);
-            var from = flying.Body.transform.position;
-            flying.Body.transform.position = Vec.SqrLength(from - target) > ThrownSnap * ThrownSnap ? target : Vector3.Lerp(from, target, 1f - Mathf.Exp(-ForgeCore.Frame.UnscaledDeltaTime / ThrownGlide));
+            var place = flying.Place!;
+            var from = place.position;
+            place.position = Vec.SqrLength(from - target) > ThrownSnap * ThrownSnap ? target : Vector3.Lerp(from, target, 1f - Mathf.Exp(-ForgeCore.Frame.UnscaledDeltaTime / ThrownGlide));
             // A glowstick's life runs on real time and it despawns itself after: held for as long as the recording has it, however long the bar stands still.
             if (flying.Glow != null && !flying.Glow.WasCollected && flying.Glow.m_state == eFadeState.One) flying.Glow.m_progression = 1f;
             if (flying.Repeller == null || flying.Repeller.WasCollected) continue;
@@ -588,6 +596,7 @@ internal static class Deployables
         flying.Made = true;
         flying.Replicator = replicator!.TryCast<SNetwork.IReplicator>();
         flying.Body = item.gameObject;
+        flying.Place = item.transform;
         foreach (var body in item.GetComponentsInChildren<Rigidbody>(true)) body.isKinematic = true;
         foreach (var contact in item.GetComponentsInChildren<Collider>(true)) contact.enabled = false;
         // A grenade's fuse and blast are in its own update.

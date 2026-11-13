@@ -33,19 +33,19 @@ internal struct HostTotals
 }
 
 /// <summary>The host-to-client records (PLAN 5.7): the wire layout of a packet and the events a client writes into its own recording. Core, no game
-/// reference. A packet is one header (type byte, sequence, host clock in ms, 4 bytes each, little endian) and records until its end; every number inside a
+/// reference. A packet is a type byte and records until its end (ForgeCore delivers the packets in the order sent, each once); every number inside a
 /// record is a <see cref="Compact"/> variable-length integer. A packet is refused as a whole when anything in it is cut off or out of range.</summary>
 internal static class HostLink
 {
     internal const byte DataPacket = 0x48;
-    internal const int HeaderBytes = 9, MaxPacketBytes = 1200, RecordRoom = 64;
+    /// <summary>A packet stays under the size ForgeCore sends as one message (1 KiB), so none is split.</summary>
+    internal const int HeaderBytes = 1, MaxPacketBytes = 1000, RecordRoom = 64;
+    /// <summary>The version of the packet's bytes, part of the channel's format fingerprint: two builds whose packets differ refuse each other.</summary>
+    internal const int Version = 3;
     internal const int RecordHit = 1, RecordWake = 2, RecordSnapshot = 3, RecordHurt = 4, RecordSupply = 5, RecordPack = 6, RecordRay = 7;
     /// <summary>Beyond these a record is not a real one: ten thousand health in a hit, a million tenths on a player, ten minutes between the record and its packet.</summary>
     internal const uint MaxTakenTenths = 100000, MaxPlayerTenths = 1000000, MaxAgeMs = 600000, MaxDistanceCm = 100000, MaxCount = 1000000, MaxDamageTenths = 100000000;
     internal const int MaxHurtKind = 6, MaxSupplyKind = 2;
-
-    /// <summary>What the handshake's content holds, so two builds of different protocols refuse each other: the recording format and this protocol's own version.</summary>
-    internal static string Content(int recordingFormat) => "frpl-" + recordingFormat + "/host-records-2";
 
     // ---- Packet writer -------------------------------------------------------------------------------------------------------------
 
@@ -134,24 +134,16 @@ internal static class HostLink
             }
         }
 
-        /// <summary>The finished packet (header filled in) as an array of exactly its length, and the buffer starts again. One array per packet sent, at most ten a second.</summary>
-        internal byte[] Seal(uint sequence, uint hostMs)
+        /// <summary>The finished packet as an array of exactly its length, and the buffer starts again. One array per packet sent, at most ten a second.</summary>
+        internal byte[] Seal()
         {
             _buffer[0] = DataPacket;
-            WriteU32(_buffer, 1, sequence); WriteU32(_buffer, 5, hostMs);
             var packet = new byte[_length];
             Buffer.BlockCopy(_buffer, 0, packet, 0, _length);
             _length = HeaderBytes;
             return packet;
         }
     }
-
-    internal static void WriteU32(byte[] buffer, int at, uint value)
-    {
-        buffer[at] = (byte)value; buffer[at + 1] = (byte)(value >> 8); buffer[at + 2] = (byte)(value >> 16); buffer[at + 3] = (byte)(value >> 24);
-    }
-
-    internal static uint ReadU32(byte[] buffer, int at) => buffer[at] | (uint)buffer[at + 1] << 8 | (uint)buffer[at + 2] << 16 | (uint)buffer[at + 3] << 24;
 
     // ---- Packet reader -------------------------------------------------------------------------------------------------------------
 
@@ -169,13 +161,10 @@ internal static class HostLink
     }
 
     /// <summary>Checks <paramref name="data"/> from start to end and, when it is sound, hands every record to <paramref name="into"/>. Returns false (and hands out
-    /// nothing) for a packet that is too short or too long, of another type, or has a record that is cut off or out of range; <paramref name="sequence"/> is the
-    /// header's sequence when the header was readable.</summary>
-    internal static bool Read(byte[]? data, IRecords into, out uint sequence, out uint hostMs)
+    /// nothing) for a packet that is too short or too long, of another type, or has a record that is cut off or out of range.</summary>
+    internal static bool Read(byte[]? data, IRecords into)
     {
-        sequence = 0; hostMs = 0;
         if (data == null || data.Length <= HeaderBytes || data.Length > MaxPacketBytes || data[0] != DataPacket) return false;
-        sequence = ReadU32(data, 1); hostMs = ReadU32(data, 5);
         uint span = 0;
         if (!Walk(data, null, ref span)) return false;
         Walk(data, into, ref span);

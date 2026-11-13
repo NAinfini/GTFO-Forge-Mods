@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using BepInEx;
 using BepInEx.Configuration;
@@ -10,9 +9,6 @@ namespace ForgeReplay;
 
 [BepInPlugin(Id, "Forge Replay", Version)]
 [BepInDependency("NAinfini.ForgeCore", ">=1.0.0")]
-[BepInDependency("NAinfini.ForgeUI", ">=1.0.0")]
-[BepInDependency("NAinfini.ForgeAudio", ">=1.0.0")]
-[BepInDependency("NAinfini.ForgeVisual", ">=1.0.0")]
 [BepInDependency("dev.gtfomodding.gtfo-api", ">=0.6.1")]
 internal sealed class Plugin : BasePlugin
 {

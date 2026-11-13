@@ -4,17 +4,13 @@ Source code and release notes for NAinfini's GTFO mods, published on Thunderstor
 
 | Package | Version | What it is | Thunderstore |
 |---|---|---|---|
-| [ForgeCore](ForgeCore/README.md) | 1.0.0 | Foundation library: asset bundles, logging, settings, pools, networking, input leases, local saves and calls into the game's own systems. | [NAinfini/ForgeCore](https://thunderstore.io/c/gtfo/p/NAinfini/ForgeCore/) |
-| [ForgeUI](ForgeUI/README.md) | 1.0.0 | Shared interface library: lobby buttons, pickers, menu pages and HUD elements in the game's own style. | [NAinfini/ForgeUI](https://thunderstore.io/c/gtfo/p/NAinfini/ForgeUI/) |
-| [ForgeAudio](ForgeAudio/README.md) | 1.0.0 | Audio library: Ogg Vorbis cues, positioned playback, voice budgets and occlusion. | [NAinfini/ForgeAudio](https://thunderstore.io/c/gtfo/p/NAinfini/ForgeAudio/) |
-| [ForgeVisual](ForgeVisual/README.md) | 1.0.0 | World-visuals library: named effects, particle pools, ground markers, glow materials and model loading. | [NAinfini/ForgeVisual](https://thunderstore.io/c/gtfo/p/NAinfini/ForgeVisual/) |
-| [ForgeOrdnance](ForgeOrdnance/README.md) | 1.0.1 | Call-in system: enter a directional code, throw a beacon and receive supplies or turrets. | [NAinfini/ForgeOrdnance](https://thunderstore.io/c/gtfo/p/NAinfini/ForgeOrdnance/) |
-| [ForgeOrdnance_Arsenal](ForgeOrdnance_Arsenal/README.md) | 1.0.1 | Supply pods, sentry turrets, strikes and drop-pod heavy weapons for ForgeOrdnance. | [NAinfini/ForgeOrdnance_Arsenal](https://thunderstore.io/c/gtfo/p/NAinfini/ForgeOrdnance_Arsenal/) |
-| [ForgeOrdnance_Frames](ForgeOrdnance_Frames/README.md) | 1.0.1 | Four powered exosuits you call in and climb into. | [NAinfini/ForgeOrdnance_Frames](https://thunderstore.io/c/gtfo/p/NAinfini/ForgeOrdnance_Frames/) |
+| [ForgeCore](ForgeCore/README.md) | 1.0.0 | The one shared library: asset bundles, logging, settings, pools, networking, input leases and local saves, plus its interface (lobby buttons, pickers, menu pages, HUD), audio (Ogg Vorbis cues, positioned playback) and world-visuals (effects, markers, model loading) parts. | [NAinfini/ForgeCore](https://thunderstore.io/c/gtfo/p/NAinfini/ForgeCore/) |
+| [ForgeOrdnance](ForgeOrdnance/README.md) | 1.0.1 | Call-in system: enter a directional code and throw a beacon. Includes the Arsenal (supply pods, turrets, strikes, heavy weapons) and four powered exosuits. | [NAinfini/ForgeOrdnance](https://thunderstore.io/c/gtfo/p/NAinfini/ForgeOrdnance/) |
 | [ForgeWeapon_EnergyLab](ForgeWeapon_EnergyLab/README.md) | 1.0.1 | Eight standalone energy guns: beams, chain lightning, charged plasma, explosions, ricochets, flame and gravity control. | [NAinfini/ForgeWeapon_EnergyLab](https://thunderstore.io/c/gtfo/p/NAinfini/ForgeWeapon_EnergyLab/) |
 | [ForgeReplay](ForgeReplay/README.md) | 1.0.0 | Records your runs and plays them back in game: free and first-person cameras, team stats and member ratings. | [NAinfini/ForgeReplay](https://thunderstore.io/c/gtfo/p/NAinfini/ForgeReplay/) |
 | [ForgeEmote](ForgeEmote/README.md) | 1.0.0 | An action wheel: dances, gestures, callouts, handshakes and fist bumps. | [NAinfini/ForgeEmote](https://thunderstore.io/c/gtfo/p/NAinfini/ForgeEmote/) |
 | [ForgePerformance](ForgePerformance/README.md) | 1.0.0 | Raises the frame rate without changing gameplay. | [NAinfini/ForgePerformance](https://thunderstore.io/c/gtfo/p/NAinfini/ForgePerformance/) |
+| [ForgeSkin](ForgeSkin/README.md) | 1.0.3 | Applies ForgeSkin packs (textures, attachments, live ammo screens, animated layers) to your own weapons; includes the desktop skin editor. | [NAinfini/ForgeSkin](https://thunderstore.io/c/gtfo/p/NAinfini/ForgeSkin/) |
 
 ## Layout
 

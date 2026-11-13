@@ -19,7 +19,7 @@ internal sealed class ChainLightning
         while (segments < numbers.Targets)
         {
             var origin = shots[segments - 1].End;
-            if (!_enemies.Nearest(owner, TargetRelationFilter.Enemies, hitInterveningReceiver: true,
+            if (!_enemies.Nearest(owner, hitInterveningReceiver: true,
                 origin, numbers.JumpRange, _visited.AsSpan(0, segments),
                 _visited[segments - 1], out var hit, out var identity)) break;
             var tuning = shot with

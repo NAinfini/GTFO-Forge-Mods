@@ -1,6 +1,5 @@
 using System;
 using Enemies;
-using UnityEngine;
 using AirParticles = AirParticleSystem.AirParticleSystem;
 
 namespace ForgePerformance.LoadShedding;

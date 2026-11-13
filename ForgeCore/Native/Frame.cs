@@ -19,7 +19,19 @@ public static class Frame
 
     public static float UnscaledDeltaTime { get; private set; }
 
-    internal static void Stamp() { UnscaledTime = Time.unscaledTime; UnscaledDeltaTime = Time.unscaledDeltaTime; }
+    /// <summary><c>Time.time</c> (scaled game time), <c>Screen.width</c> and <c>Screen.height</c> as of the same moment, by the same rule.</summary>
+    public static float GameTime { get; private set; }
+
+    public static int ScreenWidth { get; private set; }
+
+    public static int ScreenHeight { get; private set; }
+
+    /// <summary>Read once at the start of the driver's <c>Update</c>, and once when ForgeCore loads so a reader before the first frame sees real values.</summary>
+    internal static void Stamp()
+    {
+        UnscaledTime = Time.unscaledTime; UnscaledDeltaTime = Time.unscaledDeltaTime; GameTime = Time.time;
+        ScreenWidth = Screen.width; ScreenHeight = Screen.height;
+    }
 
     /// <summary>Runs in the game's <c>FixedUpdate</c>, before the physics step.</summary>
     public static void OnFixedUpdate(string modId, Action callback) => FixedUpdates.Add(modId, callback);

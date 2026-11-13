@@ -41,7 +41,9 @@ internal sealed class CosmeticPlayer : IDisposable
     private int _wanted = -1;
     private readonly Vector3 _offset;
     private readonly Quaternion _turn;
-    private CosmeticPlayer(GameObject body, Animator animator, Vector3 offset, Quaternion turn) { _body = body; _animator = animator; _offset = offset; _turn = turn; }
+    // The copy's root transform, read once when it is made: a GameObject keeps its transform for as long as it lives, and nothing here outlives the copy (Held).
+    private readonly Transform _place;
+    private CosmeticPlayer(GameObject body, Animator animator, Vector3 offset, Quaternion turn) { _body = body; _place = body.transform; _animator = animator; _offset = offset; _turn = turn; }
 
     /// <summary>The model object, for hiding it, outlining it and removing it.</summary>
     internal GameObject Body => _body;
@@ -153,17 +155,14 @@ internal sealed class CosmeticPlayer : IDisposable
         foreach (var group in _body.GetComponentsInChildren<LODGroup>(true)) if (group != null) { group.ForceLOD(0); lods++; }
         Plugin.Diagnostic.LogDebug("A body copy was made: " + _body.GetComponentsInChildren<Renderer>(true).Length + " renderers (" + clothes + " clothes re-bound), " + off + " off as copied, layers " + string.Join(",", layers) + ", " + lods + " LOD groups.");
     }
+
     // The donor's wielded item hangs on its hand bone: the same child path on the copy is its clone, which goes, and where it hung (its parent and its
     // pose there) is where the copy's own weapon is put.
     private void DropHeld(PlayerAgent donor, Transform source, Transform copy)
     {
         var held = donor.Inventory?.WieldedItem;
-        if (held == null || held.WasCollected || !held.transform.IsChildOf(source)) { UseHand(); return; }
-        var path = new Stack<int>();
-        for (var node = held.transform; node != source; node = node.parent) path.Push(node.GetSiblingIndex());
-        var clone = copy;
-        foreach (var index in path) clone = clone.GetChild(index);
-        if (clone == copy) { UseHand(); return; }
+        var clone = held == null || held.WasCollected ? null : Counterpart(source, copy, held.transform);
+        if (clone == null || clone == copy) { UseHand(); return; }
         _socket = clone.parent;
         _socketPosition = clone.localPosition;
         _socketRotation = clone.localRotation;
@@ -268,7 +267,7 @@ internal sealed class CosmeticPlayer : IDisposable
     internal void Say(int slot, uint eventId)
     {
         if (!Held) return;
-        var at = _head != null ? _head.position : _body.transform.position + Vector3.up * 1.6f;
+        var at = _head != null ? _head.position : _place.position + Vec.Up * 1.6f;
         AudioKit.PostGameEvent(eventId, at, AK.SWITCHES.CHARACTER.GROUP, Characters[slot & 3]);
     }
 
@@ -299,7 +298,7 @@ internal sealed class CosmeticPlayer : IDisposable
     /// <summary>Plays the muzzle flash of the weapon in the hands (no shot, no sound); false when it has none.</summary>
     internal bool MuzzleFlash(out Vector3 muzzle)
     {
-        muzzle = _body != null ? _body.transform.position : Vector3.zero;
+        muzzle = _body != null ? _place.position : Vec.Zero;
         if (!_items.TryGetValue(_wanted, out var shown) || shown.Gun == null || shown.Gun.WasCollected || shown.Gun.m_muzzleFlash == null) return false;
         try
         {
@@ -309,6 +308,7 @@ internal sealed class CosmeticPlayer : IDisposable
         }
         catch (Exception error) { Skipped.Note("a cosmetic player's muzzle flash could not play", error.Message); return false; }
     }
+
     /// <summary>Puts the body at <paramref name="position"/> turned along <paramref name="look"/> and animates it with the game's walk values
     /// <paramref name="forward"/> and <paramref name="right"/>, crouched by <paramref name="crouch"/> (0 standing, 1 crouched), holding
     /// a melee weapon (<paramref name="melee"/>) or a gun.</summary>
@@ -340,7 +340,7 @@ internal sealed class CosmeticPlayer : IDisposable
         _look = look;
         var flat = new Vector3(look.x, 0f, look.z);
         if (Vec.SqrLength(flat) > 1e-6f) _yaw = Quaternion.LookRotation(flat);
-        _body.transform.SetPositionAndRotation(position + _yaw * _offset, _yaw * _turn);
+        _place.SetPositionAndRotation(position + _yaw * _offset, _yaw * _turn);
         _animator.speed = rate;
         _forward = Mathf.MoveTowards(_forward, forward, WalkRate * ForgeCore.Frame.UnscaledDeltaTime);
         _right = Mathf.MoveTowards(_right, right, WalkRate * ForgeCore.Frame.UnscaledDeltaTime);
@@ -358,8 +358,9 @@ internal sealed class CosmeticPlayer : IDisposable
     /// its cause in the log (a copy made while the donor's body was hidden took that over).</summary>
     internal void KeepDrawn(int slot)
     {
-        if (!Held || ForgeCore.Frame.UnscaledTime < _drawnAt) return;
-        _drawnAt = ForgeCore.Frame.UnscaledTime + 2f;
+        var now = ForgeCore.Frame.UnscaledTime;
+        if (!Held || now < _drawnAt) return;
+        _drawnAt = now + 2f;
         var renderers = _body.GetComponentsInChildren<Renderer>(true);
         var on = 0;
         foreach (var renderer in renderers) if (renderer != null && renderer.enabled) on++;
@@ -367,7 +368,7 @@ internal sealed class CosmeticPlayer : IDisposable
         foreach (var renderer in renderers) if (renderer != null) renderer.enabled = true;
         _body.SetActive(true);
         Plugin.Logger.ErrorOnce("The body copy of player " + (slot + 1) + " had nothing drawn while present: " + renderers.Length + " renderers, " + on + " enabled, body active "
-            + _body.activeInHierarchy + ", layer " + _body.layer + ", at " + _body.transform.position + "; all were turned on.");
+            + _body.activeInHierarchy + ", layer " + _body.layer + ", at " + _place.position + "; all were turned on.");
     }
 
     public void Dispose()

@@ -53,9 +53,8 @@ public static class AgentModifiers
         var id = synced
             ? AgentModifierManager.AddSyncedModifierValue(agent, modifier, amount, 0f)
             : AgentModifierManager.AddModifierValue(agent, modifier, amount, 0f);
-        Plugin.Diag.LogInfo("[diag1110] modifier.add entry=" + (synced ? "synced" : "local")
-            + " modifier=" + modifier + " amount=" + amount + " id=" + id + " held=" + (TableOf(agent)?.Holds(id) ?? false)
-            + " applied=" + AgentModifierManager.ApplyModifier(agent, modifier, 1f));
+        // This read came with a diagnostic line that is gone; whether the game needs it is not confirmed in game yet.
+        AgentModifierManager.ApplyModifier(agent, modifier, 1f);
         return id;
     }
 

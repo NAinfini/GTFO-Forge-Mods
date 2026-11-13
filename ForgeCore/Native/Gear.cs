@@ -31,6 +31,22 @@ public static partial class Gear
         }
     }
 
+    /// <summary>The archetype block ID of a gun: the one its category (<c>GearCategoryDataBlock</c>) names for the gear's fire mode
+    /// component (semi, burst, auto or semi-burst); 0 when the category is missing or the fire mode is none of those.</summary>
+    public static uint ArchetypeId(GearIDRange gear)
+    {
+        var category = GameData.GearCategoryDataBlock.GetBlock(gear.GetCompID(global::Gear.eGearComponent.Category));
+        if (category == null) return 0u;
+        return (eWeaponFireMode)gear.GetCompID(global::Gear.eGearComponent.FireMode) switch
+        {
+            eWeaponFireMode.Semi => category.SemiArchetype,
+            eWeaponFireMode.Burst => category.BurstArchetype,
+            eWeaponFireMode.Auto => category.AutoArchetype,
+            eWeaponFireMode.SemiBurst => category.SemiBurstArchetype,
+            _ => 0u,
+        };
+    }
+
     /// <summary>Brings in what the game reads while it assembles <paramref name="gear"/>; call again until it is not Loading.</summary>
     public static GearAssetReading Prepare(GearIDRange gear) => GearEffectAssets.Prepare(gear);
 

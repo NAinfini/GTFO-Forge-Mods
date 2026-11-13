@@ -147,7 +147,7 @@ internal sealed partial class DecorationShedding
     }
     private void RestoreVisibility(VisualEntry entry)
     {
-        if (entry.Rotator.gameObject.activeInHierarchy && entry.Culler.IsRegistered && _nativeShown?.Contains(entry.Culler) == true)
+        if (entry.Body.activeInHierarchy && entry.Culler.IsRegistered && _nativeShown?.Contains(entry.Culler) == true)
         { entry.Culler.Show(); _cullRestored++; }
         else _cullReleased++; // Native unregistration/visibility supersedes us.
         entry.Hidden = false;
@@ -166,12 +166,22 @@ internal sealed partial class DecorationShedding
             _cullCalls++;
             // Distance to nearest bounds point, not centre, protects a nearby
             // part of a large decorative object from premature disappearance.
-            if (!DecorationPolicy.Beyond((entry.Culler.Bounds.ClosestPoint(position) - position).sqrMagnitude, Settings.CullDistance)) continue;
+            // The bounds are a native field (no call); the nearest point is worked out here, not by a native call per candidate.
+            if (!DecorationPolicy.Beyond(SqrDistance(entry.Culler.Bounds, position), Settings.CullDistance)) continue;
             entry.Culler.HideSafe();
             if (!entry.Hidden) _hiddenByDistance.Add(entry);
             entry.Hidden = true;
             if (!entry.Culled) { entry.Culled = true; _cullChanged++; }
         }
+    }
+    // Bounds.ClosestPoint's answer for an axis-aligned box: the point clamped into it on each axis (itself when inside).
+    private static float SqrDistance(Bounds bounds, Vector3 point)
+    {
+        var c = bounds.m_Center; var e = bounds.m_Extents;
+        var x = point.x - Math.Clamp(point.x, c.x - e.x, c.x + e.x);
+        var y = point.y - Math.Clamp(point.y, c.y - e.y, c.y + e.y);
+        var z = point.z - Math.Clamp(point.z, c.z - e.z, c.z + e.z);
+        return x * x + y * y + z * z;
     }
 
     internal ShadowScope? Shadows(CL_ShadowGenerator generator)
@@ -522,6 +532,8 @@ internal sealed partial class DecorationShedding
     internal sealed class VisualEntry
     {
         internal readonly LG_AnimatorRotator Rotator;
+        // The rotator's object, kept: every read of Rotator.gameObject makes a new wrapper.
+        internal readonly GameObject Body;
         internal readonly C_CullBucket Culler;
         internal readonly DecorationRisk Risks;
         internal readonly bool ShadowEligible;
@@ -529,7 +541,7 @@ internal sealed partial class DecorationShedding
         internal readonly List<(Animator, AnimatorCullingMode)> Animators = new();
         internal bool Hidden, Culled, Shadowed;
         internal VisualEntry(LG_AnimatorRotator rotator, C_CullBucket culler, DecorationRisk risks, bool shadowEligible)
-        { Rotator = rotator; Culler = culler; Risks = risks; ShadowEligible = shadowEligible; }
+        { Rotator = rotator; Body = rotator.gameObject; Culler = culler; Risks = risks; ShadowEligible = shadowEligible; }
     }
     private sealed class LightEntry
     {

@@ -98,8 +98,9 @@ internal sealed class EnergyEffects : IDisposable
     /// <summary>Charging: the rise plays once from the first held frame and is timed to reach its top as the charge
     /// becomes full. At full the full ping sounds once and a waiting loop that continues the rise's hum takes over
     /// until launch or cancel.</summary>
-    public void Charge(float power)
+    public void Charge(float power, Vector3 position)
     {
+        _root.transform.position = position;
         if (!_charging)
         {
             _charging = true;
@@ -114,12 +115,6 @@ internal sealed class EnergyEffects : IDisposable
             _chargeFull.Play(Look.Cue(ChargeFull), 0.9f);
             _chargeHold.Hold(Look.Cue(ChargeHold), ChargeHoldGain);
         }
-    }
-
-    public void Charge(float power, Vector3 position)
-    {
-        _root.transform.position = position;
-        Charge(power);
     }
 
     public void Discharge(bool arcOrb, Vector3 position)

@@ -315,15 +315,6 @@ internal static class ShownPlayback
     }
 
     // The node the recording named (kind 0 nothing, 1 player slot, 2 enemy entity; then a name path), found on the puppet of the same player or enemy.
-    private static Transform? Anchor(PayloadReader r, out bool anchored)
-    {
-        var kind = r.U();
-        var id = (int)r.U();
-        var path = r.Text();
-        anchored = kind != 0;
-        return Anchor(kind, id, path);
-    }
-
     private static Transform? Anchor(ulong kind, int id, string path)
     {
         if (kind == 0) return null;

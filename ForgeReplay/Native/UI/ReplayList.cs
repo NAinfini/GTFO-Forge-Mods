@@ -4,31 +4,31 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using CellMenu;
-using ForgeCore;
 using ForgeUI;
 using SNetwork;
 using UnityEngine;
 
 namespace ForgeReplay;
 
-/// <summary>The REPLAYS screen on the menu bar (PLAN 2.1), on the game's settings page and made of its own pieces (ForgeUI <c>MenuScreen</c>), three windows
-/// left to right: the filters (how it ended, which rundown, the files that cannot be read), the recordings (newest first unless a heading is clicked), and the
-/// chosen recording with its three pages (this run, estimates, file) and its buttons right under it. A recording of a rundown this game has not installed says
+/// <summary>The REPLAYS screen on the menu bar (PLAN 2.1), on the game's settings page and made of its own pieces (ForgeUI <c>MenuScreen</c>): a row of
+/// filter tabs across the top (how it ended, the rundown choice, the files that cannot be read, the size on disk), under it two windows only as tall as
+/// their rows: the recordings (an entry of two or three lines each, newest first unless another sort is chosen) and the chosen recording (the run; the
+/// estimates and the file behind More) with play, star and More right under it. A recording of a rundown this game has not installed says
 /// so by name and its play button stays dim; a failure is one sentence with a way to the log and goes away when closed. Values keep the game's own menu text
 /// colour; labels, alerts and warnings are the game's colours (<see cref="UIKitColors"/>). Nothing pops up: deleting the chosen recording, and playing when
 /// others are in the lobby (it leaves the lobby), are confirmed on the button itself (ForgeUI <c>AddConfirmButton</c>). After a replay the screen opens again.</summary>
 internal static class ReplayList
 {
-    // The details keep their width, wide enough for a table of four players; the list takes what the screen leaves between them and the filters. The filters and
-    // the list reach the bottom of the screen; the details stop for their two rows of buttons, which stand clear of the game's own version text in the corner under them.
-    private const float FilterWidth = 320f, MinListWidth = 1230f, DetailWidth = 800f, UnderDetails = 310f;
-    // The list's columns in the page's units, each wide enough for its longest text in the game's menu font (star, rundown, level "A1", start "YESTERDAY 13:30",
-    // length, result "INCOMPLETE", kills / downs "~999/99"); the team takes what the row's box leaves. It names one player and how many more, so it is
-    // never cut in the middle of a list of names; the whole team is on the run's page.
-    // The rating column holds the overall grade of each of up to four players, each in the player's colour ("S A B —").
-    private static readonly float[] Widths = { 34f, 230f, 80f, 220f, 96f, 150f, 130f, 130f, 0f };
-    private const int SortableFrom = 1, SortableTo = 5, StartColumn = 3;
+    // Two columns under the filter tabs: the list takes what the screen leaves beside the details, which keep their width (a table of four players).
+    // Both are only as tall as their rows (MenuScreen fit); the details leave room under them for their buttons, clear of the game's version text.
+    private const float MinListWidth = 1100f, DetailWidth = 800f, UnderDetails = 310f;
+    // The sort choices over the list: start, length, result, rundown (the ids of _sort), in the order they stand.
+    private static readonly int[] SortChoices = { 3, 4, 5, 1 };
+    private static readonly string[] SortKeys = { "list.start", "list.length", "list.result", "list.rundown" };
+    private const int StartColumn = 3;
     private const int Unreadable = 4;
+    // The rundown choice open (its options stand in the list's place) and the details' More buttons shown.
+    private static bool _rundownOpen, _more;
     private static UIKitMod _ui = null!;
     private static MenuBarButton? _screen;
     // The whole reads kept (a recording is read through once for its tables): the last few only, the lighter totals of every read stay for the rows.
@@ -65,8 +65,10 @@ internal static class ReplayList
         else if (_wasActive) { _wasActive = false; _reopen = true; }
         // A chosen recording that did not start: the list opens again and says why.
         if (Replayer.Failure != null) _reopen = true;
-        if (_reopen && GameStateManager.CurrentStateName is eGameStateName.NoLobby && _screen != null && _screen.Open()) _reopen = false;
-        if (_waitingFor != null && !SNet.IsInLobby && SNet.LocalPlayer?.IsInSessionHub != true && GameStateManager.CurrentStateName == eGameStateName.NoLobby)
+        // The game's state is read once, and only on a frame that has something to open or start.
+        var noLobby = (_reopen || _waitingFor != null) && GameStateManager.CurrentStateName == eGameStateName.NoLobby;
+        if (_reopen && noLobby && _screen != null && _screen.Open()) _reopen = false;
+        if (_waitingFor != null && noLobby && !SNet.IsInLobby && SNet.LocalPlayer?.IsInSessionHub != true)
         {
             var path = _waitingFor; _waitingFor = null;
             Replayer.Start(path);
@@ -136,26 +138,21 @@ internal static class ReplayList
         var chosen = entries.FirstOrDefault(e => e.Path == _chosen) ?? entries.FirstOrDefault();
         _chosen = chosen?.Path;
 
-        screen.FillScreen(FilterWidth + MinListWidth + DetailWidth + 2f * 24f);
+        screen.FillScreen(MinListWidth + DetailWidth + 24f);
         Filters(screen, all);
 
         var listWidth = screen.RoomAcross(DetailWidth, MinListWidth);
-        // The title says what is shown and what all recordings take on disk, starred ones included.
         var title = _ui.Text(_section == Unreadable ? "list.oldfiles" : Sections[_section]) + (_rundown == null ? "" : "  ·  " + MenuText.Plain(_rundown));
-        var list = screen.AddWindow(UIText.Plain(title + "  " + Dim(_ui.Text("list.total", Bytes(ReplayLibrary.TotalBytes(Plugin.ReplayFolder))))), listWidth, screen.ToastRoom);
-        list.ColumnWidths(Widths, Widths.Length - 1, 4, 6);
-        if (entries.Count == 0) list.AddRow(UIText.Plain(Dim(_ui.Text(all.Count > 0 ? "list.nomatch" : "list.empty"))));
+        var list = screen.AddWindow(UIText.Plain(title), listWidth, screen.ToastRoom, fit: true);
+        if (_rundownOpen) RundownChoices(screen, list, all);
+        else if (entries.Count == 0) list.AddRow(UIText.Plain(Dim(_ui.Text(all.Count > 0 ? "list.nomatch" : "list.empty"))));
         else
         {
-            list.AddHeader(column => Sort(screen, column), _sort, UIText.Plain(""), Heading("list.rundown", 1), Heading("list.level", 2), Heading("list.start", 3), Heading("list.length", 4), Heading("list.result", 5),
-                UIText.Key("list.killsdowns"), UIText.Key("list.rating"), UIText.Key("list.team"));
-            // How many are kept, on the pointer over the header rather than as a line of its own.
-            var limit = Math.Max(0, Plugin.DiskLimitMb.Value);
-            list.Tooltip(UIText.Key("list.title"), limit > 0 ? UIText.Key("list.keeplimit", ReplayLibrary.Keep, limit) : UIText.Key("list.keep", ReplayLibrary.Keep));
+            SortRow(screen, list);
             foreach (var entry in entries)
             {
                 var e = entry;
-                list.AddRow(Row(e), () => { _chosen = e.Path; screen.Rebuild(); }, ReferenceEquals(e, chosen));
+                list.AddEntry(Entry(e), () => { _chosen = e.Path; screen.Rebuild(); }, ReferenceEquals(e, chosen));
             }
         }
         if (chosen != null) Details(screen, chosen);
@@ -165,40 +162,67 @@ internal static class ReplayList
     // How long a problem and a confirmation stay when not closed.
     private const float ProblemSeconds = 12f, DoneSeconds = 10f;
 
-    // The left window: each option with how many recordings it would show given the other group's choice. The files that cannot be read appear only when there are some.
+    // The tabs across the top: how it ended (each with how many it would show given the rundown chosen), the rundown choice, the files that cannot be
+    // read (only when there are some), and at the right end what all recordings take on disk, starred ones included.
     private static void Filters(MenuScreen screen, IReadOnlyCollection<ReplayEntry> all)
     {
-        var filter = screen.AddWindow(UIText.Key("list.filter"), FilterWidth);
-        filter.ColumnWidths(new[] { 0f, 70f }, 0, 1);
-        void Option(string label, int count, bool selected, Action choose)
-            => filter.AddRow(new[] { label, count.ToString(CultureInfo.InvariantCulture) }, () => { choose(); screen.Rebuild(); }, selected);
-
-        var inSection = _section == Unreadable ? 0 : _section;
-        filter.AddHeader(UIText.Key("list.result"));
+        screen.AddTab(UIText.Plain(_ui.Text("list.total", Bytes(ReplayLibrary.TotalBytes(Plugin.ReplayFolder)))), false, null, right: true);
+        string Counted(string text, int count) => text + "  " + count.ToString(CultureInfo.InvariantCulture);
         for (var s = 0; s < Sections.Length; s++)
         {
             var section = s;
-            Option(_ui.Text(Sections[s]), all.Count(e => Shown(e, section, _rundown)), _section == s, () => _section = section);
+            screen.AddTab(UIText.Plain(Counted(_ui.Text(Sections[s]), all.Count(e => Shown(e, section, _rundown)))), _section == s, () => { _section = section; _rundownOpen = false; screen.Rebuild(); });
         }
-        filter.AddHeader(UIText.Key("list.rundown"));
-        Option(_ui.Text("list.allrundowns"), all.Count(e => Shown(e, inSection, null)), _section != Unreadable && _rundown == null, () => { _rundown = null; _section = inSection; });
+        var chosen = _rundown == null ? _ui.Text("list.allrundowns") : RundownMissing(all, _rundown) ? Warn(MenuText.Plain(_rundown)) : MenuText.Plain(_rundown);
+        screen.AddTab(UIText.Plain(chosen + (_rundownOpen ? " ^" : " v")), _rundownOpen || _rundown != null, () => { _rundownOpen = !_rundownOpen; screen.Rebuild(); });
+        var old = all.Count(e => e.Header == null);
+        if (old > 0) screen.AddTab(UIText.Plain(Counted(_ui.Text("list.oldfiles"), old)), _section == Unreadable, () => { _section = Unreadable; _rundown = null; _rundownOpen = false; screen.Rebuild(); });
+    }
+
+    private static bool RundownMissing(IEnumerable<ReplayEntry> all, string name)
+        => all.Where(e => e.Header != null && RundownLabel(e) == name).All(e => RundownNames.Refusal(e) != null);
+
+    // The rundown choice open: its options in the list's place, each with how many recordings it would show; a rundown no recording of which this game can
+    // play is in the warning colour and says what is missing on the pointer. Choosing one closes the choice.
+    private static void RundownChoices(MenuScreen screen, MenuScreenWindow list, IReadOnlyCollection<ReplayEntry> all)
+    {
+        var inSection = _section == Unreadable ? 0 : _section;
+        list.Columns(new[] { 85f }, 1);
+        void Option(string? name, string label, bool selected)
+            => list.AddRow(new[] { label, all.Count(e => Shown(e, inSection, name)).ToString(CultureInfo.InvariantCulture) }, () => { _rundown = name; _section = inSection; _rundownOpen = false; screen.Rebuild(); }, selected);
+        Option(null, _ui.Text("list.allrundowns"), _rundown == null);
         var unknown = _ui.Text("list.unknownrundown");
         foreach (var group in all.Where(e => e.Header != null).GroupBy(RundownLabel).OrderBy(g => g.Key == unknown).ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
         {
             var name = group.Key;
             var missing = group.All(e => RundownNames.Refusal(e) != null);
-            Option(name == unknown ? Dim(name) : missing ? Warn(MenuText.Plain(name)) : MenuText.Plain(name), all.Count(e => Shown(e, inSection, name)), _section != Unreadable && _rundown == name, () => { _rundown = name; _section = inSection; });
-            filter.Tooltip(UIText.Plain(name), UIText.Plain(missing ? RundownNames.Refusal(group.First()) ?? name : name));
+            Option(name, name == unknown ? Dim(name) : missing ? Warn(MenuText.Plain(name)) : MenuText.Plain(name), _rundown == name);
+            if (missing) list.Tooltip(UIText.Plain(name), UIText.Plain(RundownNames.Refusal(group.First()) ?? name));
         }
-        var old = all.Count(e => e.Header == null);
-        if (old == 0) return;
-        filter.AddHeader(UIText.Key("list.other"));
-        Option(_ui.Text("list.oldfiles"), old, _section == Unreadable, () => { _section = Unreadable; _rundown = null; });
-        filter.Tooltip(UIText.Key("list.oldfiles"), UIText.Key("list.oldfileswhy"));
+    }
+
+    // Over the list, the sort choice: start (newest first by default), length, result or rundown; the one in use lit with v or ^, the same again turns it
+    // round. How many are kept is on the pointer over it rather than a line of its own.
+    private static void SortRow(MenuScreen screen, MenuScreenWindow list)
+    {
+        list.Columns(new[] { 18f, 40f, 58f, 76f });
+        var cells = new UIText[SortChoices.Length + 1];
+        cells[0] = UIText.Key("list.sortby");
+        var current = -1;
+        for (var i = 0; i < SortChoices.Length; i++)
+        {
+            var on = SortChoices[i] == _sort;
+            if (on) current = i + 1;
+            // ASCII v and ^: the game's menu font has no arrow or triangle and would draw a box.
+            cells[i + 1] = on ? UIText.Plain(_ui.Text(SortKeys[i]) + (_descending ? " v" : " ^")) : UIText.Key(SortKeys[i]);
+        }
+        list.AddHeader(column => { if (column >= 1) Sort(screen, SortChoices[column - 1]); }, current, cells);
+        var limit = Math.Max(0, Plugin.DiskLimitMb.Value);
+        list.Tooltip(UIText.Key("list.title"), limit > 0 ? UIText.Key("list.keeplimit", ReplayLibrary.Keep, limit) : UIText.Key("list.keep", ReplayLibrary.Keep));
     }
 
     /// <summary>The rundown as the list writes it: its name, or "unknown rundown" with no number.</summary>
-    private static string RundownLabel(ReplayEntry e) => RundownNames.Name(e) ?? _ui.Text("list.unknownrundown");
+    internal static string RundownLabel(ReplayEntry e) => RundownNames.Name(e) ?? _ui.Text("list.unknownrundown");
 
     /// <summary>A text of this mod's language file.</summary>
     internal static string Say(string key, params object[] args) => _ui.Text(key, args);
@@ -230,7 +254,6 @@ internal static class ReplayList
         var sorted = _sort switch
         {
             1 => by(e => RundownLabel(e)),
-            2 => by(e => RundownNames.Code(e) ?? ""),
             4 => by(e => e.DurationMs),
             5 => by(e => (int)e.Outcome),
             _ => by(e => e.Start),
@@ -239,39 +262,48 @@ internal static class ReplayList
         return ordered.Concat(list.Where(e => e.Header == null).OrderByDescending(e => e.Start));
     }
 
-    // The sorted heading marked with ASCII v and ^: the game's menu font has no arrow or triangle and would draw a box.
-    private static UIText Heading(string key, int column) => column == _sort ? UIText.Plain(_ui.Text(key) + (_descending ? " v" : " ^")) : UIText.Key(key);
-
-    // A heading clicked: sorted by it, or the other way round when it already was (time starts newest first, the others from the top).
+    // A sort chosen: by it, or the other way round when it already was (time starts newest first, the others from the top).
     private static void Sort(MenuScreen screen, int column)
     {
-        if (column < SortableFrom || column > SortableTo) return;
         if (column == _sort) _descending = !_descending;
         else { _sort = column; _descending = column == StartColumn; }
         screen.Rebuild();
     }
 
-    // A row: starred or not, the rundown (in the warning colour when it is not installed here), level, when, how it went, and one of the team with how many more.
-    private static string[] Row(ReplayEntry e)
+    // A list entry, two lines and a third for the grades: "Rundown · A1" (in the warning colour when this game cannot play it, a star when starred) and how it
+    // ended; when it started, how long, how many played and the team's kills and downs; then each member's grade in the player's colour, from the rating cache
+    // (no recording is read for the row). A file that cannot be read says so and why under its start.
+    private static readonly float[] TitleStops = { 74f }, InfoStops = { 30f, 48f, 64f }, GradeStops = { 25f, 50f, 75f };
+    private static readonly int[] ResultRight = { 1 }, NoRight = Array.Empty<int>();
+
+    private static List<MenuScreenWindow.MenuLine> Entry(ReplayEntry e)
     {
-        var rundown = RundownNames.Name(e);
-        var name = rundown == null ? Dim(_ui.Text("list.unknownrundown")) : e.Header != null && RundownNames.Refusal(e) != null ? Warn(MenuText.Plain(rundown)) : MenuText.Plain(rundown);
-        return new[]
+        var star = e.Starred ? Extra(_ui.Text("list.starmark")) + " " : "";
+        if (e.Header == null)
+            return new() { new(new[] { star + Dim(System.IO.Path.GetFileNameWithoutExtension(e.Path)), Alert(_ui.Text(ShortKey(e))) }, TitleStops, ResultRight), new(new[] { When(e) }, InfoStops, NoRight) };
+        var title = RundownNames.Refusal(e) != null ? Warn(LevelName(e)) : LevelName(e);
+        var people = e.Header.Players.Count <= 1 ? _ui.Text("list.solo") : _ui.Text("list.people", e.Header.Players.Count);
+        var lines = new List<MenuScreenWindow.MenuLine>
         {
-            e.Starred ? UIKitColors.Tint(_ui.Text("list.starmark"), UIKitColors.MenuOver) : " ",
-            name, RundownNames.Code(e) ?? Dim("—"), When(e), Duration(e), e.Header == null ? Alert(_ui.Text(ShortKey(e))) : Outcome(e), Counts(e), Grades(e), Team(e),
+            new(new[] { star + title, Outcome(e) }, TitleStops, ResultRight),
+            new(new[] { When(e), Duration(e), Dim(people), Counts(e) }, InfoStops, NoRight),
         };
+        if (Grades(e) is { } grades) lines.Add(new(grades, GradeStops, NoRight));
+        return lines;
     }
 
-    // The overall grade of each player of a recording in the player's own colour, from the rating cache (no recording is read for the row): — for a player
-    // the recording gives no grade. The six scores per player are on the run page of the details.
-    private static string Grades(ReplayEntry e)
+    // A member's overall grade for the team table, — when the rating cache has none.
+    private static string Grade(ReplayEntry e, int slot)
+        => RatingStore.Table is { } table && RatingStore.OfRecording(e.Path) is { } ratings && ratings[slot] is { Grade: >= 0 } r ? Value(table.Grades[r.Grade].Name) : Dim("—");
+
+    // Each member's name and overall grade in the player's own colour; null when the rating cache has none for the recording.
+    private static string[]? Grades(ReplayEntry e)
     {
-        if (e.Header == null || RatingStore.Table is not { } table || RatingStore.OfRecording(e.Path) is not { } ratings) return Dim("—");
-        var parts = new List<string>();
+        if (e.Header == null || RatingStore.Table is not { } table || RatingStore.OfRecording(e.Path) is not { } ratings) return null;
+        var cells = new List<string>();
         for (var slot = 0; slot < 4; slot++)
-            if (ratings[slot] is { } r) parts.Add(UIKitColors.Tint(r.Grade >= 0 ? table.Grades[r.Grade].Name : "—", ReplayScreen.SlotColour(slot)));
-        return parts.Count == 0 ? Dim("—") : string.Join(" ", parts);
+            if (ratings[slot] is { } r) cells.Add(UIKitColors.Tint(MenuText.Plain(PlayerName.Plain(ReplayFeed.Holder(slot, uint.MaxValue, e.Header.Players, NoPresence, _ui.Text("player.slot", slot + 1)).Name)) + "  " + (r.Grade >= 0 ? table.Grades[r.Grade].Name : "—"), ReplayScreen.SlotColour(slot)));
+        return cells.Count == 0 ? null : cells.ToArray();
     }
 
     // The members' ratings as text: the six dimension scores and the overall grade of each player, what the recording cannot say is — and a worked-out score is "about N".
@@ -298,14 +330,6 @@ internal static class ReplayList
                 : Value(table.Grades[r.Grade].Name + (r.Score is { } total ? "  " + ((int)Math.Round(total * 100)).ToString(CultureInfo.InvariantCulture) : "")));
             details.AddRow(cells.ToArray());
         }
-    }
-
-    private static string Team(ReplayEntry e)
-    {
-        if (e.Header is not { Players.Count: > 0 } h) return Dim("—");
-        var first = h.Players.FirstOrDefault(p => p.Slot == h.RecorderSlot);
-        if (first.Name == null) first = h.Players[0];
-        return PlayerName.Rich(first.Name) + (h.Players.Count > 1 ? "  " + Dim("+" + (h.Players.Count - 1).ToString(CultureInfo.InvariantCulture)) : "");
     }
 
     // Why a file cannot be read: another recording format, or damaged.
@@ -337,7 +361,7 @@ internal static class ReplayList
         else foreach (var p in e.Summary.Players) { kills += p.Kills; downs += p.Downs; }
         var k = kills.ToString(CultureInfo.InvariantCulture);
         if (client && kills > 0) k = Warn(_ui.Text("estimate", k));
-        return k + "/" + downs.ToString(CultureInfo.InvariantCulture);
+        return _ui.Text("list.counts", k, downs.ToString(CultureInfo.InvariantCulture));
     }
 
     private static string Duration(ReplayEntry e) => e.Header == null ? Dim("—") : TimelineMath.Clock(e.DurationMs);
@@ -357,7 +381,7 @@ internal static class ReplayList
     /// play, delete last.</summary>
     private static void Details(MenuScreen screen, ReplayEntry e)
     {
-        var details = screen.AddWindow(UIText.Plain(LevelName(e)), DetailWidth, UnderDetails);
+        var details = screen.AddWindow(UIText.Plain(LevelName(e) + "  " + (e.Header == null ? Alert(_ui.Text(ShortKey(e))) : Outcome(e))), DetailWidth, UnderDetails, fit: true);
         // Why it cannot play first, in a few words: it is what the player came to the window to learn; the sentence is on the pointer over it.
         var refusal = e.Header == null ? null : RundownNames.Refusal(e);
         if (e.Header == null)
@@ -375,35 +399,45 @@ internal static class ReplayList
                 details.Tooltip(UIText.Key("list.unplayable"), UIText.Key("missing.hint"));
             }
             else if (!CanStart()) details.AddRow(UIText.Plain(Warn(_ui.Text(Replayer.Starting ? "list.starting" : "list.inlevel"))));
-            details.Columns(new[] { 33f, 66f });
-            details.AddHeader(column => { _page = column; screen.Rebuild(); }, _page, UIText.Key("list.pagerun"), UIText.Key("list.estimates"), UIText.Key("list.pagefile"));
+            // The estimates and the file are pages of their own, opened from More; a row on top leads back to the run.
+            if (_page != 0) details.AddRow(UIText.Plain(Extra(_ui.Text("list.back")) + "   " + Dim(_ui.Text(_page == 1 ? "list.estimates" : "list.pagefile"))), () => { _page = 0; screen.Rebuild(); });
             if (_page == 0) RunPage(details, e);
-            else if (_page == 1) Estimates(details, e);
+            else if (_page == 1) { Estimates(details, e); RatingText(details, e); }
             else FilePage(details, e);
         }
+        // Play (red, the largest) and star; the rest behind More: the estimates, the file, export, show in folder and delete.
         details.Buttons(1.25f, 1f, 1f);
-        if (e.Header != null)
+        if (e.Header == null)
         {
-            // A replay is its own level, started from the lobby or the main menu; with others in the lobby the button asks first, in place: playing leaves the lobby.
-            var ready = refusal == null && CanStart();
-            if (ready && OthersInLobby()) details.AddConfirmButton("play:" + e.Path, UIText.Key("list.play"), UIText.Key("list.leaveplay"), UIText.Key("list.cancel"), () => Choose(e), true);
-            else details.AddButton(UIText.Key("list.play"), () => Choose(e), true, 0, ready);
-            details.AddButton(UIText.Key(e.Starred ? "list.unstar" : "list.dostar"), () => Star(screen, e), false, 1);
-            details.AddButton(UIText.Key("list.export"), () => Export(screen, e), false, 1);
+            details.AddButton(UIText.Key("list.folder"), () => Reveal(e.Path), false, 1);
+            DeleteButton(screen, details, e, 2);
+            return;
         }
-        details.AddButton(UIText.Key("list.folder"), () => Reveal(e.Path), false, e.Header == null ? 1 : 2);
-        details.AddConfirmButton("delete:" + e.Path, UIText.Key("list.delete"), UIText.Key("list.deleteconfirm"), UIText.Key("list.cancel"), () => Delete(screen, e), false, 2);
+        // A replay is its own level, started from the lobby or the main menu; with others in the lobby the button asks first, in place: playing leaves the lobby.
+        var ready = refusal == null && CanStart();
+        if (ready && OthersInLobby()) details.AddConfirmButton("play:" + e.Path, UIText.Key("list.play"), UIText.Key("list.leaveplay"), UIText.Key("list.cancel"), () => Choose(e), true);
+        else details.AddButton(UIText.Key("list.play"), () => Choose(e), true, 0, ready);
+        details.AddButton(UIText.Key(e.Starred ? "list.unstar" : "list.dostar"), () => Star(screen, e), false, 1);
+        details.AddButton(UIText.Plain(_ui.Text("list.more") + (_more ? " ^" : " v")), () => { _more = !_more; screen.Rebuild(); }, false, 2);
+        if (!_more) return;
+        details.AddButton(UIText.Key("list.estimates"), () => { _page = 1; screen.Rebuild(); }, false, 1);
+        details.AddButton(UIText.Key("list.pagefile"), () => { _page = 2; screen.Rebuild(); }, false, 2);
+        details.AddButton(UIText.Key("list.export"), () => Export(screen, e), false, 1);
+        details.AddButton(UIText.Key("list.folder"), () => Reveal(e.Path), false, 2);
+        DeleteButton(screen, details, e, 1);
     }
 
+    private static void DeleteButton(MenuScreen screen, MenuScreenWindow details, ReplayEntry e, int column)
+        => details.AddConfirmButton("delete:" + e.Path, UIText.Key("list.delete"), UIText.Key("list.deleteconfirm"), UIText.Key("list.cancel"), () => Delete(screen, e), false, column);
+
+    // The run: one line of when it started, how long it took and who recorded it (host or client); the team table; the fiercest wave and the most dangerous moment.
     private static void RunPage(MenuScreenWindow details, ReplayEntry e)
     {
         void Line(string key, string value) => details.AddField(UIText.Key(key), value);
-        Line("list.start", When(e));
-        Line(e.Outcome == ForgeReplay.Outcome.Success ? "sum.time" : "list.length", Duration(e));
-        Line("list.result", Outcome(e));
-        Line("list.recorder", string.IsNullOrEmpty(e.Header!.RecorderName) ? Dim("—") : PlayerName.Rich(e.Header.RecorderName) + "  " + Dim(_ui.Text(e.Header.RecorderIsHost ? "list.host" : "list.client")));
+        var recorder = string.IsNullOrEmpty(e.Header!.RecorderName) ? Dim("—") : PlayerName.Rich(e.Header.RecorderName) + "  " + Dim(_ui.Text(e.Header.RecorderIsHost ? "list.host" : "list.client"));
+        details.Columns(new[] { 34f, 56f });
+        details.AddRow(new[] { When(e), Duration(e), recorder });
         Players(details, e);
-        RatingText(details, e);
         var report = Summary(e)?.Report;
         if (report != null)
         {
@@ -512,7 +546,7 @@ internal static class ReplayList
     private static string Size(string path)
     {
         try { return Bytes(new System.IO.FileInfo(path).Length); }
-        catch (Exception) { return "—"; }
+        catch (Exception) { return "—"; } // gone or locked since the list was read: no size, nothing else is wrong
     }
 
     private static string Bytes(long bytes) => bytes >= 1 << 20 ? (bytes / 1048576.0).ToString("0.0", CultureInfo.InvariantCulture) + " MB" : (bytes / 1024.0).ToString("0", CultureInfo.InvariantCulture) + " KB";
@@ -528,7 +562,7 @@ internal static class ReplayList
         details.Columns(new[] { 32f, 51f, 68f, 84f }, 1, 2, 3, 4);
         var rows = new List<string[]>();
         var guessed = false;
-        int kills = 0, downs = 0, revives = 0; float damage = 0;
+        int kills = 0, downs = 0; float damage = 0;
         var players = analysis?.Players ?? e.Summary?.Players;
         string Whole(float value) => ((int)MathF.Round(value)).ToString(CultureInfo.InvariantCulture);
         foreach (var slot in slots)
@@ -536,7 +570,7 @@ internal static class ReplayList
             if (players != null && slot < players.Length)
             {
                 var p = players[slot];
-                kills += p.Kills; downs += p.Downs; revives += p.Revives; damage += p.BulletDamage + p.MeleeDamage + p.ExplosionDamage;
+                kills += p.Kills; downs += p.Downs; damage += p.BulletDamage + p.MeleeDamage + p.ExplosionDamage;
             }
             if (analysis == null)
             {
@@ -547,21 +581,21 @@ internal static class ReplayList
                     var killed = header.RecorderIsHost || header.Players.Count == 1 ? p.Kills.ToString(CultureInfo.InvariantCulture) : Dim("—");
                     // A client's footer holds only the recorder's damage: another player's is worked out by the read on its way.
                     var dealt = header.RecorderIsHost || slot == header.RecorderSlot ? Whole(p.BulletDamage + p.MeleeDamage + p.ExplosionDamage) : Dim("—");
-                    rows.Add(new[] { SlotName(header, analysis, slot), dealt, killed, Whole(p.Downs), Whole(p.Revives) });
+                    rows.Add(new[] { SlotName(header, analysis, slot), dealt, killed, Whole(p.Downs), Grade(e, slot) });
                 }
-                else rows.Add(new[] { SlotName(header, analysis, slot), Dim("—"), Dim("—"), Dim("—"), Dim("—") });
+                else rows.Add(new[] { SlotName(header, analysis, slot), Dim("—"), Dim("—"), Dim("—"), Grade(e, slot) });
                 continue;
             }
             var s = analysis.Players[slot];
             string Settled(StatRow row) { var cell = ReplayFeed.Cell(row, s, analysis, slot, 0f); guessed |= cell.Quality == StatQuality.Estimate; return Cell(cell); }
-            rows.Add(new[] { SlotName(header, analysis, slot), Settled(StatRow.Damage), Settled(StatRow.Kills), Settled(StatRow.Downs), Settled(StatRow.Revives) });
+            rows.Add(new[] { SlotName(header, analysis, slot), Settled(StatRow.Damage), Settled(StatRow.Kills), Settled(StatRow.Downs), Grade(e, slot) });
         }
-        details.AddHeader(UIText.Plain(_ui.Text("list.team") + (guessed ? "  (i)" : "")), UIText.Key("list.damage"), UIText.Key("stats.kills"), UIText.Key("stats.downs"), UIText.Key("stats.revives"));
+        details.AddHeader(UIText.Plain(_ui.Text("list.team") + (guessed ? "  (i)" : "")), UIText.Key("list.damage"), UIText.Key("stats.kills"), UIText.Key("stats.downs"), UIText.Key("list.rating"));
         if (guessed) details.Tooltip(UIText.Key("list.team"), UIText.Plain(EstimateWhy(true, false)));
         foreach (var row in rows) details.AddRow(row);
         // The team's damage says what it is: about N with anyone's worked out, — with anyone's unknown, never the sum of whom the recording happens to show.
         var teamDamage = analysis != null ? Cell(ReplayFeed.TeamDamage(analysis.Players, analysis, slots)) : header.RecorderIsHost ? Whole(damage) : Dim("—");
-        if (players != null && slots.Count > 1) details.AddRow(new[] { Dim(_ui.Text("sum.team")), teamDamage, kills.ToString(CultureInfo.InvariantCulture), downs.ToString(CultureInfo.InvariantCulture), revives.ToString(CultureInfo.InvariantCulture) });
+        if (players != null && slots.Count > 1) details.AddRow(new[] { Dim(_ui.Text("sum.team")), teamDamage, kills.ToString(CultureInfo.InvariantCulture), downs.ToString(CultureInfo.InvariantCulture), "" });
         if (analysis == null && IsReading(e.Path)) details.AddRow(UIText.Plain(Dim(_ui.Text("list.reading"))));
     }
 
@@ -733,7 +767,9 @@ internal static class ReplayList
         if (done.Keep) { Summaries[done.Path] = analysis; Touch(done.Path); }
         // A read only the member rating asked for changes nothing on screen.
         if (done.Keep || !RatingOnly.Remove(done.Path)) _built?.Rebuild();
-    }    /// <summary>The rundown's name and the level as players call it, for a title: "Name · A1". Never the rundown's number.</summary>
+    }
+
+    /// <summary>The rundown's name and the level as players call it, for a title: "Name · A1". Never the rundown's number.</summary>
     internal static string LevelName(ReplayEntry e) => MenuText.Plain(RundownLabel(e)) + (RundownNames.Code(e) is { } code ? " · " + code : "");
 
     /// <summary>Filters and a chosen recording for a script, as the clicks do: the section (0 all, 1 starred, 2 cleared, 3 not cleared, 4 the files that cannot be read), a rundown's name
@@ -744,9 +780,6 @@ internal static class ReplayList
         if (file.Length > 0) _chosen = ReplayLibrary.List(Plugin.ReplayFolder).FirstOrDefault(e => System.IO.Path.GetFileName(e.Path) == file)?.Path ?? _chosen;
         _built?.Rebuild();
     }
-
-    /// <summary>The rundown's name as the list writes it, for a script's readback.</summary>
-    internal static string RundownOf(ReplayEntry e) => RundownLabel(e);
 
     private static void Star(MenuScreen screen, ReplayEntry entry)
     {

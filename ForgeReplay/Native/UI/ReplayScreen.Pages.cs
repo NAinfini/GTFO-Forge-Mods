@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using ForgeCore;
 using ForgeUI;
 using UnityEngine;
 

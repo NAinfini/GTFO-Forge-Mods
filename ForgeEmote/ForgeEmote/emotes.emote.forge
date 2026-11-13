@@ -5,8 +5,8 @@
     "Icon": "ForgeEmote:come-here",
     "Page": "tactical",
     "Slot": 0,
-    "Clip": "Clips/come-here.clip.forge",
-    "FirstPersonClip": "Clips/come-here-fp.clip.forge",
+    "Clip": "Clips/come-here.glb",
+    "FirstPersonClip": "Clips/come-here-fp.glb",
     "Comms": 1283
   },
   {
@@ -15,8 +15,8 @@
     "Icon": "ForgeEmote:stop",
     "Page": "tactical",
     "Slot": 1,
-    "Clip": "Clips/stop.clip.forge",
-    "FirstPersonClip": "Clips/stop-fp.clip.forge",
+    "Clip": "Clips/stop.glb",
+    "FirstPersonClip": "Clips/stop-fp.glb",
     "Comms": 1300
   },
   {
@@ -25,8 +25,8 @@
     "Icon": "ForgeEmote:go-there",
     "Page": "tactical",
     "Slot": 2,
-    "Clip": "Clips/go-there.clip.forge",
-    "FirstPersonClip": "Clips/go-there-fp.clip.forge",
+    "Clip": "Clips/go-there.glb",
+    "FirstPersonClip": "Clips/go-there-fp.glb",
     "Ping": true,
     "Comms": 1305
   },
@@ -38,8 +38,8 @@
     "Slot": 0,
     "Body": "full",
     "Crude": true,
-    "Clip": "Clips/middle-finger.clip.forge",
-    "FirstPersonClip": "Clips/middle-finger-fp.clip.forge"
+    "Clip": "Clips/middle-finger.glb",
+    "FirstPersonClip": "Clips/middle-finger-fp.glb"
   },
   {
     "Id": "ForgeEmote:wave",
@@ -47,8 +47,8 @@
     "Icon": "ForgeEmote:wave",
     "Page": "gesture",
     "Slot": 1,
-    "Clip": "Clips/wave.clip.forge",
-    "FirstPersonClip": "Clips/wave-fp.clip.forge"
+    "Clip": "Clips/wave.glb",
+    "FirstPersonClip": "Clips/wave-fp.glb"
   },
   {
     "Id": "ForgeEmote:cheer",
@@ -56,8 +56,8 @@
     "Icon": "ForgeEmote:cheer",
     "Page": "gesture",
     "Slot": 2,
-    "Clip": "Clips/cheer.clip.forge",
-    "FirstPersonClip": "Clips/cheer-fp.clip.forge",
+    "Clip": "Clips/cheer.glb",
+    "FirstPersonClip": "Clips/cheer-fp.glb",
     "Comms": 1327,
     "Sound": "cheer"
   },
@@ -67,8 +67,8 @@
     "Icon": "ForgeEmote:thumbs-up",
     "Page": "gesture",
     "Slot": 3,
-    "Clip": "Clips/thumbs-up.clip.forge",
-    "FirstPersonClip": "Clips/thumbs-up-fp.clip.forge",
+    "Clip": "Clips/thumbs-up.glb",
+    "FirstPersonClip": "Clips/thumbs-up-fp.glb",
     "Comms": 1321
   },
   {
@@ -77,8 +77,8 @@
     "Icon": "ForgeEmote:dance",
     "Page": "dance",
     "Slot": 0,
-    "Clip": "Clips/dance.clip.forge",
-    "FirstPersonClip": "Clips/dance-fp.clip.forge",
+    "Clip": "Clips/dance.glb",
+    "FirstPersonClip": "Clips/dance-fp.glb",
     "Sound": "dance"
   },
   {
@@ -87,8 +87,8 @@
     "Icon": "ForgeEmote:quiet",
     "Page": "tactical",
     "Slot": 3,
-    "Clip": "Clips/quiet.clip.forge",
-    "FirstPersonClip": "Clips/quiet-fp.clip.forge",
+    "Clip": "Clips/quiet.glb",
+    "FirstPersonClip": "Clips/quiet-fp.glb",
     "Comms": 1298
   },
   {
@@ -97,8 +97,8 @@
     "Icon": "ForgeEmote:wait",
     "Page": "tactical",
     "Slot": 4,
-    "Clip": "Clips/wait.clip.forge",
-    "FirstPersonClip": "Clips/wait-fp.clip.forge"
+    "Clip": "Clips/wait.glb",
+    "FirstPersonClip": "Clips/wait-fp.glb"
   },
   {
     "Id": "ForgeEmote:follow-me",
@@ -106,8 +106,8 @@
     "Icon": "ForgeEmote:follow-me",
     "Page": "tactical",
     "Slot": 5,
-    "Clip": "Clips/follow-me.clip.forge",
-    "FirstPersonClip": "Clips/follow-me-fp.clip.forge",
+    "Clip": "Clips/follow-me.glb",
+    "FirstPersonClip": "Clips/follow-me-fp.glb",
     "Comms": 1283
   },
   {
@@ -116,8 +116,8 @@
     "Icon": "ForgeEmote:cover-me",
     "Page": "tactical",
     "Slot": 6,
-    "Clip": "Clips/cover-me.clip.forge",
-    "FirstPersonClip": "Clips/cover-me-fp.clip.forge",
+    "Clip": "Clips/cover-me.glb",
+    "FirstPersonClip": "Clips/cover-me-fp.glb",
     "Comms": 1307
   },
   {
@@ -126,8 +126,8 @@
     "Icon": "ForgeEmote:countdown",
     "Page": "tactical",
     "Slot": 7,
-    "Clip": "Clips/countdown.clip.forge",
-    "FirstPersonClip": "Clips/countdown-fp.clip.forge",
+    "Clip": "Clips/countdown.glb",
+    "FirstPersonClip": "Clips/countdown-fp.glb",
     "Comms": 1303
   },
   {
@@ -139,7 +139,7 @@
     "Body": "full",
     "View": "third-person",
     "CancelOnHit": true,
-    "Clip": "Clips/praying.clip.forge"
+    "Clip": "Clips/praying.glb"
   },
   {
     "Id": "ForgeEmote:backflip",
@@ -150,7 +150,7 @@
     "Body": "full",
     "View": "third-person",
     "CancelOnHit": true,
-    "Clip": "Clips/backflip.clip.forge"
+    "Clip": "Clips/backflip.glb"
   },
   {
     "Id": "ForgeEmote:laying-shrugging",
@@ -161,7 +161,7 @@
     "Body": "full",
     "View": "third-person",
     "CancelOnHit": true,
-    "Clip": "Clips/laying-shrugging.clip.forge"
+    "Clip": "Clips/laying-shrugging.glb"
   },
   {
     "Id": "ForgeEmote:laying-seizure",
@@ -172,7 +172,7 @@
     "Body": "full",
     "View": "third-person",
     "CancelOnHit": true,
-    "Clip": "Clips/laying-seizure.clip.forge"
+    "Clip": "Clips/laying-seizure.glb"
   },
   {
     "Id": "ForgeEmote:dancing-twerk",
@@ -181,7 +181,7 @@
     "Page": "dance",
     "Slot": 1,
     "Crude": true,
-    "Clip": "Clips/dancing-twerk.clip.forge",
+    "Clip": "Clips/dancing-twerk.glb",
     "Sound": "dancing-twerk"
   },
   {
@@ -190,7 +190,7 @@
     "Icon": "ForgeEmote:hip-hop-dancing",
     "Page": "dance",
     "Slot": 2,
-    "Clip": "Clips/hip-hop-dancing.clip.forge",
+    "Clip": "Clips/hip-hop-dancing.glb",
     "Sound": "hip-hop-dancing"
   },
   {
@@ -200,7 +200,7 @@
     "Page": "dance",
     "Slot": 3,
     "Loop": false,
-    "Clip": "Clips/zombie-stumbling.clip.forge"
+    "Clip": "Clips/zombie-stumbling.glb"
   },
   {
     "Id": "ForgeEmote:handshake",
@@ -214,7 +214,7 @@
     "CancelOnHit": true,
     "Pair": true,
     "PairHold": 2.0,
-    "Clip": "Clips/handshake.clip.forge"
+    "Clip": "Clips/handshake.glb"
   },
   {
     "Id": "ForgeEmote:fist-bump",
@@ -228,6 +228,6 @@
     "CancelOnHit": true,
     "Pair": true,
     "PairHold": 1.9,
-    "Clip": "Clips/fist-bump.clip.forge"
+    "Clip": "Clips/fist-bump.glb"
   }
 ]

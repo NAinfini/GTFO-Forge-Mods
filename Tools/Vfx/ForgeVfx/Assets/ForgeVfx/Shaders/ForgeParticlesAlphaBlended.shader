@@ -22,6 +22,7 @@ Shader "ForgeVfx/Particles Alpha Blended"
             #pragma fragment frag
             #pragma target 3.0
             #include "UnityCG.cginc"
+            #include "ForgeLineFade.cginc"
 
             sampler2D _MainTex;
             float4 _MainTex_ST;
@@ -39,6 +40,7 @@ Shader "ForgeVfx/Particles Alpha Blended"
                 float4 pos : SV_POSITION;
                 half4 color : COLOR;
                 float2 uv : TEXCOORD0;
+                float3 lineWorld : TEXCOORD1;
             };
 
             v2f vert (appdata v)
@@ -47,13 +49,14 @@ Shader "ForgeVfx/Particles Alpha Blended"
                 o.pos = UnityObjectToClipPos(v.vertex);
                 o.color = v.color;
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
+                FORGE_LINE_VERTEX(o, v)
                 return o;
             }
 
             half4 frag (v2f i) : SV_Target
             {
                 half4 texel = tex2D(_MainTex, i.uv);
-                return half4(texel.rgb * i.color.rgb * _TintColor.rgb, saturate(texel.a * i.color.a * _TintColor.a));
+                return half4(texel.rgb * i.color.rgb * _TintColor.rgb, saturate(texel.a * i.color.a * _TintColor.a * ForgeLineFade(i.lineWorld)));
             }
             ENDCG
         }

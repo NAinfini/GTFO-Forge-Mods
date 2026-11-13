@@ -9,8 +9,7 @@ internal enum SheddingHookId
     DeadEnter,
     CorpseMove,
     RagdollToggle,
-    CorpseHide,
-    RagdollHide,
+    DecayHidden,
     AmbientStart,
     AirStart,
     AmbientSystemUpdate,
@@ -23,12 +22,11 @@ internal enum SheddingHookId
     GardenEnable,
     GardenDisable,
     GardenShadow,
-    DecorationCamera,
+    VisibilityPreCull,
     DecorationShadowsUpdate,
     ImpactEffect,
     DecalPlay,
     DecalReturn,
-    LightList,
     LightCollectionScan,
     DecayInit,
     DebrisRun,
@@ -45,8 +43,7 @@ internal enum SheddingHookId
     LeakScrollHeaders,
     MeleePacket,
     IrfDraw,
-    IrfLateUpdate,
-    ClosedDoorCamera
+    IrfLateUpdate
 }
 
 internal sealed class SheddingHookPlan
@@ -85,8 +82,7 @@ internal sealed class SheddingHookPlan
         Add(settings.FastCorpseHide || settings.CorpseShadows, SheddingHookId.DeadEnter);
         Add(settings.FastCorpseHide || settings.CorpseRecycle, SheddingHookId.CorpseMove);
         Add(settings.RagdollCap || settings.RagdollNodeRefresh, SheddingHookId.RagdollToggle);
-        Add(settings.FastCorpseHide, SheddingHookId.CorpseHide);
-        Add(settings.RagdollCap, SheddingHookId.RagdollHide);
+        Add(settings.FastCorpseHide || settings.RagdollCap, SheddingHookId.DecayHidden);
         Add(settings.AmbientParticles || settings.AmbientDustOff, SheddingHookId.AmbientStart);
         Add(settings.AmbientParticles || settings.AmbientDustOff, SheddingHookId.AirStart);
         Add(settings.AmbientParticles || settings.AmbientDustOff, SheddingHookId.AmbientSystemUpdate);
@@ -99,12 +95,11 @@ internal sealed class SheddingHookPlan
         Add(settings.GardenShadows, SheddingHookId.GardenEnable);
         Add(settings.GardenShadows, SheddingHookId.GardenDisable);
         Add(settings.GardenShadows, SheddingHookId.GardenShadow);
-        Add(settings.DecorationCulling, SheddingHookId.DecorationCamera);
+        Add(settings.DecorationCulling || settings.DecorationLights || settings.ClosedDoorDepthLimit, SheddingHookId.VisibilityPreCull);
         Add(settings.DecorationShadows, SheddingHookId.DecorationShadowsUpdate);
         Add(settings.CombatDecals, SheddingHookId.ImpactEffect);
         Add(settings.CombatDecals, SheddingHookId.DecalPlay);
         Add(settings.CombatDecals, SheddingHookId.DecalReturn);
-        Add(settings.DecorationLights, SheddingHookId.LightList);
         Add(settings.DecorationLights, SheddingHookId.LightCollectionScan);
         Add(settings.DecayCleanup, SheddingHookId.DecayInit);
         Add(settings.DebrisFreeze, SheddingHookId.DebrisRun);
@@ -122,7 +117,6 @@ internal sealed class SheddingHookPlan
         Add(settings.MeleePacketReuse, SheddingHookId.MeleePacket);
         Add(settings.IrfWorldCameraOnly, SheddingHookId.IrfDraw);
         Add(settings.IrfOffscreenSkip, SheddingHookId.IrfLateUpdate);
-        Add(settings.ClosedDoorDepthLimit, SheddingHookId.ClosedDoorCamera);
         return new SheddingHookPlan(settings, hooks.ToArray());
     }
 }

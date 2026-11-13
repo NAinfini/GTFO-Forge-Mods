@@ -8,7 +8,8 @@ namespace ForgeReplay;
 internal static class Rec
 {
     private static readonly PayloadWriter Writer = new();
-    private static readonly KeyframeStates States = new();
+    /// <summary>The remembered state of every object; written again at the start of each keyframe block.</summary>
+    internal static readonly KeyframeStates States = new();
 
     internal static bool On => PlayerRecorder.Pipeline is { } pipeline && !pipeline.Failed;
 
@@ -34,12 +35,6 @@ internal static class Rec
     {
         Emit(kind);
         States.Set(kind, key, Writer.Span);
-    }
-
-    /// <summary>Writes the remembered state of every object, at the start of a keyframe block.</summary>
-    internal static void WriteStates(BlockPipeline pipeline, uint nowMs)
-    {
-        States.Write(pipeline, nowMs);
     }
 
     internal static void Reset() { States.Clear(); Hooks.ResetRecordingState(); HookFailures = 0; }

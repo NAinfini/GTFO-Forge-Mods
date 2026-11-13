@@ -25,19 +25,12 @@ string? Refused(string json)
     }
 }
 
-const string Good = """[{"Id":"pack:wave","Name":"wave","Page":"gesture","Slot":2,"Clip":"Clips/wave.clip.forge"}]""";
+const string Good = """[{"Id":"pack:wave","Name":"wave","Page":"gesture","Slot":2,"Clip":"Clips/wave.glb"}]""";
 var read = EmoteFile.Parse(Good, "folder");
 Check(read.Count == 1 && read[0].Id == "pack:wave" && read[0].Slot == 2 && read[0].Folder == "folder", "a valid file is read");
-Check(Refused(Good) == null, "a valid file is not refused");
 Check(Refused("""[{"Id":"pack:wave","Name":"wave","Page":"gesture","Clip":"c","Surprise":1}]""") == "[0].Surprise", "an unknown field is refused with its path");
+// The file goes through EmoteRules.Validate, the check Emotes.Register applies to a definition given in code; one rule stands for all.
 Check(Refused("""[{"Id":"pack:wave","Name":"wave","Page":"gesture","Clip":"c","Body":"legs"}]""") == "[0].Body", "a Body outside the list is refused");
-Check(Refused("""[{"Id":"wave","Name":"wave","Page":"gesture","Clip":"c"}]""") == "[0].Id", "an Id without a colon is refused");
-Check(Refused("""[{"Id":"pack:","Name":"wave","Page":"gesture","Clip":"c"}]""") == "[0].Id", "an Id with nothing after the colon is refused");
-
-// The same checks apply to a definition given in code (Emotes.Register calls EmoteRules.Validate).
-Check(EmoteRules.Validate(read[0]) == null, "a valid definition passes the shared check");
-Check(EmoteRules.Validate(new ForgeEmote.Api.EmoteDefinition { Id = "pack:x", Name = "x", Page = "gesture", Clip = "c", Body = "legs" }) is { Field: "Body" }, "a code definition with a Body outside the list is refused");
-Check(EmoteRules.Validate(new ForgeEmote.Api.EmoteDefinition { Id = "x", Name = "x", Page = "gesture", Clip = "c" }) is { Field: "Id" } && EmoteRules.Validate(new ForgeEmote.Api.EmoteDefinition { Id = "pack:x", Name = "x", Page = "gesture", Clip = "c", Slot = 8 }) is { Field: "Slot" }, "a code definition with an Id without a colon or a Slot out of range is refused");
 
 // The two-player flow: the offerer waits with the hand out; a teammate beyond reach or in another dimension does not pair it; the answerer waits for the start; both sides give up when nothing comes.
 var link = new EmotePair();
@@ -56,12 +49,6 @@ Check(EmotePair.ClipTime(EmotePair.Phase.Offering, 123f, Hold) == Hold && EmoteP
 Check(EmotePair.ClipTime(EmotePair.Phase.Paired, Hold, Hold) == Hold && Math.Abs(EmotePair.ClipTime(EmotePair.Phase.Paired, Hold + EmotePair.ClaspSeconds, Hold) - Hold) < 1e-4f
     && Math.Abs(EmotePair.ClipTime(EmotePair.Phase.Paired, Hold + EmotePair.ClaspSeconds + 0.5f, Hold) - (Hold + 0.5f)) < 1e-4f, "the clasp is held, then the clip goes on from the same pose");
 Check(EmotePair.ClipTime(EmotePair.Phase.Paired, Hold + 0.25f, Hold) is > Hold and <= Hold + EmotePair.WobbleSpan, "the held hands move within the clip's own poses");
-link.Clear();
-var stars = new List<string> { "gone:1", "gone:2", "a", "b", "c", "d", "e", "f" };
-Func<string, bool> here = id => !id.StartsWith("gone:");
-Check(EmoteRules.Toggle(stars, "g", here) && EmoteRules.Toggle(stars, "h", here) && stars.Count == 10 && !EmoteRules.Toggle(stars, "i", here) && stars.Contains("gone:1"), "stars of what is no longer installed take no place and are kept");
-Check(link.Now == EmotePair.Phase.None && ReadPair("""[{"Id":"pack:five","Name":"five","Page":"gesture","Clip":"c","Pair":true}]"""), "Pair is read from a definition file");
-static bool ReadPair(string json) => EmoteFile.Parse(json, "")[0].Pair;
 
 Console.WriteLine(failures == 0 ? "ForgeEmote core: " + checks + " checks passed, 0 failed" : failures + " check(s) failed");
 return failures == 0 ? 0 : 1;

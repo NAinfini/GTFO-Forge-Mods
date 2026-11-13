@@ -8,7 +8,7 @@ namespace ForgeCore;
 /// any patch method ran, on every call (owner log of 2026-10-28, <c>EnemyDetection.DetectOnNoiseDistance_Conditional_AnimatedWindow</c>,
 /// 1240 lines), and the game's own check went with it. Such a method is never patched: <see cref="Why"/> names the reason.
 /// </summary>
-public static class TrampolineSafety
+internal static class TrampolineSafety
 {
     /// <summary>Null when <paramref name="method"/> can be patched, else the reason it cannot.</summary>
     public static string? Why(MethodBase method)

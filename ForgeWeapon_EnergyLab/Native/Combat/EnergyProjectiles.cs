@@ -87,7 +87,7 @@ internal sealed class EnergyProjectiles : IDisposable
             flight.Phase = Phase.Launched;
             flight.Contacts.Reset();
             flight.NextPulse = double.NegativeInfinity;
-            Visuals.Orb(index, position, flight.Payload.BodyRadius, now, mode == EnergyMode.PlasmaArc, flying: true);
+            Visuals.Orb(index, position, flight.Payload.BodyRadius, mode == EnergyMode.PlasmaArc, flying: true);
             return;
         }
         throw new BudgetExhausted("All energy projectile slots are occupied.");
@@ -150,11 +150,11 @@ internal sealed class EnergyProjectiles : IDisposable
         }
         if (flight.Phase is Phase.Exploding or Phase.Fading)
         {
-            var lifetime = flight.Phase == Phase.Exploding ? ExplosionLifetime(flight) : flight.Gear.Numbers.FadeLifetime;
+            var lifetime = flight.Phase == Phase.Exploding ? flight.Gear.Numbers.ExplosionLifetime : flight.Gear.Numbers.FadeLifetime;
             var progress = 1f - (flight.Until - now) / lifetime;
             if (progress >= 1f) { Clear(index); return; }
             if (flight.Phase == Phase.Fading)
-                Visuals.Dissipate(index, flight.Position, flight.Payload.BodyRadius, progress, now);
+                Visuals.Dissipate(index, flight.Position, flight.Payload.BodyRadius, progress);
             return;
         }
         var remainingTime = MathF.Max(0f, flight.Until - (now - delta));
@@ -179,7 +179,7 @@ internal sealed class EnergyProjectiles : IDisposable
         }
         flight.Position += flight.Direction * distance;
         if (now >= flight.Until) { EndFlight(index, now); return; }
-        Visuals.Orb(index, flight.Position, flight.Payload.BodyRadius, now, flight.Mode == EnergyMode.PlasmaArc, flying: true);
+        Visuals.Orb(index, flight.Position, flight.Payload.BodyRadius, flight.Mode == EnergyMode.PlasmaArc, flying: true);
         if (flight.Mode == EnergyMode.PlasmaArc) Pulse(index, now);
     }
     // Even a projectile launched inside a receiver waits until Fire has returned before contact or explosion damage.
@@ -224,7 +224,7 @@ internal sealed class EnergyProjectiles : IDisposable
         flight.NextPulse = now - flight.NextPulse >= interval ? now + interval : flight.NextPulse + interval;
         var count = 0;
         var tuning = flight.Gear.Numbers.Pulse with { Range = flight.Payload.ArcRadius, Damage = flight.Payload.ArcDamage };
-        while (count < flight.Gear.Numbers.PulseTargets && _enemies.Nearest(flight.Owner!, TargetRelationFilter.Enemies,
+        while (count < flight.Gear.Numbers.PulseTargets && _enemies.Nearest(flight.Owner!,
             hitInterveningReceiver: false, flight.Position, tuning.Range,
             _pulseTargets.AsSpan(0, count), flight.Owner!.Pointer.ToInt64(), out var hit, out var identity))
         {
@@ -237,7 +237,7 @@ internal sealed class EnergyProjectiles : IDisposable
         if (count == 0) return;
         if (_damageEnabled)
             for (var shot = 0; shot < count; shot++) _pulseShots[shot].Apply();
-        Visuals.Pulse(index, _pulseEnds.AsSpan(0, count), now);
+        Visuals.Pulse(index, _pulseEnds.AsSpan(0, count));
     }
 
     private void EndFlight(int index, float now)
@@ -250,27 +250,24 @@ internal sealed class EnergyProjectiles : IDisposable
         flight.Phase = Phase.Fading;
         flight.Until = now + flight.Gear.Numbers.FadeLifetime;
         Visuals.Fade(index, flight.Position);
-        Visuals.Dissipate(index, flight.Position, flight.Payload.BodyRadius, 0f, now);
+        Visuals.Dissipate(index, flight.Position, flight.Payload.BodyRadius, 0f);
     }
-
-    private static float BlastRadius(Flight flight) => flight.Payload.BlastRadius;
-    private static float ExplosionLifetime(Flight flight) => flight.Gear.Numbers.ExplosionLifetime;
 
     private void Explode(int index, float now)
     {
         var flight = _flights[index];
         // Claim the terminal transition before native writes; partial damage is never retried.
         flight.Phase = Phase.Exploding;
-        flight.Until = now + ExplosionLifetime(flight);
+        flight.Until = now + flight.Gear.Numbers.ExplosionLifetime;
         if (_damageEnabled)
         {
-            _explosion.Apply(flight.Owner!, flight.Gear, flight.Position, BlastRadius(flight), flight.Payload.Damage);
-            WeaponNoise.Explosion(flight.Owner!, flight.Gear, flight.Position);
+            _explosion.Apply(flight.Owner!, flight.Gear, flight.Position, flight.Payload.BlastRadius, flight.Payload.Damage);
+            // The game's world noise of an explosion, as the blast shell makes it (host only).
+            ForgeCore.Combat.Noise(flight.Position, flight.Gear.Numbers.NoiseRadius, (int)flight.Owner!.DimensionIndex);
         }
-        Visuals.Explosion(index, flight.Position, BlastRadius(flight), now);
+        Visuals.Explosion(index, flight.Position, flight.Payload.BlastRadius);
         Visuals.Boom(flight.Position);
     }
-
 
     private void Clear(int index)
     {

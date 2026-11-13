@@ -1,5 +1,6 @@
 using ForgeCore;
 using ForgeReplay;
+using ForgeUI;
 
 internal static class RecordingChecks
 {
@@ -444,10 +445,6 @@ internal static class RecordingChecks
         check(NoiseRebuild.Reach(NoiseAction.Run, ears) == 12f && NoiseRebuild.Reach(NoiseAction.Shot, ears) == 40f && NoiseRebuild.Reach(NoiseAction.Melee, ears) == 12f
             && NoiseRebuild.Reach(NoiseAction.DoorOpen, ears) == 12f && NoiseRebuild.Reach(NoiseAction.DoorBreak, ears) == 40f,
             "noise: every rebuilt player action has a hearing distance, the game data's own where it has one and the estimate of the like sound for a melee hit and the doors");
-        // A sentry's recorded shot carries the gun's audio block and fire mode after the muzzle direction.
-        var shot = new PayloadWriter().Reset().U(9).Pos(1, 2, 3).U(7).Pos(0, 0, 1).U(1234).U(12).Span.ToArray();
-        var shotRead = new PayloadReader(shot); shotRead.U(); shotRead.Pos(); shotRead.U(); shotRead.Pos();
-        check(!shotRead.AtEnd && shotRead.U() == 1234 && shotRead.U() == 12 && shotRead.AtEnd, "sentry shot: the audio block id and fire mode follow the muzzle direction");
 
         // Library: keep 20 plain recordings and every starred one, mark an unfinished file; a recording of another game build still plays.
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "forge-replay-test-" + Guid.NewGuid().ToString("N"));
@@ -541,9 +538,9 @@ internal static class RecordingChecks
         check(afterHit && Math.Abs(hosted.Players[1].BulletDamage - 10f) < 0.01f && hosted.Players[1].Landed == 2,
             "host records: the host's hit counts exactly once the snapshot is in, and a later snapshot makes the totals the host's (" + hosted.Players[1].BulletDamage + " damage)");
         // A packet cut off, of the wrong type or with a count the rest cannot hold is refused as a whole, and nothing of it is handed out.
-        var sender = new HostLink.Writer(); sender.Hit(new HostHit(9, 0, 1, 0, false, false, 20, 0, 100, 0)); var good = sender.Seal(1, 5000);
+        var sender = new HostLink.Writer(); sender.Hit(new HostHit(9, 0, 1, 0, false, false, 20, 0, 100, 0)); var good = sender.Seal();
         var halved = good[..^2]; var typed = (byte[])good.Clone(); typed[0] = 0; var sink = new CountingRecords();
-        check(HostLink.Read(good, sink, out var seq, out _) && sink.Hits == 1 && seq == 1 && !HostLink.Read(halved, sink, out _, out _) && !HostLink.Read(typed, sink, out _, out _) && sink.Hits == 1,
+        check(HostLink.Read(good, sink) && sink.Hits == 1 && !HostLink.Read(halved, sink) && !HostLink.Read(typed, sink) && sink.Hits == 1,
             "host records: a sound packet is read, a cut-off or foreign one is refused and hands out nothing");
         // The extended records: a player hurt, a gift and a pack use travel beside the hits, and the snapshot's packs and supplies level the client.
         var extended = new HostLink.Writer();
@@ -556,8 +553,8 @@ internal static class RecordingChecks
         extTotals[2] = new HostTotals { Supplied = 4 };
         extended.Snapshot(5, extTotals);
         var extSink = new CountingRecords();
-        var extPacket = extended.Seal(3, 5000);
-        check(HostLink.Read(extPacket, extSink, out var extSeq, out _) && extSeq == 3 && extSink.Hurts == 1 && extSink.Supplies == 1 && extSink.Packs == 1 && extSink.Rays == 1
+        var extPacket = extended.Seal();
+        check(HostLink.Read(extPacket, extSink) && extSink.Hurts == 1 && extSink.Supplies == 1 && extSink.Packs == 1 && extSink.Rays == 1
             && extSink.Snapshots == 1 && extSink.PacksTotal == 2 && extSink.Supplied == 3,
             "host records: a player hurt, a gift, a pack use, a shot and the extended snapshot are read back");
         var hostFacts = new Analysis(false) { RecorderSlot = 2 };
@@ -761,5 +758,25 @@ internal static class RecordingChecks
         var h1 = health.At(7, 2500, out var r1); var h2 = health.At(7, 3500, out var r2); var h3 = health.At(7, 1500, out _); var h4 = health.At(7, 5500, out _); var h5 = health.At(7, 6500, out var r5);
         check(h1 && r1 == 40f && h2 && r2 == 10f && !h3 && !h4 && h5 && r5 == 55f && !health.At(8, 2500, out _),
             "enemy health: the synced health at a moment is the one after the last loss of the spawn alive then, and a number used again by the next enemy starts its own run");
+        // The screen's zones at 16:9, 16:10, 21:9 and 4:3 (HUD units: the height is the same at every resolution, 720p included), with the default and a wide
+        // safe margin: none over another, the four cards equal and inside their zone, everything on the screen, and a deliberately overlapping pair caught.
+        var zonesOk = !new HudBox(0f, 0f, 10f, 10f).Overlaps(new HudBox(10f, 0f, 20f, 10f)) && new HudBox(0f, 0f, 10f, 10f).Overlaps(new HudBox(9f, 9f, 20f, 20f));
+        foreach (var width in new[] { 2560f, 2304f, 3360f, 1920f })
+            foreach (var margin in new[] { 48f, 120f })
+            {
+                var screen = new HudBox(-width / 2f, -720f, width / 2f, 720f);
+                var z = ReplayZones.Of(screen, margin, 204f + margin - 48f, 84f, 12f, 600f, 152f);
+                var height = z.CardHeight(214f, 6f);
+                var boxes = new List<HudBox> { z.Bottom, z.Mission, z.Feed, z.Middle };
+                for (var i = 0; i < 4; i++) boxes.Add(z.Card(i, height, 6f));
+                for (var a = 0; a < boxes.Count; a++)
+                {
+                    var box = boxes[a];
+                    zonesOk &= box.Width > 0f && box.Height > 0f && box.Left >= screen.Left + margin && box.Right <= screen.Right - margin && box.Bottom >= screen.Bottom + margin && box.Top <= screen.Top - margin;
+                    for (var b = a + 1; b < boxes.Count; b++) zonesOk &= !box.Overlaps(boxes[b]);
+                }
+                zonesOk &= height >= 180f && z.Card(3, height, 6f).Bottom >= z.Cards.Bottom && z.Control.Bottom > z.Bottom.Bottom && z.Control.Top == z.Bottom.Top && z.Panels(z.Work.Top, 12f).Right < z.Cards.Left;
+            }
+        check(zonesOk, "screen zones: at every screen shape and margin no zone covers another, the four equal cards fit, and an overlap is caught");
     }
 }

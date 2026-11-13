@@ -14,7 +14,4 @@ internal static class OrbitMath
         var step = seconds > 0f ? dt / seconds : 1f;
         return Math.Clamp(at + (outward ? step : -step), 0f, 1f);
     }
-
-    /// <summary>A smooth start and stop.</summary>
-    public static float Eased(float t) => t * t * (3f - 2f * t);
 }

@@ -58,6 +58,9 @@ public sealed class SlowZoneLease : IDisposable
     internal readonly HashSet<IntPtr> SlowedSet = new();
     public void Dispose() => Enemies.ZoneEnd(this);
 }
+/// <summary>A damageable limb collider of a living enemy and that enemy, as <see cref="Enemies.Limbs"/> finds them.</summary>
+public readonly record struct EnemyLimb(Collider Collider, EnemyAgent Enemy);
+
 /// <summary>Enemies as the game holds them: which enemy a collider belongs to, every living enemy near a point (each once, all of
 /// them), every living enemy in the level (<see cref="Live"/>) and how alert an enemy is. Main thread only.</summary>
 public static class Enemies
@@ -65,10 +68,15 @@ public static class Enemies
     private const int InitialCapacity = 256;
     private static Il2CppReferenceArray<Collider> _overlap = new(InitialCapacity);
     private static EnemyAgent?[] _found = new EnemyAgent?[InitialCapacity];
+    private static EnemyLimb[] _limbs = new EnemyLimb[InitialCapacity];
     private static float[] _distances = new float[InitialCapacity];
-    private static readonly HashSet<IntPtr> FoundPointers = new(InitialCapacity);
-    private static readonly Dictionary<int, (Collider Collider, EnemyAgent Enemy)> Owners = new(InitialCapacity);
-    private static readonly List<int> InvalidOwners = new(InitialCapacity);
+    // Each enemy one query met, with whether it lives: its life is read once however many of its limbs are inside.
+    private static readonly Dictionary<IntPtr, bool> Seen = new(InitialCapacity);
+    private static int _foundCount;
+    // A limb collider's enemy, keyed by the collider's pointer; the entry holds the collider's wrapper, so the pointer is not reused while
+    // it is cached. An enemy's entries go when it is set up again, dies or leaves (Forget), through LimbKeys.
+    private static readonly Dictionary<IntPtr, (Collider Collider, EnemyAgent Enemy)> Owners = new(InitialCapacity);
+    private static readonly Dictionary<IntPtr, List<IntPtr>> LimbKeys = new(InitialCapacity);
     private static readonly Dictionary<IntPtr, int> SlotOf = new(InitialCapacity);
     private static readonly Stack<int> Vacant = new();
     private static EnemyAgent?[] _live = new EnemyAgent?[InitialCapacity];
@@ -110,40 +118,52 @@ public static class Enemies
     public static int Generation(int slot) => (uint)slot < (uint)_slotCount ? _generations[slot] : 0;
 
     /// <summary>Every living enemy with a damageable limb inside the sphere, each once however many limbs are inside. Never
-    /// truncated: the query grows until it holds every collider. The span is valid until the next call.</summary>
+    /// truncated: the query grows until it holds every collider. The span is valid until the next call of this or <see cref="Limbs"/>.</summary>
     public static ReadOnlySpan<EnemyAgent?> Near(Vector3 position, float radius)
     {
+        Collect(position, radius, QueryTriggerInteraction.Collide);
+        return _found.AsSpan(0, _foundCount);
+    }
+
+    /// <summary>Every damageable limb collider inside the sphere that belongs to a living enemy, each with its enemy: an enemy appears once
+    /// per limb inside, in the order the game found them. Only the enemy limb layer (<c>MASK_ENEMY_DAMAGABLE</c>) is asked, so walls and
+    /// floors in range take no room, and it is never truncated: the query grows until it holds every collider. <paramref name="triggers"/>
+    /// is the game's trigger setting for the query. The limb-to-enemy cache is <see cref="Near"/>'s. The span is valid until the next call
+    /// of this or <see cref="Near"/>; nothing is allocated once the buffers have grown.</summary>
+    public static ReadOnlySpan<EnemyLimb> Limbs(Vector3 position, float radius, QueryTriggerInteraction triggers)
+        => _limbs.AsSpan(0, Collect(position, radius, triggers));
+
+    /// <summary>One sphere query on the enemy limb layer, its buffer doubled until it is not full: the limbs of living enemies into
+    /// <c>_limbs</c> (how many is returned) and each living enemy once into <c>_found</c>.</summary>
+    private static int Collect(Vector3 position, float radius, QueryTriggerInteraction triggers)
+    {
         EnemyLifeHooks.Ensure();
-        var hits = Physics.OverlapSphereNonAlloc(position, radius, _overlap, LayerManager.MASK_ENEMY_DAMAGABLE, QueryTriggerInteraction.Collide);
+        var hits = Physics.OverlapSphereNonAlloc(position, radius, _overlap, LayerManager.MASK_ENEMY_DAMAGABLE, triggers);
         while (hits == _overlap.Length)
         {
             _overlap = new Il2CppReferenceArray<Collider>(checked(_overlap.Length * 2));
-            hits = Physics.OverlapSphereNonAlloc(position, radius, _overlap, LayerManager.MASK_ENEMY_DAMAGABLE, QueryTriggerInteraction.Collide);
+            hits = Physics.OverlapSphereNonAlloc(position, radius, _overlap, LayerManager.MASK_ENEMY_DAMAGABLE, triggers);
         }
         if (_found.Length < hits) Array.Resize(ref _found, hits);
-        var count = 0;
-        FoundPointers.Clear();
+        if (_limbs.Length < hits) _limbs = new EnemyLimb[hits];
+        Seen.Clear();
+        _foundCount = 0;
+        var limbs = 0;
         for (var i = 0; i < hits; i++)
         {
             var collider = _overlap[i];
             if (collider == null) continue;
-            var id = collider.GetInstanceID();
-            EnemyAgent? enemy;
-            if (Owners.TryGetValue(id, out var cached) && cached.Collider == collider && cached.Enemy != null
-                && !cached.Enemy.WasCollected && collider.transform.IsChildOf(cached.Enemy.transform))
-                enemy = cached.Enemy;
-            else
+            var enemy = Owner(collider);
+            if (enemy == null) continue;
+            if (!Seen.TryGetValue(enemy.Pointer, out var alive))
             {
-                Owners.Remove(id);
-                enemy = collider.GetComponentInParent<IDamageable>()?.GetBaseAgent()?.TryCast<EnemyAgent>();
-                // Misses are not cached: a pooled collider may get its damage receiver later.
-                if (enemy != null) Owners[id] = (collider, enemy);
+                alive = enemy.Alive;
+                Seen.Add(enemy.Pointer, alive);
+                if (alive) _found[_foundCount++] = enemy;
             }
-            if (enemy == null || !enemy.Alive) continue;
-            if (!FoundPointers.Add(enemy.Pointer)) continue;
-            _found[count++] = enemy;
+            if (alive) _limbs[limbs++] = new EnemyLimb(collider, enemy);
         }
-        return _found.AsSpan(0, count);
+        return limbs;
     }
 
     /// <summary>Where a shot or blast looks at <paramref name="enemy"/>: the game's own aim target, else a metre above its feet.</summary>
@@ -198,8 +218,24 @@ public static class Enemies
     /// <summary>The living enemy <paramref name="collider"/> belongs to, or null.</summary>
     public static EnemyAgent? FromCollider(Collider? collider)
     {
-        var enemy = collider == null ? null : collider.GetComponentInParent<IDamageable>()?.GetBaseAgent()?.TryCast<EnemyAgent>();
+        if (collider == null) return null;
+        EnemyLifeHooks.Ensure();
+        var enemy = Owner(collider);
         return enemy != null && enemy.Alive ? enemy : null;
+    }
+
+    /// <summary>The enemy a live collider belongs to, from the cache or else looked up once and cached.</summary>
+    private static EnemyAgent? Owner(Collider collider)
+    {
+        var key = collider.Pointer;
+        if (Owners.TryGetValue(key, out var cached)) return cached.Enemy;
+        var enemy = collider.GetComponentInParent<IDamageable>()?.GetBaseAgent()?.TryCast<EnemyAgent>();
+        // Misses are not cached: a pooled collider may get its damage receiver later.
+        if (enemy == null) return null;
+        Owners.Add(key, (collider, enemy));
+        if (!LimbKeys.TryGetValue(enemy.Pointer, out var limbs)) LimbKeys.Add(enemy.Pointer, limbs = new List<IntPtr>());
+        limbs.Add(key);
+        return enemy;
     }
 
     /// <summary>The living enemy <paramref name="collider"/> belongs to, when it is in <paramref name="context"/>'s dimension.</summary>
@@ -386,12 +422,8 @@ public static class Enemies
             var live = anim != null && !anim.WasCollected;
             if (Slows.RemoveAll(enemy.Pointer, live ? anim!.speed : 0f, out var speed) && live) anim!.speed = speed;
         }
-        InvalidOwners.Clear();
-        foreach (var entry in Owners)
-            if (entry.Value.Enemy == null || entry.Value.Collider == null || entry.Value.Enemy.Pointer == enemy.Pointer)
-                InvalidOwners.Add(entry.Key);
-        foreach (var id in InvalidOwners) Owners.Remove(id);
-        InvalidOwners.Clear();
+        if (!LimbKeys.Remove(enemy.Pointer, out var limbs)) return;
+        foreach (var key in limbs) Owners.Remove(key);
     }
 
     internal static void Clear()
@@ -402,19 +434,21 @@ public static class Enemies
         _nextZonePass = 0f;
         Slows.Clear();
         Array.Clear(_found, 0, _found.Length);
+        Array.Clear(_limbs, 0, _limbs.Length);
         Array.Clear(_live, 0, _live.Length);
         _slotCount = _liveCount = 0;
         _liveVersion++;
         _seeded = false;
         SlotOf.Clear();
         Vacant.Clear();
-        FoundPointers.Clear();
+        Seen.Clear();
+        _foundCount = 0;
         Owners.Clear();
-        InvalidOwners.Clear();
+        LimbKeys.Clear();
     }
 }
 
-/// <summary>Subscribed by <see cref="Enemies.Near"/> and <see cref="Enemies.Live"/> the first time either runs, to the enemy hooks of
+/// <summary>Subscribed by <see cref="Enemies.Near"/>, <see cref="Enemies.Limbs"/> and <see cref="Enemies.Live"/> the first time one runs, to the enemy hooks of
 /// <see cref="GameHooks"/>.</summary>
 internal static class EnemyLifeHooks
 {

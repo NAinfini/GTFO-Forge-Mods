@@ -12,7 +12,7 @@
     "open-trailing": {"Index": [16, 16, 10], "Middle": [18, 18, 10], "Ring": [20, 18, 10], "Pinky": [24, 20, 12], "spread": 5, "thumb": [[0.55, 0.8, 0.2], [0.7, 0.7, 0.1]]},
     "beckon": {"Index": [65, 85, 55], "Middle": [58, 75, 50], "Ring": [50, 65, 45], "Pinky": [42, 55, 40], "spread": 1, "thumb": [[0.75, 0.5, 0.45], [0.9, 0.3, 0.3]]},
     "relaxed": {"Index": [14, 22, 12], "Middle": [18, 24, 14], "Ring": [22, 26, 14], "Pinky": [26, 28, 16], "spread": 4, "thumb": [[0.7, 0.55, 0.3], [0.85, 0.35, 0.25]]},
-    "one": {"Index": [2, 3, 2], "Middle": [85, 100, 60], "Ring": [90, 100, 60], "Pinky": [92, 100, 60], "thumb": [[0.6, 0.05, 0.8], [0.55, -0.6, 0.55]]},
+    "one": {"Index": [2, 3, 2], "Middle": [85, 100, 60], "Ring": [90, 100, 60], "Pinky": [92, 100, 60], "thumb": [[0.42, -0.2, 0.92], [0.3, -0.85, 0.55]]},
     "two": {"Index": [2, 3, 2], "Middle": [2, 3, 2], "Ring": [88, 100, 60], "Pinky": [92, 100, 60], "spread": 9, "thumb": [[0.42, -0.2, 0.92], [0.28, -0.88, 0.5]]},
     "three": {"Index": [2, 3, 2], "Middle": [2, 3, 2], "Ring": [4, 4, 3], "Pinky": [92, 100, 60], "spread": 7, "thumb": [[0.42, -0.2, 0.92], [0.22, -0.92, 0.45]]}
   },
@@ -327,7 +327,7 @@
           {"t": 1.7, "pose": "low", "ease": "in"}
         ],
         "poses": {
-          "low": {"aim": {"leftUpperArm": [0.32, -0.94, 0.08], "leftLowerArm": [0.2, -0.9, 0.38]}},
+          "low": {"aim": {"leftUpperArm": [0.12, -1, 0.04], "leftLowerArm": [0.08, -0.95, 0.3]}},
           "lips": {"aim": {"leftUpperArm": [-0.15, -0.75, 0.65], "leftLowerArm": [-0.45, 0.85, -0.15]}, "hands": {"leftHand": {"aim": [-0.05, 1, 0.05], "knuckles": [0, 0, -1], "shape": "one"}}},
           "press": {"from": "lips", "aim": {"leftUpperArm": [-0.16, -0.76, 0.63], "leftLowerArm": [-0.47, 0.84, -0.2]}},
           "hold": {"from": "lips", "aim": {"leftUpperArm": [-0.14, -0.76, 0.64], "leftLowerArm": [-0.45, 0.86, -0.13]}}
@@ -346,7 +346,7 @@
           {"t": 1.8, "pose": "low", "ease": "in"}
         ],
         "poses": {
-          "low": {"aim": {"leftUpperArm": [0.32, -0.94, 0.08], "leftLowerArm": [0.2, -0.9, 0.38]}},
+          "low": {"aim": {"leftUpperArm": [0.12, -1, 0.04], "leftLowerArm": [0.08, -0.95, 0.3]}},
           "up": {"aim": {"leftUpperArm": [0.25, -0.45, 0.86], "leftLowerArm": [0.05, 0.78, 0.62]}, "hands": {"leftHand": {"aim": [0, 1, 0.15], "knuckles": [-1, 0, 0], "shape": "one"}}},
           "push": {"from": "up", "aim": {"leftUpperArm": [0.24, -0.38, 0.9], "leftLowerArm": [0.05, 0.7, 0.71]}},
           "held": {"from": "up", "aim": {"leftUpperArm": [0.25, -0.46, 0.85], "leftLowerArm": [0.05, 0.8, 0.6]}}
@@ -366,7 +366,7 @@
           {"t": 1.84, "pose": "low", "ease": "in"}
         ],
         "poses": {
-          "low": {"aim": {"leftUpperArm": [0.32, -0.94, 0.08], "leftLowerArm": [0.2, -0.9, 0.38]}},
+          "low": {"aim": {"leftUpperArm": [0.12, -1, 0.04], "leftLowerArm": [0.08, -0.95, 0.3]}},
           "raise": {"aim": {"leftUpperArm": [0.35, 0.7, -0.1], "leftLowerArm": [0.15, 0.97, 0.15]}, "hands": {"leftHand": {"aim": [0, 1, 0.1], "knuckles": [-1, 0, 0], "shape": "flat"}}},
           "forward": {"aim": {"leftUpperArm": [0.18, 0.08, 0.98], "leftLowerArm": [0.08, 0.02, 1]}, "hands": {"leftHand": {"aim": [0, -0.05, 1], "knuckles": [-1, 0, 0], "shape": "flat"}}}
         }
@@ -386,7 +386,7 @@
           {"t": 1.94, "pose": "low", "ease": "in"}
         ],
         "poses": {
-          "low": {"aim": {"leftUpperArm": [0.32, -0.94, 0.08], "leftLowerArm": [0.2, -0.9, 0.38]}},
+          "low": {"aim": {"leftUpperArm": [0.12, -1, 0.04], "leftLowerArm": [0.08, -0.95, 0.3]}},
           "on": {"aim": {"leftUpperArm": [0.75, 0.55, 0.2], "leftLowerArm": [-0.78, 0.6, 0.02]}, "hands": {"leftHand": {"aim": [-1, 0.05, 0.05], "knuckles": [0, 0, -1], "shape": "flat"}}},
           "lift": {"from": "on", "aim": {"leftUpperArm": [0.74, 0.58, 0.2], "leftLowerArm": [-0.7, 0.71, 0.02]}}
         }
@@ -408,7 +408,7 @@
           {"t": 3.36, "pose": "low", "ease": "in"}
         ],
         "poses": {
-          "low": {"aim": {"leftUpperArm": [0.32, -0.94, 0.08], "leftLowerArm": [0.2, -0.9, 0.38]}},
+          "low": {"aim": {"leftUpperArm": [0.12, -1, 0.04], "leftLowerArm": [0.08, -0.95, 0.3]}},
           "three": {"aim": {"leftUpperArm": [0.45, -0.25, 0.86], "leftLowerArm": [0.1, 0.95, 0.25]}, "hands": {"leftHand": {"aim": [0, 1, 0.1], "knuckles": [-1, 0, 0], "shape": "three"}}},
           "two": {"from": "three", "hands": {"leftHand": {"aim": [0, 1, 0.1], "knuckles": [-1, 0, 0], "shape": "two"}}},
           "one": {"from": "three", "hands": {"leftHand": {"aim": [0, 1, 0.1], "knuckles": [-1, 0, 0], "shape": "one"}}},
@@ -430,11 +430,11 @@
           {"t": 1.7, "pose": "rest"}
         ],
         "poses": {
-          "lips": {"reach": {"left": {"wrist": [0.05, -0.15, 0.4], "elbow": [0.05, -0.18, 0.28]}}, "hands": {"leftHand": {"aim": [-0.1, 0.97, 0.2], "knuckles": [0.1, 0, -1], "shape": "one"}}},
-          "press": {"from": "lips", "reach": {"left": {"wrist": [0.046, -0.155, 0.385], "elbow": [0.05, -0.18, 0.28]}}},
-          "hold": {"from": "lips", "reach": {"left": {"wrist": [0.051, -0.148, 0.402], "elbow": [0.05, -0.18, 0.28]}}},
-          "enter": {"from": "lips", "reach": {"left": {"wrist": [0.05, -0.45, 0.32], "elbow": [0.05, -0.18, 0.28]}}},
-          "fall": {"from": "hold", "reach": {"left": {"wrist": [0.051, -0.45, 0.32], "elbow": [0.05, -0.18, 0.28]}}}
+          "lips": {"reach": {"left": {"wrist": [0.06, -0.12, 0.36], "elbow": [0.05, -0.18, 0.28]}}, "hands": {"leftHand": {"aim": [-0.1, 0.97, 0.2], "knuckles": [0.1, 0, -1], "shape": "one"}}},
+          "press": {"from": "lips", "reach": {"left": {"wrist": [0.055, -0.125, 0.345], "elbow": [0.05, -0.18, 0.28]}}},
+          "hold": {"from": "lips", "reach": {"left": {"wrist": [0.061, -0.118, 0.362], "elbow": [0.05, -0.18, 0.28]}}},
+          "enter": {"from": "lips", "reach": {"left": {"wrist": [0.06, -0.45, 0.32], "elbow": [0.05, -0.18, 0.28]}}},
+          "fall": {"from": "hold", "reach": {"left": {"wrist": [0.061, -0.45, 0.32], "elbow": [0.05, -0.18, 0.28]}}}
         }
       }
     },
@@ -498,10 +498,10 @@
           {"t": 1.94, "pose": "rest"}
         ],
         "poses": {
-          "on": {"reach": {"left": {"wrist": [0.13, 0.07, 0.34], "elbow": [0.3, -0.2, 0.15]}}, "hands": {"leftHand": {"aim": [-0.6, 0.15, 0.78], "knuckles": [-0.8, 0, -0.6], "shape": "flat"}}},
-          "lift": {"from": "on", "reach": {"left": {"wrist": [0.13, 0.1, 0.34], "elbow": [0.3, -0.2, 0.15]}}},
-          "enter": {"from": "on", "reach": {"left": {"wrist": [0.13, -0.45, 0.32], "elbow": [0.3, -0.2, 0.15]}}},
-          "fall": {"from": "on", "reach": {"left": {"wrist": [0.13, -0.45, 0.32], "elbow": [0.3, -0.2, 0.15]}}}
+          "on": {"reach": {"left": {"wrist": [0.15, 0.02, 0.3], "elbow": [0.3, -0.2, 0.15]}}, "hands": {"leftHand": {"aim": [-0.6, 0.2, 0.75], "knuckles": [-0.8, 0, -0.6], "shape": "flat"}}},
+          "lift": {"from": "on", "reach": {"left": {"wrist": [0.15, 0.05, 0.3], "elbow": [0.3, -0.2, 0.15]}}},
+          "enter": {"from": "on", "reach": {"left": {"wrist": [0.15, -0.45, 0.32], "elbow": [0.3, -0.2, 0.15]}}},
+          "fall": {"from": "on", "reach": {"left": {"wrist": [0.15, -0.45, 0.32], "elbow": [0.3, -0.2, 0.15]}}}
         }
       }
     },

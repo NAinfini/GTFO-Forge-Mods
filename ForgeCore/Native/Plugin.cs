@@ -3,7 +3,6 @@ using System.IO;
 using BepInEx;
 using BepInEx.Unity.IL2CPP;
 using GTFO.API;
-using SNetwork;
 using UnityEngine;
 
 namespace ForgeCore;
@@ -16,13 +15,9 @@ internal sealed class Plugin : BasePlugin
 
     internal static ModLog Logger { get; private set; } = null!;
 
-    /// <summary>[diag1110] Info lines while the modifier path is confirmed in game; removed with them.</summary>
-    internal static BepInEx.Logging.ManualLogSource Diag { get; private set; } = null!;
-
     public override void Load()
     {
         var own = base.Log;
-        Diag = own;
         // One startup.timing line per library too, so a slow start can be told apart from the packages that depend on it.
         using var timing = new StartupTiming(Id, message => own.LogInfo(message));
         Settings.Adopt(Id, Config);
@@ -36,10 +31,10 @@ internal sealed class Plugin : BasePlugin
         HarmonyLib.Public.Patching.PatchManager.ResolvePatcher += Hooks.Resolve;
         if (HookBridgeBackend.Mismatch() is { } bridge) Logger.ErrorOnce("core-hook-bridge-mismatch", bridge);
         Store.Root = Path.Combine(Paths.BepInExRootPath, "ForgeCore", "Store");
-        Net.Transport = new GtfoTransport();
-        Net.Clock = static () => Time.time;
-        Net.WorldProbe = static () => GameStateManager.CurrentStateName == eGameStateName.InLevel
-            && SNet.MasterManagement != null && !SNet.MasterManagement.IsMigrating && SNet.Master != null;
+        Net.Node = new NetNode(new GtfoTransport(), Id) { Clock = static () => Time.time };
+        Net.Notice = message => own.LogInfo(message);
+        // Before any dependent mod subscribes, so the world has moved on when their own handlers of the same events run.
+        LevelAPI.OnBuildStart += static () => Net.Node!.NoteWorld(NetWorldReason.Build);
         Patches.CheckTargets();
         // Once every plugin has loaded (and declared its hooks at load), each owned run-time target must still have one package.
         IL2CPPChainloader.Instance.Finished += Hooks.CheckAll;
@@ -68,8 +63,16 @@ internal sealed class Plugin : BasePlugin
         ReplicationMisses.Start(message => own.LogInfo(message));
         // After ForgeCore's own cleanup and recall, so a mod's GameEvents handler sees them done.
         GameEventSources.Start();
-        LandingWork.Start();
+        // The UI, audio and visual parts start after the core and before any package that depends on ForgeCore, in this order. Each keeps its
+        // own configuration file, log source and Harmony ID (NAinfini.ForgeUI, NAinfini.ForgeAudio, NAinfini.ForgeVisual), so players keep their settings.
+        // The frame's clock and screen size are read first, so what the parts build at load sees real values.
         Frame.Stamp();
+        timing.Mark("ui");
+        ForgeUI.Plugin.Load();
+        timing.Mark("audio");
+        ForgeAudio.Plugin.Load();
+        timing.Mark("visual");
+        ForgeVisual.Plugin.Load();
         AddComponent<CoreDriver>();
         timing.Complete();
     }
@@ -77,8 +80,8 @@ internal sealed class Plugin : BasePlugin
     public override bool Unload() => false;
 }
 
-/// <summary>The only injected type: it answers network handshakes, runs the enemy slow zones' passes and every mod's <see cref="Frame"/> callbacks. Nothing here
-/// allocates on an ordinary frame.</summary>
+/// <summary>The only injected type: it answers network handshakes, runs the enemy slow zones' passes, the landing work, the UI, audio and
+/// visual parts' frame steps (direct calls, each failing alone) and then every mod's <see cref="Frame"/> callbacks. Nothing here allocates on an ordinary frame.</summary>
 internal sealed class CoreDriver : MonoBehaviour
 {
     public CoreDriver(IntPtr pointer) : base(pointer) { }
@@ -88,17 +91,32 @@ internal sealed class CoreDriver : MonoBehaviour
         Frame.Stamp();
         try
         {
-            Net.Tick(Time.realtimeSinceStartup);
+            Net.Node!.Tick(Time.realtimeSinceStartup);
             SoloDrop.Tick();
             Enemies.TickZones(Time.time);
+            LandingWork.Tick();
         }
-        catch (Exception error) { Plugin.Logger.ErrorOnce("core-frame-update-failed", "ForgeCore frame update failed: " + error); }
+        catch (Exception error) { Failed("core", error); }
+        try { ForgeUI.UIKitFrame.Update(); } catch (Exception error) { Failed("ui", error); }
+        try { ForgeAudio.AudioDriver.Update(); } catch (Exception error) { Failed("audio", error); }
+        try { ForgeVisual.VisualFrame.Update(); } catch (Exception error) { Failed("visual", error); }
         Frame.Updates.Run();
     }
 
-    private void LateUpdate() => Frame.LateUpdates.Run();
+    private void LateUpdate()
+    {
+        try { ForgeUI.UIKitFrame.LateUpdate(); } catch (Exception error) { Failed("ui late", error); }
+        try { ForgeVisual.VisualFrame.LateUpdate(); } catch (Exception error) { Failed("visual late", error); }
+        Frame.LateUpdates.Run();
+    }
 
     private void FixedUpdate() => Frame.FixedUpdates.Run();
 
-    private void OnDestroy() => Frame.Quits.Run();
+    private void OnDestroy()
+    {
+        try { ForgeAudio.AudioDriver.Shutdown(); } catch (Exception error) { Failed("audio quit", error); }
+        Frame.Quits.Run();
+    }
+
+    private static void Failed(string part, Exception error) => Plugin.Logger.ErrorOnce("core-frame-update-failed", "ForgeCore frame update (" + part + ") failed: " + error);
 }

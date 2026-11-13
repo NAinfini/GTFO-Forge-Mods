@@ -107,7 +107,7 @@ internal static class PlayerRecorder
     private static bool _settled;
     internal static void Unsettled() => _settled = false;
 
-    /// <summary>Ends the recording and finishes the file. Returns what was lost, for the log.</summary>
+    /// <summary>Ends the recording and finishes the file; what the writer lost goes to the log.</summary>
     internal static void Stop()
     {
         ShownRecorder.Stop();
@@ -135,7 +135,7 @@ internal static class PlayerRecorder
         var frameAt = Clock.Elapsed.TotalMilliseconds;
         if (_lastFrameMs >= 0) _health.Frame(now, frameAt - _lastFrameMs);
         _lastFrameMs = frameAt;
-        Hooks.SettleMelee();
+        Hooks.Melee.Settle();
         var agents = PlayerManager.PlayerAgentsInLevel;
         var seen = 0;
         var probe = AnimatorStateProbe.Due();
@@ -183,7 +183,7 @@ internal static class PlayerRecorder
         Array.Fill(LastMotion, (long.MinValue, long.MinValue));
         Array.Clear(LastKit);
         ForgetExtras();
-        Rec.WriteStates(pipeline, nowMs);
+        Rec.States.Write(pipeline, nowMs);
         EnemyRecorder.Full(pipeline, nowMs);
         var agents = PlayerManager.PlayerAgentsInLevel;
         for (var i = 0; i < agents.Count; i++)
@@ -214,7 +214,8 @@ internal static class PlayerRecorder
         var direction = new Vector3(look.x, look.y, look.z);
         var rotation = Vec.SqrLength(direction) > 1e-6f ? Quaternion.LookRotation(direction) : Vec.Identity;
         var damage = PartsOf(agent, slot).Damage;
-        var health = damage == null || damage.HealthMax <= 0f ? (byte)0 : (byte)Mathf.Clamp(Mathf.RoundToInt(127f * damage.Health / damage.HealthMax), 0, 127);
+        var max = damage == null ? 0f : damage.HealthMax;
+        var health = max <= 0f ? (byte)0 : (byte)Mathf.Clamp(Mathf.RoundToInt(127f * damage!.Health / max), 0, 127);
         pipeline.Sample(now, slot, position.x, position.y, position.z, rotation.x, rotation.y, rotation.z, rotation.w, health);
     }
 
@@ -244,8 +245,9 @@ internal static class PlayerRecorder
     private static void Hands(PlayerAgent agent, int slot)
     {
         // A bot on the host fires BulletWeaponSynced too.
-        if (PartsOf(agent, slot).Owner is { IsBot: true }) return;
-        var item = agent.Inventory?.WieldedItem;
+        var parts = PartsOf(agent, slot);
+        if (parts.Owner is { IsBot: true }) return;
+        var item = parts.Inventory?.WieldedItem;
         var bullets = item?.TryCast<BulletWeapon>();
         var melee = item?.TryCast<MeleeWeaponFirstPerson>();
         Hooks.NoteCharge(agent, melee != null && melee.CurrentState?.TryCast<MWS_ChargeUp>() != null);
@@ -275,14 +277,16 @@ internal static class PlayerRecorder
         var players = BoosterImplantManager.Current?.m_boosterPlayers;
         if (players == null || slot >= players.Length || players[slot]?.BoosterImplantDatas is not { } implants) return;
         var write = Rec.Begin().U((ulong)slot);
+        // Each implant's id is read once: the count of worn implants goes before them.
+        Span<uint> ids = stackalloc uint[implants.Length];
         var count = 0;
-        for (var i = 0; i < implants.Length; i++) if (implants[i].BoosterImplantID != 0) count++;
+        for (var i = 0; i < implants.Length; i++) if ((ids[i] = implants[i].BoosterImplantID) != 0) count++;
         write.U((ulong)count);
         for (var i = 0; i < implants.Length; i++)
         {
-            var implant = implants[i];
-            var id = implant.BoosterImplantID;
+            var id = ids[i];
             if (id == 0) continue;
+            var implant = implants[i];
             var effects = implant.BoosterEffectCount;
             var datas = implant.BoosterEffectDatas;
             write.U(id).U((ulong)Math.Max(0, implant.UseCount)).U((ulong)Math.Max(0, effects));
@@ -319,20 +323,23 @@ internal static class PlayerRecorder
             .U(ItemIn(backpack, InventorySlot.ResourcePack)).U((ulong)Math.Max(0, PlayerBackpackManager.GetBulletsInPack(AmmoType.ResourcePackRel, owner)))
             .U(ItemIn(backpack, InventorySlot.Consumable)).U((ulong)Math.Max(0, PlayerBackpackManager.GetBulletsInPack(AmmoType.CurrentConsumable, owner)))
             .U(ItemIn(backpack, InventorySlot.InLevelCarry)).U(parts.Inventory!.FlashlightEnabled ? 1UL : 0UL);
+        // The pockets are walked once: their count goes before their items.
         var groups = backpack.PocketItemsGroups;
-        var pockets = 0;
-        for (var i = 0; i < groups.Count; i++) pockets += groups[i].Count;
-        write.U((ulong)pockets);
-        for (var i = 0; i < groups.Count; i++)
+        Pockets.Clear();
+        for (int i = 0, groupCount = groups.Count; i < groupCount; i++)
         {
             var group = groups[i];
-            for (var j = 0; j < group.Count; j++) write.U(group[j].itemID);
+            for (int j = 0, count = group.Count; j < count; j++) Pockets.Add(group[j].itemID);
         }
+        write.U((ulong)Pockets.Count);
+        foreach (var pocket in Pockets) write.U(pocket);
         var built = Rec.Built;
         if (LastKit[slot] is { } last && built.SequenceEqual(last)) return;
         LastKit[slot] = built.ToArray();
         Rec.Emit(EventKind.PlayerKit);
     }
+
+    private static readonly System.Collections.Generic.List<uint> Pockets = new();
 
     private static ulong ItemIn(PlayerBackpack backpack, InventorySlot slot) => backpack.TryGetBackpackItem(slot, out var item) && item != null ? item.ItemID : 0UL;
 
@@ -366,11 +373,12 @@ internal static class PlayerRecorder
         var infection = parts.Damage == null ? 0 : Mathf.RoundToInt(100f * parts.Damage.Infection);
         var values = LastStatus.AsSpan(slot * StatusSize, StatusSize);
         Span<int> now = stackalloc int[StatusSize];
-        now[0] = (int)parts.Locomotion!.m_currentStateEnum; now[1] = (int)parts.Inventory!.WieldedSlot; now[2] = infection;
+        var stance = parts.Locomotion!.m_currentStateEnum;
+        now[0] = (int)stance; now[1] = (int)parts.Inventory!.WieldedSlot; now[2] = infection;
         now[3] = owner == null ? 0 : PlayerBackpackManager.GetBulletsInPack(AmmoType.Standard, owner);
         now[4] = owner == null ? 0 : PlayerBackpackManager.GetBulletsInPack(AmmoType.Special, owner);
         now[5] = owner == null ? 0 : PlayerBackpackManager.GetBulletsInPack(AmmoType.Class, owner);
-        now[6] = parts.Locomotion.m_currentStateEnum == PlayerLocomotion.PLOC_State.Downed ? 1 : 0;
+        now[6] = stance == PlayerLocomotion.PLOC_State.Downed ? 1 : 0;
         if (now.SequenceEqual(values)) return;
         now.CopyTo(values);
         var writer = Rec.Begin().U((ulong)slot);

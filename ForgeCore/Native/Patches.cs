@@ -26,14 +26,16 @@ public static class Patches
         return new LazyPatches(modId, install ?? throw new ArgumentNullException(nameof(install)));
     }
 
-    /// <summary>The patch classes of <paramref name="assembly"/> that <paramref name="groupOf"/> sorts into a group (null: not a lazy patch),
-    /// put on group by group at first use (<see cref="LazyGroups{TGroup}.Ensure"/>). <paramref name="onFail"/> gets each class that could not be patched;
-    /// the other classes of the group still go on. Once on they stay (the game keeps a detour for a patched method after an unpatch).</summary>
-    public static LazyGroups<TGroup> Groups<TGroup>(string modId, Assembly assembly, Func<Type, TGroup?> groupOf, Action<TGroup, Type, Exception> onFail) where TGroup : struct, Enum
-    {
-        if (string.IsNullOrWhiteSpace(modId)) throw new ArgumentException("Name the mod (its plugin GUID).", nameof(modId));
-        return new LazyGroups<TGroup>(modId, assembly ?? throw new ArgumentNullException(nameof(assembly)), groupOf ?? throw new ArgumentNullException(nameof(groupOf)), onFail ?? throw new ArgumentNullException(nameof(onFail)));
-    }
+    /// <summary>The patch classes of this assembly that <paramref name="groupOf"/> sorts into a group (null: not a lazy patch), put on group by
+    /// group at first use (<see cref="LazyGroups{TGroup}.Ensure"/>) under the Harmony ID <paramref name="modId"/>. <paramref name="onFail"/> gets each
+    /// class that could not be patched; the other classes of the group still go on. Once on they stay (the game keeps a detour for a patched method after an unpatch).</summary>
+    internal static LazyGroups<TGroup> Groups<TGroup>(string modId, Func<Type, TGroup?> groupOf, Action<TGroup, Type, Exception> onFail) where TGroup : struct, Enum
+        => new(modId, groupOf, onFail);
+
+    private static Type[]? _ownTypes;
+
+    /// <summary>This assembly's types, read once for every <see cref="LazyGroups{TGroup}"/> (the UI's and the audio's groups share one scan).</summary>
+    internal static Type[] OwnTypes => _ownTypes ??= AccessTools.GetTypesFromAssembly(typeof(Patches).Assembly);
     internal static void CheckTargets()
     {
         // Assembly.GetType per loaded assembly, never AccessTools.TypeByName: that calls GetTypes on every assembly for every name,
@@ -188,28 +190,27 @@ public sealed class LazyPatches
     }
 }
 
-/// <summary>A mod's patch classes sorted into feature groups (<see cref="Patches.Groups{TGroup}"/>); a group goes on the first time its feature is used.</summary>
-public sealed class LazyGroups<TGroup> where TGroup : struct, Enum
+/// <summary>This assembly's patch classes of one part (UI, audio) sorted into feature groups (<see cref="Patches.Groups{TGroup}"/>); a group goes on the first time its feature is used.</summary>
+internal sealed class LazyGroups<TGroup> where TGroup : struct, Enum
 {
     private readonly string _modId;
     private readonly Func<Type, TGroup?> _groupOf;
     private readonly Action<TGroup, Type, Exception> _onFail;
     private readonly HashSet<TGroup> _on = new();
-    private readonly Assembly _assembly;
     private Dictionary<TGroup, List<Type>>? _types;
     private Harmony? _harmony;
 
-    internal LazyGroups(string modId, Assembly assembly, Func<Type, TGroup?> groupOf, Action<TGroup, Type, Exception> onFail)
+    internal LazyGroups(string modId, Func<Type, TGroup?> groupOf, Action<TGroup, Type, Exception> onFail)
     {
-        _modId = modId; _assembly = assembly; _groupOf = groupOf; _onFail = onFail;
+        _modId = modId; _groupOf = groupOf; _onFail = onFail;
     }
 
     /// <summary>The group's feature has been used (its patches are on, or were attempted).</summary>
-    public bool Has(TGroup group) => _on.Contains(group);
+    internal bool Has(TGroup group) => _on.Contains(group);
 
     /// <summary>Puts the group's patches on the first time (one set lookup on every later call). True when this call put on all of them;
     /// a class that cannot be patched goes to the failure callback and the others still go on.</summary>
-    public bool Ensure(TGroup group)
+    internal bool Ensure(TGroup group)
     {
         if (!_on.Add(group)) return false;
         _types ??= Scan();
@@ -229,7 +230,7 @@ public sealed class LazyGroups<TGroup> where TGroup : struct, Enum
     private Dictionary<TGroup, List<Type>> Scan()
     {
         var found = new Dictionary<TGroup, List<Type>>();
-        foreach (var type in AccessTools.GetTypesFromAssembly(_assembly))
+        foreach (var type in Patches.OwnTypes)
         {
             if (_groupOf(type) is not { } group) continue;
             if (!found.TryGetValue(group, out var list)) found[group] = list = new List<Type>();

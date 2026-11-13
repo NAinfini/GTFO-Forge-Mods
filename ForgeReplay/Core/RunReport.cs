@@ -253,9 +253,9 @@ internal sealed class RunReport
         {
             case EventKind.EnemyHurt:
                 {
-                    var entity = (int)read.U(); var kind = (int)read.U(); var damage = read.U() / 10f; var attacker = read.U(); read.U();
-                    var settled = read.U() == 1; var taken = read.U() / 10f; var lethal = read.U() == 1; var overkill = read.U() / 10f;
-                    var weak = read.U() == 1; read.U(); var behind = read.U() == 1; read.U(); var metres = read.U() / 100f;
+                    var hurt = EnemyHurtEvent.Read(read);
+                    var (entity, kind, attacker, settled, lethal, weak, behind) = (hurt.Entity, hurt.Kind, hurt.Attacker, hurt.Settled, hurt.Lethal, hurt.Weak, hurt.Behind);
+                    var (taken, overkill, metres) = (hurt.Taken, hurt.Overkill, hurt.Metres);
                     if (attacker > 3) break;
                     var slot = (int)attacker; var data = DataAt(entity, timeMs);
                     _firstHit.TryAdd(entity, timeMs);
@@ -736,7 +736,4 @@ internal sealed class RunReport
         }
         return sum;
     }).OrderByDescending(t => t.Killed + t.Escaped).ToList();
-
-    /// <summary>The tension of the second at <paramref name="ms"/> (0 outside the recording).</summary>
-    internal int TensionAt(uint ms) { var i = (int)(ms / TensionStepMs); return i < Tension.Count ? Tension[i] : 0; }
 }

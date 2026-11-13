@@ -9,7 +9,7 @@ namespace ForgeCore;
 /// does no lookup, no string compare and no allocation. Movement noises are scaled; any other noise (a shot, a melee hit, a decoy) is
 /// answered 1. Pure arithmetic, no game types.
 /// </summary>
-public sealed class NoiseScaleBook
+internal sealed class NoiseScaleBook
 {
     private readonly float[] _factor;
     private readonly Dictionary<int, List<(int Id, float Multiplier)>> _leases = new();

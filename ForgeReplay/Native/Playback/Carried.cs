@@ -39,8 +39,8 @@ internal static class Carried
     private static readonly List<Renderer>[] HiddenGear = { new(), new(), new(), new() };
     private static readonly Dictionary<int, Renderer[]> GearRenderers = new();
     private static readonly bool[] GearBlocked = new bool[4];
-    private static readonly InventorySlot[] GearSlots = { InventorySlot.GearStandard, InventorySlot.GearSpecial, InventorySlot.GearMelee, InventorySlot.GearClass };
-    private static readonly Dictionary<(int Slot, uint Item), ItemEquippable> ThirdPerson = new();
+    // Each made item with its object, read once when it is made: the object is the item's own for as long as the item lives (WasCollected says when it does not).
+    private static readonly Dictionary<(int Slot, uint Item), (ItemEquippable Item, GameObject Body)> ThirdPerson = new();
     // The (player, item) pairs the game would not make or hold in third person: those two only, so a puppet that was not ready for it does not cost every player the item.
     private static readonly HashSet<(int Slot, uint Item)> NoThirdPerson = new();
     private static readonly uint[] HoldingNow = new uint[4];
@@ -112,7 +112,7 @@ internal static class Carried
                 puppet.HoldItem(null);
                 // The game's switch back to the last gear and this item's own hiding can be a frame apart: a pack switched away from must not
                 // stay beside the item that replaces it.
-                if (ThirdPerson.TryGetValue((slot, before), out var old) && old != null && !old.WasCollected) old.gameObject.SetActive(false);
+                if (ThirdPerson.TryGetValue((slot, before), out var old) && old.Item != null && !old.Item.WasCollected) old.Body.SetActive(false);
                 HoldingNow[slot] = 0;
             }
             return false;
@@ -120,18 +120,19 @@ internal static class Carried
         if (HoldingNow[slot] == wanted) return true;
         // A switch from one pack to another: the old one is switched off here, since the game's equip entry may show the new one before it
         // hides the old (and a consumable brought up as a gun is not this path's item at all).
-        if (HoldingNow[slot] != 0 && ThirdPerson.TryGetValue((slot, HoldingNow[slot]), out var previous) && previous != null && !previous.WasCollected)
-            previous.gameObject.SetActive(false);
-        if (!ThirdPerson.TryGetValue((slot, wanted), out var item))
+        if (HoldingNow[slot] != 0 && ThirdPerson.TryGetValue((slot, HoldingNow[slot]), out var previous) && previous.Item != null && !previous.Item.WasCollected)
+            previous.Body.SetActive(false);
+        if (!ThirdPerson.TryGetValue((slot, wanted), out var made))
         {
             // A puppet just made or moved has no course node yet: tried again next frame, not given up on.
             if (puppet.Agent.CourseNode == null) return false;
-            item = MadeThirdPerson(wanted, puppet.Agent);
-            if (item == null) { NoThirdPerson.Add((slot, wanted)); return false; }
-            ThirdPerson[(slot, wanted)] = item;
+            var thirdPerson = MadeThirdPerson(wanted, puppet.Agent);
+            if (thirdPerson == null) { NoThirdPerson.Add((slot, wanted)); return false; }
+            ThirdPerson[(slot, wanted)] = made = (thirdPerson, thirdPerson.gameObject);
         }
+        var item = made.Item;
         // An item this held before was switched off; the game's equip entry does not switch an item it already counts as wielded on again.
-        if (item.gameObject != null && !item.gameObject.activeSelf) item.gameObject.SetActive(true);
+        if (made.Body != null && !made.Body.activeSelf) made.Body.SetActive(true);
         if (!puppet.HoldItem(item)) { NoThirdPerson.Add((slot, wanted)); return false; }
         HoldingNow[slot] = wanted;
         return true;
@@ -237,9 +238,9 @@ internal static class Carried
             // Every gear line the body still carries goes with the pack: the game keeps the last one in the hands, and the rest are placed on
             // the body by the same equip pass, so after a switch one of them could stay beside the pack.
             if (puppet.Agent.Owner is { } owner && PlayerBackpackManager.TryGetBackpack(owner, out var backpack) && backpack != null)
-                foreach (var gearSlot in GearSlots)
-                    if (backpack.TryGetBackpackItem(gearSlot, out var item) && item?.Instance != null)
-                        Hide(item.Instance.gameObject, slot);
+                foreach (var gearSlot in Puppeteer.GearSlots)
+                    if (backpack.TryGetBackpackItem(gearSlot, out var item) && item?.Instance is { } instance && instance != null)
+                        Hide(instance.gameObject, slot);
         }
         if (Puppeteer.CosmeticOf(slot)?.HeldWeapon is { } copy) Hide(copy, slot);
     }
@@ -260,12 +261,15 @@ internal static class Carried
         if (hidden.Count == 0 || GearBlocked[slot]) return;
         var current = Puppeteer.PlayerOf(slot)?.Agent.Inventory?.WieldedItem;
         var copy = Puppeteer.CosmeticOf(slot)?.HeldWeapon;
+        // The two places a hidden renderer may belong to, read once for the whole list.
+        var currentRoot = current == null ? null : current.transform;
+        var copyRoot = copy == null ? null : copy.transform;
         for (var i = hidden.Count - 1; i >= 0; i--)
         {
             var renderer = hidden[i];
             if (renderer == null || renderer.WasCollected) { hidden.RemoveAt(i); continue; }
             var root = renderer.transform;
-            if (current == null || !root.IsChildOf(current.transform)) { if (copy == null || !root.IsChildOf(copy.transform)) continue; }
+            if (currentRoot == null || !root.IsChildOf(currentRoot)) { if (copyRoot == null || !root.IsChildOf(copyRoot)) continue; }
             renderer.forceRenderingOff = false;
             hidden.RemoveAt(i);
         }

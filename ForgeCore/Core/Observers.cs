@@ -5,7 +5,7 @@ namespace ForgeCore;
 
 /// <summary>Any number of observers of one kind of report. Adding or removing one copies the array, so a report walks a stable array and
 /// nothing allocates; <see cref="Any"/> is one field read, so a library's report site costs nothing while nobody observes. Main thread only.</summary>
-public sealed class Observers<T> where T : class
+internal sealed class Observers<T> where T : class
 {
     private T[] _items = Array.Empty<T>();
 
@@ -45,7 +45,7 @@ public static class RecordingNames
     private static readonly List<string> Names = new() { "" };
 
     /// <summary>The number of <paramref name="name"/>, given out the first time it is asked for; 0 for null or empty.</summary>
-    public static int Of(string? name)
+    internal static int Of(string? name)
     {
         if (string.IsNullOrEmpty(name)) return 0;
         if (Ids.TryGetValue(name!, out var id)) return id;

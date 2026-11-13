@@ -20,13 +20,20 @@
     <ForgeModsRoot Condition="'$(ForgeModsRoot)' == '' And '$(ForgeMainCheckout)' != ''">$(ForgeMainCheckout)/Mods/</ForgeModsRoot>
     <ForgeModsRoot Condition="'$(ForgeModsRoot)' == ''">$(MSBuildThisFileDirectory)</ForgeModsRoot>
     <ForgeModsRoot>$([MSBuild]::EnsureTrailingSlash('$(ForgeModsRoot)'))</ForgeModsRoot>
+    <!-- The native schema the engine, the weapon game half and their tools embed: a local-only build input
+         (Tools/resource-roots.json). FORGE_CATALOG_ROOT, else this checkout's file, else the main checkout's. -->
+    <ForgeNativeSchemaSource Condition="'$(ForgeNativeSchemaSource)' == '' And '$(FORGE_CATALOG_ROOT)' != ''">$(FORGE_CATALOG_ROOT)/native/native-schema.json</ForgeNativeSchemaSource>
+    <ForgeNativeSchemaSource Condition="'$(ForgeNativeSchemaSource)' == '' And !Exists('$(MSBuildThisFileDirectory)../catalog/native/native-schema.json') And '$(ForgeMainCheckout)' != ''">$(ForgeMainCheckout)/catalog/native/native-schema.json</ForgeNativeSchemaSource>
+    <ForgeNativeSchemaSource Condition="'$(ForgeNativeSchemaSource)' == ''">$(MSBuildThisFileDirectory)../catalog/native/native-schema.json</ForgeNativeSchemaSource>
   </PropertyGroup>
   <!-- Package version: Release/release.json is the only table. A project listed in a row's identity.csprojs builds with that
        row's version, so csproj files write no <Version>; projects outside the table (tests, tools) keep the SDK default. Source
        constants that repeat a package version are tagged "// package-version: <package>" and written by
        Tools/Forge/set-package-version.ts. -->
+  <!-- ForgeEngine.Framework (the game-independent build of the same sources, never shipped) takes the engine row's version. -->
   <PropertyGroup>
-    <ForgeTableVersion>$([System.Text.RegularExpressions.Regex]::Replace($([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)Release/release.json')), '(?s)^(?:.*?"version":\s*"([^"]+)",[^{}]*\{\s*"csprojs":\s*\[[^\]]*"$([System.Text.RegularExpressions.Regex]::Escape($([MSBuild]::MakeRelative('$(MSBuildThisFileDirectory)', '$(MSBuildProjectFullPath)').Replace('\', '/'))))".*|.*)$', '$1'))</ForgeTableVersion>
+    <_ForgeTableProject>$([MSBuild]::MakeRelative('$(MSBuildThisFileDirectory)', '$(MSBuildProjectFullPath)').Replace('\', '/').Replace('ForgeEngine/Framework/ForgeEngine.Framework.csproj', 'ForgeEngine/ForgeEngine.csproj'))</_ForgeTableProject>
+    <ForgeTableVersion>$([System.Text.RegularExpressions.Regex]::Replace($([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)Release/release.json')), '(?s)^(?:.*?"version":\s*"([^"]+)",[^{}]*\{\s*"csprojs":\s*\[[^\]]*"$([System.Text.RegularExpressions.Regex]::Escape($(_ForgeTableProject)))".*|.*)$', '$1'))</ForgeTableVersion>
     <Version Condition="'$(ForgeTableVersion)' != ''">$(ForgeTableVersion)</Version>
   </PropertyGroup>
   <!-- Dead-code rescan (Mods/Build/dead-code.globalconfig); off in normal builds. -->

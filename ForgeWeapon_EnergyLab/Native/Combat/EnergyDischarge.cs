@@ -32,7 +32,6 @@ internal sealed class EnergyDischarge
             ? (_shots[0].End - start).normalized : direction.normalized;
         var visual = new FireVisual
         {
-            Epoch = EnergyNetwork.Epoch,
             Sequence = EnergyNetwork.NextSequence(),
             Shooter = owner.Owner.Lookup,
             CategoryId = gear.CategoryId,

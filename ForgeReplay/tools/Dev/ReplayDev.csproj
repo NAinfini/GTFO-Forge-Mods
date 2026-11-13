@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Development tools over recorded files (not tests): REPLAY_FILE, REPLAY_NOISE_DIR, REPLAY_CALIBRATE_DIR; see DEVELOPERS.md. -->
   <PropertyGroup>
+    <!-- The linked ForgeCore sources hold internal structs whose fields only the library's game-side code fills. -->
+    <NoWarn>$(NoWarn);CS0649</NoWarn>
     <RootNamespace>ForgeReplay.Dev</RootNamespace>
     <AssemblyName>ForgeReplay.Dev</AssemblyName>
     <OutputType>Exe</OutputType>
@@ -18,7 +20,8 @@
     <Compile Include="../../../ForgeCore/Core/ChunkLog.cs" Link="ForgeCore/ChunkLog.cs" />
     <Compile Include="../../../ForgeCore/Core/EnemyAlert.cs" Link="ForgeCore/EnemyAlert.cs" />
     <Compile Include="../../../ForgeCore/Once/FormatVersion.cs" Link="ForgeCore/FormatVersion.cs" />
-    <Compile Include="../../../ForgeUI/Core/HudLayout.cs" Link="ForgeUI/HudLayout.cs" />
+    <Compile Include="../../../ForgeCore/UI/Core/HudLayout.cs" Link="ForgeUI/HudLayout.cs" />
+    <Compile Include="../../../ForgeCore/UI/Core/Easing.cs" Link="ForgeUI/Easing.cs" />
     <Compile Include="Program.cs;DamageCalibration.cs;RatingCalibration.cs" />
   </ItemGroup>
 </Project>

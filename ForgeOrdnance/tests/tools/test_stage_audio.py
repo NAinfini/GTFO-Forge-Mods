@@ -4,7 +4,7 @@ from pathlib import Path
 import unittest
 
 
-spec = importlib.util.spec_from_file_location("stage_audio", Path(__file__).parents[2] / "tools/stage_audio.py")
+spec = importlib.util.spec_from_file_location("stage_audio", Path(__file__).parents[2] / "tools/Carrier/stage_audio.py")
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 render = module.cue_render
@@ -19,9 +19,6 @@ class StageAudioTests(unittest.TestCase):
         result, gain = render.normalise(array.array("h", [1000, -1000, 500]), -40, -10, -18)
         self.assertAlmostEqual(gain, 8.5)
         self.assertEqual(result[0], round(1000 * 10 ** (8.5 / 20)))
-
-
-
 
     def document(self, cue, buses=None):
         return {"schemaVersion": "1.0.0", "namespace": "test", "buses": buses or {"b": {"category": "ui"}}, "cues": cue}
@@ -47,9 +44,6 @@ class StageAudioTests(unittest.TestCase):
                 ({"b": {"category": "ui"}}, {}, "needs a bus")):
             with self.assertRaisesRegex(module.StageError, message):
                 module.validate_document(self.document([{"id": "a", "layers": [{"sources": [source]}]} | cue], buses))
-
-
-
 
 
 if __name__ == "__main__":

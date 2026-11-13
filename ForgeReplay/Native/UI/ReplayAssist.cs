@@ -1,6 +1,5 @@
 using System;
 using ForgeVisual;
-using UnityEngine;
 
 namespace ForgeReplay;
 
@@ -30,7 +29,7 @@ internal static class ReplayAssist
     {
         var volume = PreLitVolume.Current;
         var fog = volume == null ? "fog volume none" : "fog density " + volume.m_fogDensity.ToString("0.#####") + " boost " + volume.m_densityHeightMaxBoost.ToString("0.#####");
-        uint block; try { block = ForgeCore.WorldStates.CurrentFog(); } catch (Exception) { block = 0; }
+        uint block; try { block = ForgeCore.WorldStates.CurrentFog(); } catch (Exception) { block = 0; } // a read-out line only: a fog block that cannot be read shows as 0
         return "assist fog " + (_fog ? "on" : "off") + " brightness " + (_bright ? "on " + _brightLevel.ToString("0.##") + (_lease is { Active: true } ? " lease" : " no-lease") : "off") + " | " + fog + " level-fog-block " + block;
     }
 
@@ -98,7 +97,7 @@ internal static class ReplayAssist
     {
         try
         {
-            if (_lease is not { Active: true }) _lease = Ambient.Lease(Plugin.Id, _brightLevel, BrightRange, Color.white);
+            if (_lease is not { Active: true }) _lease = Ambient.Lease(Plugin.Id, _brightLevel, BrightRange, ReplayScreen.White);
             if (!_lease.Active) { Plugin.Logger.ErrorOnce("Global brightness failed: the local player has no ambient light."); _bright = false; return; }
             // The observer stands apart from what is watched: the light goes where the camera is.
             _lease.Follow(ReplayCamera.Shown);

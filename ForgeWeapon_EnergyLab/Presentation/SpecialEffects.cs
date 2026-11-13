@@ -20,7 +20,7 @@ internal sealed class SpecialEffects : IDisposable
 
     /// <summary>The flying well is drawn this many times its body radius across (0.75 m for a 0.18 m body).</summary>
     private const float ShellShare = 4.17f;
-    private const int ShellCapacity = 64;
+    private const int ShellCapacity = BlastShells.Capacity;
     private const float FlameImpactInterval = 0.08f;
     private const int FlameStart = 0, FlameCrackle = 1, FlameImpactSound = 2, DiscLaunch = 3, DiscFlight = 4,
         DiscBounce = 5, HoleLaunchSound = 6, HoleFlight = 7, HoleOpen = 8, HoleClose = 9, BlastLaunchSound = 10, BlastCycle = 11,
@@ -141,7 +141,7 @@ internal sealed class SpecialEffects : IDisposable
 
     /// <summary>The held flame jet from the muzzle along <paramref name="direction"/>. The jet reaches the weapon's
     /// full range; its puffs collide with level geometry, so a wall closer than that stops them.</summary>
-    internal void Flame(Vector3 start, Vector3 direction, float distance, float now)
+    internal void Flame(Vector3 start, Vector3 direction, float distance)
     {
         if (!Ready) return;
         Origin(start);
@@ -159,7 +159,7 @@ internal sealed class SpecialEffects : IDisposable
     internal void StopFlame()
     {
         if (!_flaming) return;
-        if (_flaming && !_disposed)
+        if (!_disposed)
         {
             _flameAudio.Stop();
             BurstSound(FlameStop, 0.5f);
@@ -220,14 +220,14 @@ internal sealed class SpecialEffects : IDisposable
         HeavyBlast.Play(position);
     }
 
-    internal void Sparks(Vector3 point, Vector3 normal, float now)
+    internal void Sparks(Vector3 point, Vector3 normal)
     {
         if (!Ready) return;
         Impacts.Play(_sparks, point, normal);
         EnergyAudio.PlayAt(Look.Cue(Sounds[DiscBounce]), point, 0.7f);
     }
 
-    internal void DiscImpact(Vector3 point, Vector3 direction, float now)
+    internal void DiscImpact(Vector3 point, Vector3 direction)
     {
         if (!Ready) return;
         EnergyVfx.Play(Look.Effect(EnergyVfx.DiscHit), point, -direction);

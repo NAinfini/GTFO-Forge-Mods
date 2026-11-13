@@ -18,7 +18,7 @@ public static class ReplayControl
         foreach (var e in ReplayLibrary.List(Plugin.ReplayFolder))
         {
             if (text.Length > 0) text.Append('\n');
-            text.Append(Path.GetFileName(e.Path)).Append(e.Starred ? " starred" : "").Append(" rundown='").Append(ReplayList.RundownOf(e)).Append("' level=").Append(RundownNames.Code(e)).Append(" missing='").Append(e.Header == null ? "" : RundownNames.Refusal(e)).Append("'")
+            text.Append(Path.GetFileName(e.Path)).Append(e.Starred ? " starred" : "").Append(" rundown='").Append(ReplayList.RundownLabel(e)).Append("' level=").Append(RundownNames.Code(e)).Append(" missing='").Append(e.Header == null ? "" : RundownNames.Refusal(e)).Append("'")
                 .Append(e.Header != null ? " playable" : e.OtherFormat ? " unplayable=format" : " unplayable=damaged")
                 .Append(" build=").Append(e.Header?.GameRevision).Append('/').Append(Version.Revision)
                 .Append(e.Complete ? " complete" : " cut-off").Append(" duration=").Append(e.DurationMs).Append("ms outcome=").Append(e.Outcome);

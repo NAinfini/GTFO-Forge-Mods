@@ -221,7 +221,7 @@ internal static class EnergyConfiguration
         {
             case ArcChainTuning arc:
                 Check(nameof(arc.Range), arc.Range, 0.01, EnergyLimits.Reach);
-                Check(nameof(arc.Targets), arc.Targets, 1, 4); Check(nameof(arc.JumpRange), arc.JumpRange, 0.01, 1000);
+                Check(nameof(arc.Targets), arc.Targets, 1, EnergyLimits.ArcTargets); Check(nameof(arc.JumpRange), arc.JumpRange, 0.01, 1000);
                 Check(nameof(arc.DamageRetention), arc.DamageRetention, 0, 1); Check(nameof(arc.ArcLifetime), arc.ArcLifetime, 0.01, 120); Check(nameof(arc.HopDelay), arc.HopDelay, 0, 10);
                 break;
             case PlasmaTuning orb:
@@ -240,7 +240,7 @@ internal static class EnergyConfiguration
                 {
                     Check(nameof(arcOrb.ArcRadius), arcOrb.ArcRadius, 0.01, 100); Check(nameof(arcOrb.FullArcRadius), arcOrb.FullArcRadius, 0.01, 100);
                     Check(nameof(arcOrb.PulseInterval), arcOrb.PulseInterval, 0.01, 60); Check(nameof(arcOrb.PulseDamageFraction), arcOrb.PulseDamageFraction, 0, 1); Check(nameof(arcOrb.PulseStagger), arcOrb.PulseStagger, 0, 100);
-                    Check(nameof(arcOrb.PulseTargets), arcOrb.PulseTargets, 1, 3); Check(nameof(arcOrb.FadeLifetime), arcOrb.FadeLifetime, 0.01, 120);
+                    Check(nameof(arcOrb.PulseTargets), arcOrb.PulseTargets, 1, EnergyLimits.PulseTargets); Check(nameof(arcOrb.FadeLifetime), arcOrb.FadeLifetime, 0.01, 120);
                 }
                 break;
             case BlastTuning blast:

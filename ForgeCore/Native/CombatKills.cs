@@ -34,12 +34,6 @@ public static partial class Combat
         if (!wasAlive || enemy == null || enemy.Alive) return;
         Agent? source = null;
         if (call.Data.source.TryGet(out var found)) source = found;
-        var handlers = _killed;
-        if (handlers == null) return;
-        foreach (var handler in handlers.GetInvocationList())
-        {
-            try { ((Action<EnemyAgent, Agent?>)handler)(enemy, source); }
-            catch (Exception error) { Plugin.Logger.ErrorOnce("core-combat-killed-handler-failed", "A Combat.Killed handler failed: " + error); }
-        }
+        Plugin.Logger.RaiseEach(_killed, enemy, source, "core-combat-killed-handler-failed", "Combat.Killed");
     }
 }

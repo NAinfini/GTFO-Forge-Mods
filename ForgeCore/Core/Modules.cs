@@ -36,14 +36,12 @@ internal static class Modules
         ("ChunkLog", "An append-only file of independently compressed, checksummed chunks with a trailing index; after a crash the reader scans chunk headers and keeps every whole chunk, and another format version is refused with the difference named."),
         ("Items", "Spawns an item pickup the way the game does, in play as well as before it; the Spawned event reports every item the game spawns, so no other package patches the game's spawn method."),
         ("SoloDrop", "Starts one chosen expedition as a private host with chosen seeds, alone or with up to three of the game's bots, through the game's own menu calls; stops at the first unexpected state and never retries."),
-        ("Fingerprint", "A stable SHA-256 fingerprint over labelled values, with floats rounded to a stated precision."),
-        ("DataBlockHashes", "Content hashes of the loaded game data blocks, one per block type, read from memory as the game's CellJSON writes them."),
         ("InstalledPlugins", "The loaded BepInEx plugins with version and DLL hash, and one fingerprint over them."),
         ("DataBlocks", "Adds new gear and item data blocks to the game's tables; an ID already in use is refused."),
         ("Frame", "Per-frame callbacks for mods (update, late update, quit) run from ForgeCore's one driver; a callback that throws is reported once and never stops the others."),
         ("Patches", "Puts a mod's own Harmony patches on at first use and keeps them, so a session that never uses the feature never pays for them."),
         ("StrictJson", "Strict reading of a JSON object: unknown or repeated fields are refused, a wrong type names its field, a number outside its range is refused, never clamped; also canonical JSON."),
-        ("GameHooks", "The game methods that more than one package reads, each patched here once and handed to every subscriber around the game's own body: door, reactor, scan, container, generator, pickup and terminal state callbacks, noise, scout and wave events, a player's damage receive entries, a revive, the four firing bodies and the weapon ray casts, push, sentry placement and every sentry lifecycle step, mine placement, item spawn, level cleanup, marker and prefab placement, survival waves, the end and the failure check of an expedition, enemy setup, death, despawn, destruction, mode change, spawn sync, limb break, received damage and the bullet and melee receive entries, the local player's death, the bullet hit entry, weapon wield, dry fire, gear assembly, reload start and end, the deployed marker, sentry spawn, the objective panel and intel messages, host migration, and the game event log; no package patches these methods itself."),
+        ("GameHooks", "The game methods that more than one package reads, each patched here once and handed to every subscriber around the game's own body: door, reactor, scan, container, generator, pickup and terminal state callbacks, noise, scout and wave events, a player's damage receive entries, a revive, the four firing bodies and the weapon ray casts, push, sentry placement and every sentry lifecycle step, mine placement, item spawn, level cleanup, marker and prefab placement, survival waves, the end and the failure check of an expedition, enemy setup, death, despawn, destruction, mode change, spawn sync, limb break, received damage and the bullet and melee receive entries, the local player's death, the bullet hit entry, weapon wield and item unwield, dry fire, gear assembly (also a synced gun's), reload start and end, the attached flashlight switch, the C-foam burst, a throwable's throw, the deployed marker, sentry spawn, the objective panel and intel messages, host migration, and the game event log; no package patches these methods itself."),
         ("Puppets", "Holds an enemy or a non-local player agent as a puppet: its own control is switched off and the caller drives place, animation, states and actions through the game's own entries (an enemy's sleep, heartbeat, light sleep and exact wake-up animation among them); an enemy puppet's own projectile and tentacle launches are held off; a take-back by the game is put right and counted."),
         ("Fnv", "FNV-1a 32 and 64 bit over UTF-8 text or bytes, the one hash behind wire formats and saved keys."),
         ("DeterministicRandom", "Random numbers that are a pure function of their keys (SplitMix64): every peer and a replay draw the same value, and the game's own random sequence is untouched."),
@@ -104,7 +102,6 @@ internal static class Modules
         ("GameHooks.WaveStopped", new[] { new Target("SurvivalWave", "StopEvent") }),
         ("GameHooks.FirstPersonHolderLateUpdate", new[] { new Target("FirstPersonItemHolder", "LateUpdate") }),
         ("GameHooks.SyncIkSolved", new[] { new Target("Player.PlayerSyncIK", "UpdateIK") }),
-        ("GameHooks.ReloadAnimationStarted", new[] { new Target("ItemEquippable", "TryTriggerReloadAnimationSequence") }),
         ("GameHooks.EnemyAttackStarted", new[] { new Target("Enemies.ES_EnemyAttackBase", "DoStartAttack") }),
         ("GameHooks.EnemyHitreacted", new[] { new Target("ES_Hitreact", "DoHitReact") }),
         ("GameHooks.AnimatorCrossFaded", new[] { new Target("UnityEngine.Animator", "CrossFadeInFixedTime") }),
@@ -123,8 +120,6 @@ internal static class Modules
         ("GameHooks.MuzzleRay", new[] { new Target("Weapon", "CastWeaponRay") }),
         ("GameHooks.AlignedRay", new[] { new Target("Weapon", "CastWeaponRay") }),
         ("GameHooks.PushEntered", new[] { new Target("Gear.MWS_Push", "Enter") }),
-        ("GameHooks.SentryGearSpawned", new[] { new Target("SentryGunInstance", "OnGearSpawnComplete") }),
-        ("GameHooks.SentryDespawned", new[] { new Target("SentryGunInstance", "OnDespawn") }),
         ("GameHooks.SentryFired", new[] { new Target("SentryGunInstance_Firing_Bullets", "FireBullet") }),
         ("GameHooks.SentryLifecycle", new[]
         {
@@ -167,6 +162,11 @@ internal static class Modules
         ("GameHooks.ReloadDone", new[] { new Target("ItemEquippable", "_TryTriggerReloadAnimationSequence_b__145_0") }),
         ("GameHooks.BackpackDeployed", new[] { new Target("Player.PlayerBackpack", "SetDeployed") }),
         ("GameHooks.SentrySpawned", new[] { new Target("SentryGunInstance", "OnSpawn") }),
+        ("GameHooks.ItemUnwielded", new[] { new Target("ItemEquippable", "OnUnWield") }),
+        ("GameHooks.SyncedGearSpawnCompleted", new[] { new Target("Gear.BulletWeaponSynced", "OnGearSpawnComplete") }),
+        ("GameHooks.FlashlightSet", new[] { new Target("ItemEquippable", "SetAttachedFlashlightEnabled") }),
+        ("GameHooks.GlueBurstFired", new[] { new Target("GlueGun", "FireBurst") }),
+        ("GameHooks.ThrowableThrown", new[] { new Target("ThrowingWeapon", "Throw") }),
         ("GameHooks.ProgressionObjectiveSet", new[] { new Target("PUI_GameObjectives", "SetProgressionObjective") }),
         ("GameHooks.ProgressionObjectiveRemoved", new[] { new Target("PUI_GameObjectives", "RemoveProgressionObjective") }),
         ("GameHooks.ObjectivesCleaned", new[] { new Target("PUI_GameObjectives", "OnLevelCleanup") }),
@@ -185,12 +185,5 @@ internal static class Modules
         (StackedVolumes, new[] { new Target("AIGraph.AIG_GeomorphNodeVolume", "TryGetGeomorphVolume") }),
         (InteractionSwitches, new[] { new Target("PlayerInteraction", "set_CameraRayInteractionEnabled"), new Target("PlayerInteraction", "set_SphereCheckInteractionEnabled"), new Target("PlayerInteraction", "set_LadderInteractionEnabled") }),
     };
-
-    internal static Target[] TargetsOf(string module)
-    {
-        foreach (var (name, targets) in Patched)
-            if (name == module) return targets;
-        throw new ArgumentException("Unknown module " + module + ".", nameof(module));
-    }
 }
 

@@ -12,7 +12,7 @@ using UnityEngine;
 
 namespace ForgeReplay;
 
-// The recorder hooks found by walking the game system by system (the list is DEVELOPERS.md, event numbers 62 and up): what was said, what a
+// The world's recorder hooks (DEVELOPERS.md, event numbers 62 and up): what was said, what a
 // terminal printed, level events, lights, the level objects that had no event, thrown things. Same rules as Hooks.cs. A method another package
 // patches is not patched here: it is read by polling, or from a method beside it, or through ForgeCore.
 internal static partial class Hooks
@@ -42,8 +42,6 @@ internal static partial class Hooks
     // Slot + 1 of a player named in a state packet, 0 none.
     private static ulong PlayerOf(SNetStructs.pPlayer player)
         => player.TryGetPlayer(out var who) && who != null && who.PlayerSlotIndex() >= 0 ? (ulong)who.PlayerSlotIndex() + 1 : 0UL;
-
-    private static ulong Scaled(float value, float scale) => (ulong)Mathf.Max(0, Mathf.RoundToInt(value * scale));
 
     // 64 Say: U voice number (the game's playerID), U sound event, U seed, U dialogue it belongs to, U dialogue it starts, U subtitle, U slot + 1. Runs on every machine.
     [HarmonyPatch]
@@ -76,7 +74,7 @@ internal static partial class Hooks
         {
             var p = data.Position;
             Rec.Begin().U((ulong)(int)data.Type).U(accepted ? 1UL : 0UL).U((ulong)(int)data.Trigger).U((ulong)(int)data.Layer).U((ulong)(int)data.DimensionIndex).U((ulong)(int)data.LocalIndex)
-                .U(Scaled(data.Delay, 100f)).U(Scaled(data.Duration, 100f)).U(data.Enabled ? 1UL : 0UL).U(data.SoundID).U(data.DialogueID).U(data.FogSetting).U(Scaled(data.FogTransitionDuration, 100f))
+                .U(Pack(data.Delay, 100f)).U(Pack(data.Duration, 100f)).U(data.Enabled ? 1UL : 0UL).U(data.SoundID).U(data.DialogueID).U(data.FogSetting).U(Pack(data.FogTransitionDuration, 100f))
                 .U((ulong)Math.Max(0, data.Count)).U(data.EnemyID).Pos(p.x, p.y, p.z)
                 .Text(data.WardenIntel?.ToString()).Text(data.CustomSubObjectiveHeader?.ToString()).Text(data.CustomSubObjective?.ToString()).Text(data.SoundSubtitle?.ToString()).Text(data.WorldEventObjectFilter);
             Rec.Emit(EventKind.WorldEvent);
@@ -91,7 +89,7 @@ internal static partial class Hooks
         try
         {
             if (kind == 0) _lastIntel = text;
-            Rec.Begin().U(kind).U(Scaled(duration, 10f)).Text(text, 1000);
+            Rec.Begin().U(kind).U(Pack(duration, 10f)).Text(text, 1000);
             Rec.Emit(EventKind.Intel);
         }
         catch (Exception e) { Rec.Fail("intel", e); }
@@ -118,7 +116,7 @@ internal static partial class Hooks
             }
         }
         var sequence = state.LatestLightSequenceInteraction;
-        write.U((ulong)Math.Max(0, sequence.SectionCount)).U(Scaled(sequence.SectionDelay, 1000f)).Pos(sequence.Position.x, sequence.Position.y, sequence.Position.z);
+        write.U((ulong)Math.Max(0, sequence.SectionCount)).U(Pack(sequence.SectionDelay, 1000f)).Pos(sequence.Position.x, sequence.Position.y, sequence.Position.z);
         var built = Rec.Built;
         if (_lastLights != null && built.SequenceEqual(_lastLights)) return;
         _lastLights = built.ToArray();
@@ -132,7 +130,7 @@ internal static partial class Hooks
         try
         {
             var manager = EnvironmentStateManager.Current;
-            if (manager != null && manager.m_stateReplicator != null) ZoneLights(manager.m_stateReplicator.State);
+            if (manager != null && manager.m_stateReplicator is { } replicator) ZoneLights(replicator.State);
         }
         catch (Exception e) { Rec.Fail("zone-lights", e); }
     }
@@ -149,7 +147,7 @@ internal static partial class Hooks
         {
             var terminal = interpreter.m_terminal;
             if (terminal == null) return;
-            Rec.Begin().U(Rec.Key(terminal)).U(type).U(Scaled(wait, 1000f)).Text(line, 2000);
+            Rec.Begin().U(Rec.Key(terminal)).U(type).U(Pack(wait, 1000f)).Text(line, 2000);
             Rec.Emit(EventKind.TerminalLine);
         }
         catch (Exception e) { Rec.Fail("terminal-line", e); }
@@ -313,14 +311,13 @@ internal static partial class Hooks
         [HarmonyPostfix]
         private static void PuzzleCluster(CP_Cluster_Core __instance, eClusterStatus newStatus, float progress)
         {
-            try { World(EventKind.Cluster, __instance, Rec.Key(__instance), (ulong)(int)newStatus, Scaled(Mathf.Clamp01(progress), 100f)); } catch (Exception e) { Rec.Fail("cluster", e); }
+            try { World(EventKind.Cluster, __instance, Rec.Key(__instance), (ulong)(int)newStatus, Pack(Mathf.Clamp01(progress), 100f)); } catch (Exception e) { Rec.Fail("cluster", e); }
         }
     }
 
     [HarmonyPatch]
     private static class LaidHook
     {
-
         // 83 Holopath: U key, U phase (0 the path was laid, 1 it is being revealed, 2 shown, 3 hidden), U 0, Pos of the object, Pos from, Pos to (the tip when revealed).
         [HarmonyPatch(typeof(CP_Holopath_Spline), nameof(CP_Holopath_Spline.GeneratePath))]
         [HarmonyPostfix]
@@ -358,7 +355,7 @@ internal static partial class Hooks
                 var core = __instance.GetComponent<CP_Bioscan_Core>();
                 var key = core != null ? Rec.Key(core) : Rec.Key(__instance);
                 var p = __instance.transform.position;
-                Rec.Begin().U(key).U(Scaled(newState.lerp, 1000f)).U(newState.paused ? 1UL : 0UL).Pos(p.x, p.y, p.z);
+                Rec.Begin().U(key).U(Pack(newState.lerp, 1000f)).U(newState.paused ? 1UL : 0UL).Pos(p.x, p.y, p.z);
                 Rec.EmitState(EventKind.ScanMove, key);
             }
             catch (Exception e) { Rec.Fail("scan-move", e); }
@@ -373,7 +370,7 @@ internal static partial class Hooks
         [HarmonyPostfix]
         private static void Held(Interact_Timed __instance, PlayerAgent sourceAgent, bool state)
         {
-            // The game also lets go of a hold when the level is torn down (Temp 11-05: right after the expedition ended), with the held
+            // The game also lets go of a hold when the level is torn down (right after the expedition ended), with the held
             // object already destroyed: Unity's own null says so (its transform would throw). That one release is not recorded.
             if (!Rec.On || sourceAgent == null || sourceAgent.WasCollected || __instance == null || __instance.WasCollected) return;
             try
@@ -450,12 +447,11 @@ internal static partial class Hooks
             {
                 var entity = EnemyRecorder.Entity(__instance.m_enemyAgent);
                 if (entity < 0) return;
-                Rec.Begin().U((ulong)entity).U(Scaled(heartbeatStrength, 100f)).Pos(detectPos.x, detectPos.y, detectPos.z);
+                Rec.Begin().U((ulong)entity).U(Pack(heartbeatStrength, 100f)).Pos(detectPos.x, detectPos.y, detectPos.z);
                 Rec.Emit(EventKind.EnemyBeat);
             }
             catch (Exception e) { Rec.Fail("enemy-beat", e); }
         }
-
     }
 
     internal static void NoteCharge(PlayerAgent? owner, bool charging)
@@ -521,7 +517,7 @@ internal static partial class Hooks
         var stick = item.TryCast<GlowstickInstance>();
         if (stick != null) return (ulong)(int)stick.GlowStickColor;
         var repeller = item.TryCast<FogRepellerInstance>();
-        if (repeller?.m_repellerSphere is { } sphere) return (ulong)(uint)(int)sphere.CurrentState | Scaled(sphere.Range, 10f) << 4;
+        if (repeller?.m_repellerSphere is { } sphere) return (ulong)(uint)(int)sphere.CurrentState | Pack(sphere.Range, 10f) << 4;
         return 0UL;
     }
 
@@ -559,14 +555,24 @@ internal static partial class Hooks
     }
 
     // 68 ObjectiveTimer (state, key 0): U 0, U shown, U seconds left, U blinking, Text title. Polled: the game's timer calls are another package's.
+    // The game's one objective timer and its object, found once: the player GUI layer lives for the whole game and keeps the same timer. Found
+    // again when that object is destroyed (Unity's null), so a rebuilt GUI is followed.
+    private static PUI_ObjectiveTimer? _timer;
+    private static GameObject? _timerObject;
+
     internal static void PollTimer()
     {
         if (!Rec.On) return;
         try
         {
-            var timer = GuiManager.PlayerLayer?.m_objectiveTimer;
-            if (timer == null) return;
-            var active = timer.gameObject.activeInHierarchy;
+            if (_timer == null || _timerObject == null)
+            {
+                _timer = GuiManager.PlayerLayer?.m_objectiveTimer;
+                if (_timer == null) return;
+                _timerObject = _timer.gameObject;
+            }
+            var timer = _timer;
+            var active = _timerObject.activeInHierarchy;
             var now = (active, active ? Mathf.CeilToInt(Mathf.Max(0f, timer.m_lastSetTimer)) : 0, active && timer.IsBlinking, active ? timer.CurrentTimerTitle ?? "" : "");
             if (now == _lastTimer || (!now.Item1 && !_lastTimer.Active)) return;
             _lastTimer = now;

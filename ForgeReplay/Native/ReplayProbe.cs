@@ -1,11 +1,7 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Text;
 using Gear;
-using Player;
-using UnityEngine;
 
 namespace ForgeReplay;
 
@@ -26,9 +22,8 @@ public static class ReplayProbe
             var recorded = -1;
             if (state.PlayerStatus[slot] is { } status) { var read = new PayloadReader(status); read.U(); read.U(); recorded = (int)read.U(); }
             var asked = Puppeteer.WieldedOf(slot);
-            var loadout = Puppeteer.LoadoutOf(slot).Split('\n');
-            var line = asked switch { 1 => 0, 2 => 1, 10 => 2, 3 => 3, _ => -1 };
-            var expected = line >= 0 && line < loadout.Length && loadout[line].Trim().Length > 0 ? new GearIDRange(loadout[line].Trim()).GetCompID(eGearComponent.BaseItem) : 0u;
+            var gearLine = Puppeteer.GearLineOf(Puppeteer.LoadoutOf(slot), asked);
+            var expected = gearLine.Length > 0 ? new GearIDRange(gearLine).GetCompID(eGearComponent.BaseItem) : 0u;
             var puppet = Puppeteer.PlayerOf(slot);
             var cosmetic = Puppeteer.CosmeticOf(slot);
             string body, item = "";

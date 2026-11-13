@@ -13,8 +13,9 @@ internal static class Program
             else { failed++; Console.WriteLine("FAIL " + label); }
         }
         NetChecks.Run(Check, errors);
-        NetEpochChecks.Run(Check);
+
         HookChecks.Run(Check);
+        AnimationChecks.Run(Check, args);
         Console.WriteLine(passed + " passed, " + failed + " failed");
         return failed == 0 ? 0 : 1;
     }

@@ -28,14 +28,14 @@
     <!-- The eight shipped guns are a ForgeEnergyLab definition file with its own lang/ folder, like any content pack's. -->
     <None Update="ForgeEnergyLab/**/*.forge" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="../ForgeCore/ForgeCore.csproj" Private="false" />
-    <ProjectReference Include="../ForgeUI/ForgeUI.csproj" Private="false" />
-    <ProjectReference Include="../ForgeAudio/ForgeAudio.csproj" Private="false" />
-    <ProjectReference Include="../ForgeVisual/ForgeVisual.csproj" Private="false" />
     <!-- ForgeAudio reads the cues and their Ogg files from audio/ beside the DLL; the Ogg files are local media (Assets/Audio/ogg). -->
     <None Include="audio/cues.forge" Link="audio/cues.forge" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(ForgeModsRoot)ForgeWeapon_EnergyLab/Assets/Audio/ogg/*.ogg" Link="audio/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <!-- The eight weapon model bundles sit beside energylab.forge, which names them; they are local media (Assets/Models). -->
+    <!-- The eight weapon model bundles sit beside energylab.forge, which names them, with the shared bundle they depend on and Unity's
+         manifest of the set, which ForgeCore reads as ForgeEnergyLab/ForgeEnergyLab; they are local media (Assets/Models). -->
     <None Include="$(ForgeModsRoot)ForgeWeapon_EnergyLab/Assets/Models/forge-energy-model-*.bundle" Link="ForgeEnergyLab/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(ForgeModsRoot)ForgeWeapon_EnergyLab/Assets/Models/forge-energy-unity-manifest.bundle" Link="ForgeEnergyLab/ForgeEnergyLab" CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('$(ForgeModsRoot)ForgeWeapon_EnergyLab/Assets/Models/forge-energy-unity-manifest.bundle')" />
     <EmbeddedResource Include="$(ForgeModsRoot)ForgeWeapon_EnergyLab/Assets/Vfx/forge-energy-disc.bundle" LogicalName="ForgeWeaponEnergyLab.Vfx.forge-energy-disc.bundle" />
     <Reference Include="BepInEx.Core" HintPath="$(GTFOBepInExPath)/core/BepInEx.Core.dll" Private="false" />
     <Reference Include="GTFO-API" HintPath="$(GTFOApiPath)" Private="false" />

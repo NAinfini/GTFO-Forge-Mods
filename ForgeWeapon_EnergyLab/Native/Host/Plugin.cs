@@ -1,4 +1,3 @@
-using System.Linq;
 using BepInEx;
 using BepInEx.Unity.IL2CPP;
 using Gear;
@@ -12,9 +11,6 @@ namespace ForgeWeaponEnergyLab.Native;
 [BepInPlugin(Id, "Forge Weapon Energy Lab", Version)]
 [BepInDependency("dev.gtfomodding.gtfo-api", ">=0.6.1")]
 [BepInDependency("NAinfini.ForgeCore", ">=1.0.0")]
-[BepInDependency(ForgeUI.UIKit.PluginId, ">=1.0.0")]
-[BepInDependency(ForgeAudio.AudioKit.PluginId, ">=1.0.0")]
-[BepInDependency("NAinfini.ForgeVisual", ">=1.0.0")]
 // MTFO marks the game as modded (achievements and public matchmaking off), so the guns stay out of official play.
 [BepInDependency("com.dak.MTFO")]
 internal sealed class Plugin : BasePlugin
@@ -26,9 +22,6 @@ internal sealed class Plugin : BasePlugin
 
     public override void Load()
     {
-        // The kit's volumes in the game's audio settings (ForgeAudio holds the values, ForgeUI draws the rows; added once however many packages ask).
-        ForgeUI.SettingsPages.AddAudioSliders("ForgeAudio.volumes", ForgeAudio.AudioVolumes.HeadingKey,
-            ForgeAudio.AudioVolumes.Controls.Select(c => new ForgeUI.SettingsSlider(c.Id, c.TextKey, c.Get, c.Set)).ToList(), ForgeAudio.AudioVolumes.ResetAll);
         EnergyLab.Initialize(System.IO.Path.Combine(Paths.ConfigPath, "ForgeWeapon_EnergyLab"));
         // Queue this package's own sounds before any definition pack: ForgeAudio decodes one library at a time, so a
         // third-party pack's slow or stuck decode must never be in front of the sounds every energy gun needs.
@@ -41,8 +34,7 @@ internal sealed class Plugin : BasePlugin
             EnergyGameHooks.Subscribe();
             EnergyMuzzleFlash.Register();
             EnergyGearRegistry.Register();
-            EnergyNetwork.Register();
-            EnergyController.Start(Id);
+            EnergyNetwork.Register(EnergyController.Start(Id));
         }
         catch (System.Exception error)
         {
@@ -236,7 +228,8 @@ internal static class EnergyGameHooks
         ForgeCore.GameHooks.BulletWeaponWielded.After(BindWieldModel);
         ForgeCore.GameHooks.BulletWeaponUnwielded.After(NoteUnwield);
         ForgeCore.GameHooks.ReloadTriggered.Before(BindReloadModel);
-        BindEnergyInventoryModel.Subscribe();
+        // After every other patch of the gear-spawn completion.
+        ForgeCore.GameHooks.GearSpawnCompleted.After(BindInventoryModel);
         NativeEnergyHit.Subscribe();
         NativeEnergyFireEntry.Subscribe();
         NativeEnergyRay.Subscribe();
@@ -251,11 +244,19 @@ internal static class EnergyGameHooks
     private static void BindWieldModel(BulletWeapon weapon, bool ran)
     {
         EnergyController.NoteWield(weapon, true);
-        if (!EnergyController.Owns(weapon)) return;
+        if (EnergyGearRegistry.DefinitionOf(weapon) == null) return;
         Presentation.WeaponModels.NoteHeld(weapon, true);
         EnergyLazyHooks.Hooks.Ensure();
         try { Presentation.WeaponModels.BindWeapon(weapon); }
         catch (System.Exception error) { Plugin.Logger.ErrorOnce("Energy wield model binding failed: " + error); }
+    }
+
+    private static void BindInventoryModel(ItemEquippable item, bool ran)
+    {
+        EnergyMuzzleFlash.Queue(item);
+        // The model bind owns its registration snapshot and rollback, including deferred asset mounts.
+        try { Presentation.WeaponModels.BindWeapon(item); }
+        catch (System.Exception error) { Plugin.Logger.ErrorOnce("Energy native socket binding failed: " + error); }
     }
 
     // The held gun leaving the hand ends the controller's armed state without a per-frame look at the hand.

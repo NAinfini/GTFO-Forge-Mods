@@ -1,64 +1,38 @@
 using System;
 using Enemies;
-using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using Player;
 using UnityEngine;
 
 namespace ForgeWeaponEnergyLab.Native;
 
-/// <summary>Whom an energy effect may select, relative to its explicit context actor (the shooter).</summary>
-internal enum TargetRelationFilter { Enemies }
-
 // Shared by the hand-held chain and the moving orb; all candidates require a resolved visible hit.
 internal sealed class VisibleEnemies
 {
-    private const int Capacity = 512;
-    private readonly ForgeCore.ColliderQuery _overlap = new(Capacity);
-    private readonly Il2CppStructArray<RaycastHit> _blockers = new(64);
-    private readonly ArcCandidate[] _candidates = new ArcCandidate[Capacity];
+    private readonly ForgeCore.SweepQuery _blockers = new(64);
+    private ArcCandidate[] _candidates = new ArcCandidate[64];
     private readonly NativeShot _shot = new();
 
-    internal static EnemyAgent? SelectEnemy(PlayerAgent context, Collider collider, TargetRelationFilter relation)
-    {
-        if (relation != TargetRelationFilter.Enemies) throw new ArgumentOutOfRangeException(nameof(relation));
-        return ForgeCore.Enemies.FromCollider(collider, context);
-    }
-
-    /// <summary>The nearest enemy that is hit by a clear segment from <paramref name="origin"/>. A search that outgrew its fixed query
-    /// budget finds nobody (and logs once): no damage is ever dealt from a truncated answer.</summary>
-    internal bool Nearest(PlayerAgent context, TargetRelationFilter relation, bool hitInterveningReceiver,
-        Vector3 origin, float range, ReadOnlySpan<long> visited, long ignore,
-        out RaycastHit hit, out long identity)
-    {
-        try { return NearestChecked(context, relation, hitInterveningReceiver, origin, range, visited, ignore, out hit, out identity); }
-        catch (BudgetExhausted error)
-        {
-            Plugin.Logger.ErrorOnce("An arc target search was dropped: " + error);
-            hit = default; identity = 0;
-            return false;
-        }
-    }
-
-    private bool NearestChecked(PlayerAgent context, TargetRelationFilter relation, bool hitInterveningReceiver,
+    /// <summary>The nearest enemy in <paramref name="context"/>'s dimension that is hit by a clear segment from <paramref name="origin"/>.
+    /// The candidates are every enemy limb in range (<c>ForgeCore.Enemies.Limbs</c>), so the answer is never cut short.</summary>
+    internal bool Nearest(PlayerAgent context, bool hitInterveningReceiver,
         Vector3 origin, float range, ReadOnlySpan<long> visited, long ignore,
         out RaycastHit hit, out long identity)
     {
         hit = default;
         identity = 0;
-        var count = _overlap.Sphere(origin, range, LayerManager.MASK_BULLETWEAPON_RAY, QueryTriggerInteraction.Ignore);
-        if (_overlap.Truncated) throw new BudgetExhausted("Arc target query budget exhausted; no damage submitted.");
-        for (var index = 0; index < count; index++)
+        var limbs = ForgeCore.Enemies.Limbs(origin, range, QueryTriggerInteraction.Ignore);
+        if (_candidates.Length < limbs.Length) _candidates = new ArcCandidate[limbs.Length];
+        for (var index = 0; index < limbs.Length; index++)
         {
-            var collider = _overlap[index];
-            var enemy = collider == null ? null : SelectEnemy(context, collider, relation);
-            _candidates[index] = enemy != null
-                ? new ArcCandidate(enemy.Pointer.ToInt64(), (collider!.bounds.center - origin).sqrMagnitude, true) : default;
+            var (collider, enemy) = limbs[index];
+            _candidates[index] = enemy.DimensionIndex == context.DimensionIndex
+                ? new ArcCandidate(enemy.Pointer.ToInt64(), (collider.bounds.center - origin).sqrMagnitude, true) : default;
         }
         while (true)
         {
-            var chosen = ArcSelection.Nearest(_candidates.AsSpan(0, count), visited, range);
+            var chosen = ArcSelection.Nearest(_candidates.AsSpan(0, limbs.Length), visited, range);
             if (chosen < 0) return false;
-            var collider = _overlap[chosen];
+            var collider = limbs[chosen].Collider;
             // Unity rays omit a collider containing their origin; a moving orb may be inside an enemy.
             var containsOrigin = (collider.ClosestPoint(origin) - origin).sqrMagnitude < 0.00000001f;
             if (containsOrigin)
@@ -84,10 +58,9 @@ internal sealed class VisibleEnemies
         var direction = target - start;
         var distance = direction.magnitude;
         if (distance < 0.001f) return false;
-        var count = Physics.RaycastNonAlloc(start, direction / distance, _blockers, distance + 0.025f,
+        // Nearest first; the first hit that is not the shooter's own body or the ignored agent is what the segment meets.
+        var count = _blockers.Cast(start, 0f, direction / distance, distance + 0.025f,
             LayerManager.MASK_BULLETWEAPON_RAY, QueryTriggerInteraction.UseGlobal);
-        if (count == _blockers.Length) throw new BudgetExhausted("Arc visibility budget exhausted; no damage submitted.");
-        var nearest = float.PositiveInfinity;
         var nearestIsReceiver = false;
         for (var index = 0; index < count; index++)
         {
@@ -96,11 +69,11 @@ internal sealed class VisibleEnemies
             if (collider == null || ForgeCore.Combat.IsPartOf(collider, context)) continue;
             var receiver = collider.GetComponentInParent<IDamageable>();
             var identity = receiver?.GetBaseAgent()?.Pointer.ToInt64() ?? 0L;
-            if ((ignore != 0 && identity == ignore) || candidate.distance >= nearest) continue;
-            nearest = candidate.distance;
+            if (ignore != 0 && identity == ignore) continue;
             recipient = identity;
             hit = candidate;
             nearestIsReceiver = receiver != null;
+            break;
         }
         // Only enemies are selected. A chain's physical segment can hit a different receiver en route;
         // that collision ends the chain. Pulses do not select that blocker.

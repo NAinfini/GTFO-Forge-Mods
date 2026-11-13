@@ -15,7 +15,7 @@ namespace ForgeVfx.EditorTools
     ///     Unity.exe -batchmode -quit -projectPath Tools/Vfx/ForgeVfx -executeMethod ForgeVfx.EditorTools.ForgeVfxBuild.Build
     ///         [-forgeVfxOut &lt;folder&gt;] -logFile &lt;log&gt;
     ///
-    /// The default output is the repository's `Mods/ForgeVisual/Assets/Vfx/`. Before anything is built every effect prefab
+    /// The default output is the repository's `Mods/ForgeCore/Assets/Vfx/`. Before anything is built every effect prefab
     /// is checked: every member of <see cref="ForgeVfxProject.Members"/> has one, it is a particle effect with a
     /// ParticleSystem at the root that loops there if and only if the member is sustained, it carries no script,
     /// every renderer draws with a shader that ships in this project, and every file it depends on is covered by a
@@ -28,7 +28,7 @@ namespace ForgeVfx.EditorTools
         private static void BuildBundle()
         {
             var output = ForgeVfxProject.Argument("-forgeVfxOut")
-                ?? Path.Combine(ForgeVfxProject.RepositoryRoot, "Mods", "ForgeVisual", "Assets", "Vfx");
+                ?? Path.Combine(ForgeVfxProject.RepositoryRoot, "Mods", "ForgeCore", "Assets", "Vfx");
             var sources = Sources();
             var prefabs = ForgeVfxProject.EffectPrefabs();
             var missing = ForgeVfxProject.Members.Select(member => member.Name)
@@ -36,38 +36,7 @@ namespace ForgeVfx.EditorTools
             if (missing.Length > 0) throw new InvalidOperationException("No prefab for " + string.Join(", ", missing) + " in " + ForgeVfxProject.EffectsFolder);
             var effects = prefabs.Select(path => Check(path, sources)).ToArray();
 
-            var staging = Path.Combine(ForgeVfxProject.ProjectFolder, "Library", "ForgeVfxBuild");
-            Directory.CreateDirectory(staging);
-            var build = new AssetBundleBuild
-            {
-                assetBundleName = ForgeVfxProject.BundleName,
-                assetNames = prefabs,
-                addressableNames = prefabs.Select(Path.GetFileNameWithoutExtension).ToArray()
-            };
-            // A shader that fails to compile is still written into the bundle, as an empty program the game draws
-            // nothing with; any shader error logged while the bundle builds fails the build instead.
-            var shaderErrors = new List<string>();
-            Application.LogCallback watch = (message, stack, type) =>
-            {
-                if ((type == LogType.Error || type == LogType.Exception) && message.IndexOf("shader", StringComparison.OrdinalIgnoreCase) >= 0)
-                    lock (shaderErrors) shaderErrors.Add(message);
-            };
-            Application.logMessageReceivedThreaded += watch;
-            AssetBundleManifest result;
-            try
-            {
-                result = BuildPipeline.BuildAssetBundles(staging, new[] { build },
-                    BuildAssetBundleOptions.ChunkBasedCompression | BuildAssetBundleOptions.StrictMode
-                    | BuildAssetBundleOptions.DeterministicAssetBundle | BuildAssetBundleOptions.ForceRebuildAssetBundle,
-                    BuildTarget.StandaloneWindows64);
-            }
-            finally { Application.logMessageReceivedThreaded -= watch; }
-            if (shaderErrors.Count > 0)
-                throw new InvalidOperationException("Shader compilation failed while building the bundle; nothing was written:\n" + string.Join("\n", shaderErrors.Distinct()));
-            if (result == null) throw new InvalidOperationException("BuildAssetBundles returned no manifest.");
-            var built = Path.Combine(staging, ForgeVfxProject.BundleName);
-            if (!File.Exists(built)) throw new FileNotFoundException("The bundle was not written.", built);
-
+            var built = BuildBundleFile(ForgeVfxProject.BundleName, prefabs);
             Directory.CreateDirectory(output);
             var target = Path.Combine(output, ForgeVfxProject.BundleName);
             File.Copy(built, target, true);
@@ -91,6 +60,43 @@ namespace ForgeVfx.EditorTools
             Debug.Log("Forge VFX bundle: " + target + " (" + bytes.LongLength + " bytes, " + effects.Length + " effects)");
         }
 
+        /// <summary>Builds one bundle of the given prefabs (each addressed by its file name) into the project's staging folder and
+        /// returns the file. A shader that fails to compile is still written into the bundle, as an empty program the game draws
+        /// nothing with; any shader error logged while the bundle builds fails the build instead. Shared by the member bundle
+        /// above and the converted library effects (<see cref="ForgeVfxConvert"/>).</summary>
+        internal static string BuildBundleFile(string bundleName, string[] prefabs)
+        {
+            var staging = Path.Combine(ForgeVfxProject.ProjectFolder, "Library", "ForgeVfxBuild");
+            Directory.CreateDirectory(staging);
+            var build = new AssetBundleBuild
+            {
+                assetBundleName = bundleName,
+                assetNames = prefabs,
+                addressableNames = prefabs.Select(Path.GetFileNameWithoutExtension).ToArray()
+            };
+            var shaderErrors = new List<string>();
+            Application.LogCallback watch = (message, stack, type) =>
+            {
+                if ((type == LogType.Error || type == LogType.Exception) && message.IndexOf("shader", StringComparison.OrdinalIgnoreCase) >= 0)
+                    lock (shaderErrors) shaderErrors.Add(message);
+            };
+            Application.logMessageReceivedThreaded += watch;
+            AssetBundleManifest result;
+            try
+            {
+                result = BuildPipeline.BuildAssetBundles(staging, new[] { build },
+                    BuildAssetBundleOptions.ChunkBasedCompression | BuildAssetBundleOptions.StrictMode
+                    | BuildAssetBundleOptions.DeterministicAssetBundle | BuildAssetBundleOptions.ForceRebuildAssetBundle,
+                    BuildTarget.StandaloneWindows64);
+            }
+            finally { Application.logMessageReceivedThreaded -= watch; }
+            if (shaderErrors.Count > 0)
+                throw new InvalidOperationException("Shader compilation failed while building the bundle; nothing was written:\n" + string.Join("\n", shaderErrors.Distinct()));
+            if (result == null) throw new InvalidOperationException("BuildAssetBundles returned no manifest.");
+            var built = Path.Combine(staging, bundleName);
+            if (!File.Exists(built)) throw new FileNotFoundException("The bundle was not written.", built);
+            return built;
+        }
         private static Effect Check(string path, Source[] sources)
         {
             var name = Path.GetFileNameWithoutExtension(path);

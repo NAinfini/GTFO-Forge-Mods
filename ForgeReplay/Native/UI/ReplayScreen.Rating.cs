@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using ForgeCore;
 using ForgeUI;
 using UnityEngine;
 
@@ -17,7 +16,7 @@ internal static partial class ReplayScreen
     private static readonly Color[] CardGradeColours = new Color[4];
     private static readonly RadarChart[] CardRadars = { new(), new(), new(), new() };
     private static readonly RadarChart BigRadar = new();
-    private static readonly HudTable CompareTable = new() { Pad = 12f };
+    private static readonly HudTable CompareTable = new();
     private static string[] _dimensionLabels = Array.Empty<string>();
     private static string _ratingLegend = "", _compareFor = "";
     private static int _ratingPick = -1, _ratingDrawn = -2;
@@ -95,7 +94,7 @@ internal static partial class ReplayScreen
         for (var i = 0; i < slots.Count; i++) heads[i + 1] = Names[slots[i]];
         CompareTable.Clear();
         CompareTable.SetColumns(heads, Head);
-        for (var i = 0; i < slots.Count; i++) CompareTable.SetHead(i + 1, SlotColour(slots[i]), SlotColour(slots[i]));
+        for (var i = 0; i < slots.Count; i++) CompareTable.SetHead(i + 1, NameColour(slots[i], UIKitColors.MenuOver), SlotColour(slots[i]));
         for (var d = 0; d <= RatingMetrics.Dimensions.Length; d++)
         {
             var total = d == RatingMetrics.Dimensions.Length;
@@ -182,17 +181,5 @@ internal static partial class ReplayScreen
         else if (rating?.State == RatingState.TooFewDimensions) c.Text(c.FitText(_ui.Text("rating.fewdims"), 18f, true, textRoom), left + 20f, cy - 18f, 18f, UIKitColors.Warn, HudAlign.Left, bold: true);
         else c.Text("—", left + 20f, cy - 18f, 30f, Fade(UIKitColors.GameText, 0.55f), HudAlign.Left, bold: true);
         CardRadars[slot].Draw(c, left + width - CardRadarRadius - 22f, cy - 18f, CardRadarRadius, Fade(UIKitColors.GameText, 0.35f), null, 16f, null, 2);
-    }
-
-    // The width the small grade on a player's card takes (with its gap), 0 when the player has none.
-    private static float BadgeRoom(HudCanvas c, int slot) => CardGrades[slot].Length == 0 ? 0f : c.TextWidth(CardGrades[slot], 17f, true) + 16f + 8f;
-
-    // The small grade at the right end of a card's name line.
-    private static void Badge(HudCanvas c, int slot, float right, float y)
-    {
-        if (CardGrades[slot].Length == 0) return;
-        var wide = BadgeRoom(c, slot) - 8f;
-        c.Rect(right - wide / 2f, y, wide, 24f, CardGradeColours[slot]);
-        c.Text(CardGrades[slot], right - wide / 2f, y, 17f, Plate(), HudAlign.Centre, bold: true);
     }
 }

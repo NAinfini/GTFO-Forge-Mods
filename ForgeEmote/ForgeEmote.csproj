@@ -14,7 +14,7 @@
     <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
   </PropertyGroup>
   <Target Name="RequireLocalMedia" BeforeTargets="ResolveReferences">
-    <Error Condition="!Exists('$(ForgeModsRoot)ForgeEmote/Assets/Clips/wave.clip.json')" Text="ForgeEmote ships its clips from local media: Assets/Clips/*.clip.json (shipped as *.clip.forge). See DEVELOPERS.md." />
+    <Error Condition="!Exists('$(ForgeModsRoot)ForgeEmote/Assets/Clips/wave.glb')" Text="ForgeEmote ships its clips from local media: Assets/Clips/*.glb. See DEVELOPERS.md." />
   </Target>
   <Target Name="RequireGameReferences" BeforeTargets="ResolveReferences">
     <Error Condition="!Exists('$(GTFOBepInExPath)/core/BepInEx.Unity.IL2CPP.dll') or !Exists('$(GTFOBepInExPath)/interop/Modules-ASM.dll')"
@@ -26,7 +26,7 @@
     <!-- The eight shipped actions are a ForgeEmote definition file with its own lang/ folder, like any third party's. -->
     <None Update="ForgeEmote/**/*.forge" CopyToOutputDirectory="PreserveNewest" />
     <!-- Clips and icons are local media (Assets); they sit beside the definitions in the package. -->
-    <None Include="$(ForgeModsRoot)ForgeEmote/Assets/Clips/*.clip.json" Link="ForgeEmote/Clips/%(Filename).forge" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(ForgeModsRoot)ForgeEmote/Assets/Clips/*.glb" Link="ForgeEmote/Clips/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(ForgeModsRoot)ForgeEmote/Assets/Icons/*.png" Link="ForgeEmote/Icons/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(MSBuildProjectDirectory)/Assets/Clips/LICENSE.forge" Link="ForgeEmote/Clips/LICENSE.forge" CopyToOutputDirectory="PreserveNewest" />
     <!-- Sounds: the ForgeAudio folder beside the definitions; cues.forge and the record are in Git, the .ogg files are local media. -->
@@ -34,9 +34,6 @@
     <None Include="$(MSBuildProjectDirectory)/Assets/Audio/cues.forge" Link="ForgeEmote/audio/cues.forge" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(MSBuildProjectDirectory)/Assets/Audio/LICENSE.forge" Link="ForgeEmote/audio/LICENSE.forge" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="../ForgeCore/ForgeCore.csproj" Private="false" />
-    <ProjectReference Include="../ForgeAudio/ForgeAudio.csproj" Private="false" />
-    <ProjectReference Include="../ForgeUI/ForgeUI.csproj" Private="false" />
-    <ProjectReference Include="../ForgeVisual/ForgeVisual.csproj" Private="false" />
     <Reference Include="BepInEx.Core" HintPath="$(GTFOBepInExPath)/core/BepInEx.Core.dll" Private="false" />
     <Reference Include="BepInEx.Unity.IL2CPP" HintPath="$(GTFOBepInExPath)/core/BepInEx.Unity.IL2CPP.dll" Private="false" />
     <Reference Include="Il2CppInterop.Runtime" HintPath="$(GTFOBepInExPath)/core/Il2CppInterop.Runtime.dll" Private="false" />

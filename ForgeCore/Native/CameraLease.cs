@@ -108,7 +108,7 @@ public sealed class CameraLease : IDisposable
         if (length > 0.001f && Physics.SphereCast(focus, OrbitRadius, back / length, out var hit, length, LayerManager.MASK_WORLD, QueryTriggerInteraction.Ignore))
             reach = OrbitMath.Pulled(hit.distance, length, OrbitRadius);
         var at = focus + (length > 0.001f ? back / length * reach : Vec.Zero);
-        var eased = OrbitMath.Eased(_orbitOut);
+        var eased = ForgeUI.Ease.Smoothstep(_orbitOut);
         Look(Vector3.Lerp(agent!.EyePosition, at, eased), Quaternion.Slerp(_orbitFromRotation, turn, eased));
         if (leaving && _orbitOut <= 0f) _orbiting = false;
         return _orbitOut;

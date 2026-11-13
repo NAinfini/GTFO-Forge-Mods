@@ -6,7 +6,7 @@ MIT License in ../../LICENSE. manifest.json preserves source filenames and SHA-2
 the audio folder's cues.forge describes how ForgeAudio plays them.
 
 The blast-fire and blast-explode cues are not Firefly sounds. They are the grenade launcher's fire and burst sounds of
-ForgeOrdnance_Arsenal, copied unchanged (provenance of every clip in ForgeOrdnance_Arsenal/Assets/Audio/sources.json). Their sources:
+ForgeOrdnance, copied unchanged (provenance of every clip in ForgeOrdnance/Assets/Arsenal/Audio/sources.forge). Their sources:
 
 Attribution (Creative Commons Attribution; converted and trimmed for game use):
 

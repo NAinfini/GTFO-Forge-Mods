@@ -64,7 +64,7 @@ internal sealed class PlasmaEffects : IDisposable
     /// muzzle); the orb body shows once it flies. It is <see cref="ChargeShare"/> of the payload's diameter, and in the local player's own
     /// view (<paramref name="firstPerson"/>) at most <see cref="FirstPersonCharge"/>; aimed through an optic, <paramref name="sight"/> is
     /// the look camera's ray and the charge also stays below it however close the optic sits to the bore.</summary>
-    public void ChargingOrb(int index, Vector3 position, float radius, float now, bool electric, bool firstPerson, Ray? sight)
+    public void ChargingOrb(int index, Vector3 position, float radius, bool electric, bool firstPerson, Ray? sight)
     {
         if (!Ready) return;
         var size = radius * 2f * ChargeShare;
@@ -81,10 +81,10 @@ internal sealed class PlasmaEffects : IDisposable
 
     /// <summary>The orb of slot <paramref name="index"/>. A flying orb hums as it goes;
     /// an orb still charging at the muzzle has no flight sound.</summary>
-    public void Orb(int index, Vector3 position, float radius, float now, bool electric, bool flying)
+    public void Orb(int index, Vector3 position, float radius, bool electric, bool flying)
     {
         if (!Ready) return;
-        Draw(index, position, radius, electric, flying, now);
+        Draw(index, position, radius, electric, flying);
         if (!flying) return;
         var voice = _flightVoices[index];
         voice.Anchor.position = position;
@@ -109,14 +109,14 @@ internal sealed class PlasmaEffects : IDisposable
     }
 
     /// <summary>An orb running out: it shrinks to a tenth of its radius as <paramref name="progress"/> reaches 1.</summary>
-    public void Dissipate(int index, Vector3 position, float radius, float progress, float now)
+    public void Dissipate(int index, Vector3 position, float radius, float progress)
     {
         if (!Ready) return;
-        Draw(index, position, radius * (1f - Mathf.Clamp01(progress) * 0.9f), electric: true, flying: true, now);
+        Draw(index, position, radius * (1f - Mathf.Clamp01(progress) * 0.9f), electric: true, flying: true);
     }
 
     // The slot latch prevents duplicate detonations until the next orb starts.
-    public void Explosion(int index, Vector3 position, float blastRadius, float now)
+    public void Explosion(int index, Vector3 position, float blastRadius)
     {
         if (!Ready || _exploded[index]) return;
         _exploded[index] = true;
@@ -144,7 +144,7 @@ internal sealed class PlasmaEffects : IDisposable
         _positions[index] = position;
     }
 
-    private void Draw(int index, Vector3 position, float radius, bool electric, bool flying, float now)
+    private void Draw(int index, Vector3 position, float radius, bool electric, bool flying)
     {
         Begin(index, position, flying);
         if (Look.Effect(electric ? EnergyVfx.ShockOrb : EnergyVfx.OrbBody) is { } body) Fx.Hold(body, _bodyKeys[index], position, Vector3.up, radius * 2f, Color.white);
@@ -157,7 +157,7 @@ internal sealed class PlasmaEffects : IDisposable
         }
     }
 
-    public void Pulse(int index, ReadOnlySpan<Vector3> targets, float now)
+    public void Pulse(int index, ReadOnlySpan<Vector3> targets)
     {
         if (!Ready) return;
         if (targets.Length < 1 || targets.Length > EnergyLimits.PulseTargets) throw new ArgumentException("Invalid orb pulse targets.");

@@ -38,8 +38,8 @@ internal static class EnergyGearRegistry
         if (!Ready) return;
         foreach (var gear in EnergyGears.All)
         {
-            var name = Label(EnergyText.Name(gear));
-            var description = Label(EnergyText.Description(gear));
+            var name = ForgeUI.GameText.Localized(EnergyText.Name(gear));
+            var description = ForgeUI.GameText.Localized(EnergyText.Description(gear));
             var archetype = GameDataBlockBase<ArchetypeDataBlock>.GetBlock(gear.ArchetypeId);
             var category = GameDataBlockBase<GearCategoryDataBlock>.GetBlock(gear.CategoryId);
             if (archetype != null) { archetype.PublicName = name; archetype.Description = description; }
@@ -49,7 +49,6 @@ internal static class EnergyGearRegistry
 
     internal static EnergyGear? DefinitionOf(BulletWeapon? weapon)
         => weapon?.GearCategoryData is { } category ? EnergyGears.ForCategory(category.persistentID) : null;
-    internal static EnergyMode ModeOf(BulletWeapon? weapon) => DefinitionOf(weapon)?.Mode ?? EnergyMode.Off;
     internal static bool Matches(BulletWeapon? weapon, uint categoryId, int mode)
         => EnergyGears.Match(categoryId, mode) is { } gear && DefinitionOf(weapon) == gear;
 
@@ -61,7 +60,7 @@ internal static class EnergyGearRegistry
         try
         {
             var problems = new List<string>();
-            EnergyGears.Freeze(problems);
+            EnergyGears.Freeze(problems, ForgeCore.Assets.Digest);
             foreach (var problem in problems) Plugin.Logger.ErrorOnce(problem);
             Presentation.EnergyIcons.Supply();
             var mainGear = Require<PlayerOfflineGearDataBlock>(MainTemplate);
@@ -101,8 +100,8 @@ internal static class EnergyGearRegistry
                 // Nested donor data is shared read-only; only the cloned blocks are changed.
                 var archetype = DataBlocks.Clone(sourceArchetype, gear.NativeName, gear.ArchetypeId);
                 archetype.RecoilDataID = recoil.persistentID;
-                archetype.PublicName = Label(EnergyText.Name(gear));
-                archetype.Description = Label(EnergyText.Description(gear));
+                archetype.PublicName = ForgeUI.GameText.Localized(EnergyText.Name(gear));
+                archetype.Description = ForgeUI.GameText.Localized(EnergyText.Description(gear));
                 archetype.Damage = gear.Numbers.Shot.Damage;
                 archetype.DamageFalloff = new Vector2(gear.Numbers.Shot.Range, gear.Numbers.Shot.Range);
                 archetype.StaggerDamageMulti = gear.Numbers.Shot.Stagger;
@@ -123,8 +122,8 @@ internal static class EnergyGearRegistry
                 archetype.EquipTransitionTime = gear.Definition.Tuning.EquipTime;
                 archetype.AimTransitionTime = gear.Definition.Tuning.AimTime;
                 var category = DataBlocks.Clone(sourceCategory, gear.NativeName, gear.CategoryId);
-                category.PublicName = Label(EnergyText.Name(gear));
-                category.Description = Label(EnergyText.Description(gear));
+                category.PublicName = ForgeUI.GameText.Localized(EnergyText.Name(gear));
+                category.Description = ForgeUI.GameText.Localized(EnergyText.Description(gear));
                 category.SemiArchetype = category.BurstArchetype = category.AutoArchetype = category.SemiBurstArchetype = gear.ArchetypeId;
                 var block = new PlayerOfflineGearDataBlock
                 {
@@ -278,14 +277,5 @@ internal static class EnergyGearRegistry
         var result = DataBlocks.Add(Plugin.Id, block);
         if (result is not (DataBlockResult.Added or DataBlockResult.AlreadyAdded))
             throw new InvalidOperationException($"Energy block registration failed ({result}): {typeof(T).Name}/{block.persistentID}.");
-    }
-
-    // LocalizedText is an IL2CPP value type. Its managed string constructor does not
-    // allocate a boxed instance; the game's uint conversion does.
-    private static LocalizedText Label(string text)
-    {
-        LocalizedText value = 0u;
-        value.UntranslatedText = text;
-        return value;
     }
 }

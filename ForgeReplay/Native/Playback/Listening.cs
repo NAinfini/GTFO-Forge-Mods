@@ -45,8 +45,7 @@ internal static class Listening
     {
         if (ForgeCore.Frame.UnscaledTime < _next) return;
         _next = ForgeCore.Frame.UnscaledTime + 0.25f;
-        if (!View(out var at) || !ForgeCore.Level.CourseNodeAt(at, 1f, out var node, out _) || node?.m_area == null) return;
-        var area = node.m_area;
+        if (!View(out var at) || !ForgeCore.Level.CourseNodeAt(at, 1f, out var node, out _) || node?.m_area is not { } area || area == null) return;
         if (_area != null && !_area.WasCollected && _area.Pointer == area.Pointer) return;
         _area = area;
         _entering = true;

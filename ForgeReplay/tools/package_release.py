@@ -2,10 +2,10 @@
 
     python Mods/ForgeReplay/tools/package_release.py --artifacts-path <dotnet artifacts> --output <folder>
 
-Checks the manifest's dependencies (BepInExPack_GTFO 3.2.4, GTFO_API 0.6.1 and the four libraries at the versions their
-own manifests declare), that the manifest and release.json versions agree and that lang/en.forge and lang/zh.forge hold the
-same keys, then writes NAinfini-ForgeReplay-<version>.zip. Mods/Build/verify_release.py, run on a folder holding this zip
-and the four library zips, checks the DLL against the build and its assembly version against the manifest.
+Checks the manifest's dependencies (BepInExPack_GTFO 3.2.4, GTFO_API 0.6.1 and ForgeCore at the version its own manifest
+declares), that the manifest and release.json versions agree and that lang/en.forge and lang/zh.forge hold the same keys,
+then writes NAinfini-ForgeReplay-<version>.zip. Mods/Build/verify_release.py, run on a folder holding this zip and the
+ForgeCore zip, checks the DLL against the build and its assembly version against the manifest.
 """
 from pathlib import Path
 import json
@@ -18,7 +18,7 @@ import package_common
 NAME = "ForgeReplay"
 FOLDER = MODS / NAME
 EXTERNAL = ("BepInEx-BepInExPack_GTFO-3.2.4", "GTFOModding-GTFO_API-0.6.1")
-LIBRARIES = ("ForgeCore", "ForgeUI", "ForgeAudio", "ForgeVisual")
+LIBRARIES = ("ForgeCore",)
 LANGUAGES = ("en", "zh")
 METADATA = ("rating.forge", "manifest.json", "icon.png", "README.md", "CHANGELOG.md", "LICENSE", "NOTICE") + tuple("lang/" + code + ".forge" for code in LANGUAGES)
 

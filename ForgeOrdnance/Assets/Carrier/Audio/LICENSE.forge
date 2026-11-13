@@ -1,0 +1,80 @@
+The converted Ogg Vorbis files are derived from the exact owner-selected recordings in sources.forge, which is kept in the source repository.
+The original recordings are not included in Git or the release package.
+
+Sonniss GameAudioGDC 2026 bundle (royalty-free, commercial use allowed; the owner's licensed copy, and the original bundle licence remains authoritative):
+
+- ui.key_up - Rescopic Sound - User Interaction - UIClick_Select Middle 29_RSCPC_USIN.wav - Sonniss GameAudioGDC 2026 royalty-free
+- ui.key_right - Rescopic Sound - User Interaction - UIClick_Select Middle 29_RSCPC_USIN.wav - Sonniss GameAudioGDC 2026 royalty-free
+- ui.key_left - Rescopic Sound - User Interaction - UIClick_Select Middle 29_RSCPC_USIN.wav - Sonniss GameAudioGDC 2026 royalty-free
+- ui.key_down - Rescopic Sound - User Interaction - UIClick_Select Middle 29_RSCPC_USIN.wav - Sonniss GameAudioGDC 2026 royalty-free
+- beacon.tick - 奇幻游戏第二套音效 - UIAlert_Collect Scifi Futuristic Electronic Bass Burst Sweep Heavy 04_ESM_FG2.wav - Sonniss GameAudioGDC 2026 royalty-free
+- ui.slot_select - Rescopic Sound - User Interaction - UIClick_Select Middle 29_RSCPC_USIN.wav - Sonniss GameAudioGDC 2026 royalty-free
+
+Boom Library (the owner's licensed sound library, cleared for use in released mods):
+
+- drop.incoming - Boom Library - 041 港口码头工业车间及周围环境音效 - NP04 0707 Industrial jackhammers portable loop v1.wav
+- drop.impact - Boom Library - 028 大气震撼低音冲击电影史诗预告片音效 - CH-DS HIT Massive 12.wav
+- drop.impact - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBDS Impact Metal Large 01.wav
+- drop.open - Boom Library - 037 机器零件机械齿轮音效 - MEDS Medium Lock And Load Short.wav
+- drop.open - Boom Library - 037 机器零件机械齿轮音效 - MECK SNAP Door Handle 04 Clack Open Close.wav
+- drop.open - Boom Library - 037 机器零件机械齿轮音效 - MEDS Large Crossover Long.wav
+- drop.open - Boom Library - 037 机器零件机械齿轮音效 - MEDS Large Drawbridge Long.wav
+- beacon.loop - Boom Library - 034 未来科幻机器人音效 - SF-DS Energy Hum 02.wav
+- supply.pickup - Boom Library - 037 机器零件机械齿轮音效 - MEDS Small Keylock Short.wav
+- supply.pickup - Boom Library - 037 机器零件机械齿轮音效 - MEDS Medium Strongbox Long.wav
+- supply.pickup - Boom Library - 037 机器零件机械齿轮音效 - MEDS Medium Behind Bars Long.wav
+- supply.pickup - Boom Library - 108 飞船宇宙空间站史诗震撼科幻场景音效 - METLImpt_IMPACT-Chunky Vice Latch Double_B00M_SFMCK.wav
+- ui.key_wrong - Boom Library - 056 未来科幻UI动态界面音效 - HIT_Signal_Access_Denied_03.wav
+- ui.key_wrong - Boom Library - 056 未来科幻UI动态界面音效 - HIT_Signal_Access_Denied_02.wav
+- ui.key_wrong - Boom Library - 056 未来科幻UI动态界面音效 - HIT_Signal_Access_Denied_01.wav
+- ui.code_complete - Boom Library - 056 未来科幻UI动态界面音效 - HIT_Signal_Triad_Short.wav
+- ui.code_complete - Boom Library - 056 未来科幻UI动态界面音效 - FX_GUI_Data_Access_Check_04.wav
+- ui.code_complete - Boom Library - 056 未来科幻UI动态界面音效 - FX_GUI_Data_Access_Check_01.wav
+- ui.call_open - Boom Library - 056 未来科幻UI动态界面音效 - FX_Signal_Warning_Fast_01.wav
+- ui.call_open - Boom Library - 056 未来科幻UI动态界面音效 - FX_System_Start_Up.wav
+- ui.call_cancel - Boom Library - 056 未来科幻UI动态界面音效 - FX_GUI_Data_Slide_02.wav
+- ui.call_cancel - Boom Library - 056 未来科幻UI动态界面音效 - FX_Signal_Warning_Fast_01.wav
+- beacon.throw - Boom Library - 053 大气泰坦风格气氛渲染音效 - FX_Whoosh_Plastic_06.wav
+- beacon.land - Boom Library - 052 大气危险紧张金属撞击泰坦黑暗风格电影预告片音效 - CTCK IMPACT Shipping Container Brick Hammer Hits.wav
+- beacon.tick - Boom Library - 056 未来科幻UI动态界面音效 - HIT_GUI_Single_Beep_High_02.wav
+- ui.denied - Boom Library - 056 未来科幻UI动态界面音效 - HIT_Signal_Access_Denied_03.wav
+- ui.denied - Boom Library - 056 未来科幻UI动态界面音效 - HIT_Signal_Access_Denied_02.wav
+- ui.denied - Boom Library - 056 未来科幻UI动态界面音效 - HIT_Signal_Access_Denied_01.wav
+- ui.pick_confirm - Boom Library - 056 未来科幻UI动态界面音效 - HIT_Camera_Shutter_01.wav
+- ui.pick_confirm - Boom Library - 056 未来科幻UI动态界面音效 - HIT_Signal_Triad_Short.wav
+- ui.pick_confirm - Boom Library - 056 未来科幻UI动态界面音效 - HIT_Camera_Shutter_03.wav
+- ui.pick_clear - Boom Library - 056 未来科幻UI动态界面音效 - FX_GUI_Data_Slide_02.wav
+- ui.pick_clear - Boom Library - 056 未来科幻UI动态界面音效 - FX_Signal_Warning_Fast_01.wav
+- ui.pick_clear - Boom Library - 056 未来科幻UI动态界面音效 - FX_Signal_Warning_Fast_03.wav
+- drop.unlatch - Boom Library - 037 机器零件机械齿轮音效 - MEDS Small Grandpas Little Money Machine Short.wav
+- drop.unlatch - Boom Library - 037 机器零件机械齿轮音效 - MEDS Large Scrooge Safe Short.wav
+- drop.unlatch - Boom Library - 037 机器零件机械齿轮音效 - MEDS Tiny Inspector G Short.wav
+- drop.unlatch - Boom Library - 037 机器零件机械齿轮音效 - MEDS Tiny Lockpicker Short.wav
+- drop.unlatch - Boom Library - 037 机器零件机械齿轮音效 - MECK CLICK Metal Latch Lock Clunk.wav
+- drop.unlatch - Boom Library - 037 机器零件机械齿轮音效 - MECK CLICK Metal Latch Clunk.wav
+- drop.leave - Boom Library - 037 机器零件机械齿轮音效 - MEDS Large Enigma Short.wav
+- drop.leave - Boom Library - 037 机器零件机械齿轮音效 - MEDS Large Crossover Long.wav
+- drop.leave - Boom Library - 108 飞船宇宙空间站史诗震撼科幻场景音效 - DSGNDist_AIR DISTORTION-Pops Low Large Heavy_B00M_SFMCK.wav
+- drop.debris - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBDS Glass & Stone Small 01.wav
+- drop.debris - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBCK Rock Bricks Roll Long.wav
+- drop.debris - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBDS Rocks Small 02.wav
+- drop.debris - Boom Library - 023 玻璃金属木头碎石建筑物炸毁破碎音效 - DBDS Glass & Stone Medium 01.wav
+- turret.lid_blast - Boom Library - 110 冲击粒子能量爆炸科幻元素音效 - EXPLDsgn_EXPLOSION SMALL-Smash Transient_B00M_MATTER.wav
+
+Public domain (CC0 1.0, no attribution required), recorded for provenance:
+
+- beacon.land - "217459_4056007-hq.mp3" by JarredGibb (https://freesound.org/people/JarredGibb/sounds/217459/)
+
+Sonniss (GameAudioGDC 2026), per the owner (collection: 8600 high-quality sound collection):
+
+- drop.open - GL_FuturisticHatch_Opening_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- beacon.activate - GL_TelemetryCalibration_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- beacon.activate - GL_Open_posititive2_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- turret.lid_blast - GL_Impact_Metal_Various2_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+- turret.lid_blast - GL_Impact_Metal_Various4_CT.wav (所有者说明：来自 Sonniss GameAudioGDC 2026（原集合名：8600 高质量音效合集）)
+
+Owner-confirmed open collection, original authors not named:
+
+- ui.click - 按钮与蜂鸣等科技界面音效 - Button36.Wav (所有者确认为国内开源合集，原作者未署名)
+
+Pack, source file, source SHA-256 and processing section of every clip are recorded in sources.forge in the source repository.

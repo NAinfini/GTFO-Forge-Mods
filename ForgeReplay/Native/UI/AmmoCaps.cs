@@ -28,16 +28,8 @@ internal static class AmmoCaps
         {
             var player = PlayerDataBlock.GetBlock(1U);
             var gear = new GearIDRange(gearJson);
-            var category = GearCategoryDataBlock.GetBlock(gear.GetCompID(eGearComponent.Category));
-            if (player == null || category == null) return 0;
-            var id = (eWeaponFireMode)gear.GetCompID(eGearComponent.FireMode) switch
-            {
-                eWeaponFireMode.Auto => category.AutoArchetype,
-                eWeaponFireMode.Burst => category.BurstArchetype,
-                eWeaponFireMode.SemiBurst => category.SemiBurstArchetype,
-                _ => category.SemiArchetype,
-            };
-            var cost = ArchetypeDataBlock.GetBlock(id)?.CostOfBullet ?? 0f;
+            if (player == null) return 0;
+            var cost = ArchetypeDataBlock.GetBlock(ForgeCore.Gear.ArchetypeId(gear))?.CostOfBullet ?? 0f;
             if (cost <= 0f) return 0;
             var cap = line == 0 ? player.AmmoStandardMaxCap : line == 1 ? player.AmmoSpecialMaxCap : player.AmmoClassMaxCap;
             return (uint)Math.Max(0f, cap / cost);

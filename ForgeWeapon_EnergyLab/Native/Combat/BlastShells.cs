@@ -12,8 +12,6 @@ internal sealed class BlastShells
     private const int QueryCapacity = 128;
     /// <summary>The shell's collision radius in metres.</summary>
     private const float BodyRadius = 0.05f;
-    /// <summary>The shell never ends by distance: this is how far it may fly (metres), beyond any level sightline.</summary>
-    private const float Reach = 1000f;
     private sealed class Shell
     {
         internal PlayerAgent? Owner;
@@ -57,7 +55,8 @@ internal sealed class BlastShells
             if (shell.Owner is not null) continue;
             shell.Owner = owner; shell.Gear = gear; shell.Dimension = (int)owner.DimensionIndex;
             shell.Position = position; shell.Direction = direction.normalized;
-            shell.Until = now + Reach / gear.Numbers.Speed;
+            // The shell never ends by distance: it may fly as far as a shot without a tuned range reaches.
+            shell.Until = now + EnergyLimits.Reach / gear.Numbers.Speed;
             shell.Damage = damage;
             shell.Fresh = true;
             shell.Sequence = sequence; shell.Hold = 0f; shell.Confirmed = false;
@@ -147,7 +146,8 @@ internal sealed class BlastShells
             if (_contact.Receiver?.TryCast<Dam_EnemyDamageLimb>() != null) _contact.Apply(0f, 0f);
         }
         _explosion.Apply(owner, gear, position, gear.Numbers.BlastRadius, shell.Damage);
-        WeaponNoise.Explosion(owner, gear, position);
+        // A vanilla explosion (a mine) alerts sleepers with the game's world noise, made on the host only; gunfire sets only the shooter's noise.
+        ForgeCore.Combat.Noise(position, gear.Numbers.NoiseRadius, (int)owner.DimensionIndex);
     }
 
     /// <summary>The host's word: shot <paramref name="sequence"/> burst at <paramref name="at"/>. The shell, if it is still flying here, bursts there.</summary>

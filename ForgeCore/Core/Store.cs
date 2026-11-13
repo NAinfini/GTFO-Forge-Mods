@@ -62,7 +62,7 @@ public static class Store
         }
         catch
         {
-            try { File.Delete(temporary); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            try { File.Delete(temporary); } catch (IOException) { } catch (UnauthorizedAccessException) { } // Cleanup only: the write failure itself is rethrown.
             throw;
         }
     }

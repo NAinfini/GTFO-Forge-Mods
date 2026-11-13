@@ -29,6 +29,8 @@ internal static class EnemyRecorder
     // The values that do not change while an enemy lives, read once when it is taken up: every keyframe writes them again for every enemy.
     private static readonly ulong[] DataIds = new ulong[MaxSlots], HealthTenths = new ulong[MaxSlots], SizeMilli = new ulong[MaxSlots];
     private static readonly int[] Dimensions = new int[MaxSlots], Seeds = new int[MaxSlots];
+    // The health an enemy has when whole, read once when it is taken up (the spawn event writes it as HealthTenths): every sample divides by it.
+    private static readonly float[] MaxHealth = new float[MaxSlots];
     // When each enemy is next sampled; one above the highest slot ever tracked (it bounds every loop); the ForgeCore list version last tracked.
     private static readonly uint[] NextMs = new uint[MaxSlots], HotUntil = new uint[MaxSlots];
     private const uint HotMs = 2000;
@@ -36,6 +38,9 @@ internal static class EnemyRecorder
     private static readonly long[] LastMind = new long[MaxSlots];
     private static readonly int[] LastMode = new int[MaxSlots];
     private static readonly EnemyAI?[] Minds = new EnemyAI?[MaxSlots];
+
+    // The enemy's AI, read once: taken up with the enemy, or at the first read after a spawn that had none yet; cleared when the slot ends.
+    private static EnemyAI? MindOf(int slot, EnemyAgent agent) => Minds[slot] ??= agent.AI;
     // Reading what an enemy has in mind costs a few interop reads: at most this many every tick, round the slots.
     private const int MindsPerTick = 24;
     private static int _mindCursor;
@@ -158,7 +163,7 @@ internal static class EnemyRecorder
     // No try/catch here: the two per-frame callers guard a whole batch, which kept this writer out of one guarded call per enemy per frame.
     private static void WriteMind(int slot, EnemyAgent agent)
     {
-        var ai = Minds[slot] ??= agent.AI;
+        var ai = MindOf(slot, agent);
         // The AI mode changes while the enemy lives (asleep, hunting, scouting): written when it does, not left to the next keyframe.
         if ((ai == null ? 0 : (int)ai.Mode) != LastMode[slot]) WriteLook(slot, agent);
         var target = ai?.Target?.m_agent?.TryCast<Player.PlayerAgent>();
@@ -212,7 +217,7 @@ internal static class EnemyRecorder
             Died.Remove(agent.Pointer);
             Agents[slot] = agent; Pointers[slot] = agent.Pointer; Transforms[slot] = agent.transform; Damages[slot] = agent.Damage; Locomotions[slot] = agent.Locomotion; Generations[slot] = Foes.Generation(slot); LocomotionStates[slot] = -1;
             Minds[slot] = agent.AI;
-            DataIds[slot] = agent.EnemyDataID; Dimensions[slot] = (int)agent.DimensionIndex; HealthTenths[slot] = (ulong)Math.Max(0, (int)Math.Round((Damages[slot]?.HealthMax ?? 0f) * 10f));
+            DataIds[slot] = agent.EnemyDataID; Dimensions[slot] = (int)agent.DimensionIndex; MaxHealth[slot] = Damages[slot]?.HealthMax ?? 0f; HealthTenths[slot] = (ulong)Math.Max(0, (int)Math.Round(MaxHealth[slot] * 10f));
             SizeMilli[slot] = (ulong)Mathf.Max(0, Mathf.RoundToInt(agent.SizeMultiplier * 1000f)); Seeds[slot] = agent.Seed;
             EntityOf[agent.Pointer] = FirstEntity + slot;
             Keys[slot] = agent.GlobalID; EntityOfKey[Keys[slot]] = FirstEntity + slot;
@@ -242,7 +247,8 @@ internal static class EnemyRecorder
         var key = Keys[slot];
         var now = PlayerRecorder.Now;
         if (EntityOfKey.TryGetValue(key, out var mine) && mine == FirstEntity + slot) EntityOfKey.Remove(key);
-        if (GoneKeys.Count > 256) { var old = new List<ushort>(); foreach (var pair in GoneKeys) if (now - pair.Value.At > GoneKeepMs) old.Add(pair.Key); foreach (var k in old) GoneKeys.Remove(k); }
+        // Removing while enumerating a Dictionary is allowed (.NET Core 3.0 on), so the sweep makes nothing.
+        if (GoneKeys.Count > 256) foreach (var pair in GoneKeys) if (now - pair.Value.At > GoneKeepMs) GoneKeys.Remove(pair.Key);
         GoneKeys[key] = (FirstEntity + slot, now);
         Agents[slot] = null; Pointers[slot] = IntPtr.Zero; Transforms[slot] = null; Damages[slot] = null; Locomotions[slot] = null; Minds[slot] = null; LastMind[slot] = -1;
     }
@@ -258,7 +264,7 @@ internal static class EnemyRecorder
     // 71 EnemyLook: U entity, U size x 1000, S seed, U AgentMode it is in.
     private static void WriteLook(int slot, EnemyAgent agent)
     {
-        var ai = Minds[slot] ??= agent.AI;
+        var ai = MindOf(slot, agent);
         LastMode[slot] = ai == null ? 0 : (int)ai.Mode;
         Rec.Begin().U((ulong)(FirstEntity + slot)).U(SizeMilli[slot]).S(Seeds[slot]).U((ulong)LastMode[slot]);
         Rec.Emit(EventKind.EnemyLook);
@@ -269,9 +275,10 @@ internal static class EnemyRecorder
         var p = agent.Position;
         var r = Transforms[slot]!.rotation;
         var damage = Damages[slot];
-        var health = damage == null || damage.HealthMax <= 0f ? 0 : Mathf.Clamp(Mathf.RoundToInt(31f * damage.Health / damage.HealthMax), 0, 31);
+        var max = MaxHealth[slot];
+        var health = damage == null || max <= 0f ? 0 : Mathf.Clamp(Mathf.RoundToInt(31f * damage.Health / max), 0, 31);
         // The enemy's own AI and locomotion, read once at its spawn, say how alert it is: nothing is made here, and the alert sets when it is sampled next.
-        var alert = Foes.Alert(true, Minds[slot] ??= agent.AI, Locomotions[slot]);
+        var alert = Foes.Alert(true, MindOf(slot, agent), Locomotions[slot]);
         NextMs[slot] = now + IntervalOf(alert, slot, now);
         pipeline.Sample(now, FirstEntity + slot, p.x, p.y, p.z, r.x, r.y, r.z, r.w, (byte)((int)alert | (health << 2)));
         // What the enemy is doing (walking, climbing, jumping, stuck in glue, knocked down ...): its locomotion state, written when it changes.

@@ -88,7 +88,7 @@ internal sealed class ShownRecorder : IShownObserver
     // quantised pose or scale changed since (a pod falling, a frame following its pilot, a turret turning), so a model at rest writes nothing more.
     private static void WriteState(TrackedModel tracked)
     {
-        var t = tracked.Model.transform;
+        var t = tracked.Place;
         var local = tracked.Anchor is 1 or 2;
         var p = local ? t.localPosition : t.position;
         var q = local ? t.localRotation : t.rotation;
@@ -114,6 +114,8 @@ internal sealed class ShownRecorder : IShownObserver
     private sealed class TrackedModel
     {
         internal GameObject Model = null!;
+        // Model's transform, read once when it is taken up: an object keeps its transform for its whole life, and Tick drops the model when its life ends.
+        internal Transform Place = null!;
         internal ulong Key;
         internal int Name, Id;
         internal byte Anchor;
@@ -233,7 +235,7 @@ internal sealed class ShownRecorder : IShownObserver
             case ShownModelKind.Spawned:
                 {
                     if (m.Instance == null) return;
-                    var tracked = new TrackedModel { Model = m.Instance, Key = ShownCodec.ModelKey(Rec.Key(m.Instance), false), Name = (int)NameId(m.Name) };
+                    var tracked = new TrackedModel { Model = m.Instance, Place = m.Instance.transform, Key = ShownCodec.ModelKey(Rec.Key(m.Instance), false), Name = (int)NameId(m.Name) };
                     tracked.Anchor = Resolve(m.On, out tracked.Id, out tracked.Path);
                     Models.Add(tracked);
                     WriteState(tracked);

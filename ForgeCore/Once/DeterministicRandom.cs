@@ -1,5 +1,3 @@
-using System;
-
 namespace ForgeCore;
 
 /// <summary>Random numbers that are a pure function of their keys, so every peer, a replay and a checkpoint reload draw the same value with

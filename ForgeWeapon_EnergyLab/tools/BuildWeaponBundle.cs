@@ -8,8 +8,10 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-/// <summary>Unity 2019.4.21f1 format-4 bundles, one per gun: its prefab of part meshes, its texture sets and its
-/// own presentation-format/presentation-profile, the same layout a third-party model bundle uses. No materials.</summary>
+/// <summary>Unity 2019.4.21f1 format-5 bundles, one per gun: its prefab of part meshes, its own texture sets and its
+/// own presentation-format/presentation-profile, the same layout a third-party model bundle uses; the prefab carries no materials.
+/// A texture set several guns use goes once into the shared bundle, and each of those guns' bundles holds a material
+/// <c>&lt;set&gt;-surface</c> referencing it, so Unity's own manifest lists the shared bundle as that gun bundle's dependency.</summary>
 public static class ForgeEnergyModelBuild
 {
     [Serializable] public sealed class Part { public string name, surface, textureSet, mesh, sha256, reducedMesh, reducedSha256; public Vector3 pivot; public Color color; public int triangles, reducedTriangles; }
@@ -19,10 +21,24 @@ public static class ForgeEnergyModelBuild
     [Serializable] public sealed class PartSummary { public string name, surface, textureSet; public int triangles, reducedTriangles; }
     [Serializable] public sealed class WeaponSummary { public string mode, sight, rail; public float length; public int triangles, reducedTriangles; public PartSummary[] parts; }
     [Serializable] public sealed class TextureEvidence { public string asset, format; public int width, height, mipCount; }
-    [Serializable] public sealed class BundleEvidence { public string bundle, sha256; public long bytes; public WeaponSummary weapon; public TextureEvidence[] textures; }
-    [Serializable] public sealed class Manifest { public string unity; public int format; public BundleEvidence[] bundles; }
+    [Serializable] public sealed class BundleEvidence { public string bundle, sha256; public long bytes; public string[] dependencies; public WeaponSummary weapon; public TextureEvidence[] textures; }
+    [Serializable] public sealed class SharedEvidence { public string bundle, sha256; public long bytes; public TextureEvidence[] textures; }
+    [Serializable] public sealed class FileEvidence { public string file, sha256; public long bytes; }
+    [Serializable] public sealed class Manifest { public string unity; public int format; public BundleEvidence[] bundles; public SharedEvidence shared; public FileEvidence unityManifest; }
     const long BundleBudget = 80L * 1024 * 1024;
+    const int Format = 5;
     static string BundleName(string mode) => "forge-energy-model-" + mode + ".bundle";
+    const string SharedName = "forge-energy-model-shared.bundle";
+    // Unity names its manifest bundle after the build folder; the package ships the bundles in ForgeEnergyLab/, so the manifest is
+    // ForgeEnergyLab/ForgeEnergyLab there, where ForgeCore's loader looks for it. Kept among the local media under this file name.
+    const string ManifestFolder = "ForgeEnergyLab", ManifestFile = "forge-energy-unity-manifest.bundle";
+    // The shared bundle's surface shader only names the texture slots of a surface material; the game never draws with it
+    // (the runtime builds its materials with the game's gear shader). A fixed-function pass, as a pass-less bundle shader logs an error.
+    const string SurfaceShaderPath = "Assets/Generated/SurfaceTextures.shader", SurfaceShaderName = "forge-surface-textures";
+    const string SurfaceShader = "Shader \"ForgeEnergyLab/SurfaceTextures\"\n{\n    Properties\n    {\n        _MainTex (\"Albedo\", 2D) = \"white\" {}\n" +
+        "        _MetallicGlossMap (\"Metallic\", 2D) = \"black\" {}\n        _EmissionMap (\"Emission\", 2D) = \"black\" {}\n        _BumpMap (\"Normal\", 2D) = \"bump\" {}\n" +
+        "    }\n    SubShader { Pass { Color (1,1,1,1) } }\n}\n";
+    static readonly string[] Slots = { "_MainTex", "_MetallicGlossMap", "_EmissionMap", "_BumpMap" };
     static readonly string[] Modes = { "beam", "arc", "plasma-blast", "plasma-arc", "blast", "disc", "flame", "hole" };
     static readonly string[] Required = { "Receiver", "Rail", "Front", "Stock", "Magazine", "Sight" };
     static readonly string[] Surfaces = { "body", "glass", "reticle" };
@@ -85,69 +101,104 @@ public static class ForgeEnergyModelBuild
             }
             finally { UnityEngine.Object.DestroyImmediate(root); }
         }
-        // An asset can belong to one bundle only. Each bundle gets its own profile/format TextAssets, and a texture
-        // set shared by several guns (the rails) is imported once per gun from a copy.
+        // An asset belongs to one bundle only. Each gun bundle gets its own profile/format TextAssets; a texture set several guns use
+        // (the rail) goes once into the shared bundle, which each such gun bundle references through its surface material.
         var users = contract.textureSets.ToDictionary(s => s.name, s => contract.weapons.Count(w => w.parts.Any(p => p.textureSet == s.name)));
+        bool Shared(TextureSet s) => users[s.name] > 1;
         var subsets = new Dictionary<string, Contract>();
         foreach (var w in contract.weapons)
         {
             var used = new HashSet<string>(w.parts.Where(p => p.surface == "body").Select(p => p.textureSet));
-            var sub = new Contract { format = 4, weapons = new[] { w }, textureSets = contract.textureSets.Where(s => used.Contains(s.name)).ToArray() };
+            var sub = new Contract { format = Format, weapons = new[] { w }, textureSets = contract.textureSets.Where(s => used.Contains(s.name)).ToArray() };
             subsets.Add(w.mode, sub);
             var folder = Path.Combine(project, "Assets/Generated", w.mode); Directory.CreateDirectory(folder);
-            File.WriteAllText(Path.Combine(folder, "presentation-format.txt"), "4");
+            File.WriteAllText(Path.Combine(folder, "presentation-format.txt"), Format.ToString());
             File.WriteAllText(Path.Combine(folder, "presentation-profile.json"), JsonUtility.ToJson(sub, true));
-            foreach (var s in sub.textureSets.Where(s => users[s.name] > 1))
-            {
-                var copy = Path.Combine(folder, s.name); Directory.CreateDirectory(copy);
-                foreach (var kind in Kinds) if (Has(s, kind)) File.Copy(Path.Combine(project, "Assets/Weapons", s.name, kind + ".png"), Path.Combine(copy, kind + ".png"), true);
-            }
         }
+        File.WriteAllText(Path.Combine(project, SurfaceShaderPath), SurfaceShader);
         AssetDatabase.Refresh();
-        var builds = new List<AssetBundleBuild>();
+        var shader = AssetDatabase.LoadAssetAtPath<Shader>(SurfaceShaderPath) ?? throw new InvalidDataException("The surface shader did not import.");
+        var sharedSets = new Contract { textureSets = contract.textureSets.Where(Shared).ToArray() };
+        var sharedTextures = ImportTextures(sharedSets.textureSets.Select(s => "Assets/Weapons/" + s.name), sharedSets);
+        var builds = new List<AssetBundleBuild>
+        {
+            new AssetBundleBuild { assetBundleName = SharedName, assetNames = sharedTextures.Concat(new[] { SurfaceShaderPath }).ToArray(),
+                addressableNames = sharedTextures.Select(TextureName).Concat(new[] { SurfaceShaderName }).ToArray() }
+        };
         foreach (var w in contract.weapons)
         {
             var sub = subsets[w.mode]; var generated = "Assets/Generated/" + w.mode + "/";
-            var textures = ImportTextures(sub.textureSets.Select(s => users[s.name] > 1 ? generated + s.name : "Assets/Weapons/" + s.name), sub);
+            var own = new Contract { textureSets = sub.textureSets.Where(s => !Shared(s)).ToArray() };
+            var textures = ImportTextures(own.textureSets.Select(s => "Assets/Weapons/" + s.name), own);
+            var surfaces = new List<string>();
+            foreach (var s in sub.textureSets.Where(Shared))
+            {
+                var material = new Material(shader) { name = s.name + "-surface" };
+                for (var i = 0; i < Kinds.Length; i++)
+                    if (Has(s, Kinds[i])) material.SetTexture(Slots[i], AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Weapons/" + s.name + "/" + Kinds[i] + ".png"));
+                var path = generated + s.name + "-surface.mat"; AssetDatabase.CreateAsset(material, path); surfaces.Add(path);
+            }
             var reduced = reducedMeshes[w.mode];
-            var paths = new[] { prefabs[w.mode], generated + "presentation-format.txt", generated + "presentation-profile.json" }.Concat(textures).Concat(reduced.Select(r => r.Path)).ToArray();
-            var names = new[] { w.mode, "presentation-format", "presentation-profile" }.Concat(textures.Select(TextureName)).Concat(reduced.Select(r => r.Name)).ToArray();
+            var paths = new[] { prefabs[w.mode], generated + "presentation-format.txt", generated + "presentation-profile.json" }.Concat(textures).Concat(reduced.Select(r => r.Path)).Concat(surfaces).ToArray();
+            var names = new[] { w.mode, "presentation-format", "presentation-profile" }.Concat(textures.Select(TextureName)).Concat(reduced.Select(r => r.Name))
+                .Concat(surfaces.Select(Path.GetFileNameWithoutExtension)).ToArray();
             builds.Add(new AssetBundleBuild { assetBundleName = BundleName(w.mode), assetNames = paths, addressableNames = names });
         }
-        var staging = Path.Combine(project, "Library/EnergyModelBuild4");
+        var staging = Path.Combine(project, "Library/EnergyModelBuild5", ManifestFolder);
         if (Directory.Exists(staging)) Directory.Delete(staging, true);
         Directory.CreateDirectory(staging); AssetDatabase.SaveAssets();
-        if (BuildPipeline.BuildAssetBundles(staging, builds.ToArray(), BuildAssetBundleOptions.ChunkBasedCompression | BuildAssetBundleOptions.StrictMode | BuildAssetBundleOptions.ForceRebuildAssetBundle, BuildTarget.StandaloneWindows64) == null)
-            throw new InvalidOperationException("Unity bundle build failed.");
+        var unityManifest = BuildPipeline.BuildAssetBundles(staging, builds.ToArray(), BuildAssetBundleOptions.ChunkBasedCompression | BuildAssetBundleOptions.StrictMode | BuildAssetBundleOptions.ForceRebuildAssetBundle, BuildTarget.StandaloneWindows64)
+            ?? throw new InvalidOperationException("Unity bundle build failed.");
         Directory.CreateDirectory(output);
+        var sharedFile = Path.Combine(staging, SharedName);
+        var sharedBundle = AssetBundle.LoadFromFile(sharedFile) ?? throw new InvalidDataException("The shared bundle does not load.");
         var evidence = new List<BundleEvidence>();
-        foreach (var w in contract.weapons)
+        SharedEvidence sharedEvidence;
+        try
         {
-            var name = BundleName(w.mode); var file = Path.Combine(staging, name); var bytes = new FileInfo(file).Length;
-            if (bytes > BundleBudget) throw new InvalidDataException(name + " exceeds the size budget; do not silently lower texture quality.");
-            var textures = Verify(file, subsets[w.mode]);
-            var destination = Path.Combine(output, name); File.Copy(file, destination, true);
-            var hash = Hash(destination);
-            evidence.Add(new BundleEvidence
+            sharedEvidence = new SharedEvidence { bundle = SharedName, bytes = new FileInfo(sharedFile).Length, textures = VerifyTextures(sharedBundle, sharedSets.textureSets) };
+            if (unityManifest.GetAllDependencies(SharedName).Length != 0 || sharedBundle.LoadAsset<Shader>(SurfaceShaderName) == null) throw new InvalidDataException("The shared bundle is not self-contained.");
+            foreach (var w in contract.weapons)
             {
-                bundle = name,
-                sha256 = hash,
-                bytes = bytes,
-                textures = textures,
-                weapon = new WeaponSummary
+                var name = BundleName(w.mode); var file = Path.Combine(staging, name); var bytes = new FileInfo(file).Length;
+                if (bytes > BundleBudget) throw new InvalidDataException(name + " exceeds the size budget; do not silently lower texture quality.");
+                // Unity's manifest is the dependency record the runtime loads by: exactly the shared bundle when the gun uses a shared set.
+                var dependencies = unityManifest.GetAllDependencies(name);
+                var expected = subsets[w.mode].textureSets.Any(Shared) ? new[] { SharedName } : new string[0];
+                if (!dependencies.SequenceEqual(expected)) throw new InvalidDataException(name + ": Unity's manifest lists dependencies " + string.Join(",", dependencies) + ".");
+                var textures = Verify(file, subsets[w.mode], Shared);
+                var destination = Path.Combine(output, name); File.Copy(file, destination, true);
+                var hash = Hash(destination);
+                evidence.Add(new BundleEvidence
                 {
-                    mode = w.mode,
-                    sight = w.sight,
-                    rail = w.rail,
-                    length = w.length,
-                    triangles = w.parts.Sum(p => p.triangles),
-                    reducedTriangles = w.parts.Sum(p => p.reducedTriangles > 0 ? p.reducedTriangles : p.triangles),
-                    parts = w.parts.Select(p => new PartSummary { name = p.name, surface = p.surface, textureSet = p.textureSet, triangles = p.triangles, reducedTriangles = p.reducedTriangles }).ToArray()
-                }
-            });
-            Debug.Log("ENERGY_BUNDLE_VERIFIED " + name + " " + bytes + " bytes " + hash);
+                    bundle = name,
+                    sha256 = hash,
+                    bytes = bytes,
+                    dependencies = dependencies,
+                    textures = textures,
+                    weapon = new WeaponSummary
+                    {
+                        mode = w.mode,
+                        sight = w.sight,
+                        rail = w.rail,
+                        length = w.length,
+                        triangles = w.parts.Sum(p => p.triangles),
+                        reducedTriangles = w.parts.Sum(p => p.reducedTriangles > 0 ? p.reducedTriangles : p.triangles),
+                        parts = w.parts.Select(p => new PartSummary { name = p.name, surface = p.surface, textureSet = p.textureSet, triangles = p.triangles, reducedTriangles = p.reducedTriangles }).ToArray()
+                    }
+                });
+                Debug.Log("ENERGY_BUNDLE_VERIFIED " + name + " " + bytes + " bytes " + hash);
+            }
         }
-        File.WriteAllText(Path.Combine(output, "weapon-models-manifest.json"), JsonUtility.ToJson(new Manifest { unity = Application.unityVersion, format = 4, bundles = evidence.ToArray() }, true));
+        finally { sharedBundle.Unload(true); }
+        var sharedDestination = Path.Combine(output, SharedName); File.Copy(sharedFile, sharedDestination, true);
+        sharedEvidence.sha256 = Hash(sharedDestination);
+        Debug.Log("ENERGY_BUNDLE_VERIFIED " + SharedName + " " + sharedEvidence.bytes + " bytes " + sharedEvidence.sha256);
+        var manifestDestination = Path.Combine(output, ManifestFile); File.Copy(Path.Combine(staging, ManifestFolder), manifestDestination, true);
+        var manifestEvidence = new FileEvidence { file = ManifestFile, sha256 = Hash(manifestDestination), bytes = new FileInfo(manifestDestination).Length };
+        Debug.Log("ENERGY_BUNDLE_VERIFIED " + ManifestFile + " " + manifestEvidence.bytes + " bytes " + manifestEvidence.sha256);
+        File.WriteAllText(Path.Combine(output, "weapon-models-manifest.json"), JsonUtility.ToJson(new Manifest
+        { unity = Application.unityVersion, format = Format, bundles = evidence.ToArray(), shared = sharedEvidence, unityManifest = manifestEvidence }, true));
         ForgeEnergyDiscBuild.Build(output);
     }
     static void Validate(Contract c, string geometry, string project)
@@ -274,16 +325,18 @@ public static class ForgeEnergyModelBuild
         AssetDatabase.Refresh();
         return paths.ToArray();
     }
-    static TextureEvidence[] Verify(string file, Contract c)
+    // A gun bundle, loaded while the shared bundle is: its own texture sets are inside it, a shared set is absent from it and reached
+    // through its surface material, whose textures Unity resolves from the shared bundle.
+    static TextureEvidence[] Verify(string file, Contract c, Func<TextureSet, bool> shared)
     {
         var bundle = AssetBundle.LoadFromFile(file);
         if (bundle == null) throw new InvalidDataException("Bundle does not load.");
         try
         {
             var format = bundle.LoadAsset<TextAsset>("presentation-format"); var profile = bundle.LoadAsset<TextAsset>("presentation-profile");
-            if (format == null || format.text != "4" || profile == null) throw new InvalidDataException("Bundle verification failed: presentation TextAssets.");
+            if (format == null || format.text != Format.ToString() || profile == null) throw new InvalidDataException("Bundle verification failed: presentation TextAssets.");
             var loaded = JsonUtility.FromJson<Contract>(profile.text);
-            if (loaded.format != 4 || loaded.weapons.Length != c.weapons.Length || loaded.weapons.Sum(w => w.parts.Length) != c.weapons.Sum(w => w.parts.Length)) throw new InvalidDataException("Bundled profile differs from the built manifest.");
+            if (loaded.format != Format || loaded.weapons.Length != c.weapons.Length || loaded.weapons.Sum(w => w.parts.Length) != c.weapons.Sum(w => w.parts.Length)) throw new InvalidDataException("Bundled profile differs from the built manifest.");
             foreach (var w in c.weapons)
             {
                 var prefab = bundle.LoadAsset<GameObject>(w.mode);
@@ -306,19 +359,35 @@ public static class ForgeEnergyModelBuild
                         throw new InvalidDataException(w.mode + "/" + p.name + ": bundled reduced mesh differs from the manifest.");
                 }
             }
-            var evidence = new List<TextureEvidence>();
-            foreach (var s in c.textureSets)
-                foreach (var kind in Kinds)
+            foreach (var s in c.textureSets.Where(shared))
+            {
+                var material = bundle.LoadAsset<Material>(s.name + "-surface");
+                if (material == null) throw new InvalidDataException(Path.GetFileName(file) + ": no surface material for the shared set " + s.name);
+                for (var i = 0; i < Kinds.Length; i++)
                 {
-                    var name = s.name + "-" + kind; var texture = bundle.LoadAsset<Texture2D>(name);
-                    if (!Has(s, kind)) { if (texture != null) throw new InvalidDataException("Unexpected texture: " + name); continue; }
-                    if (texture == null || texture.mipmapCount < 2) throw new InvalidDataException("Bundled texture missing or without mips: " + name);
-                    RequireBlockCompressed(texture);
-                    evidence.Add(new TextureEvidence { asset = name, format = texture.format.ToString(), width = texture.width, height = texture.height, mipCount = texture.mipmapCount });
+                    if (bundle.Contains(s.name + "-" + Kinds[i])) throw new InvalidDataException(Path.GetFileName(file) + " holds its own copy of " + s.name + "-" + Kinds[i]);
+                    var texture = material.GetTexture(Slots[i]);
+                    if (Has(s, Kinds[i]) ? texture == null || texture.name != Kinds[i] : texture != null)
+                        throw new InvalidDataException(Path.GetFileName(file) + ": the surface material of " + s.name + " does not reach its " + Kinds[i] + " texture in the shared bundle.");
                 }
-            return evidence.ToArray();
+            }
+            return VerifyTextures(bundle, c.textureSets.Where(s => !shared(s)).ToArray());
         }
         finally { bundle.Unload(true); }
+    }
+    static TextureEvidence[] VerifyTextures(AssetBundle bundle, TextureSet[] sets)
+    {
+        var evidence = new List<TextureEvidence>();
+        foreach (var s in sets)
+            foreach (var kind in Kinds)
+            {
+                var name = s.name + "-" + kind; var texture = bundle.LoadAsset<Texture2D>(name);
+                if (!Has(s, kind)) { if (texture != null) throw new InvalidDataException("Unexpected texture: " + name); continue; }
+                if (texture == null || texture.mipmapCount < 2) throw new InvalidDataException("Bundled texture missing or without mips: " + name);
+                RequireBlockCompressed(texture);
+                evidence.Add(new TextureEvidence { asset = name, format = texture.format.ToString(), width = texture.width, height = texture.height, mipCount = texture.mipmapCount });
+            }
+        return evidence.ToArray();
     }
     static void RequireBlockCompressed(Texture2D texture)
     {

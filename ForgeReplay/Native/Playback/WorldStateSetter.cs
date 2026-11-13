@@ -59,13 +59,15 @@ internal sealed class WorldStateSetter
 
     internal LG_PickupItem_Sync? Known(ulong key) => _itemByKey.TryGetValue(key, out var kept) && kept != null && !kept.WasCollected ? kept : null;
 
-    // A door whose object is switched off cannot play its state: it gets the last one the moment it is on (WakeDoors).
-    private readonly Dictionary<IntPtr, (Component Door, eDoorStatus Status)> _asleep = new();
+    // A door whose object is switched off cannot play its state: it gets the last one the moment it is on (WakeDoors). Its object is kept with it, read
+    // when it went to sleep: a component stays on the object it was made on for as long as it lives, and the door's life is checked first.
+    private readonly Dictionary<IntPtr, (Component Door, GameObject Body, eDoorStatus Status)> _asleep = new();
     private static readonly List<IntPtr> Woken = new();
 
     private void PutDoor(Component door, eDoorStatus status, bool instant)
     {
-        if (!door.gameObject.activeInHierarchy) { _asleep[door.Pointer] = (door, status); return; }
+        var body = door.gameObject;
+        if (!body.activeInHierarchy) { _asleep[door.Pointer] = (door, body, status); return; }
         _asleep.Remove(door.Pointer);
         if (door is LG_SecurityDoor security) WorldStates.Door(security, status, instant);
         else if (door is LG_WeakDoor weak) WorldStates.Door(weak, status, instant);
@@ -76,10 +78,10 @@ internal sealed class WorldStateSetter
     {
         if (_asleep.Count == 0) return;
         Woken.Clear();
-        foreach (var (pointer, asleep) in _asleep) if (asleep.Door == null || asleep.Door.WasCollected || asleep.Door.gameObject.activeInHierarchy) Woken.Add(pointer);
+        foreach (var (pointer, asleep) in _asleep) if (asleep.Door == null || asleep.Door.WasCollected || asleep.Body == null || asleep.Body.activeInHierarchy) Woken.Add(pointer);
         foreach (var pointer in Woken)
         {
-            var (door, status) = _asleep[pointer];
+            var (door, _, status) = _asleep[pointer];
             _asleep.Remove(pointer);
             if (door != null && !door.WasCollected) PutDoor(door, status, true);
         }

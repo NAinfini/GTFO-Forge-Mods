@@ -17,6 +17,12 @@ public static class Vec
     /// <summary>The same value as <c>Vector3.Dot</c>, computed here: the game's interop makes that a native call.</summary>
     public static float Dot(Vector3 a, Vector3 b) => a.x * b.x + a.y * b.y + a.z * b.z;
 
+    /// <summary>True when no component of <paramref name="v"/> is NaN or infinite.</summary>
+    public static bool Finite(Vector3 v) => float.IsFinite(v.x) && float.IsFinite(v.y) && float.IsFinite(v.z);
+
+    /// <summary>True when no component of <paramref name="q"/> is NaN or infinite.</summary>
+    public static bool Finite(Quaternion q) => float.IsFinite(q.x) && float.IsFinite(q.y) && float.IsFinite(q.z) && float.IsFinite(q.w);
+
     /// <summary>The same value as <c>Vector3.sqrMagnitude</c>.</summary>
     public static float SqrLength(Vector3 v) => v.x * v.x + v.y * v.y + v.z * v.z;
 

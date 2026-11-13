@@ -165,7 +165,7 @@ def shared_mods(repo: Path = REPO) -> Path | None:
 
 
 def media_path(relative: str, repo: Path = REPO) -> Path:
-    """Where a build reads one file under Mods/ (relative to Mods/, e.g. ForgeOrdnance/Assets/Models/forge-ordnance.bundle): this
+    """Where a build reads one file under Mods/ (relative to Mods/, e.g. ForgeOrdnance/Assets/Carrier/Models/forge-ordnance.bundle): this
     checkout's file when it exists, else the main checkout's. The same per-file rule as build-release-set.ps1 and Tools/local-inputs.ts,
     so a worktree's tracked tables (fx-slots.forge) are never read from a stale main checkout. A file found in neither place is returned
     at this checkout's path."""
@@ -220,11 +220,11 @@ def media_audio_files(folder: Path | str, records: tuple[str, ...] = (), repo: P
         raise ValueError("Ogg files not named by cues.forge would load as extra cues: " + ", ".join(stray))
     return files
 
-def vfx_files(package: str, short: str, repo: Path = REPO) -> dict[str, Path]:
-    """The effect library's bundle, slot table and licence note (Mods/<package>/Assets/Vfx, each file through media_path); a package
+def vfx_files(package: str, short: str, repo: Path = REPO, folder: str = "Assets/Vfx") -> dict[str, Path]:
+    """The effect library's bundle, slot table and licence note (Mods/<package>/<folder>, each file through media_path); a package
     built without them ships its own effects."""
     names = ("forge-" + short + "-fx.bundle", "fx-slots.forge", "fx-licences.forge")
-    files = {name: media_path(package + "/Assets/Vfx/" + name, repo) for name in names}
+    files = {name: media_path(package + "/" + folder + "/" + name, repo) for name in names}
     if files["fx-slots.forge"].is_file() and not files[names[0]].is_file():
         raise ValueError(str(files[names[0]]) + ": fx-slots.forge is in Git but the bundle is not; effect media stays out of Git and has to be put there before packaging")
     return {name: path for name, path in files.items() if path.is_file()}
@@ -259,12 +259,13 @@ def package_files(folder: Path, name: str, files: dict[str, Path | str], output:
 
 def package_library(
     folder: Path, name: str, dlls: tuple[str, ...], artifacts: Path, output: Path,
-    metadata: tuple[str, ...] = LIBRARY_METADATA, extra: dict[str, Path] | None = None,
+    metadata: tuple[str, ...] = LIBRARY_METADATA, extra: dict[str, Path] | None = None, project: str | None = None,
 ) -> Path:
-    """Zip a package: metadata beside the package, every dll read from artifacts/bin/<project>/release, plus the extra entry -> file table."""
+    """Zip a package: metadata beside the package, every dll read from artifacts/bin/<project>/release (by default the dll's own name),
+    plus the extra entry -> file table."""
     files: dict[str, Path | str] = {entry: folder / entry for entry in metadata}
     for dll in dlls:
-        built = artifacts / "bin" / dll[:-4] / "release" / dll
+        built = artifacts / "bin" / (project or dll[:-4]) / "release" / dll
         if not built.is_file():
             raise ValueError("missing build output " + str(built) + "; run the Release build first")
         with built.open("rb") as head:
@@ -280,8 +281,12 @@ def package_library(
     return package_files(folder, name, files, output)
 
 
-def main(name: str, dlls: tuple[str, ...], extra: Callable[[Path, Path], dict[str, Path]] | None = None, metadata: tuple[str, ...] = LIBRARY_METADATA) -> int:
-    """extra(folder, built) returns the entry -> file table beyond the dlls and metadata; built is the first dll's Release output folder."""
+def main(
+    name: str, dlls: tuple[str, ...], extra: Callable[[Path, Path], dict[str, Path]] | None = None, metadata: tuple[str, ...] = LIBRARY_METADATA,
+    project: str | None = None,
+) -> int:
+    """extra(folder, built) returns the entry -> file table beyond the dlls and metadata; built is the first dll's Release output folder.
+    project names the project folder under artifacts/bin when the assembly is named differently from its project."""
     parser = argparse.ArgumentParser(description="Build the " + name + " Thunderstore zip from the Release build output.")
     parser.add_argument("--artifacts-path", type=Path, required=True, help="the dotnet --artifacts-path of the Release build")
     parser.add_argument("--output", type=Path, required=True, help="folder that receives the zip")
@@ -290,8 +295,8 @@ def main(name: str, dlls: tuple[str, ...], extra: Callable[[Path, Path], dict[st
     output = args.output if args.output.is_absolute() else Path.cwd() / args.output
     try:
         folder = REPO / "Mods" / name
-        built = artifacts / "bin" / dlls[0][:-4] / "release"
-        package_library(folder, name, dlls, artifacts, output, metadata, extra(folder, built) if extra else None)
+        built = artifacts / "bin" / (project or dlls[0][:-4]) / "release"
+        package_library(folder, name, dlls, artifacts, output, metadata, extra(folder, built) if extra else None, project)
         return 0
     except (OSError, ValueError) as error:
         print("package_release: " + str(error), file=sys.stderr)

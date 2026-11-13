@@ -38,6 +38,54 @@ public sealed class ModLog
         Write(message);
     }
 
+    /// <summary>Calls every handler subscribed to an event in turn: one that throws is written once (<see cref="ErrorOnce(string, string)"/>
+    /// with <paramref name="code"/>, as "A <paramref name="what"/> handler failed") and does not stop the others.</summary>
+    public void RaiseEach(Action? handlers, string code, string what)
+    {
+        if (handlers == null) return;
+        foreach (var handler in handlers.GetInvocationList())
+            try { ((Action)handler)(); }
+            catch (Exception error) { Failed(code, what, error); }
+    }
+
+    /// <inheritdoc cref="RaiseEach(Action?, string, string)"/>
+    public void RaiseEach<T>(Action<T>? handlers, T arg, string code, string what)
+    {
+        if (handlers == null) return;
+        foreach (var handler in handlers.GetInvocationList())
+            try { ((Action<T>)handler)(arg); }
+            catch (Exception error) { Failed(code, what, error); }
+    }
+
+    /// <inheritdoc cref="RaiseEach(Action?, string, string)"/>
+    public void RaiseEach<T1, T2>(Action<T1, T2>? handlers, T1 arg1, T2 arg2, string code, string what)
+    {
+        if (handlers == null) return;
+        foreach (var handler in handlers.GetInvocationList())
+            try { ((Action<T1, T2>)handler)(arg1, arg2); }
+            catch (Exception error) { Failed(code, what, error); }
+    }
+
+    /// <inheritdoc cref="RaiseEach(Action?, string, string)"/>
+    public void RaiseEach<T1, T2, T3>(Action<T1, T2, T3>? handlers, T1 arg1, T2 arg2, T3 arg3, string code, string what)
+    {
+        if (handlers == null) return;
+        foreach (var handler in handlers.GetInvocationList())
+            try { ((Action<T1, T2, T3>)handler)(arg1, arg2, arg3); }
+            catch (Exception error) { Failed(code, what, error); }
+    }
+
+    private void Failed(string code, string what, Exception error) => ErrorOnce(code, "A " + what + " handler failed: " + error);
+
+    private readonly HashSet<string> _keys = new(StringComparer.Ordinal);
+
+    /// <summary>True the first time <paramref name="key"/> is asked: a failing place keyed this way is written once even when its text
+    /// changes (a count, a path), and the text is built only when it is written.</summary>
+    internal bool FirstReport(string key)
+    {
+        lock (_keys) return _keys.Add(key);
+    }
+
     private void Write(string message)
     {
         try { _sink(message); }

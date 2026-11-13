@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using ForgeCore;
 using ForgeUI;
 using Player;
 using UnityEngine;
@@ -13,11 +11,10 @@ namespace ForgeReplay;
 /// Sizes are HUD units (about 2560 x 1440 at 16:9); text sizes are 1080p pixels.</summary>
 internal static partial class ReplayScreen
 {
-    private const float CardWide = 460f, CardHead = 90f, CardFoot = 6f, CardEmpty = 40f, CardGap = 6f, CardRowMin = 20f, CardRowMax = 30f;
-    private const float FeedRow = 38f, ControlHeight = 76f, Row = 34f, Cut = 10f, PlateAlpha = 1f;
+    private const float CardWide = 640f, CardMost = 214f, CardGap = 6f, BlockGap = 8f, BlockPx = 15f;
+    private const float FeedRow = 38f, ControlHeight = 84f, Row = 34f, Cut = 10f, PlateAlpha = 1f;
     private const float PanelTitle = 50f, PanelFoot = 12f, ListLine = 28f, ListMaxWidth = 900f, ListMaxHeight = 800f, ListMinWidth = 460f, PopupMax = 860f;
     private const float StatsLegend = 36f, Info = 26f;
-    private const float NameLine = 26f;
     private const int FeedLines = 4;
     private const uint FeedMs = 8000, ChatMs = 8000;
     private const int ChatLines = 4;
@@ -27,6 +24,8 @@ internal static partial class ReplayScreen
     private static HudCanvas? _world, _over;
     // Where the mission card ended when it last showed everything, and how far the view menu's button reaches.
     private static float _missionFull, _menuRight;
+    // The mission card as drawn last frame: the pointer on it opens the whole card, and a click there is not the camera's.
+    private static HudBox _missionBox;
 
     private static readonly Dictionary<(string Text, float Px, bool Bold, float Width), List<string>> WrapCache = new();
 
@@ -86,14 +85,19 @@ internal static partial class ReplayScreen
         var pointer = HudPointer.Position(hud, out var px, out var py);
         // The keys run before this frame is drawn, so a click is judged on the pointer's place of this frame and the one before: one that came onto a button in the same frame is on it.
         _onHudBefore = PointerOnHud;
-        PointerOnHud = !pointer || py < work.Bottom || px > zones.Cards.Left - gap || py > zones.Feed.Bottom && px > zones.Feed.Left
+        var onMission = pointer && px >= _missionBox.Left && px <= _missionBox.Right && py >= _missionBox.Bottom && py <= _missionBox.Top;
+        PointerOnHud = !pointer || py < work.Bottom || px > zones.Cards.Left - gap || py > zones.Feed.Bottom && px > zones.Feed.Left || onMission
             || _showMenu || _pinKeys || _overKeys || _showLog || _showEvents || _showStats || _showHighlights || board;
 
-        // The control row: the panels' tabs right under the panels, the player's buttons on the right, who is watched between them.
-        var rowY = zones.Control.Top - Row / 2f;
-        var buttonsLeft = Buttons(hud, c, work.Right, rowY);
-        var tabsRight = Tabs(c, work.Left, rowY);
-        Watched(c, state, (tabsRight + buttonsLeft) / 2f, (zones.Control.Bottom + zones.Control.Top) / 2f, buttonsLeft - tabsRight - 2f * gap);
+        // The bottom panel, one plate under the time bar and its own two rows: along its top a thin line (who is watched, what is in the hands, the
+        // keys), under it the panels' tabs on the left, the views in the middle and the player's buttons on the right, all one kind of button.
+        Chrome(c, zones.Bottom);
+        var rowY = zones.Control.Top - 56f;
+        var inLeft = work.Left + 16f; var inRight = work.Right - 16f;
+        var buttonsLeft = Buttons(hud, c, inRight, rowY);
+        var tabsRight = Tabs(c, inLeft, rowY);
+        CameraButtons(c, (work.Left + work.Right) / 2f, tabsRight + 2f * gap, buttonsLeft - 2f * gap, rowY);
+        InfoLine(c, state, inLeft, inRight, zones.Control.Top - 18f);
         var menuWidth = _showMenu ? MenuWidth(c, work.Width) : 0f;
         _overMenu = _showMenu && HudPointer.Over(hud, _menuRight - menuWidth / 2f, work.Bottom + MenuHeight / 2f, menuWidth, MenuHeight);
 
@@ -101,13 +105,17 @@ internal static partial class ReplayScreen
         if (!keys)
         {
             Feed(hud, c, now, zones.Feed);
-            Cards(hud, c, state, zones.Cards);
+            Cards(hud, c, state, zones);
         }
-        // Statistics that would not fit under the whole mission card: the card keeps only its title.
+        // Two lines unless the mission has more to say (layers, a timer, the reactor) and room for it: statistics that would not fit under the
+        // whole card keep it at two lines. The pointer on the card shows the whole of it over the rest.
         var statsOpen = _showStats && !board && analysis != null && !keys;
-        var whole = !statsOpen || StatsWanted() <= work.Height - _missionFull - gap;
+        var whole = MissionBusy(state) && (!statsOpen || StatsWanted() <= work.Height - _missionFull - gap);
         var missionBottom = keys ? work.Top : Mission(c, state, zones.Mission.Left, work.Top, zones.Mission.Width, whole);
         if (whole && !keys) _missionFull = work.Top - missionBottom;
+        _missionBox = keys ? default : new HudBox(zones.Mission.Left, missionBottom, zones.Mission.Right, work.Top);
+        if (!keys && !whole && onMission && ReplayCamera.Ui)
+            _missionBox = new HudBox(zones.Mission.Left, Mission(over, state, zones.Mission.Left, work.Top, zones.Mission.Width, true), zones.Mission.Right, work.Top);
         var panels = zones.Panels(missionBottom - gap, gap);
         var panelRight = work.Left;
         _overPanel = false;
@@ -151,7 +159,7 @@ internal static partial class ReplayScreen
         }
         if (_closeFrom >= 0f) Leaving(over, midX, midY);
         // The wheel scrolls an open list or the time bar under the pointer while using the screen; otherwise it is the camera's.
-        WheelTaken = ReplayCamera.Ui && pointer && (_overPanel || py < zones.Control.Bottom - gap);
+        WheelTaken = ReplayCamera.Ui && pointer && (_overPanel || py < zones.Control.Bottom);
         EndLayers(c, world, over);
     }
 
@@ -195,8 +203,8 @@ internal static partial class ReplayScreen
 
     // ---- Mission ----------------------------------------------------------------------------------------------------------------
 
-    // Top left: the level as players call it, when and by whom it was recorded; under them each objective with its state and its whole text, the timer and
-    // the reactor's words. Returns the card's bottom. Not whole, only the title lines.
+    // Top left: the level as players call it with the replay tag; whole, under it when and by whom it was recorded, each objective with its state
+    // and its whole text, the timer and the reactor's words; else one line, the objective under way. Returns the card's bottom.
     private static float Mission(HudCanvas c, WorldState state, float left, float top, float width, bool whole)
     {
         const float pad = 20f;
@@ -208,29 +216,60 @@ internal static partial class ReplayScreen
         var title = c.FitText(_title, 26f, true, inner - tagWidth - 12f);
         var titleWidth = c.Text(title, x, y, 26f, UIKitColors.MenuOver, HudAlign.Left, bold: true);
         c.Rect(x + titleWidth + 12f + tagWidth / 2f, y, tagWidth, 26f, UIKitColors.Alert);
-        c.Text(tag, x + titleWidth + 12f + tagWidth / 2f, y, 15f, Color.white, HudAlign.Centre, bold: true);
+        c.Text(tag, x + titleWidth + 12f + tagWidth / 2f, y, 15f, ReplayScreen.White, HudAlign.Centre, bold: true);
         y -= 16f;
-        if (_subtitle.Length > 0)
-            foreach (var line in Wrapped(c, _subtitle, 16f, false, inner)) { y -= 13f; c.Text(line, x, y, 16f, Fade(UIKitColors.GameText, 0.8f)); y -= 13f; }
-        if (whole) y = MissionDetail(c, state, x, y, inner);
+        if (whole)
+        {
+            if (_subtitle.Length > 0)
+                foreach (var line in Wrapped(c, _subtitle, 16f, false, inner)) { y -= 13f; c.Text(line, x, y, 16f, Fade(UIKitColors.GameText, 0.8f)); y -= 13f; }
+            y = MissionDetail(c, state, x, y, inner);
+        }
+        else if (CurrentObjective(state) is { Length: > 0 } goal) { y -= 15f; c.Text(c.FitText(goal, 16f, false, inner), x, y, 16f, UIKitColors.GameText); y -= 13f; }
         var bottom = y - 12f;
         Chrome(c, new HudBox(left, bottom, left + width, top));
         c.Rect(left + 3f, (top + bottom) / 2f, 4f, top - bottom - 16f, UIKitColors.Alert);
         return bottom;
     }
 
+    // A layer's recorded state (0: not in the level) with its texts made again only when it changes.
+    private static ulong Objective(WorldState state, int layer)
+    {
+        if (!state.Objects.TryGetValue((EventKind.Objective, (ulong)layer), out var payload)) return 0;
+        var read = new PayloadReader(payload);
+        read.U();
+        var status = read.U(); var extra = read.U();
+        if (status != 0 && (ObjectiveSeen[layer] != (status, extra) || ObjectiveTexts[layer].Head == null)) { ObjectiveSeen[layer] = (status, extra); ObjectiveTexts[layer] = ObjectiveLine(layer, status, extra); }
+        return status;
+    }
+
+    // The mission card has more than two lines to say: more than one layer, a running timer or the reactor's words.
+    private static bool MissionBusy(WorldState state)
+    {
+        var layers = 0;
+        for (var layer = 0; layer < 3; layer++) if (Objective(state, layer) != 0) layers++;
+        if (layers > 1 || ReplayExtras.Timer(state, out var timer) && timer.Active) return true;
+        foreach (var (id, _) in state.Extras) if (id.Kind == EventKind.ReactorText) return true;
+        return false;
+    }
+
+    // The objective under way for the two-line card: the first layer not done, else the main one.
+    private static string CurrentObjective(WorldState state)
+    {
+        var shown = -1;
+        for (var layer = 0; layer < 3 && shown < 0; layer++) if (Objective(state, layer) is > 0 and < 40) shown = layer;
+        if (shown < 0 && Objective(state, 0) != 0) shown = 0;
+        if (shown < 0) return "";
+        var (head, body) = ObjectiveTexts[shown];
+        return body.Length > 0 ? body : head;
+    }
+
     private static float MissionDetail(HudCanvas c, WorldState state, float x, float y, float inner)
     {
         var any = false;
-        for (var layer = 0UL; layer < 3UL; layer++)
+        for (var i = 0; i < 3; i++)
         {
-            if (!state.Objects.TryGetValue((EventKind.Objective, layer), out var payload)) continue;
-            var read = new PayloadReader(payload);
-            read.U();
-            var status = read.U(); var extra = read.U();
+            var status = Objective(state, i);
             if (status == 0) continue;
-            var i = (int)layer;
-            if (ObjectiveSeen[i] != (status, extra) || ObjectiveTexts[i].Head == null) { ObjectiveSeen[i] = (status, extra); ObjectiveTexts[i] = ObjectiveLine(i, status, extra); }
             var done = status >= 40;
             var colour = i == 0 ? UIKitColors.MenuOver : i == 1 ? UIKitColors.Warn : UIKitColors.Infection;
             if (!any) { y -= 8f; c.Rect(x + inner / 2f, y, inner, 1.5f, Fade(ReplayPlate.Line, 0.5f)); y -= 4f; any = true; }
@@ -267,116 +306,104 @@ internal static partial class ReplayScreen
 
     // ---- Players ----------------------------------------------------------------------------------------------------------------
 
-    /// <summary>The squad: a card for each of the four slots, top to bottom, whoever is in it (a bot's recorded state shows like a player's); an empty
-    /// slot is one line. A card has the slot number and whole name; the kills and downs, and the state or zone; the health with its percent, infection
-    /// and stamina; then a row for each thing the player has, by its name, with what is left of it, the one in the hands marked. The rows share
-    /// the height the cards have.</summary>
-    private static void Cards(HudElement hud, HudCanvas c, WorldState state, HudBox zone)
+    /// <summary>The squad: a card for each of the four slots, top to bottom, all the same size at fixed places, whoever is in it (a bot's recorded
+    /// state shows like a player's). A card's top line has the slot number, the name, and from the right the grade, the state (absent, down, grabbed,
+    /// at a terminal) and carrying something in the arms; under it the health with its percent, infection and stamina; then six blocks, three
+    /// across and two down, in a fixed order: main and special weapon, melee, tool, consumable, resource pack. A block has the name and what is left
+    /// of it; the one in the hands is lit and an empty one says so. A click on a card watches that player.</summary>
+    private static void Cards(HudElement hud, HudCanvas c, WorldState state, ReplayZones zones)
     {
-        var filledCards = 0; var rowCount = 0; var fixedHeight = 3f * CardGap;
+        var height = zones.CardHeight(CardMost, CardGap);
         for (var slot = 0; slot < 4; slot++)
         {
             ref var pose = ref state.Poses[slot];
             Refresh(slot, state.PlayerStatus[slot], pose.Present ? pose.State : -1, state.PlayerKits[slot]);
-            if (InRecording[slot] || !Known[slot] && pose.Present) { filledCards++; rowCount += Reserve(slot); fixedHeight += CardHead + CardFoot + NameExtra(c, slot, zone.Width - 52f); }
-            else fixedHeight += CardEmpty;
-        }
-        var rowHeight = rowCount == 0 ? CardRowMax : Math.Clamp((zone.Height - fixedHeight) / rowCount, CardRowMin, CardRowMax);
-        var rowPx = rowHeight >= 24f ? 17f : 16f;
-        var width = zone.Width;
-        var left = zone.Left;
-        var cx = left + width / 2f;
-        var x = left + 36f;
-        var inner = width - 52f;
-        var y = zone.Top;
-        for (var slot = 0; slot < 4; slot++)
-        {
-            ref var pose = ref state.Poses[slot];
-            // A slot is filled while someone holds it (the header's player, or a join until its leave): a card left behind is an empty slot
-            // again. A slot nothing names is filled while it has a recorded position.
-            var filled = InRecording[slot] || !Known[slot] && pose.Present;
-            var nameExtra = filled ? NameExtra(c, slot, inner) : 0f;
-            var height = filled ? CardHead + nameExtra + Reserve(slot) * rowHeight + CardFoot : CardEmpty;
-            var cy = y - height / 2f;
-            var colour = SlotColour(slot);
-            var followed = filled && slot == Replayer.Follow;
-            var over = filled && !_overMenu && HudPointer.Hover(hud, cx, cy, width, height);
-            c.Plate(cx, cy, width, height, Cut, Plate());
-            c.Pointed(cx, cy, width, height, Cut, UIKitColors.MenuOver, over, over && HudPointer.PressedOn(hud, cx, cy, width, height), followed, rest: false);
-            c.Rect(left + 4f, cy, 5f, height - 12f, filled ? colour : Fade(colour, 0.35f));
-            var line = filled ? y - 20f : cy;
-            c.Text(Numbers[slot], left + 21f, line, 18f, filled ? colour : Fade(colour, 0.5f), HudAlign.Centre, bold: true);
-            var grabbed = ClientInference.Grabbed(CardMove[slot]);
-            var (stateText, stateColour) = !filled ? (_ui.Text("player.empty"), Fade(UIKitColors.GameText, 0.55f))
-                : !pose.Present ? (_ui.Text("player.absent"), Fade(UIKitColors.GameText, 0.65f))
-                : CardDown[slot] ? (_ui.Text("player.down"), UIKitColors.Downed)
-                : grabbed ? (_ui.Text("player.grabbed"), UIKitColors.Grabbed)
-                // At a terminal: said on the card, so whoever is at one shows without following them (11-06).
-                : CardMove[slot] == (int)PlayerLocomotion.PLOC_State.OnTerminal ? (_ui.Text("player.terminal"), UIKitColors.MenuOver)
-                : (ZoneText(state, slot), followed ? UIKitColors.MenuOver : Fade(UIKitColors.GameText, 0.8f));
-            var alarm = filled && (CardDown[slot] || grabbed);
-            var stateWidth = stateText.Length > 0 ? c.TextWidth(stateText, 16f, true) + (alarm ? 18f : 0f) : 0f;
-            // The name has the first line to itself; an empty slot says so on the same line.
-            var nameInk = filled ? NameColour(slot, UIKitColors.MenuOver) : Fade(UIKitColors.GameText, 0.55f);
-            if (nameExtra > 0f)
-            {
-                var lines = Wrapped(c, Names[slot], 20f, true, inner - BadgeRoom(c, slot));
-                c.Text(lines[0], x, line, 20f, nameInk, HudAlign.Left, bold: true);
-                c.Text(c.FitText(lines[1], 20f, true, inner), x, line - NameLine, 20f, nameInk, HudAlign.Left, bold: true);
-            }
-            else c.Text(c.FitText(Names[slot], 20f, true, filled ? inner - BadgeRoom(c, slot) : inner - stateWidth - 12f), x, line, 20f, nameInk, HudAlign.Left, bold: true);
-            if (filled) Badge(c, slot, x + inner, line);
-            var second = filled ? y - 46f - nameExtra : line;
-            var stateRight = left + width - 14f;
-            if (alarm) c.Rect(stateRight - stateWidth / 2f, second, stateWidth, 24f, stateColour);
-            if (stateText.Length > 0) c.Text(stateText, alarm ? stateRight - 9f : stateRight, second, 16f, alarm ? Plate() : stateColour, HudAlign.Right, bold: true);
-            if (filled)
-            {
-                var counts = c.FitText(CardCounts[slot], 16f, false, inner - stateWidth - 12f);
-                if (counts.Length > 0) c.Text(counts, x, second, 16f, CardEstimate[slot] ? UIKitColors.Warn : UIKitColors.GameText);
-                // The health with its number; the thin lines under it are infection and, for the recorder alone (the game does not send it), stamina.
-                var health = CardHealth[slot] < 0 ? 0f : CardHealth[slot] / 127f;
-                var number = PercentText(health);
-                var healthColour = UIKitColors.Level(health);
-                const float numberRoom = 56f;
-                var bar = y - 71f - nameExtra;
-                var barWidth = inner - numberRoom;
-                c.Rect(x + barWidth / 2f, bar, barWidth, 10f, Fade(UIKitColors.GameText, 0.18f));
-                if (health > 0f) c.Rect(x + barWidth * health / 2f, bar, barWidth * health, 10f, healthColour);
-                c.Text(number, x + inner, bar, 16f, healthColour, HudAlign.Right, bold: true);
-                if (CardInfection[slot] > 0f) c.Rect(x + barWidth * CardInfection[slot] / 2f, bar - 8f, barWidth * CardInfection[slot], 3f, UIKitColors.Infection);
-                var hasGun = ReplayExtras.Gun(state, slot, out var gun);
-                if (hasGun && gun.StaminaPercent >= 0) c.Rect(x + barWidth * gun.StaminaPercent / 200f, bar - 13f, barWidth * gun.StaminaPercent / 100f, 3f, Fade(UIKitColors.GameText, 0.7f));
-                var rowY = y - CardHead - nameExtra - rowHeight / 2f;
-                var rows = CardRows[slot];
-                for (var r = 0; r < rows.Count; r++)
-                {
-                    var row = rows[r];
-                    var inHands = row.Slot == CardHeld[slot];
-                    if (inHands)
-                    {
-                        c.Rect(x + inner / 2f, rowY, inner + 8f, rowHeight - 1f, Fade(colour, 0.32f));
-                        c.Rect(x - 3f, rowY, 3f, rowHeight - 1f, colour);
-                    }
-                    var count = row.Count;
-                    var countWidth = count.Length > 0 ? c.TextWidth(count, rowPx, true) + 12f : 0f;
-                    c.Text(c.FitText(row.Name, rowPx, inHands, inner - countWidth - 6f), x + 3f, rowY, rowPx, inHands ? UIKitColors.MenuOver : UIKitColors.GameText, HudAlign.Left, bold: inHands);
-                    if (count.Length > 0) c.Text(count, x + inner - 3f, rowY, rowPx, row.Share >= 0f ? UIKitColors.Level(row.Share) : inHands ? UIKitColors.MenuOver : UIKitColors.GameText, HudAlign.Right, bold: true);
-                    rowY -= rowHeight;
-                }
-                if (over && HudPointer.Click(hud, cx, cy, width, height)) ReplayCamera.Select(slot);
-            }
-            y -= height + CardGap;
+            Card(hud, c, state, slot, pose.Present, zones.Card(slot, height, CardGap));
         }
     }
 
-    // The rows a card keeps room for: the most it has had since the replay began, so a card does not shrink when a player puts something away and the cards under it do not move.
-    private static readonly int[] RowsReserved = new int[4];
+    private static void Card(HudElement hud, HudCanvas c, WorldState state, int slot, bool present, HudBox box)
+    {
+        // A slot is filled while someone holds it (the header's player, or a join until its leave): a card left behind is an empty slot
+        // again. A slot nothing names is filled while it has a recorded position.
+        var filled = InRecording[slot] || !Known[slot] && present;
+        var width = box.Width; var height = box.Height;
+        var cx = (box.Left + box.Right) / 2f; var cy = (box.Bottom + box.Top) / 2f;
+        var colour = SlotColour(slot);
+        var followed = filled && slot == Replayer.Follow;
+        var over = filled && !_overMenu && HudPointer.Hover(hud, cx, cy, width, height);
+        c.Plate(cx, cy, width, height, Cut, Plate());
+        c.Pointed(cx, cy, width, height, Cut, UIKitColors.MenuOver, over, over && HudPointer.PressedOn(hud, cx, cy, width, height), followed, rest: false);
+        c.Rect(box.Left + 4f, cy, 5f, height - 12f, filled ? colour : Fade(colour, 0.35f));
+        var top = box.Top - 22f;
+        c.Text(Numbers[slot], box.Left + 24f, top, 18f, filled ? colour : Fade(colour, 0.5f), HudAlign.Centre, bold: true);
+        var x = box.Left + 40f;
+        if (!filled) { c.Text(_ui.Text("player.empty"), x, top, 18f, Fade(UIKitColors.GameText, 0.55f), HudAlign.Left, bold: true); return; }
+        var left = box.Left + 18f; var right = box.Right - 14f;
+        // The top line from the right: the grade, the state, carrying; the name has what is left.
+        var tags = right;
+        if (CardGrades[slot].Length > 0) tags -= Tag(c, CardGrades[slot], CardGradeColours[slot], true, tags, top);
+        var grabbed = ClientInference.Grabbed(CardMove[slot]);
+        if (!present) tags -= Tag(c, _ui.Text("player.absent"), Fade(UIKitColors.GameText, 0.65f), false, tags, top);
+        else if (CardDown[slot]) tags -= Tag(c, _ui.Text("player.down"), UIKitColors.Downed, true, tags, top);
+        else if (grabbed) tags -= Tag(c, _ui.Text("player.grabbed"), UIKitColors.Grabbed, true, tags, top);
+        // At a terminal: said on the card, so whoever is at one shows without following them (11-06).
+        else if (CardMove[slot] == (int)PlayerLocomotion.PLOC_State.OnTerminal) tags -= Tag(c, _ui.Text("player.terminal"), UIKitColors.MenuOver, false, tags, top);
+        if (CarryNames[slot].Length > 0) tags -= Tag(c, _ui.Text("player.carry"), UIKitColors.MenuOver, false, tags, top);
+        c.Text(c.FitText(Names[slot], 20f, true, tags - x), x, top, 20f, NameColour(slot, UIKitColors.MenuOver), HudAlign.Left, bold: true);
 
-    private static int Reserve(int slot) => RowsReserved[slot] = Math.Max(RowsReserved[slot], CardRows[slot].Count);
+        // The health with its number; the thin lines under it are infection and, for the recorder alone (the game does not send it), stamina.
+        var health = CardHealth[slot] < 0 ? 0f : CardHealth[slot] / 127f;
+        var healthColour = UIKitColors.Level(health);
+        const float numberRoom = 56f;
+        var bar = box.Top - 48f;
+        var barWidth = right - left - numberRoom;
+        c.Rect(left + barWidth / 2f, bar, barWidth, 10f, Fade(UIKitColors.GameText, 0.18f));
+        if (health > 0f) c.Rect(left + barWidth * health / 2f, bar, barWidth * health, 10f, healthColour);
+        c.Text(PercentText(health), right, bar, 16f, healthColour, HudAlign.Right, bold: true);
+        if (CardInfection[slot] > 0f) c.Rect(left + barWidth * CardInfection[slot] / 2f, bar - 8f, barWidth * CardInfection[slot], 3f, UIKitColors.Infection);
+        if (ReplayExtras.Gun(state, slot, out var gun) && gun.StaminaPercent >= 0) c.Rect(left + barWidth * gun.StaminaPercent / 200f, bar - 13f, barWidth * gun.StaminaPercent / 100f, 3f, Fade(UIKitColors.GameText, 0.7f));
 
-    // How much taller a card is for a name that needs a second line.
-    private static float NameExtra(HudCanvas c, int slot, float width) => c.TextWidth(Names[slot], 20f, true) > width - BadgeRoom(c, slot) ? NameLine : 0f;
+        // The six blocks, three across and two down.
+        var gridTop = box.Top - 66f;
+        var blockWidth = (right - left - 2f * BlockGap) / 3f;
+        var blockHeight = (gridTop - box.Bottom - 10f - BlockGap) / 2f;
+        for (var b = 0; b < BlockSlots.Length; b++)
+        {
+            var bx = left + (b % 3) * (blockWidth + BlockGap) + blockWidth / 2f;
+            var by = gridTop - (b / 3) * (blockHeight + BlockGap) - blockHeight / 2f;
+            Block(c, Blocks[slot, b], BlockSlots[b] == CardHeld[slot], colour, bx, by, blockWidth, blockHeight);
+        }
+        if (over && HudPointer.Click(hud, cx, cy, width, height)) ReplayCamera.Select(slot);
+    }
+
+    // One thing a player has: its name over what is left of it (a percent in green to red, a count, nothing for a melee weapon); the one in the
+    // hands lit in the player's colour with a bright frame; an empty slot a faint frame saying so.
+    private static void Block(HudCanvas c, in CardBlock block, bool held, Color colour, float cx, float cy, float width, float height)
+    {
+        var x = cx - width / 2f + 8f;
+        if (string.IsNullOrEmpty(block.Name))
+        {
+            c.Frame(cx, cy, width, height, 4f, Fade(ReplayPlate.Line, 0.2f));
+            c.Text(_ui.Text("card.none"), x, cy, BlockPx, Fade(UIKitColors.GameText, 0.45f));
+            return;
+        }
+        if (held) c.Rect(cx, cy, width, height, Fade(colour, 0.3f));
+        c.Frame(cx, cy, width, height, 4f, held ? UIKitColors.MenuOver : Fade(ReplayPlate.Line, 0.45f));
+        var line = Math.Min(12f, height / 4f);
+        c.Text(c.FitText(block.Name, BlockPx, held, width - 16f), x, cy + line, BlockPx, held ? UIKitColors.MenuOver : UIKitColors.GameText, HudAlign.Left, bold: held);
+        if (block.Count.Length > 0) c.Text(block.Count, x, cy - line, 16f, block.Share >= 0f ? UIKitColors.Level(block.Share) : held ? UIKitColors.MenuOver : UIKitColors.GameText, HudAlign.Left, bold: true);
+    }
+
+    // A tag on a card's top line ending at <paramref name="right"/>: filled in its colour for an alarm (down, grabbed) and the grade, else framed. Returns the room it took.
+    private static float Tag(HudCanvas c, string text, Color colour, bool fill, float right, float y)
+    {
+        var width = c.TextWidth(text, 15f, true) + 16f;
+        if (fill) c.Rect(right - width / 2f, y, width, 24f, colour);
+        else c.Frame(right - width / 2f, y, width, 24f, 4f, Fade(colour, 0.7f));
+        c.Text(text, right - width / 2f, y, 15f, fill ? Plate() : colour, HudAlign.Centre, bold: true);
+        return width + 8f;
+    }
 
     // ---- Feed -------------------------------------------------------------------------------------------------------------------
 
@@ -564,10 +591,17 @@ internal static partial class ReplayScreen
 
     // ---- Lists ------------------------------------------------------------------------------------------------------------------
 
-    private readonly record struct ListRow(uint TimeMs, Color Colour, string Text, int Index);
+    private readonly record struct ListRow(uint TimeMs, Color Colour, string Text, int Index)
+    {
+        /// <summary>The row's time as the list shows it, made with the row.</summary>
+        internal string Clock { get; } = TimelineMath.Clock(TimeMs);
+    }
     private static readonly List<ListRow> EventRows = new(), HighlightRows = new(), ChatRows = new();
     // The width each list wants, worked out once per analysis.
     private static readonly float[] ListWidths = new float[3];
+    private static readonly Shown<uint> DurationClock = new();
+    // A chat popup's "name:" per slot, and one for a line of nobody's.
+    private static readonly Shown<string>[] ChatLabels = { new(), new(), new(), new(), new() };
 
     // The chat log (0), events (1) or highlights (2) around the moment on the bar: the time, a line in the row's colour, and the whole text broken over as
     // many lines as it takes; a click picks a row. Returns the panel's right edge.
@@ -575,7 +609,7 @@ internal static partial class ReplayScreen
     {
         const float pad = 16f, bar = 12f;
         var duration = Replayer.Clock?.DurationMs ?? 0;
-        var timeWidth = c.TextWidth(TimelineMath.Clock(duration), 16f, true) + 8f;
+        var timeWidth = c.TextWidth(DurationClock.Of(duration, static ms => TimelineMath.Clock(ms)), 16f, true) + 8f;
         var chrome = 2f * pad + bar + timeWidth + 12f;
         var most = Math.Min(zone.Width, ListMaxWidth);
         if (ListWidths[list] <= 0f)
@@ -630,7 +664,7 @@ internal static partial class ReplayScreen
             c.Rect(box.Left + pad - 4f, cy, 4f, h - 8f, passed ? row.Colour : Fade(row.Colour, 0.45f));
             var ink = passed ? UIKitColors.GameText : Fade(UIKitColors.GameText, 0.55f);
             var first0 = y - 3f - ListLine / 2f;
-            c.Text(TimelineMath.Clock(row.TimeMs), box.Left + pad + bar + timeWidth - 8f, first0, 16f, Fade(ink, 0.85f), HudAlign.Right, bold: true);
+            c.Text(row.Clock, box.Left + pad + bar + timeWidth - 8f, first0, 16f, Fade(ink, 0.85f), HudAlign.Right, bold: true);
             for (var l = 0; l < lines.Count; l++) c.Text(lines[l], box.Left + pad + bar + timeWidth + 12f - 4f, first0 - l * ListLine, 18f, ink);
             if (HudPointer.Click(hud, box.Left + width / 2f, cy, width - 12f, h)) { if (list == 2) PickHighlight(_highlights[row.Index]); else JumpToEvent(row.TimeMs); }
             y -= h;
@@ -664,8 +698,8 @@ internal static partial class ReplayScreen
             var age = (now - said.TimeMs) / (float)ChatMs;
             var alpha = age > 0.8f ? (1f - age) / 0.2f : 1f;
             var player = said.Slot >= 0 && said.Slot < 4;
-            var name = player ? Names[said.Slot] : "?";
-            var nameWidth = c.TextWidth(name + ":", 18f, true);
+            var label = ChatLabels[player ? said.Slot : 4].Of(player ? Names[said.Slot] : "?", static name => name + ":");
+            var nameWidth = c.TextWidth(label, 18f, true);
             var lines = Wrapped(c, said.Text, 18f, false, Math.Max(120f, room - nameWidth - 3f * pad));
             var wide = 0f;
             foreach (var text in lines) wide = Math.Max(wide, c.TextWidth(text, 18f));
@@ -674,7 +708,7 @@ internal static partial class ReplayScreen
             c.Plate(left + width / 2f, y + height / 2f, width, height, 8f, Plate(alpha));
             c.Rect(left + 3f, y + height / 2f, 4f, height - 10f, Fade(player ? SlotColour(said.Slot) : UIKitColors.GameText, alpha));
             var top = y + height - 4f - line / 2f;
-            c.Text(name + ":", left + pad, top, 18f, Fade(player ? NameColour(said.Slot, SlotColour(said.Slot)) : UIKitColors.GameText, alpha), HudAlign.Left, bold: true);
+            c.Text(label, left + pad, top, 18f, Fade(player ? NameColour(said.Slot, SlotColour(said.Slot)) : UIKitColors.GameText, alpha), HudAlign.Left, bold: true);
             for (var l = 0; l < lines.Count; l++) c.Text(lines[l], left + pad + nameWidth + pad, top - l * line, 18f, Fade(UIKitColors.MenuOver, alpha));
             y += height + 6f;
         }

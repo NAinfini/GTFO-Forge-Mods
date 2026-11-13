@@ -70,8 +70,6 @@ public static class Emotes
             if (ByNet.TryGetValue(netId, out var other)) { error = other.Definition.Id == definition.Id ? definition.Id + " is already registered" : definition.Id + " has the same number as " + other.Definition.Id; return false; }
             var bytes = File.ReadAllBytes(Path.Combine(definition.Folder, definition.Clip));
             var firstBytes = definition.FirstPersonClip == null ? null : File.ReadAllBytes(Path.Combine(definition.Folder, definition.FirstPersonClip));
-            var text = System.Text.Encoding.UTF8.GetString(bytes);
-            var firstPerson = firstBytes == null ? null : System.Text.Encoding.UTF8.GetString(firstBytes);
             using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
             sha.AppendData(bytes);
             if (firstBytes != null) sha.AppendData(firstBytes);
@@ -79,15 +77,15 @@ public static class Emotes
             // What changes how the action plays on a teammate's screen is part of what both sides must share.
             sha.AppendData(System.Text.Encoding.UTF8.GetBytes(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{definition.Loop}|{definition.Body}|{definition.Pair}|{definition.PairHold}")));
             // Named, so a recording carries the action by name and a replay finds it again (ForgeCore Recording; the first-person clip is the local view only).
-            var clip = JointClip.Parse(text, Plugin.Id + "/" + definition.Id);
-            // Only a whole-body clip writes the hips, so only it can hover or sink (SeatOnFloor); the file's bytes (and so the content hash) stay as they are.
+            var clip = JointClip.Read(bytes, Plugin.Id + "/" + definition.Id);
             if (definition.Pair && definition.PairHold >= clip.Duration) { error = definition.Id + ": PairHold must be less than the clip's length (" + clip.Duration.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " s)."; return false; }
+            // Only a whole-body clip writes the hips, so only it can hover or sink (SeatOnFloor); the file's bytes (and so the content hash) stay as they are.
             if (definition.Body == "full") clip.SeatOnFloor();
             var entry = new Entry
             {
                 Definition = definition,
                 Clip = clip,
-                FirstPerson = firstPerson == null ? null : JointClip.Parse(firstPerson),
+                FirstPerson = firstBytes == null ? null : JointClip.Read(firstBytes),
                 Mask = MaskOf(definition.Body),
                 FirstPersonMask = MaskOf(definition.Body is "left-arm" or "right-arm" ? definition.Body : "arms"),
                 NetId = netId,

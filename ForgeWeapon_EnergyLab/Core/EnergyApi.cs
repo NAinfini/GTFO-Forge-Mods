@@ -38,9 +38,10 @@ public enum WeaponSlot
     Special
 }
 
-/// <summary>An immutable model reference. Bundles contain presentation-format (4), presentation-profile,
+/// <summary>An immutable model reference. Bundles contain presentation-format (5), presentation-profile,
 /// the named prefab, Receiver/Rail/Front/Stock/Magazine/Sight parts and RightHand/LeftHand/Muzzle/SightLook sockets.
-/// A bundle loads when the first gun using it is assembled and unloads once no gun object uses it.</summary>
+/// A bundle loads, after the bundles Unity's manifest beside it says it depends on, when the first gun using it is assembled
+/// and unloads once no gun object uses it.</summary>
 /// <param name="Key">Prefab key in the bundle.</param>
 /// <param name="BundlePath">Absolute path to the bundle file. A data file's <c>Model.Bundle</c> is relative to its folder and is made absolute when read.</param>
 public sealed record WeaponModel(string Key, string BundlePath);

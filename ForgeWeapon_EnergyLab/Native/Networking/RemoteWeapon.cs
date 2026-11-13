@@ -41,10 +41,10 @@ internal sealed class RemoteWeapon : IDisposable
     private EnergyLook _gearLook = EnergyLook.Default;
     private const float MaximumShownOffset = 3f;
 
-    internal RemoteWeapon(bool authoritative, RemotePeerState? state = null)
+    internal RemoteWeapon(bool authoritative, RemotePeerState state)
     {
         _authoritative = authoritative;
-        _state = state ?? new RemotePeerState();
+        _state = state;
     }
 
     internal void SetModel(PlayerAgent owner, BulletWeapon? weapon, EnergyGear? gear)
@@ -53,7 +53,7 @@ internal sealed class RemoteWeapon : IDisposable
             weapon.Owner.Pointer != owner.Pointer || EnergyGearRegistry.DefinitionOf(weapon) != gear ||
             weapon.GearPartHolder == null) return;
         WeaponModels.Ensure(weapon.GearPartHolder);
-        // The mode packet arrives when the shooter takes the gun up; the voices and buffers its shots need are made then, not mid-fight on its first shot.
+        // The shooter's armed row arrives when it takes the gun up; the voices and buffers its shots need are made then, not mid-fight on its first shot.
         if (PresentationPreload.Ready) PreparePresentation(gear);
     }
 
@@ -77,8 +77,8 @@ internal sealed class RemoteWeapon : IDisposable
         visual = default;
         if (!_authoritative || _disposed || EnergyGears.Match(command.CategoryId, command.Mode) is not { } gear ||
             !EnergyNativeFire.Delayed(gear.Mode) || !owner.Alive || command.Dimension != (int)owner.DimensionIndex ||
-            !Finite(owner.Position) ||
-            !Finite(command.Start) || !Finite(command.Direction) || command.Direction.sqrMagnitude < 0.25f ||
+            !ForgeCore.Vec.Finite(owner.Position) ||
+            !ForgeCore.Vec.Finite(command.Start) || !ForgeCore.Vec.Finite(command.Direction) || command.Direction.sqrMagnitude < 0.25f ||
             command.Direction.sqrMagnitude > 2.25f || !float.IsFinite(command.Power) || command.Power < 0f || command.Power > 1f ||
             !float.IsFinite(command.Damage) || command.Damage < 0f ||
             (command.Start - owner.Position).sqrMagnitude > EnergyProtocol.MaximumMuzzleDistance * EnergyProtocol.MaximumMuzzleDistance ||
@@ -117,20 +117,20 @@ internal sealed class RemoteWeapon : IDisposable
 
     private static bool ValidVisual(FireVisual visual, EnergyGear gear)
     {
-        if (!Finite(visual.Start) || !Finite(visual.Direction) || visual.Direction.sqrMagnitude < 0.25f ||
+        if (!ForgeCore.Vec.Finite(visual.Start) || !ForgeCore.Vec.Finite(visual.Direction) || visual.Direction.sqrMagnitude < 0.25f ||
             visual.Direction.sqrMagnitude > 2.25f || !float.IsFinite(visual.Power) || !float.IsFinite(visual.Damage) || visual.Damage < 0f) return false;
         if (EnergyNativeFire.Delayed(gear.Mode))
             return visual.Segments == 0 && visual.HitMask == 0 && visual.Power >= 0f && visual.Power <= 1f;
         var segments = gear.Mode == EnergyMode.ArcChain ? gear.Numbers.Targets : 1;
         if (visual.Segments < 1 || visual.Segments > segments || (visual.HitMask >> visual.Segments) != 0) return false;
-        for (var index = 0; index < visual.Segments; index++) if (!Finite(visual.End(index))) return false;
+        for (var index = 0; index < visual.Segments; index++) if (!ForgeCore.Vec.Finite(visual.End(index))) return false;
         return gear.Mode != EnergyMode.Flame || visual.Power >= 0f && visual.Power <= gear.Numbers.Shot.Range;
     }
 
     internal bool StartCharge(PlayerAgent owner, ChargePacket packet, float now)
     {
         if (_disposed || packet.Phase != 1 || packet.Mode is not ((int)EnergyMode.PlasmaBlast or (int)EnergyMode.PlasmaArc) ||
-            EnergyGears.Match(packet.CategoryId, packet.Mode) is not { } gear || !Finite(packet.Position) || !float.IsFinite(packet.Held) || packet.Held < 0f ||
+            EnergyGears.Match(packet.CategoryId, packet.Mode) is not { } gear || !ForgeCore.Vec.Finite(packet.Position) || !float.IsFinite(packet.Held) || packet.Held < 0f ||
             (_authoritative && (packet.Position - owner.Position).sqrMagnitude > EnergyProtocol.MaximumMuzzleDistance * EnergyProtocol.MaximumMuzzleDistance)) return false;
         _chargeLocal = GunPose.ToYawFrame(packet.Position - owner.Position, owner.TargetLookDir);
         _chargeUntil = now + EnergyProtocol.ChargeExpirySeconds;
@@ -173,7 +173,7 @@ internal sealed class RemoteWeapon : IDisposable
 
     internal void Present(PlayerAgent owner, BulletWeapon? weapon, FireVisual visual, float now)
     {
-        if (_disposed || EnergyGears.Match(visual.CategoryId, visual.Mode) is not { } gear || !Finite(visual.Start) || !Finite(visual.Direction) ||
+        if (_disposed || EnergyGears.Match(visual.CategoryId, visual.Mode) is not { } gear || !ForgeCore.Vec.Finite(visual.Start) || !ForgeCore.Vec.Finite(visual.Direction) ||
             visual.Direction.sqrMagnitude < 0.25f || visual.Direction.sqrMagnitude > 2.25f ||
             !float.IsFinite(visual.Power)) return;
         var mode = gear.Mode;
@@ -189,9 +189,9 @@ internal sealed class RemoteWeapon : IDisposable
         switch (mode)
         {
             case EnergyMode.Beam:
-                if (visual.Segments != 1 || !Finite(visual.End(0))) return;
+                if (visual.Segments != 1 || !ForgeCore.Vec.Finite(visual.End(0))) return;
                 Effects().Beam(start, visual.End(0), visual.Hit(0), now);
-                Visuals().Beam(start, visual.End(0), visual.Hit(0), now);
+                Visuals().Beam(start, visual.End(0), visual.Hit(0));
                 _beamUntil = now + 0.3f;
                 HoldStream(owner, weapon, gear, reported);
                 _streamEnd = visual.End(0);
@@ -203,7 +203,7 @@ internal sealed class RemoteWeapon : IDisposable
                 {
                     _starts[index] = index == 0 ? start : _ends[index - 1];
                     _ends[index] = visual.End(index);
-                    if (!Finite(_ends[index])) return;
+                    if (!ForgeCore.Vec.Finite(_ends[index])) return;
                     _hits[index] = visual.Hit(index);
                 }
                 Effects().Chain(_starts.AsSpan(0, visual.Segments), _ends.AsSpan(0, visual.Segments),
@@ -223,7 +223,7 @@ internal sealed class RemoteWeapon : IDisposable
                 break;
             case EnergyMode.Blast:
                 Effects().Hide();
-                Visuals().Blast(start, direction, now);
+                Visuals().Blast(start, direction);
                 Special().Visuals.Origin(start);
                 Special().Visuals.BlastLaunch();
                 Special().LaunchShell(owner, gear, reported, direction, MathF.Min(visual.Damage, gear.Numbers.Shot.Damage * EnergyProtocol.MaximumDamageBoost), now, visual.Sequence);
@@ -233,7 +233,7 @@ internal sealed class RemoteWeapon : IDisposable
                 break;
             case EnergyMode.Flame:
                 if (visual.Power < 0f || visual.Power > gear.Numbers.Shot.Range) return;
-                Special().Visuals.Flame(start, direction, visual.Power, now);
+                Special().Visuals.Flame(start, direction, visual.Power);
                 _flameUntil = now + 0.3f;
                 HoldStream(owner, weapon, gear, reported);
                 _streamDirection = direction;
@@ -264,7 +264,7 @@ internal sealed class RemoteWeapon : IDisposable
             EnergyGearRegistry.DefinitionOf(weapon) != gear || weapon.MuzzleAlign == null) return reported;
         var shown = weapon.MuzzleAlign.position;
         // A gun far from its own shooter is not in the hands (a switch in progress). The report is no measure of that: on a lagging link it runs ahead of the moving shooter this machine shows.
-        return Finite(shown) && (shown - owner.Position).sqrMagnitude <= MaximumShownOffset * MaximumShownOffset ? shown : reported;
+        return ForgeCore.Vec.Finite(shown) && (shown - owner.Position).sqrMagnitude <= MaximumShownOffset * MaximumShownOffset ? shown : reported;
     }
 
     internal void Tick(float delta, float now)
@@ -276,10 +276,10 @@ internal sealed class RemoteWeapon : IDisposable
         {
             var from = ShownPoint(_streamOwner, _streamWeapon, _streamGear!, _streamLocal);
             Effects().Beam(from, _streamEnd, _streamHit, now);
-            Visuals().Beam(from, _streamEnd, _streamHit, now);
+            Visuals().Beam(from, _streamEnd, _streamHit);
         }
         if (_streamOwner != null && _streamOwner.Alive && now <= _flameUntil)
-            Special().Visuals.Flame(ShownPoint(_streamOwner, _streamWeapon, _streamGear!, _streamLocal), _streamDirection, _streamReach, now);
+            Special().Visuals.Flame(ShownPoint(_streamOwner, _streamWeapon, _streamGear!, _streamLocal), _streamDirection, _streamReach);
         if (_charging && _chargeOwner != null)
         {
             var position = ShownPoint(_chargeOwner, _chargeOwner.Inventory?.WieldedItem?.TryCast<BulletWeapon>(), _chargeGear!, _chargeLocal);
@@ -288,7 +288,7 @@ internal sealed class RemoteWeapon : IDisposable
             Effects().Charge(power, position);
             var orbs = Plasma().Visuals;
             orbs.ChargingOrb(EnergyProjectiles.Capacity, position,
-                PlasmaPayload.FromCharge(power, _chargeGear!.Numbers).BodyRadius, now, _chargeGear!.Mode == EnergyMode.PlasmaArc, firstPerson: false, sight: null);
+                PlasmaPayload.FromCharge(power, _chargeGear!.Numbers).BodyRadius, _chargeGear!.Mode == EnergyMode.PlasmaArc, firstPerson: false, sight: null);
             if (power >= 1f && !_chargedFull) { _chargedFull = true; orbs.Charged(EnergyProjectiles.Capacity); }
         }
         _effects?.Tick(now);
@@ -347,7 +347,6 @@ internal sealed class RemoteWeapon : IDisposable
         _preparedModes |= bit;
     }
 
-    private static bool Finite(Vector3 value) => float.IsFinite(value.x) && float.IsFinite(value.y) && float.IsFinite(value.z);
 
     public void Dispose()
     {

@@ -31,7 +31,7 @@ public enum ShownKind : byte
 /// say how it is drawn (a beam's style). Passed by reference: nothing is copied or allocated.</summary>
 public readonly struct ShownEffect
 {
-    public ShownEffect(ShownKind kind, int name, int key, Vector3 at, Vector3 to, float size, Color colour, bool head = true, float seconds = 0f, float fade = 0f, object? look = null)
+    internal ShownEffect(ShownKind kind, int name, int key, Vector3 at, Vector3 to, float size, Color colour, bool head = true, float seconds = 0f, float fade = 0f, object? look = null)
     {
         Kind = kind; Name = name; Key = key; At = at; To = to; Size = size; Colour = colour; Head = head; Seconds = seconds; Fade = fade; Look = look;
     }
@@ -60,7 +60,7 @@ public enum ShownPlace : byte { TwoD, World, Attached }
 /// one-shot), which <see cref="IShownObserver.SoundEnded"/> names when it ends.</summary>
 public readonly struct ShownSound
 {
-    public ShownSound(int name, ShownPlace place, Vector3 at, int variant, float pitch, float gain, bool self, long loop)
+    internal ShownSound(int name, ShownPlace place, Vector3 at, int variant, float pitch, float gain, bool self, long loop)
     {
         Name = name; Place = place; At = at; Variant = variant; Pitch = pitch; Gain = gain; Self = self; Loop = loop;
     }
@@ -90,7 +90,7 @@ public enum ShownModelKind : byte
 /// <summary>One model report (<see cref="ShownModelKind"/>).</summary>
 public readonly struct ShownModel
 {
-    public ShownModel(ShownModelKind kind, int name, GameObject? instance, Transform? on, object? token)
+    internal ShownModel(ShownModelKind kind, int name, GameObject? instance, Transform? on, object? token)
     {
         Kind = kind; Name = name; Instance = instance; On = on; Token = token;
     }
@@ -117,7 +117,7 @@ public enum ShownPoseKind : byte
 /// body's few concurrent clips, numbered from 0; <see cref="Joints"/> holds one weight per canonical joint (0: the clip leaves the bone alone) and is only valid during the call.</summary>
 public readonly struct ShownPose
 {
-    public ShownPose(ShownPoseKind kind, ShownAnchor anchor, int track, int name, float elapsed, bool loop, float weight, float fadeIn, float fadeOut, float[]? joints)
+    internal ShownPose(ShownPoseKind kind, ShownAnchor anchor, int track, int name, float elapsed, bool loop, float weight, float fadeIn, float fadeOut, float[]? joints)
     {
         Kind = kind; Anchor = anchor; Track = track; Name = name; Elapsed = elapsed; Loop = loop; Weight = weight; FadeIn = fadeIn; FadeOut = fadeOut; Joints = joints;
     }
@@ -176,7 +176,7 @@ public static class Recording
     private static readonly Observers<IShownObserver> All = new();
 
     /// <summary>True while anyone observes: a library builds a report only then.</summary>
-    public static bool Watched => All.Any;
+    internal static bool Watched => All.Any;
 
     /// <summary>Adds <paramref name="observer"/>; disposing the result removes it. Several observers hear every report, in the order they were added.</summary>
     public static IDisposable Observe(IShownObserver observer) => All.Add(observer);
@@ -191,7 +191,7 @@ public static class Recording
     /// <summary>Hears every <see cref="Note"/> from now; disposing the result removes the listener. Called on the main thread inside <see cref="Note"/>; one that throws is logged once and stays.</summary>
     public static IDisposable ObserveNotes(Action<RecordingNote> listener) => RecordingNotes.Add(listener);
 
-    public static void Effect(in ShownEffect effect)
+    internal static void Effect(in ShownEffect effect)
     {
         var all = All.Items;
         for (var i = 0; i < all.Length; i++)
@@ -201,7 +201,7 @@ public static class Recording
         }
     }
 
-    public static void Sound(in ShownSound sound)
+    internal static void Sound(in ShownSound sound)
     {
         var all = All.Items;
         for (var i = 0; i < all.Length; i++)
@@ -211,7 +211,7 @@ public static class Recording
         }
     }
 
-    public static void SoundEnded(long loop)
+    internal static void SoundEnded(long loop)
     {
         var all = All.Items;
         for (var i = 0; i < all.Length; i++)
@@ -221,7 +221,7 @@ public static class Recording
         }
     }
 
-    public static void Model(in ShownModel model)
+    internal static void Model(in ShownModel model)
     {
         var all = All.Items;
         for (var i = 0; i < all.Length; i++)
@@ -231,7 +231,7 @@ public static class Recording
         }
     }
 
-    public static void Pose(in ShownPose pose)
+    internal static void Pose(in ShownPose pose)
     {
         var all = All.Items;
         for (var i = 0; i < all.Length; i++)

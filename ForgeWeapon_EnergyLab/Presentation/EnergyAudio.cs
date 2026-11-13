@@ -15,9 +15,6 @@ namespace ForgeWeaponEnergyLab.Presentation;
 /// </summary>
 internal static class EnergyAudio
 {
-    /// <summary>Every cue the presentation plays. The preload hands them to <see cref="AudioLibrary.Require"/>, which refuses to start without all of them.</summary>
-    internal static string[] Cues => EnergyLookNames.Cues;
-
     private static AudioLibrary? _library;
 
     private static readonly Dictionary<string, AudioCue> Shipped = new(StringComparer.Ordinal);
@@ -30,10 +27,10 @@ internal static class EnergyAudio
     internal static void Load()
     {
         _library = AudioKit.Load(Plugin.Id);
-        foreach (var cue in Cues) Shipped[cue] = _library.Cue(cue);
+        foreach (var cue in EnergyLookNames.Cues) Shipped[cue] = _library.Cue(cue);
     }
 
-    /// <summary>The shipped cue <paramref name="name"/> (one of <see cref="Cues"/>), found once.</summary>
+    /// <summary>The shipped cue <paramref name="name"/> (one of <see cref="EnergyLookNames.Cues"/>), found once.</summary>
     internal static AudioCue Cue(string name) => Shipped[name];
 
     /// <summary>Remembers the definition's own sounds: the <c>audio</c> folder beside its definition file, when it has a <c>cues.forge</c>, loaded once per

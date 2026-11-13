@@ -71,7 +71,7 @@ Fires a core that opens a gravity field, pulling enemies in and damaging them.
 
 ## Installation
 
-Install with r2modman; it also installs BepInExPack_GTFO, GTFO_API, MTFO, ForgeCore, ForgeUI, ForgeAudio and ForgeVisual. Names and descriptions are in English and Chinese and follow the `Language` setting in `NAinfini.ForgeUI.cfg` (by default the game's language). MTFO marks the game as modded, which turns off achievements and public matchmaking, so these guns stay out of official play. Everyone in the lobby needs the same version and the same tuning changes.
+Install with r2modman; it also installs BepInExPack_GTFO, GTFO_API, MTFO and ForgeCore. Names and descriptions are in English and Chinese and follow the `Language` setting in `NAinfini.ForgeUI.cfg` (by default the game's language). MTFO marks the game as modded, which turns off achievements and public matchmaking, so these guns stay out of official play. Everyone in the lobby needs the same version and the same tuning changes.
 
 ## Tuning
 

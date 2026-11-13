@@ -37,9 +37,9 @@ internal static class GameEventSources
         // A new session's host is found after its join events, and a player alone gets no later event: read it here.
         GameHooks.MasterFound.After(static (_, _) => ReadMaster());
         GameHooks.MasterMigrationFound.After(static (_, _) => GameEvents.NoteMasterMigrated());
-        LevelAPI.OnLevelCleanup += GameEvents.NoteLevelEnded;
+        LevelAPI.OnLevelCleanup += static () => { Net.Node!.NoteWorld(NetWorldReason.Cleanup); GameEvents.NoteLevelEnded(); };
         EventAPI.OnCheckpointReached += GameEvents.NoteCheckpointReached;
-        EventAPI.OnCheckpointReloaded += Checkpoint.NoteReloaded;
+        EventAPI.OnCheckpointReloaded += static () => { Net.Node!.NoteWorld(NetWorldReason.Checkpoint); Checkpoint.NoteReloaded(); };
         // No read here: at plugin load there is no session yet, and the first session event reads the host.
     }
 
@@ -47,9 +47,9 @@ internal static class GameEventSources
     private static void Listed(SNet_Player? player, bool added)
     {
         if (player != null) Players.NoteSession(new SessionPlayer(player.Lookup, player.IsBot, player.IsLocal), added);
-        if (player == null || player.IsBot || player.IsLocal) { Net.NoteSession(); return; }
-        if (added) Net.NotePlayerAdded(player.Lookup);
-        else Net.NotePlayerRemoved(player.Lookup);
+        if (player == null || player.IsBot || player.IsLocal) { Net.Node!.NoteSession(); return; }
+        if (added) Net.Node!.NotePlayerAdded(player.Lookup);
+        else Net.Node!.NotePlayerRemoved(player.Lookup);
     }
 
     private static void StateChanged(eGameStateName oldState, eGameStateName newState)
@@ -60,11 +60,13 @@ internal static class GameEventSources
 
     private static void ReadMaster()
     {
-        Net.NoteSession();
+        Net.Node!.NoteSession();
         try
         {
             var localChanged = Session.NoteLocal(SNet.LocalPlayer?.Lookup ?? 0);
-            GameEvents.NoteMaster(SNet.Master?.Lookup ?? 0, localChanged);
+            // The network reads the session now, not at the next frame: a host change moves the world after Session.IsHost flipped
+            // and before any mod's MasterChanged handler runs.
+            GameEvents.NoteMaster(SNet.Master?.Lookup ?? 0, localChanged, static () => Net.Node!.Settle());
         }
         catch (Exception error) { Plugin.Logger.ErrorOnce("core-reading-session-host-failed", "Reading the session host failed: " + error); }
     }

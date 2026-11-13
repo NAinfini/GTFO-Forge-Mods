@@ -240,8 +240,8 @@ internal static class DamageCalibration
                     }
                 case EventKind.EnemyHurt:
                     {
-                        var entity = (int)p.U(); var kind = (int)p.U(); var damage = p.U() / 10f; var attacker = p.U(); p.U();
-                        var settled = p.U() == 1; var taken = p.U() / 10f; p.U(); p.U(); var limb = (int)p.U(); p.U(); var behind = p.U() == 1;
+                        var hurt = EnemyHurtEvent.Read(p);
+                        var (entity, kind, damage, attacker, settled, taken, limb, behind) = (hurt.Entity, hurt.Kind, hurt.Damage, hurt.Attacker, hurt.Settled, hurt.Taken, hurt.LimbType, hurt.Behind);
                         if (attacker > 3 || kind > 1) break;
                         if (attacker == (ulong)recorder || settled) own[kind, Math.Clamp(limb, 0, 2)]++;
                         state.Enemies.TryGetValue(entity, out var e);

@@ -4,6 +4,12 @@ which keeps its own licence.
 
 This is an unofficial fan-made mod for GTFO. It is not made, endorsed or supported by 10 Chambers Collective.
 GTFO and its game data belong to their owners; no file taken from the game is included in this package.
+
+The package has three parts, each in its own folder: Carrier (the call-in platform), Arsenal (supply pods, turrets, strikes and
+heavy weapons) and Frames (the exosuits). The files named below are in the part's folder.
+
+Carrier
+
 Models bundle (forge-ordnance.bundle): the summoning ball, the drop pod and the turret shell were generated for this project by its owner with Tripo (paid membership). Effect textures:
 - "Smoke Particles" and "Particle Pack" by Kenney (https://kenney.nl), CC0 1.0 (credit given anyway); repacked or converted to white-on-alpha.
 - "Free VFX image sequences and flipbooks" (Flame02) by Unity Technologies (Unity Labs), CC0 1.0.
@@ -11,7 +17,7 @@ Models bundle (forge-ordnance.bundle): the summoning ball, the drop pod and the 
 - "Particle Pack Starter Assets" (SmokePuff01) by Unity Technologies and "Free Quick Effects Vol 1" (Circle01_v1) by Gabriel Aguiar Prod, both free
   Unity Asset Store packs used under the Asset Store EULA (commercial use allowed; embedded in this built product, not redistributed on their own).
 - The rock texture is drawn for this mod.
-Effects in forge-ordnance-fx.bundle are rebuilt from Unity Asset Store packs under the Asset Store EULA (commercial use allowed; shipped inside this built bundle, not redistributed on their own; Assets/Vfx/fx-licences.forge lists the packs).
+Effects in forge-ordnance-fx.bundle are rebuilt from Unity Asset Store packs under the Asset Store EULA (commercial use allowed; shipped inside this built bundle, not redistributed on their own; fx-licences.forge lists the packs).
 
 Sound effects (audio/*.ogg), converted to Ogg Vorbis from the recordings listed in audio/LICENSE.forge:
 - Sonniss GameAudioGDC sound effects (royalty-free; the Sonniss licence terms apply to the originals).
@@ -19,6 +25,69 @@ Sound effects (audio/*.ogg), converted to Ogg Vorbis from the recordings listed 
 - "217459_4056007-hq.mp3" by JarredGibb, https://freesound.org/people/JarredGibb/sounds/217459/, CC0 1.0 (credit given anyway).
 - A few clips come from a sound collection the owner confirmed as open source; their original authors are not named in that collection
   (audio/LICENSE.forge names the files).
+
+Arsenal
+
+Models (forge-ordnance-arsenal.bundle) were downloaded free, re-oriented, scaled and re-exported; changes were made and the authors do not endorse this mod.
+Creative Commons Attribution 4.0 (https://creativecommons.org/licenses/by/4.0/):
+- "RG-6 Grenade Launcher" by Sassiska, https://sketchfab.com/3d-models/rg-6-grenade-launcher-d911c28d568c4dec838d67760f323d98
+  (leaf and front sights removed, the reflex sight below added)
+Creative Commons Zero 1.0 (https://creativecommons.org/publicdomain/zero/1.0/; credit given anyway):
+- "Red Dot Sight" by Jean PFP, https://opengameart.org/content/red-dot-sight (scaled, recoloured, red dot added); the reflex sight on the four guns
+- "Particle Pack" and "Smoke Particles" by Kenney (https://kenney.nl)
+- "Smoke Aura" by Beast, posted by tehwave, https://opengameart.org/content/smoke-aura
+- Unity Labs "Free VFX image sequences and flipbooks" (Explosion02HD, FireBall02, FireBall01, Flame03)
+The vfx-ring, vfx-scorch, vfx-streak and vfx-glow textures are drawn for this package (CC0).
+
+From Sketchfab, per the owner (no author or page is recorded in the downloads): the guns heavy-mg (Minimi), anti-materiel-rifle (B&T SPR 300) and tracking-rifle (Honey Badger).
+They are CC0 1.0 on the project owner's statement of 2026-11-05; the reflex sight was fitted, sights, handles and optics removed, and the SPR 300 mesh reduced.
+The shells, bomblet, rocket, 40 mm grenade, gas canister, stasis emitter, mines, recoilless rifle, turrets, dispenser, radar and floodlight were generated for this project by its owner with Tripo (paid membership).
+Effects in forge-arsenal-fx.bundle are rebuilt from Unity Asset Store packs under the Asset Store EULA (commercial use allowed; shipped inside this built bundle, not redistributed on their own; fx-licences.forge lists the packs).
+The picker icons are renders: the supply icons are rendered from the game's own pickup models, the others from this package's models.
+
+Sound effects (audio/*.ogg), converted from the recordings listed in audio/LICENSE.forge:
+- "Sci-fi Grenade Launcher" by ValhallaProject, https://freesound.org/people/ValhallaProject/sounds/771167/, CC BY 4.0.
+- "2 High Quality Explosions (explode.wav)" by Michel Baradari (apollo-music.de), https://opengameart.org/content/2-high-quality-explosions, CC BY 3.0.
+- "163458_2263027-hq.mp3" by LeMudCrab and "561471_12429869-hq.mp3" by GameWithBepis (freesound.org), CC0 1.0 (credit given anyway).
+- Sonniss GameAudioGDC sound effects (royalty-free; the Sonniss licence terms apply to the originals).
+- One Unity Asset Store sound clip under the Asset Store EULA (commercial use allowed; embedded in this built product, not redistributed on its own).
+- Boom Library sound effects, used under the author's licence from Boom Library.
+- Some clips come from the Sonniss GameAudioGDC 2026, per the owner; audio/LICENSE.forge names them.
+Every clip and its source is listed in audio/LICENSE.forge; every model and texture in models/LICENSE.forge.
+
+Frames
+
+Exosuit models (forge-frames.bundle) are adapted from Sketchfab models: posed, scaled, re-textured, lined and cut into plates. Changes were made and the
+authors do not endorse this mod.
+- Assault frame, "Halo 5 Infiltrator" by Abel (abel76), https://sketchfab.com/3d-models/halo-5-infiltrator-3cd75c718dde402fa54805399b710200,
+  CC BY-NC 4.0 (http://creativecommons.org/licenses/by-nc/4.0/)
+- Tank frame, "BOT MECHA Warrior 3d by Oscar Creativo" by OSCAR CREATIVO (oscar_creativo),
+  https://sketchfab.com/3d-models/bot-mecha-warrior-3d-by-oscar-creativo-34850bfe441642788154c4a8a0bd60e4, CC BY-NC 4.0
+- Firepower frame, "spartan helioskrill" by photon (that one larry) (Professor_E12),
+  https://sketchfab.com/3d-models/spartan-helioskrill-5ef6e0bb32ce4d47a620c1bd4ac74e2e, CC BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+- Recon frame, "Halo 5 Noble Armor Thingy" by Abel (abel76),
+  https://sketchfab.com/3d-models/halo-5-noble-armor-thingy-7f769c05a8db4a1ab69653ace60d114e, CC BY-NC 4.0
+The CC BY-NC models may not be used commercially.
+
+The rocket launcher (frame-rocket-pod) and rocket (frame-rocket) were generated by the mod's author with Meshy (Premium subscription, owned by the author;
+no attribution required) and reduced to game meshes.
+
+The cockpit art (hud/: skill, shield, heat, damage-direction, mark and visor-crack drawings) was generated by the mod's author with ChatGPT; no attribution required. The frame picker icons are renders of the four frame models above and carry the same credits and licences.
+
+Effect textures (embedded in the plugin; the full list is in models/LICENSE.forge):
+- Unity Labs "Free VFX image sequences" (FireBall01, Flame02, Explosion01), CC0 1.0.
+- "Smoke Particles" by Kenney (https://kenney.nl), CC0 1.0; "Smoke Aura" by Beast, posted by tehwave (https://opengameart.org/content/smoke-aura), CC0 1.0.
+- Thruster cone "FlameThrower Stream" from "War FX" by JMO Assets, Unity Asset Store (Asset Store EULA: embedded in this mod's asset bundle, not redistributed on its own).
+- Ring, soft dot, disc, glow and crack shapes and the particle shader are drawn for this mod.
+
+Sound effects (audio/*.ogg), converted from the recordings listed in audio/LICENSE.forge:
+- "Sci Fi Shield Hit (OGG)" by steaq, https://freesound.org/people/steaq/sounds/465541/, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
+- Freesound clips by mcpable, Skylar1146, squidge316, serøutōnin--deprivəd, GameWithBepis, Paul368, LilMati and Jarusca, CC0 1.0 (credit given anyway).
+- Sonniss GameAudioGDC sound effects (royalty-free; the Sonniss licence terms apply to the originals).
+- Boom Library sound effects, used under the author's licence from Boom Library.
+- Some clips come from the Sonniss GameAudioGDC 2026, per the owner; audio/LICENSE.forge names them.
+
+Effects in forge-frames-fx.bundle are rebuilt from Unity Asset Store packs under the Asset Store EULA (commercial use allowed; shipped inside this built bundle, not redistributed on their own; fx-licences.forge lists the packs).
 
 The package is compiled against BepInEx, HarmonyX, Il2CppInterop, GTFO-API and the game's interop assemblies, which the mod manager installs
 separately and which are not included here.

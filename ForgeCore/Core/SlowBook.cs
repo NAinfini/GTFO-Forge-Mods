@@ -9,7 +9,7 @@ namespace ForgeCore;
 /// one applied, the game changed it meanwhile and that value becomes the new original; when the last lease ends the original is put
 /// back only if the applied speed is still in place, otherwise the game's own value stays. Pure arithmetic, no game types.
 /// </summary>
-public sealed class SlowBook<TKey> where TKey : notnull
+internal sealed class SlowBook<TKey> where TKey : notnull
 {
     /// <summary>Speeds closer than this are the same value read back.</summary>
     public const float Tolerance = 1e-3f;

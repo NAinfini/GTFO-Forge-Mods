@@ -4,31 +4,19 @@ using SNetwork;
 
 namespace ForgeCore;
 
-/// <summary>Channels over GTFO-API's NetworkAPI: <see cref="NetDelivery.Reliable"/> on the reliable ordered channel the game uses for
-/// orders, <see cref="NetDelivery.Lossy"/> on its non-critical (unreliable) channel.</summary>
+/// <summary>ForgeCore's network over GTFO-API's NetworkAPI: every message is a free-sized event sent to one player,
+/// <see cref="NetDelivery.Reliable"/> on the reliable ordered channel the game uses for orders, <see cref="NetDelivery.Lossy"/> on its
+/// non-critical (unreliable) channel. A message for several players is sent to each in turn: GTFO-API's player-list overload builds
+/// the packet once and hands the list to the game's own <c>SNet_Core.SendBytes</c> list overload, whose body is native code that
+/// could not be read, so what it does with a list is not known.</summary>
 internal sealed class GtfoTransport : INetTransport
 {
-    private static SNet_ChannelType Channel(NetDelivery delivery)
-        => delivery == NetDelivery.Lossy ? SNet_ChannelType.GameNonCritical : SNet_ChannelType.GameOrderCritical;
+    public void Register(string name, Action<ulong, byte[]> receive) => NetworkAPI.RegisterFreeSizedEvent(name, receive);
 
-    public void Register<T>(string name, Action<ulong, T> receive) where T : unmanaged => NetworkAPI.RegisterEvent(name, receive);
-
-    public void RegisterBytes(string name, Action<ulong, byte[]> receive) => NetworkAPI.RegisterFreeSizedEvent(name, receive);
-
-    public unsafe void Send<T>(string name, T message, ulong to, NetDelivery delivery) where T : unmanaged
+    public void Send(string name, byte[] data, ulong to, NetDelivery delivery)
     {
-        if (to == 0) NetworkAPI.InvokeEvent(name, message, Channel(delivery));
-        else if (SNet.TryGetPlayer(to, out var player) && player != null) NetworkAPI.InvokeEvent(name, message, player, Channel(delivery));
-        else return;
-        Net.CountSent(sizeof(T), delivery);
-    }
-
-    public void SendBytes(string name, byte[] data, ulong to, NetDelivery delivery)
-    {
-        if (to == 0) NetworkAPI.InvokeFreeSizedEvent(name, data, Channel(delivery));
-        else if (SNet.TryGetPlayer(to, out var player) && player != null) NetworkAPI.InvokeFreeSizedEvent(name, data, player, Channel(delivery));
-        else return;
-        Net.CountSent(data.Length, delivery);
+        if (SNet.TryGetPlayer(to, out var player) && player != null)
+            NetworkAPI.InvokeFreeSizedEvent(name, data, player, delivery == NetDelivery.Lossy ? SNet_ChannelType.GameNonCritical : SNet_ChannelType.GameOrderCritical);
     }
 
     public ulong Local => SNet.LocalPlayer?.Lookup ?? 0;

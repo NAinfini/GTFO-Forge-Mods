@@ -103,7 +103,6 @@ internal static class EmoteRunner
         internal bool Pair;
     }
 
-    private static NetChannel _channel = null!;
     /// <summary>What a player publishes: the action and which beginning of it. The same action done again has a new <see cref="Seq"/>, which tells a new start from a late joiner's resend.</summary>
     private struct State
     {
@@ -117,10 +116,6 @@ internal static class EmoteRunner
     private const float FollowRange = 8f;
     private static readonly EmotePair Link = new();
     private static readonly HashSet<string> Answerable = new();
-    /// <summary>How long past ForgeCore's own answer window a greeted player may still answer before it is said they did not (a player who joins while this side already waits answers only once it is in the lobby itself).</summary>
-    private const float AnswerGrace = 60f;
-    private static readonly Dictionary<ulong, float> Unanswered = new();
-    private static readonly List<ulong> Judged = new();
     private static InteractPrompt? _prompt;
     private static Emotes.Entry? _promptFor;
     private static string _promptText = "", _promptKey = "";
@@ -149,19 +144,16 @@ internal static class EmoteRunner
 
     internal static void Load()
     {
-        _channel = Net.Open(Plugin.Id);
-        _slot = _channel.PlayerState<State>("state");
+        var channel = Net.Open(Plugin.Id);
+        // ForgeCore stamps a state with its world and drops one from an earlier level or from before a checkpoint reload.
+        _slot = channel.PlayerState<State>("state");
         _slot.Changed += Seen;
-        EmotePeers.Load(_channel, player => { if (_slot.TryGet(player, out _, out _)) Seen(player, true); });
-        // The channel follows the game's world: a state is stamped with the host's epoch, and one another world (an earlier level, before a checkpoint reload) sent is dropped on arrival.
-        _channel.FollowWorld(() => Players.Local is { WasCollected: false });
-        _channel.Refused += (player, reason) => Plugin.Logger.Error("ForgeEmote " + NameOf(player) + " does not match: " + reason);
-        // Silent past ForgeCore's window is not "not installed": a player still joining (or one whose copy was still loading) answers later. Judge after a grace, and let an answer cancel it.
-        _channel.PeerSilent += player => Unanswered[player] = Time.time + AnswerGrace;
-        _channel.PeerSynced += player => Unanswered.Remove(player);
+        EmotePeers.Load(channel, player => { if (_slot.TryGet(player, out _, out _)) Seen(player, true); });
+        channel.Refused += (player, reason) => Plugin.Logger.Error("ForgeEmote " + NameOf(player) + " does not match: " + reason);
+        channel.PeerSilent += player => Plugin.Logger.ErrorOnce("ForgeEmote: " + NameOf(player) + " has not answered ForgeEmote (not installed, still loading, or another version); they may not see your actions.");
         _prompt = UIKit.Mod(Plugin.Id).AddInteractPrompt("Answer");
         UIKit.LanguageChanged += () => _promptFor = null;
-        // After ForgeCore forgot the values (the channel subscribed first) and ForgeVisual stopped its tracks (it loaded first).
+        // After ForgeCore dropped the values (it moves its world before it raises these) and ForgeVisual stopped its tracks (it loaded first).
         GameEvents.LevelEnded += Cleanup;
         GameEvents.CheckpointReloaded += Cleanup;
     }
@@ -272,9 +264,6 @@ internal static class EmoteRunner
     private static bool SameDimension(PlayerAgent local, PlayerAgent other) => local.DimensionIndex == other.DimensionIndex;
 
     private static bool Near(PlayerAgent local, PlayerAgent other) => EmotePair.InRange(Distance(local, other), SameDimension(local, other));
-
-    /// <summary>The wheel's two-player slots a teammate in range is waiting on, lit while the wheel is up.</summary>
-    private static void HighlightAnswers(PlayerAgent local) => EmoteWheel.Highlight(Answers(local));
 
     /// <summary>The IDs of the two-player actions a teammate in range is waiting on (what the wheel lights).</summary>
     internal static HashSet<string> Answers(PlayerAgent local)
@@ -418,11 +407,9 @@ internal static class EmoteRunner
 
     internal static void Update()
     {
-        _channel.Pump();
         EmoteWheel.Flush();
         if (!Emotes.Closed && SNet.IsInLobby) Emotes.Close();
         if (_anyWaiting) RetryWaiting();
-        if (Unanswered.Count != 0) JudgeUnanswered();
         if (_readAt > 0f && Time.time >= _readAt && Players.Local is { WasCollected: false } reading) { _readAt = 0f; Read("end+1s", reading, _readId); }
         foreach (var other in Others.Values)
             if (other.Pair && other.Shown != 0 && other.Body.Playing) other.Body.Hold(EmotePair.ClipTime(other.Phase, Time.time - other.Start, other.Hold));
@@ -431,7 +418,7 @@ internal static class EmoteRunner
         // The wheel being up (its key down) binds everything at once; otherwise one step per idle frame. Motion is read only while the wheel is up or an action is going.
         if (EmoteWheel.IsOpen) for (var step = 0; step < 2 && _warm < 2 && _current == null; step++) Warm(local);
         Warm(local);
-        if (EmoteWheel.IsOpen) HighlightAnswers(local);
+        if (EmoteWheel.IsOpen) EmoteWheel.Highlight(Answers(local)); // the two-player slots a teammate in range is waiting on
         if (_current == null)
         {
             if (EmoteWheel.IsOpen) EmoteWheel.Refresh(Players.Motion(local));
@@ -504,23 +491,6 @@ internal static class EmoteRunner
         _prompt?.Hide();
         _useHeld = true;
         if (Start(entry) is not null) _useHeld = false;
-    }
-
-    /// <summary>A greeted player who did not answer within ForgeCore's window and still has not after the grace is said not to have answered; an answer in the meantime (<see cref="NetChannel.PeerSynced"/>) cancels it.</summary>
-    private static void JudgeUnanswered()
-    {
-        Judged.Clear();
-        var now = Time.time;
-        foreach (var (player, until) in Unanswered)
-        {
-            if (_channel.State(player) != PeerState.Unknown) Judged.Add(player);
-            else if (now >= until)
-            {
-                Judged.Add(player);
-                Plugin.Logger.ErrorOnce("ForgeEmote: " + NameOf(player) + " has not answered ForgeEmote (not installed, still loading, or another version); they may not see your actions.");
-            }
-        }
-        foreach (var player in Judged) Unanswered.Remove(player);
     }
 
     private static bool Moving() => InputLease.Down(InputAction.Jump) || InputLease.Down(InputAction.Crouch)

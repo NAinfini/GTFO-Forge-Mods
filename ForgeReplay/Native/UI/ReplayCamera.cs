@@ -134,9 +134,6 @@ internal static class ReplayCamera
     /// <summary>Stops flying the film path (Esc).</summary>
     internal static void Land() => _pathAt = -1f;
 
-    /// <summary>The free camera's speed in metres a second (Shift is four times it).</summary>
-    internal static float FreeSpeed => _speed;
-
     /// <summary>Using the screen (pointer shown, view still) rather than watching: Control held or tapped (ForgeUI
     /// <see cref="PointerToggle"/>).</summary>
     internal static bool Ui => _pointer?.Using == true;
@@ -283,11 +280,12 @@ internal static class ReplayCamera
 
     internal static void SetMode(ViewMode mode)
     {
+        // The view's turn as angles, read only for the two modes that start from it.
+        var angles = mode is ViewMode.Free or ViewMode.Orbit && Mode != mode ? _shownTurn.eulerAngles : default;
         if (mode == ViewMode.Free && Mode != ViewMode.Free)
         {
             // The free camera starts where the view is.
             _free = _shown;
-            var angles = _shownTurn.eulerAngles;
             _yaw = angles.y;
             _pitch = angles.x > 180f ? angles.x - 360f : angles.x;
             _velocity = Vec.Zero;
@@ -297,7 +295,6 @@ internal static class ReplayCamera
         if (mode == ViewMode.Orbit && Mode != ViewMode.Orbit)
         {
             // The orbit starts the way the view is turned, so nothing swings when it is chosen.
-            var angles = _shownTurn.eulerAngles;
             _orbitYaw = angles.y;
             _orbitPitch = Mathf.Clamp((angles.x > 180f ? angles.x - 360f : angles.x) - OrbitTilt, -35f, 60f);
         }
@@ -322,9 +319,6 @@ internal static class ReplayCamera
     /// <summary>The previous (-1) or next (1) player in the recording, watched the same way ([ and ]).</summary>
     internal static void Cycle(bool[] present, int direction) => Watch(ReplayView.Next(present, Replayer.Follow, direction));
 
-    /// <summary>How far a change of view or player has glided (1: there).</summary>
-    internal static float Glide => _glide;
-
     /// <summary>Where the eyes view of the watched player is at this moment of the clock, whether or not the camera has been placed this frame
     /// yet; false while a change of view glides (the camera is then between the two). The recorded feet and look turn, and the height of the
     /// recorded stance: the same eye <see cref="Place"/> gives the camera.</summary>
@@ -346,6 +340,14 @@ internal static class ReplayCamera
         if (_view == null || !Replayer.Active) return;
         try { Place(); }
         catch (Exception error) { Plugin.Logger.ErrorOnce("Placing the replay camera failed: " + error); }
+    }
+
+    // The yaw in degrees (0 to 360) of something facing along <paramref name="forward"/>: the same as <c>Quaternion.LookRotation(forward).eulerAngles.y</c>
+    // for a turn with no roll, computed here (the game's interop makes eulerAngles a native call).
+    private static float Heading(Vector3 forward)
+    {
+        var yaw = Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg;
+        return yaw < 0f ? yaw + 360f : yaw;
     }
 
     private static void Place()
@@ -377,7 +379,7 @@ internal static class ReplayCamera
         // Nobody to watch yet: the free camera starts at the world's origin, so wait for a player rather than show nothing.
         if (!have && !_placed) return;
         if (!have && Mode != ViewMode.Free) SetMode(ViewMode.Free);
-        if (have && !_placed && Mode == ViewMode.Free) { _free = feet + Vec.Up * 2f; _yaw = look.eulerAngles.y; _pitch = 0f; }
+        if (have && !_placed && Mode == ViewMode.Free) { _free = feet + Vec.Up * 2f; _yaw = Heading(look * Vec.Forward); _pitch = 0f; }
 
         // Watching or using the screen alike: nothing on the screen scrolls.
         // The wheel is the camera's, except over the time bar or an open list while using the screen (those scroll themselves).
@@ -433,14 +435,16 @@ internal static class ReplayCamera
                     var eye = feet + Vec.Up * height;
                     var flat = look * Vec.Forward;
                     flat.y = 0f;
-                    var heading = Vec.SqrLength(flat) > 1e-4f ? Quaternion.LookRotation(flat.normalized).eulerAngles.y : 0f;
+                    var heading = Vec.SqrLength(flat) > 1e-4f ? Heading(flat) : 0f;
                     var same = _placed && !_snap && _lastMode == mode && _lastSlot == target;
                     _heading = same ? Mathf.LerpAngle(_heading, heading, 1f - Mathf.Exp(-12f * dt)) : heading;
                     // The first view of a replay starts behind the player.
                     if ((!_placed || _behind) && mode == ViewMode.Orbit) { _orbitYaw = heading; _behind = false; }
                     var around = Quaternion.Euler(OrbitTilt + _orbitPitch, (mode == ViewMode.Follow ? _heading : 0f) + _orbitYaw, 0f);
                     var ahead = around * Vec.Forward;
-                    var level = new Vector3(ahead.x, 0f, ahead.z).normalized;
+                    var level = Vec.Of(ahead.x, 0f, ahead.z);
+                    var levelLength = Vec.Length(level);
+                    level = levelLength > 1e-5f ? level / levelLength : Vec.Zero; // Vector3.normalized, computed here
                     var full = eye - ahead * _distance + Vec.Up * FollowUp;
                     // Not through a wall: the camera stops short of what is between the player and it. A ball rather than a thin ray, so the edge of
                     // a wall does not hit on one frame and miss on the next; quick to come in, slow to go back out.
@@ -466,7 +470,7 @@ internal static class ReplayCamera
         if (_glide < 1f)
         {
             _glide = Math.Min(1f, _glide + dt / GlideSeconds);
-            var s = _glide * _glide * (3f - 2f * _glide);
+            var s = ForgeUI.Ease.Smoothstep(_glide);
             position = Vector3.Lerp(_glideFrom, position, s);
             turn = Quaternion.Slerp(_glideTurn, turn, s);
         }

@@ -14,7 +14,7 @@ namespace ForgeVfx.EditorTools
     ///     Unity.exe -batchmode -projectPath Tools/Vfx/ForgeVfx -executeMethod ForgeVfx.EditorTools.ForgeVfxBundleCheck.Run
     ///         [-forgeVfxBundle &lt;bundle&gt;] [-forgeVfxPreviewOut &lt;folder&gt;] -logFile &lt;log&gt;
     ///
-    /// It loads `Mods/ForgeVisual/Assets/Vfx/forge-vfx.bundle` from disk (not the project's prefabs), requires exactly one
+    /// It loads `Mods/ForgeCore/Assets/Vfx/forge-vfx.bundle` from disk (not the project's prefabs), requires exactly one
     /// prefab per effect member, instantiates each, requires every renderer's material to use a shader this GPU supports
     /// (a shader that failed to compile falls back to Unity's magenta error shader), plays each effect and renders it
     /// once, and counts magenta pixels in the frame. The frames go to `&lt;previews&gt;/bundle-check.png` (one tile per
@@ -31,7 +31,7 @@ namespace ForgeVfx.EditorTools
         private static void Check()
         {
             var bundlePath = ForgeVfxProject.Argument("-forgeVfxBundle")
-                ?? Path.Combine(ForgeVfxProject.RepositoryRoot, "Mods", "ForgeVisual", "Assets", "Vfx", ForgeVfxProject.BundleName);
+                ?? Path.Combine(ForgeVfxProject.RepositoryRoot, "Mods", "ForgeCore", "Assets", "Vfx", ForgeVfxProject.BundleName);
             var output = ForgeVfxProject.Argument("-forgeVfxPreviewOut")
                 ?? Path.Combine(ForgeVfxProject.RepositoryRoot, "artifacts", "work", "fx", "previews");
             Directory.CreateDirectory(output);

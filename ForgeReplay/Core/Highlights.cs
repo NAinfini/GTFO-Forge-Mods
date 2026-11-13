@@ -202,7 +202,7 @@ internal sealed class CameraPath
         x = y = z = yaw = pitch = 0f;
         if (Keys.Count < 2 || Seconds <= 0f) return false;
         var share = Math.Clamp(at / Seconds, 0f, 1f);
-        var left = share * share * (3f - 2f * share) * Seconds;
+        var left = ForgeUI.Ease.Smoothstep(share) * Seconds;
         var i = 1;
         while (i < Keys.Count - 1 && left > Keys[i].Seconds) { left -= Keys[i].Seconds; i++; }
         var t = Math.Clamp(left / Keys[i].Seconds, 0f, 1f);

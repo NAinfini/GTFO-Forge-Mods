@@ -49,10 +49,12 @@ try {
     $manifestPath = Join-Path $candidate 'weapon-models-manifest.json'
     if (!(Test-Path -LiteralPath $log) -or !(Test-Path -LiteralPath $manifestPath)) { throw "Unity did not produce a candidate; see $log" }
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-    if ($manifest.format -ne 4 -or @($manifest.bundles).Count -ne $modes.Count) { throw "Unexpected model manifest; see $log" }
-    foreach ($mode in $modes) {
-        $name = "forge-energy-model-$mode.bundle"
-        $entry = @($manifest.bundles | Where-Object { $_.bundle -ceq $name })
+    if ($manifest.format -ne 5 -or @($manifest.bundles).Count -ne $modes.Count) { throw "Unexpected model manifest; see $log" }
+    # The eight gun bundles, the shared bundle they depend on and Unity's manifest of the set, each with this run's receipt.
+    $files = @($modes | ForEach-Object { "forge-energy-model-$_.bundle" }) + @($manifest.shared.bundle, $manifest.unityManifest.file)
+    $entries = @($manifest.bundles) + @($manifest.shared, [pscustomobject]@{ bundle = $manifest.unityManifest.file; sha256 = $manifest.unityManifest.sha256; bytes = $manifest.unityManifest.bytes })
+    foreach ($name in $files) {
+        $entry = @($entries | Where-Object { $_.bundle -ceq $name })
         $bundlePath = Join-Path $candidate $name
         if ($entry.Count -ne 1 -or !(Test-Path -LiteralPath $bundlePath)) { throw "Missing $name; see $log" }
         $length = (Get-Item -LiteralPath $bundlePath).Length
@@ -65,12 +67,10 @@ try {
     if (!(Test-Path -LiteralPath $discBundle)) { throw "Missing forge-energy-disc.bundle; see $log" }
 
     New-Item -ItemType Directory -Force (Join-Path $module 'Assets/Models'), (Join-Path $module 'Assets/Vfx') | Out-Null
-    foreach ($mode in $modes) {
-        Copy-Asset (Join-Path $candidate "forge-energy-model-$mode.bundle") (Join-Path $module "Assets/Models/forge-energy-model-$mode.bundle")
-    }
+    foreach ($name in $files) { Copy-Asset (Join-Path $candidate $name) (Join-Path $module "Assets/Models/$name") }
     Copy-Asset $discBundle (Join-Path $module 'Assets/Vfx/forge-energy-disc.bundle')
     Copy-Asset $manifestPath (Join-Path $module 'Assets/Models/weapon-models-manifest.json')
-    Write-Host "Verified and copied $($modes.Count) model bundles, and the manifest into $module/Assets. Evidence: $Evidence."
+    Write-Host "Verified and copied $($modes.Count) model bundles, the shared bundle, Unity's manifest and the model manifest into $module/Assets. Evidence: $Evidence."
 } finally {
     $env:FORGE_ENERGY_PRESENTATION_OUTPUT = $oldOutput
 }

@@ -39,18 +39,13 @@ internal static class GearTypeNames
             return melee.Length > 0 ? melee : MeleeArchetypeDataBlock.GetBlock(category.MeleeArchetype)?.PublicName ?? "";
         }
         if (line == 3) return Text(category.PublicName);
-        var archetype = (eWeaponFireMode)gear.GetCompID(eGearComponent.FireMode) switch
-        {
-            eWeaponFireMode.Auto => category.AutoArchetype,
-            eWeaponFireMode.Burst => category.BurstArchetype,
-            eWeaponFireMode.SemiBurst => category.SemiBurstArchetype,
-            _ => category.SemiArchetype,
-        };
-        var type = ArchetypeDataBlock.GetBlock(archetype) is { } block ? Text(block.PublicName) : "";
+        var type = ArchetypeDataBlock.GetBlock(ForgeCore.Gear.ArchetypeId(gear)) is { } block ? Text(block.PublicName) : "";
         return type.Length > 0 ? type : Text(category.PublicName);
     }
 
+
     // The game's text for a name, in the language the game is set to; an author's inline text where it has no text ID. "is null": the type's == throws on a null.
-    private static string Text(Localization.LocalizedText? text)
+    /// <summary>A localized text in the game's language, or its author text when it has no id; empty for none.</summary>
+    internal static string Text(Localization.LocalizedText? text)
         => text is null ? "" : (text.Id != 0 ? Localization.Text.Get(text.Id) : text.UntranslatedText) ?? "";
 }

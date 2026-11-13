@@ -59,7 +59,7 @@ internal static class PresentationPreload
         while (!EnergyAudio.Library.IsLoaded && Time.realtimeSinceStartup <= give) yield return null;
         // A sound set that does not decode in time silences this mod's sounds only; every gun still fires and shows its effects.
         if (!EnergyAudio.Library.IsLoaded) Plugin.Logger.ErrorOnce("ForgeAudio did not finish decoding the energy sounds in " + AudioLoadSeconds + " s; the guns start without their sounds.");
-        else EnergyAudio.Library.Require(EnergyAudio.Cues);
+        else EnergyAudio.Library.Require(EnergyLookNames.Cues);
         // What each gun's Look names is found now that its sounds have decoded and the effect library is known; a pack still
         // decoding is picked up later by EnergyLook.ResolvePending, one gun and one sound at a time.
         EnergyLook.ResolveAll();

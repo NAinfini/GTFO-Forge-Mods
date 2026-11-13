@@ -26,8 +26,7 @@ internal sealed partial class SheddingHooks : IDisposable
         SheddingHookId.DeadEnter => typeof(DeadEnter),
         SheddingHookId.CorpseMove => typeof(CorpseMove),
         SheddingHookId.RagdollToggle => typeof(RagdollToggle),
-        SheddingHookId.CorpseHide => typeof(CorpseHide),
-        SheddingHookId.RagdollHide => typeof(RagdollHide),
+        SheddingHookId.DecayHidden => typeof(DecayHidden),
         SheddingHookId.AmbientStart => typeof(AmbientStart),
         SheddingHookId.AirStart => typeof(AirStart),
         SheddingHookId.AmbientSystemUpdate => typeof(AmbientSystemUpdate),
@@ -36,12 +35,11 @@ internal sealed partial class SheddingHooks : IDisposable
         SheddingHookId.GardenEnable => typeof(GardenEnable),
         SheddingHookId.GardenDisable => typeof(GardenDisable),
         SheddingHookId.GardenShadow => typeof(GardenShadow),
-        SheddingHookId.DecorationCamera => typeof(DecorationCamera),
+        SheddingHookId.VisibilityPreCull => typeof(VisibilityPreCull),
         SheddingHookId.DecorationShadowsUpdate => typeof(DecorationShadowsUpdate),
         SheddingHookId.ImpactEffect => typeof(ImpactEffect),
         SheddingHookId.DecalPlay => typeof(DecalPlay),
         SheddingHookId.DecalReturn => typeof(DecalReturn),
-        SheddingHookId.LightList => typeof(LightList),
         SheddingHookId.LightCollectionScan => typeof(LightCollectionScan),
         SheddingHookId.AirCollectCommands => typeof(AirCollectCommands),
         SheddingHookId.AirPrewarm => typeof(AirPrewarm),
@@ -63,7 +61,6 @@ internal sealed partial class SheddingHooks : IDisposable
         SheddingHookId.MeleePacket => typeof(MeleePacket),
         SheddingHookId.IrfDraw => typeof(IrfDraw),
         SheddingHookId.IrfLateUpdate => typeof(IrfLateUpdate),
-        SheddingHookId.ClosedDoorCamera => typeof(ClosedDoorCamera),
         _ => throw new ArgumentOutOfRangeException(nameof(id))
     };
     public void Dispose() => _harmony.UnpatchSelf();
@@ -150,11 +147,17 @@ internal sealed partial class SheddingHooks : IDisposable
             => LoadSheddingController.Current?.Ragdoll(__instance, enabled, __state);
     }
     [HarmonyPatch(typeof(ES_Dead), nameof(ES_Dead.OnDecayRendererHidden))]
-    private static class CorpseHide
-    { [HarmonyPostfix] private static void Postfix(ES_Dead __instance) => LoadSheddingController.Current?.Corpses.NativeHidden(__instance); }
-    [HarmonyPatch(typeof(ES_Dead), nameof(ES_Dead.OnDecayRendererHidden))]
-    private static class RagdollHide
-    { [HarmonyPostfix] private static void Postfix(ES_Dead __instance) => LoadSheddingController.Current?.RagdollHidden(__instance); }
+    private static class DecayHidden
+    {
+        // One patch for the two switches that read it, each part only with its own switch on: the corpse timer first, then the ragdoll cap.
+        [HarmonyPostfix]
+        private static void Postfix(ES_Dead __instance)
+        {
+            if (LoadSheddingController.Current is not { } current) return;
+            if (current.Settings.FastCorpseHide) current.Corpses.NativeHidden(__instance);
+            if (current.Settings.RagdollCap) current.RagdollHidden(__instance);
+        }
+    }
     [HarmonyPatch(typeof(AmbientParticles), nameof(AmbientParticles.Start))]
     private static class AmbientStart
     { [HarmonyPostfix] private static void Postfix(AmbientParticles __instance) => LoadSheddingController.Current?.Ambient(__instance); }
@@ -229,11 +232,32 @@ internal sealed partial class SheddingHooks : IDisposable
     private static class GardenShadow
     { [HarmonyPrefix] private static bool Prefix(InstancedRenderFeatureRenderer __instance) => LoadSheddingController.Current?.DrawGardenShadow(__instance) ?? true; }
 
+    // One patch for the three switches that stand on the visibility pass, each part only with its own switch on. Before the pass:
+    // decoration culling, then the closed-door portals, which the finalizer opens again when the call ends, even by exception.
+    // After it: decoration culling, then the decoration light list.
     [HarmonyPatch(typeof(C_Camera), nameof(C_Camera.RunVisibilityOnPreCull))]
-    private static class DecorationCamera
+    private static class VisibilityPreCull
     {
-        [HarmonyPrefix] private static void Prefix() => LoadSheddingController.Current?.Decorations.CameraBefore();
-        [HarmonyPostfix] private static void Postfix() => LoadSheddingController.Current?.Decorations.CameraAfter();
+        [HarmonyPrefix]
+        private static void Prefix()
+        {
+            if (LoadSheddingController.Current is not { } current) return;
+            if (current.Settings.DecorationCulling) current.Decorations.CameraBefore();
+            if (current.Settings.ClosedDoorDepthLimit && current.Active) current.Doors.BeforeVisibility();
+        }
+        [HarmonyPostfix]
+        private static void Postfix()
+        {
+            if (LoadSheddingController.Current is not { } current) return;
+            if (current.Settings.DecorationCulling) current.Decorations.CameraAfter();
+            if (current.Settings.DecorationLights) current.Decorations.LightsAfter();
+        }
+        [HarmonyFinalizer]
+        private static Exception? Finalizer(Exception? __exception)
+        {
+            if (LoadSheddingController.Current is { } current && current.Settings.ClosedDoorDepthLimit) current.Doors.AfterVisibility();
+            return __exception;
+        }
     }
     [HarmonyPatch(typeof(CL_ShadowGenerator), nameof(CL_ShadowGenerator.InjectCommands))]
     private static class DecorationShadowsUpdate
@@ -271,20 +295,6 @@ internal sealed partial class SheddingHooks : IDisposable
     [HarmonyPatch(typeof(FX_Decal), nameof(FX_Decal.ReturnToPool))]
     private static class DecalReturn
     { [HarmonyPrefix] private static void Prefix(FX_Decal __instance) => LoadSheddingController.Current?.Decorations.DecalReturn(__instance); }
-    // Closes the portals picked for this visibility pass and opens them again when the call ends, even by exception.
-    [HarmonyPatch(typeof(C_Camera), nameof(C_Camera.RunVisibilityOnPreCull))]
-    private static class ClosedDoorCamera
-    {
-        [HarmonyPrefix]
-        private static void Prefix()
-        { if (LoadSheddingController.Current is { Active: true } current) current.Doors.BeforeVisibility(); }
-        [HarmonyFinalizer]
-        private static Exception? Finalizer(Exception? __exception)
-        { LoadSheddingController.Current?.Doors.AfterVisibility(); return __exception; }
-    }
-    [HarmonyPatch(typeof(C_Camera), nameof(C_Camera.RunVisibilityOnPreCull))]
-    private static class LightList
-    { [HarmonyPostfix] private static void Postfix() => LoadSheddingController.Current?.Decorations.LightsAfter(); }
     [HarmonyPatch(typeof(LevelGeneration.LG_LightCollection), nameof(LevelGeneration.LG_LightCollection.ScanForLights))]
     private static class LightCollectionScan
     { [HarmonyPostfix] private static void Postfix(LevelGeneration.LG_LightCollection __instance) => LoadSheddingController.Current?.Decorations.ControlledLights(__instance); }

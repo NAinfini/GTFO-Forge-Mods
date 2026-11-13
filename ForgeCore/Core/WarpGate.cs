@@ -15,7 +15,7 @@ public enum WarpRefusal { None, NoAgent, NotHost, NotLocal, NotAlive, State, Dim
 public readonly record struct WarpResult(bool Accepted, bool Landed, float Distance, WarpRefusal Refusal);
 
 /// <summary>The side and state rules of a warp, on plain facts so they can be tested.</summary>
-public static class WarpGate
+internal static class WarpGate
 {
     /// <summary>The refusal for a request, <see cref="WarpRefusal.None"/> when the game may be called. Synced needs the host, a live
     /// agent in a state the game warps in; Local needs the local player's own agent in the dimension it is asked to land in.</summary>

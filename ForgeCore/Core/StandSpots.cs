@@ -4,7 +4,7 @@ namespace ForgeCore;
 
 /// <summary>The order in which <c>Level.FindStandSpot</c> tries places around a body: straight behind first, then the back diagonals,
 /// the sides, further behind, and the front last (or the mirror of that when the front is preferred). Pure geometry on the ground plane.</summary>
-public static class StandSpots
+internal static class StandSpots
 {
     // Body-space offsets (x right, z forward) in units of the clearance, in the order they are tried.
     private static readonly float[] Tries =

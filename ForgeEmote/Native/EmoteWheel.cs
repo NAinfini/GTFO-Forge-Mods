@@ -43,8 +43,6 @@ internal static class EmoteWheel
     // The file is written once the wheel is down, never from inside a choice made on it.
     private static bool _unsaved;
 
-    private static void SaveMemory() => _unsaved = true;
-
     /// <summary>Writes the stars and the recent actions if they changed and the wheel is not up; called every frame.</summary>
     internal static void Flush()
     {
@@ -57,17 +55,15 @@ internal static class EmoteWheel
     internal static void Used(string id)
     {
         if (!EmoteRules.Remember(Recent, id)) return;
-        SaveMemory();
+        _unsaved = true;
         Fill();
     }
-
-    private static void Star(WheelItem item) => Toggle(item.Id);
 
     /// <summary>Stars or unstars an action (the wheel's second button and <see cref="EmoteControl"/>); false when a page of stars is full.</summary>
     internal static bool Toggle(string id)
     {
         if (!EmoteRules.Toggle(Favourites, id, Installed)) { Plugin.Logger.ErrorOnce("ForgeEmote: the favourites page holds " + EmoteRules.SlotsPerPage + " actions; take one off first."); return false; }
-        SaveMemory();
+        _unsaved = true;
         Fill();
         return true;
     }
@@ -87,7 +83,7 @@ internal static class EmoteWheel
         _wheel = ui.AddWheel("Wheel", key);
         if (_wheel == null) return;
         _wheel.Chosen += item => { if (Emotes.Find(item.Id) is { } entry) EmoteRunner.Start(entry); };
-        _wheel.Secondary += Star;
+        _wheel.Secondary += item => Toggle(item.Id);
         LoadMemory();
         ReadPlayerFile();
         _wheel.CanOpen = static () => Players.Local is { Alive: true };

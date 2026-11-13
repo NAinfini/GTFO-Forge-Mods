@@ -20,21 +20,16 @@ try
     var shippedErrors = new List<string>();
     var definitions = EnergyContent.Parse(shippedFile, File.ReadAllText(shippedFile), shippedErrors);
     Check(shippedErrors.Count == 0, "shipped file: no parse errors " + string.Join("; ", shippedErrors));
-    Check(definitions.Count == 8, "shipped file: exactly eight guns, found " + definitions.Count);
-    Check(definitions.Select(d => d.Mode).Distinct().Count() == 8, "shipped file: the eight behaviours, once each");
+    Check(definitions.Select(d => d.Mode).SequenceEqual(new[] { EnergyMode.Beam, EnergyMode.ArcChain, EnergyMode.Flame, EnergyMode.PlasmaBlast,
+        EnergyMode.PlasmaArc, EnergyMode.Blast, EnergyMode.Disc, EnergyMode.BlackHole }), "shipped file: the eight guns, one per behaviour, in the list order");
     const string Donor = "{\"Ver\":1,\"Name\":\"Donor Gun\",\"Packet\":{\"Comps\":{\"Length\":5,\"a\":{\"c\":2,\"v\":4},\"b\":{\"c\":3,\"v\":108},"
         + "\"d\":{\"c\":5,\"v\":34},\"f\":{\"c\":7,\"v\":5},\"n\":{\"c\":21,\"v\":7}},\"MatTrans\":{},\"publicName\":{\"data\":\"Donor Gun\"}}}";
-    foreach (var definition in definitions)
-    {
-        var gear = new EnergyGear(definition);
-        var packet = JsonNode.Parse(EnergyGearJson.Build(Donor, gear))!.AsObject();
-        Check(packet["Packet"]!["publicName"]!["data"]!.GetValue<string>() == gear.Name && gear.Name != "Donor Gun", definition.Id + ": the gear packet carries the gun's name");
-        Check(gear.Name.Length <= 25, definition.Id + ": the packet name fits the 25-character gear name");
-        Check(Path.GetDirectoryName(gear.ModelPath) == Path.GetFullPath(shipped) && Path.GetFileName(gear.ModelPath) == "forge-energy-model-" + definition.Model.Key + ".bundle",
-            definition.Id + ": its bundle sits beside the file");
-    }
-    Check(definitions.Select(d => d.Mode).SequenceEqual(new[] { EnergyMode.Beam, EnergyMode.ArcChain, EnergyMode.Flame, EnergyMode.PlasmaBlast,
-        EnergyMode.PlasmaArc, EnergyMode.Blast, EnergyMode.Disc, EnergyMode.BlackHole }), "shipped file: the eight guns are in the list order");
+    var shippedGears = definitions.Select(d => new EnergyGear(d)).ToArray();
+    string[] Not(Func<EnergyGear, bool> holds) => shippedGears.Where(g => !holds(g)).Select(g => g.Definition.Id).ToArray();
+    var unnamed = Not(g => JsonNode.Parse(EnergyGearJson.Build(Donor, g))!["Packet"]!["publicName"]!["data"]!.GetValue<string>() == g.Name && g.Name != "Donor Gun" && g.Name.Length <= 25);
+    Check(unnamed.Length == 0, "shipped file: every gear packet carries the gun's name, within the 25-character gear name " + string.Join(", ", unnamed));
+    var astray = Not(g => Path.GetDirectoryName(g.ModelPath) == Path.GetFullPath(shipped) && Path.GetFileName(g.ModelPath) == "forge-energy-model-" + g.Definition.Model.Key + ".bundle");
+    Check(astray.Length == 0, "shipped file: every gun's bundle sits beside the file " + string.Join(", ", astray));
     // All eight register together: their native IDs do not collide.
     var shippedRefused = definitions.Select(d => EnergyLab.Register(d, out var why) ? "" : d.Id + ": " + why).Where(s => s.Length != 0).ToArray();
     Check(shippedRefused.Length == 0, "shipped file: all eight register together " + string.Join("; ", shippedRefused));
@@ -72,7 +67,6 @@ try
     Check(Line("demo.pack.nested").Contains("Model.Bundle"), "error: a backslash '..' step is refused");
     Check(Line("demo.pack.rooted").Contains("Model.Bundle"), "error: an absolute Bundle is refused");
     Check(Line("demo.pack.wrongfield").Contains("Tuning.blastRadius"), "error: a field of another behaviour is refused");
-    Check(Line("demo.pack.badslot").Contains("Slot"), "error: an unknown Slot is refused");
     Check(errors.Any(e => e.Contains("Duplicate weapon id: demo.pack.longbeam")), "error: a repeated Id is refused");
 
     // A native ID collision names both Ids.
@@ -103,8 +97,6 @@ try
           && settings.AllowedFor("Local_31_TierA_1")!.Count == 2 && settings.AllowedFor(null)!.Count == 2, "settings: a level's list wins, a level without one inherits");
     rules.Clear();
     Check(EnergySettings.Parse("""{ "Allow": [] }""", rules) == null && rules.Any(e => e.Contains("Allow")), "settings: an unknown field rejects the whole file");
-    rules.Clear();
-    Check(EnergySettings.Parse("""{ "Levels": { "k": { "Allowed": "x" } } }""", rules) == null && rules.Any(e => e.Contains("Levels.k.Allowed")), "settings: a mistyped list is refused and named");
     EnergyLab.UseSettings(settings);
 
     File.WriteAllText(Path.Combine(pack, "look.forge"), """

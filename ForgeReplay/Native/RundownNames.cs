@@ -26,7 +26,7 @@ internal static class RundownNames
             // The field and not the Title property, which gave nothing when read in the running game. "is null": the type's == throws on a null.
             var story = GameData.RundownDataBlock.GetBlock(id)?.StorytellingData?._Title_k__BackingField;
             if (story is null) return null;
-            var title = Spaces.Replace(Analysis.Untagged((story.Id != 0 ? Localization.Text.Get(story.Id) : story.UntranslatedText) ?? ""), " ").Trim();
+            var title = Spaces.Replace(Analysis.Untagged(GearTypeNames.Text(story)), " ").Trim();
             if (title.Length == 0) return null;
             // The game's own titles read "RUNDOWN #8.0 TITLE: DUALITY" on two lines; a list says R8 DUALITY. An author's title stays as written.
             var game = GameTitle.Match(title);

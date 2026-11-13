@@ -1,39 +1,20 @@
 using System;
-using System.Globalization;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Text;
-using ForgeCore;
 using UnityEngine;
 
 namespace ForgeWeaponEnergyLab.Native;
 
-[StructLayout(LayoutKind.Sequential, Pack = 1)]
-internal struct BuildFingerprint : IEquatable<BuildFingerprint>
+/// <summary>The channel content (<c>Channel.Content</c>) two peers must share: SHA-256 hex of this build and its definitions.</summary>
+internal static class BuildFingerprint
 {
-    internal ulong A, B, C, D;
-    public bool Equals(BuildFingerprint other) => A == other.A && B == other.B && C == other.C && D == other.D;
-    public override bool Equals(object? other) => other is BuildFingerprint value && Equals(value);
-    public override int GetHashCode() => HashCode.Combine(A, B, C, D);
-    public override string ToString() => $"{A:x16}{B:x16}{C:x16}{D:x16}";
-
-    internal static BuildFingerprint Compute()
+    internal static string Compute()
     {
         var text = new StringBuilder();
-        foreach (var type in new[] { typeof(FireCommand), typeof(FireVisual),
-                     typeof(ChargePacket), typeof(ModePacket), typeof(FlightEnd), typeof(BuildFingerprint) })
-        {
-            text.Append('|').Append(type.Name).Append(':').Append(Marshal.SizeOf(type));
-            foreach (var field in type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-                         .OrderBy(f => Marshal.OffsetOf(type, f.Name).ToInt32()))
-                text.Append('|').Append(field.Name).Append(':').Append(field.FieldType.FullName)
-                    .Append('@').Append(Marshal.OffsetOf(type, field.Name).ToInt32());
-        }
-        // The module's version ID changes with every change of the compiled code, inline numeric literals and embedded resources
-        // included (deterministic builds derive it from the whole image), so an un-named formula or bundle edit cannot evade the
-        // development-build handshake.
+        // The message layouts are ForgeCore's own fingerprint. The module's version ID changes with every change of the compiled code,
+        // inline numeric literals and embedded resources included (deterministic builds derive it from the whole image), so an
+        // un-named formula or bundle edit cannot evade the development-build handshake.
         text.Append('|').Append(typeof(EnergyLab).Assembly.ManifestModule.ModuleVersionId);
         foreach (var gear in EnergyGears.All.OrderBy(g => g.Definition.Id, StringComparer.Ordinal))
         {
@@ -57,23 +38,14 @@ internal struct BuildFingerprint : IEquatable<BuildFingerprint>
         }
         // Which guns players may choose, rundown-wide and per level: a host and a client with other lists are refused like other builds.
         text.Append('|').Append(EnergyLab.Settings.Canonical());
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString()));
-        return new()
-        {
-            A = BitConverter.ToUInt64(hash, 0),
-            B = BitConverter.ToUInt64(hash, 8),
-            C = BitConverter.ToUInt64(hash, 16),
-            D = BitConverter.ToUInt64(hash, 24)
-        };
+        return ForgeCore.Hash.Sha256Hex(text.ToString());
     }
 }
 
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
-internal struct FireCommand : INetEpoch
+internal struct FireCommand
 {
-    ulong INetEpoch.Epoch { readonly get => Epoch; set => Epoch = value; }
-    internal ulong Epoch;
     internal uint Sequence;
     internal uint CategoryId;
     internal int Mode, Dimension;
@@ -85,7 +57,6 @@ internal struct FireCommand : INetEpoch
     internal static FireCommand Create(uint sequence, EnergyGear gear, Vector3 start,
         Vector3 direction, int dimension, float power = 0f, float damage = 0f) => new()
         {
-            Epoch = EnergyNetwork.Epoch,
             Sequence = sequence,
             Mode = (int)gear.Mode,
             CategoryId = gear.CategoryId,
@@ -102,10 +73,9 @@ internal struct FireCommand : INetEpoch
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
-internal struct FireVisual : INetEpoch
+internal struct FireVisual
 {
-    ulong INetEpoch.Epoch { readonly get => Epoch; set => Epoch = value; }
-    internal ulong Epoch, Shooter;
+    internal ulong Shooter;
     internal uint Sequence;
     internal uint CategoryId;
     internal int Mode, Segments, HitMask;
@@ -136,7 +106,6 @@ internal struct FireVisual : INetEpoch
     }
     internal static FireVisual From(FireCommand command, ulong shooter) => new()
     {
-        Epoch = command.Epoch,
         Shooter = shooter,
         Sequence = command.Sequence,
         Mode = command.Mode,
@@ -153,10 +122,9 @@ internal struct FireVisual : INetEpoch
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
-internal struct ChargePacket : INetEpoch
+internal struct ChargePacket
 {
-    ulong INetEpoch.Epoch { readonly get => Epoch; set => Epoch = value; }
-    internal ulong Epoch, Shooter;
+    internal ulong Shooter;
     internal uint CategoryId;
     internal int Mode, Phase;
     internal float X, Y, Z;
@@ -165,7 +133,6 @@ internal struct ChargePacket : INetEpoch
     internal Vector3 Position => new(X, Y, Z);
     internal static ChargePacket Create(ulong shooter, EnergyGear gear, bool start, Vector3 position, float held) => new()
     {
-        Epoch = EnergyNetwork.Epoch,
         Shooter = shooter,
         Mode = (int)gear.Mode,
         CategoryId = gear.CategoryId,
@@ -184,25 +151,23 @@ internal enum FlightKind { Shell = 1, Plasma, Disc, Hole }
 /// body's stop, a disc's last stop, the gravity projectile's well): the other machines move their picture there, so the picture they
 /// draw is where the host dealt the damage.</summary>
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
-internal struct FlightEnd : INetEpoch
+internal struct FlightEnd
 {
-    ulong INetEpoch.Epoch { readonly get => Epoch; set => Epoch = value; }
-    internal ulong Epoch, Shooter;
+    internal ulong Shooter;
     internal uint Sequence;
     internal int Kind;
     internal float X, Y, Z;
     internal Vector3 Position => new(X, Y, Z);
     internal static FlightEnd Create(ulong shooter, FlightKind kind, uint sequence, Vector3 at) => new()
-    { Epoch = EnergyNetwork.Epoch, Shooter = shooter, Sequence = sequence, Kind = (int)kind, X = at.x, Y = at.y, Z = at.z };
+    { Shooter = shooter, Sequence = sequence, Kind = (int)kind, X = at.x, Y = at.y, Z = at.z };
 }
 
+/// <summary>The gun a player has armed (<see cref="EnergyNetwork.Armed"/>, each player's own row): the other machines mount its model and
+/// make the voices and buffers its shots need when the shooter takes it up, not on its first shot. <see cref="Arm"/> goes up with every
+/// arming, so a machine whose copy of this shooter's gun stopped after a fault builds it again.</summary>
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
-internal struct ModePacket : INetEpoch
+internal struct ArmedGun
 {
-    ulong INetEpoch.Epoch { readonly get => Epoch; set => Epoch = value; }
-    internal ulong Epoch, Shooter;
     internal uint Arm, CategoryId;
     internal int Mode;
-    internal static ModePacket Create(EnergyGear? gear, uint arm) => new()
-    { Epoch = EnergyNetwork.Epoch, Mode = (int)(gear?.Mode ?? EnergyMode.Off), CategoryId = gear?.CategoryId ?? 0, Arm = arm };
 }

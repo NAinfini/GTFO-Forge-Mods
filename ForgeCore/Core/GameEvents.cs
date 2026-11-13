@@ -85,12 +85,15 @@ public static class GameEvents
     }
 
     /// <summary>The game says the session may have changed: <paramref name="master"/> is the host it reads now.
-    /// <paramref name="localChanged"/>: this player's own lookup changed too, which can flip <see cref="Session.IsHost"/> with the same host.</summary>
-    internal static void NoteMaster(ulong master, bool localChanged = false)
+    /// <paramref name="localChanged"/>: this player's own lookup changed too, which can flip <see cref="Session.IsHost"/> with the same host.
+    /// <paramref name="settled"/> runs once <see cref="Master"/> holds the new host and before <see cref="MasterChanged"/> is raised:
+    /// the network moves its world there, so its world-change handlers and every mod's host-change handler read the new host alike.</summary>
+    internal static void NoteMaster(ulong master, bool localChanged = false, Action? settled = null)
     {
-        if (master == Master && (!localChanged || master == 0)) return;
+        var changed = master != Master || localChanged && master != 0;
         Master = master;
-        Raise(_master, "master-changed");
+        settled?.Invoke();
+        if (changed) Raise(_master, "master-changed");
     }
 
     internal static void NoteMasterMigrated() => Raise(_migrated, "master-migrated");
@@ -119,35 +122,11 @@ public static class GameEvents
     }
 
     internal static void NoteExpeditionSelected(uint? rundownId, int tier, int index)
-    {
-        var handlers = _expeditionSelected;
-        if (handlers == null) return;
-        foreach (var handler in handlers.GetInvocationList())
-        {
-            try { ((Action<uint?, int, int>)handler).Invoke(rundownId, tier, index); }
-            catch (Exception error) { Log.For("ForgeCore").ErrorOnce("core-expedition-selected-handler-failed", "An expedition-selected handler failed: " + error); }
-        }
-    }
+        => Log.For("ForgeCore").RaiseEach(_expeditionSelected, rundownId, tier, index, "core-expedition-selected-handler-failed", "expedition-selected");
 
-    private static void Raise(Action<bool>? handlers, bool value, string key)
-    {
-        if (handlers == null) return;
-        foreach (var handler in handlers.GetInvocationList())
-        {
-            try { ((Action<bool>)handler).Invoke(value); }
-            catch (Exception error) { Log.For("ForgeCore").ErrorOnce("core-handler-failed", "A " + key + " handler failed: " + error); }
-        }
-    }
+    private static void Raise(Action<bool>? handlers, bool value, string key) => Log.For("ForgeCore").RaiseEach(handlers, value, "core-handler-failed", key);
 
-    private static void Raise(Action? handlers, string key)
-    {
-        if (handlers == null) return;
-        foreach (var handler in handlers.GetInvocationList())
-        {
-            try { ((Action)handler).Invoke(); }
-            catch (Exception error) { Log.For("ForgeCore").ErrorOnce("core-handler-failed", "A " + key + " handler failed: " + error); }
-        }
-    }
+    private static void Raise(Action? handlers, string key) => Log.For("ForgeCore").RaiseEach(handlers, "core-handler-failed", key);
 
     /// <summary>Offline tests start from no session and no subscriber.</summary>
     internal static void Reset()

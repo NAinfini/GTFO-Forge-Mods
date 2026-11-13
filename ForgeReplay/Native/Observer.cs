@@ -67,7 +67,7 @@ internal static class Observer
         Puppeteer.CollectEnemies(Puppets);
         foreach (var enemy in ForgeCore.Enemies.Live)
         {
-            if (enemy == null || enemy.WasCollected || !enemy.Alive || Puppets.Contains(enemy.Pointer) || enemy.AI == null || enemy.AI.Mode == AgentMode.Off) continue;
+            if (enemy == null || enemy.WasCollected || !enemy.Alive || Puppets.Contains(enemy.Pointer) || enemy.AI is not { } ai || ai == null || ai.Mode == AgentMode.Off) continue;
             try
             {
                 if (enemy.Sync?.Replicator is { } replicator) replicator.Despawn();

@@ -2,8 +2,6 @@ namespace ForgeWeaponEnergyLab;
 
 internal static class EnergyProtocol
 {
-    // Received packets queued between two frames; a link recovering from a stall delivers its backlog at once.
-    internal const int InboxLimit = 1024;
     internal const float MaximumMuzzleDistance = 3.5f;
     // A shooter's reported shell damage is its base damage with boosters; the host takes at most this multiple of the base from any peer.
     internal const float MaximumDamageBoost = 5f;

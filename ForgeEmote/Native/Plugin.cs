@@ -8,9 +8,6 @@ namespace ForgeEmote;
 
 [BepInPlugin(Id, "Forge Emote", Version)]
 [BepInDependency("NAinfini.ForgeCore", ">=1.0.0")]
-[BepInDependency("NAinfini.ForgeUI", ">=1.0.0")]
-[BepInDependency("NAinfini.ForgeVisual", ">=1.0.0")]
-[BepInDependency("NAinfini.ForgeAudio", ">=1.0.0")]
 internal sealed class Plugin : BasePlugin
 {
     internal const string Id = "NAinfini.ForgeEmote", Version = "1.0.0"; // package-version: NAinfini-ForgeEmote

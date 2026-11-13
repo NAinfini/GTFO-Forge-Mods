@@ -36,7 +36,7 @@ internal static class WeaponModels
     }
     private sealed class LoadedBundle
     {
-        internal AssetBundle Bundle = null!;
+        internal ForgeCore.BundleLoad Load = null!;
         internal PresentationContract Contract = null!;
         internal readonly Dictionary<string, SurfaceMaterials> Bodies = new();
         internal readonly List<Material> Created = new();
@@ -111,18 +111,19 @@ internal static class WeaponModels
             var bundleLoad = ForgeCore.Assets.LoadAsync(Plugin.Id, path, digest);
             while (!bundleLoad.IsDone) yield return null;
             // Registered before validation, so a rejected bundle is still released by the idle unload.
-            loaded = new LoadedBundle { Bundle = bundleLoad.Bundle ?? throw new InvalidDataException("Cannot load model bundle (changed after registration was sealed, missing or damaged): " + key) };
+            if (bundleLoad.Bundle == null) throw new InvalidDataException("Cannot load model bundle (changed after registration was sealed, missing or damaged): " + key);
+            loaded = new LoadedBundle { Load = bundleLoad };
             Bundles.Add(digest, loaded);
-            var version = loaded.Bundle.LoadAssetAsync("presentation-format", Il2CppType.Of<TextAsset>());
+            var version = loaded.Load.LoadAssetAsync("presentation-format", Il2CppType.Of<TextAsset>());
             while (!version.isDone) yield return null;
             if (version.asset?.TryCast<TextAsset>()?.text.Trim() != PresentationContract.CurrentFormat.ToString())
                 throw new InvalidDataException($"Model bundle requires presentation format {PresentationContract.CurrentFormat}: {key}");
-            var profile = loaded.Bundle.LoadAssetAsync("presentation-profile", Il2CppType.Of<TextAsset>());
+            var profile = loaded.Load.LoadAssetAsync("presentation-profile", Il2CppType.Of<TextAsset>());
             while (!profile.isDone) yield return null;
             loaded.Contract = PresentationContract.Parse(profile.asset?.TryCast<TextAsset>()?.text ?? throw new InvalidDataException("Missing presentation profile: " + key));
         }
         var description = Array.Find(loaded.Contract.Weapons, item => item.Mode == key) ?? throw new InvalidDataException("Missing model presentation: " + key);
-        var prefabRequest = loaded.Bundle.LoadAssetAsync(key, Il2CppType.Of<GameObject>());
+        var prefabRequest = loaded.Load.LoadAssetAsync(key, Il2CppType.Of<GameObject>());
         while (!prefabRequest.isDone) yield return null;
         var prefab = prefabRequest.asset?.TryCast<GameObject>();
         if (prefab == null) throw new InvalidDataException("Model missing: " + key);
@@ -144,7 +145,8 @@ internal static class WeaponModels
                     for (var i = 0; i < 4; i++)
                     {
                         if (i == 2 && !set.Emission || i == 3 && !set.Normal) continue;
-                        var request = loaded.Bundle.LoadAssetAsync(set.Name + suffixes[i], Il2CppType.Of<Texture2D>());
+                        // A texture set several guns share is found in the shared bundle this one depends on.
+                        var request = loaded.Load.LoadAssetAsync(set.Name + suffixes[i], Il2CppType.Of<Texture2D>());
                         while (!request.isDone) yield return null;
                         textures[i] = ForgeCore.Assets.Keep(request.asset?.TryCast<Texture2D>() ?? throw new InvalidDataException("Texture missing: " + set.Name + suffixes[i]));
                     }
@@ -165,7 +167,7 @@ internal static class WeaponModels
                 materials.Add(part.Name, body);
                 if (part.ReducedTriangles > 0)
                 {
-                    var request = loaded.Bundle.LoadAssetAsync(key + "-" + part.Name + "-reduced", Il2CppType.Of<Mesh>());
+                    var request = loaded.Load.LoadAssetAsync(key + "-" + part.Name + "-reduced", Il2CppType.Of<Mesh>());
                     while (!request.isDone) yield return null;
                     var reduced = ForgeCore.Assets.Keep(request.asset?.TryCast<Mesh>() ?? throw new InvalidDataException($"Reduced mesh missing: {key}/{part.Name}"));
                     meshes.Add(part.Name, (surface.GetComponent<MeshFilter>().sharedMesh, reduced));
@@ -239,7 +241,7 @@ internal static class WeaponModels
         foreach (var model in Models.Keys) if (model.Digest == digest) stale.Add(model);
         foreach (var model in stale) Models.Remove(model);
         foreach (var material in loaded.Created) Object.Destroy(material);
-        loaded.Bundle.Unload(true);
+        loaded.Load.Unload();
     }
 
     // Reticles are lit marks floating in the optic's opening; only the first-person view shows them.
@@ -257,7 +259,7 @@ internal static class WeaponModels
     {
         if (holder == null || holder.CategoryData == null) return false;
         var gear = EnergyGears.ForCategory(holder.CategoryData.persistentID);
-        if (gear == null || gear.Mode == EnergyMode.Off) return false;
+        if (gear == null) return false;
         if (GunMount.Of(holder) is { } mounted)
         {
             mounted.Refresh();
@@ -279,7 +281,7 @@ internal static class WeaponModels
         return queued;
     }
 
-    private static void CreateMount(GearPartHolder holder, EnergyGear gear, PreparedModel assets, bool magazineVisible)
+    private static void CreateMount(GearPartHolder holder, PreparedModel assets, bool magazineVisible)
     {
         if (Mounted.Count >= 128) throw new InvalidOperationException("Energy animation instance budget exhausted.");
         var mount = GunMount.Create(holder, assets.Prefab, new GunMountOptions
@@ -401,7 +403,7 @@ internal static class WeaponModels
             Pending.RemoveAt(i);
             // A model that cannot go on is marked failed like one that cannot load: the gun works on the game's own model and nothing asks
             // again; it never stops the controller, whose fault is kept for a damage call that may have committed.
-            try { if (GunMount.Of(holder) == null) CreateMount(holder, gear, assets, pending.MagazineVisible); }
+            try { if (GunMount.Of(holder) == null) CreateMount(holder, assets, pending.MagazineVisible); }
             catch (Exception error)
             {
                 Failed.Add((gear.ModelDigest, gear.Definition.Model.Key));

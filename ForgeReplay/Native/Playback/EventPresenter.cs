@@ -33,12 +33,14 @@ internal static class EventPresenter
     // door's handler again, which played the door sounds of the whole level at once (11-06) and made dragging the bar slow.
     private static readonly Dictionary<(ushort Kind, ulong Key), (ulong State, ulong Extra)> Applied = new();
     private static SoundTier _tier;
+    // The event being presented, and the reads made inside it (another event or a stored state): each aimed at its bytes, not copied.
+    private static readonly PayloadReader EventReader = new(Array.Empty<byte>()), InnerReader = new(Array.Empty<byte>());
 
     /// <summary>Presents one event passed during normal playing at <paramref name="speed"/>.</summary>
     internal static void Present(Record r, WorldState state, float speed)
     {
         _tier = PlaybackClock.Tier(speed);
-        var read = new PayloadReader(r.Payload!);
+        var read = EventReader.On(r.Payload!);
         try
         {
             if (_sentryPending) SentryAfter(r);
@@ -97,15 +99,9 @@ internal static class EventPresenter
                     }
                 case EventKind.EnemyHurt:
                     {
-                        // U entity, kind, damage x10, attacker, limb, settled, taken x10, lethal, overkill, weak spot, multiplier, behind.
-                        var entity = (int)read.U();
-                        var kind = read.U();
-                        var damage = read.U() / 10f; read.U();
-                        var limb = Vec.Zero;
-                        var struck = Puppeteer.LimbPoint(entity, read.U(), out limb);
-                        var settled = read.U() == 1; var taken = read.U() / 10f;
-                        read.U(); read.U();
-                        var weak = read.U() == 1; read.U(); var behind = read.U() == 1;
+                        var hurt = EnemyHurtEvent.Read(read);
+                        var (entity, kind, damage, settled, taken, weak, behind) = (hurt.Entity, (ulong)hurt.Kind, hurt.Damage, hurt.Settled, hurt.Taken, hurt.Weak, hurt.Behind);
+                        var struck = Puppeteer.LimbPoint(entity, hurt.LimbId, out var limb);
                         if (!Where(state, entity, out var at)) break;
                         if (kind == 0)
                         {
@@ -353,7 +349,7 @@ internal static class EventPresenter
         var end = new Vector3(ex, ey, ez);
         var slot = (int)shooter & 3;
         var flash = 0UL;
-        if (state.Objects.TryGetValue((EventKind.WeaponSound, item), out var note)) { var r = new PayloadReader(note); r.U(); r.Text(); flash = r.U(); }
+        if (state.Objects.TryGetValue((EventKind.WeaponSound, item), out var note)) { var r = InnerReader.On(note); r.U(); r.Text(); flash = r.U(); }
         // The recorded origin is where the game cast the ray from, the shooter's eye: the visible bullet leaves the gun the viewer sees (the first-person
         // one plays its own flash with the shot's animation), as the game draws it.
         if (!FirstPerson.Muzzle(slot, out var from)) from = MuzzleFlash(slot, flash, origin, end);
@@ -365,7 +361,7 @@ internal static class EventPresenter
         _shotMs[slot] = timeMs; _shotItem[slot] = item;
         if (first && state.Objects.TryGetValue((EventKind.WeaponSound, item), out var sound))
         {
-            var weapon = new PayloadReader(sound);
+            var weapon = InnerReader.On(sound);
             weapon.U();
             var name = weapon.Text();
             if (Deployables.ShotList(name) is { } layers) foreach (var layer in layers) Sound(layer, from, false);
@@ -408,7 +404,7 @@ internal static class EventPresenter
         _sentryPending = false;
         if (next.EventType == EventKind.EnemyHurt && next.TimeMs == _sentryMs)
         {
-            var hurt = new PayloadReader(next.Payload!);
+            var hurt = InnerReader.On(next.Payload!);
             var entity = (int)hurt.U();
             var kind = hurt.U();
             hurt.U(); hurt.U();
@@ -444,7 +440,7 @@ internal static class EventPresenter
         {
             Down[slot] = false;
             if (state.PlayerStatus[slot] is not { } status) continue;
-            var read = new PayloadReader(status);
+            var read = InnerReader.On(status);
             for (var i = 0; i < 7; i++) read.U();
             Down[slot] = read.U() == 1;
         }

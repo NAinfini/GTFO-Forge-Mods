@@ -92,15 +92,12 @@ public static partial class GameHooks
     /// <summary><c>MeleeWeaponFirstPerson.DoAttackDamage</c>: a swing's hit on one target (<c>Skip</c> keeps the hit from being dealt).</summary>
     public static readonly Bracket<(MeleeWeaponFirstPerson Weapon, MeleeWeaponDamageData Data, bool IsPush)> MeleeAttackDamage = new("GameHooks.MeleeAttackDamage", typeof(MeleeAttackDamageHook));
     public static readonly Bracket<MWS_Push> PushEntered = new("GameHooks.PushEntered", typeof(PushEnteredHook));
-    public static readonly Bracket<SentryGunInstance> SentryGearSpawned = new("GameHooks.SentryGearSpawned", typeof(SentryGearSpawnedHook));
-    public static readonly Bracket<SentryGunInstance> SentryDespawned = new("GameHooks.SentryDespawned", typeof(SentryDespawnedHook));
     /// <summary><c>SentryGunInstance_Firing_Bullets.FireBullet</c>: a sentry's one shot, on every peer that draws it (the bullet's damage is the game's;
     /// subscribe After to read the muzzle, <c>firing.MuzzleAlign</c>, for a flash or a tracer).</summary>
     public static readonly Bracket<SentryGunInstance_Firing_Bullets> SentryFired = new("GameHooks.SentryFired", typeof(SentryFiredHook));
     /// <summary>Every method that moves a sentry in or out of its owner's backpack and the world, in one bracket: <c>OnGearSpawnComplete</c>,
     /// <c>PickUp</c>, <c>SyncedPickup</c>, <c>OnDespawn</c>, <c>OnDestroy</c>, <c>OnBackpackCleanupCallback</c> and <c>CleanUp</c> (see
-    /// <see cref="SentryStep"/>). A subscriber filters on the step it wants; <see cref="SentryGearSpawned"/> and <see cref="SentryDespawned"/> are
-    /// the same two methods for a subscriber that wants only those.</summary>
+    /// <see cref="SentryStep"/>). A subscriber filters on the step it wants (one patch per method for every subscriber).</summary>
     public static readonly Bracket<SentryCall> SentryLifecycle = new("GameHooks.SentryLifecycle", typeof(SentryLifecycleHook));
     public static readonly Bracket<MineDeployerInstance> MineSpawned = new("GameHooks.MineSpawned", typeof(MineSpawnedHook));
     public static readonly Bracket<(MineDeployerInstance Mine, PlayerAgent Actor)> MinePickedUp = new("GameHooks.MinePickedUp", typeof(MinePickedUpHook));
@@ -115,8 +112,6 @@ public static partial class GameHooks
     /// <summary><c>PlayerSyncIK.UpdateIK</c>: a third-person body's arms have been put on its item's grips (FinalIK limbs) for this frame. The game runs it
     /// from a LateUpdate whose order against a mod's own is not fixed; read or copy a solved third-person pose after it.</summary>
     public static readonly Bracket<PlayerSyncIK> SyncIkSolved = new("GameHooks.SyncIkSolved", typeof(SyncIkSolvedHook));
-    /// <summary><c>ItemEquippable.TryTriggerReloadAnimationSequence</c>: an item starts its reload animation (the local player's reload).</summary>
-    public static readonly Bracket<ItemEquippable> ReloadAnimationStarted = new("GameHooks.ReloadAnimationStarted", typeof(ReloadAnimationStartedHook));
 
     // ---- The game's event log.
     public static readonly Bracket<(string Log, eGameEventChatLogType Type)> GameLogAdded = new("GameHooks.GameLogAdded", typeof(GameLogAddedHook));
@@ -477,16 +472,6 @@ internal static class FirstPersonHolderLateUpdateHook
     private static Exception? Faulted(Exception? __exception, FirstPersonItemHolder __instance) { if (__exception != null) GameHooks.FirstPersonHolderLateUpdate.RunFaulted(__instance, __exception); return __exception; }
 }
 
-[HarmonyPatch(typeof(ItemEquippable), nameof(ItemEquippable.TryTriggerReloadAnimationSequence))]
-internal static class ReloadAnimationStartedHook
-{
-    [HarmonyPrefix, HarmonyPriority(Priority.First)]
-    private static void Before(ItemEquippable __instance) => GameHooks.ReloadAnimationStarted.RunBefore(__instance);
-    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
-    private static void After(ItemEquippable __instance, bool __runOriginal) => GameHooks.ReloadAnimationStarted.RunAfter(__instance, __runOriginal);
-    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
-    private static Exception? Faulted(Exception? __exception, ItemEquippable __instance) { if (__exception != null) GameHooks.ReloadAnimationStarted.RunFaulted(__instance, __exception); return __exception; }
-}
 
 [HarmonyPatch(typeof(SurvivalWave), nameof(SurvivalWave.StopEvent))]
 internal static class WaveStoppedHook
@@ -762,16 +747,6 @@ internal static class PushEnteredHook
     private static Exception? Faulted(Exception? __exception, MWS_Push __instance) { if (__exception != null) GameHooks.PushEntered.RunFaulted(__instance, __exception); return __exception; }
 }
 
-[HarmonyPatch(typeof(SentryGunInstance), nameof(SentryGunInstance.OnGearSpawnComplete))]
-internal static class SentryGearSpawnedHook
-{
-    [HarmonyPrefix, HarmonyPriority(Priority.First)]
-    private static void Before(SentryGunInstance __instance) => GameHooks.SentryGearSpawned.RunBefore(__instance);
-    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
-    private static void After(SentryGunInstance __instance, bool __runOriginal) => GameHooks.SentryGearSpawned.RunAfter(__instance, __runOriginal);
-    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
-    private static Exception? Faulted(Exception? __exception, SentryGunInstance __instance) { if (__exception != null) GameHooks.SentryGearSpawned.RunFaulted(__instance, __exception); return __exception; }
-}
 
 [HarmonyPatch(typeof(SentryGunInstance_Firing_Bullets), nameof(SentryGunInstance_Firing_Bullets.FireBullet))]
 internal static class SentryFiredHook
@@ -784,16 +759,6 @@ internal static class SentryFiredHook
     private static Exception? Faulted(Exception? __exception, SentryGunInstance_Firing_Bullets __instance) { if (__exception != null) GameHooks.SentryFired.RunFaulted(__instance, __exception); return __exception; }
 }
 
-[HarmonyPatch(typeof(SentryGunInstance), nameof(SentryGunInstance.OnDespawn))]
-internal static class SentryDespawnedHook
-{
-    [HarmonyPrefix, HarmonyPriority(Priority.First)]
-    private static void Before(SentryGunInstance __instance) => GameHooks.SentryDespawned.RunBefore(__instance);
-    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
-    private static void After(SentryGunInstance __instance, bool __runOriginal) => GameHooks.SentryDespawned.RunAfter(__instance, __runOriginal);
-    [HarmonyFinalizer, HarmonyPriority(Priority.Last)]
-    private static Exception? Faulted(Exception? __exception, SentryGunInstance __instance) { if (__exception != null) GameHooks.SentryDespawned.RunFaulted(__instance, __exception); return __exception; }
-}
 
 /// <summary>The seven sentry lifecycle methods behind <see cref="GameHooks.SentryLifecycle"/>: one patch class over all of them, the step read
 /// from the patched method and the acting player from the first argument of the two pick-up methods (the other five take none the bracket

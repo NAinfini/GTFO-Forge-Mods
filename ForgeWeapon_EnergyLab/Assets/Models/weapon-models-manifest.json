@@ -1,11 +1,12 @@
 {
     "unity": "2019.4.21f1",
-    "format": 4,
+    "format": 5,
     "bundles": [
         {
             "bundle": "forge-energy-model-beam.bundle",
-            "sha256": "18dea98f8d46dc215a38e820da14c79d2e8ecbd87b5506ae1954a59c4d59d678",
-            "bytes": 8724188,
+            "sha256": "7ba25f486bea94de86a7c87c2ab17b34de8aa37ccf26f4725fe6747cabd658f9",
+            "bytes": 8728707,
+            "dependencies": [],
             "weapon": {
                 "mode": "beam",
                 "sight": "holo-wedge",
@@ -224,8 +225,11 @@
         },
         {
             "bundle": "forge-energy-model-arc.bundle",
-            "sha256": "ce635207e5ca6af13cb911e311e39cc4a7f429705f26d7594b08c0dc564960ca",
-            "bytes": 10593667,
+            "sha256": "eed2d38e770b8b00ae6e07bc96f0c8dc1412b27dbc62dcee023fa92ce1ec40e1",
+            "bytes": 10404417,
+            "dependencies": [
+                "forge-energy-model-shared.bundle"
+            ],
             "weapon": {
                 "mode": "arc",
                 "sight": "holo-hood",
@@ -399,20 +403,6 @@
                     "mipCount": 11
                 },
                 {
-                    "asset": "rail-picatinny-17-albedo",
-                    "format": "DXT1Crunched",
-                    "width": 512,
-                    "height": 512,
-                    "mipCount": 10
-                },
-                {
-                    "asset": "rail-picatinny-17-metallic",
-                    "format": "DXT5Crunched",
-                    "width": 512,
-                    "height": 512,
-                    "mipCount": 10
-                },
-                {
                     "asset": "sight-holo-hood-albedo",
                     "format": "DXT1Crunched",
                     "width": 1024,
@@ -444,8 +434,11 @@
         },
         {
             "bundle": "forge-energy-model-plasma-blast.bundle",
-            "sha256": "2c602420b33fa8207cb14b181fd57c579fe6d3b5931b1945ebaa3a3610622989",
-            "bytes": 8719671,
+            "sha256": "596d16f9251491eef5d51c1c31b7b24a6c0102afdfd3561d8774cda17d9f6c22",
+            "bytes": 8545506,
+            "dependencies": [
+                "forge-energy-model-shared.bundle"
+            ],
             "weapon": {
                 "mode": "plasma-blast",
                 "sight": "reflex-low",
@@ -619,20 +612,6 @@
                     "mipCount": 11
                 },
                 {
-                    "asset": "rail-picatinny-17-albedo",
-                    "format": "DXT1Crunched",
-                    "width": 512,
-                    "height": 512,
-                    "mipCount": 10
-                },
-                {
-                    "asset": "rail-picatinny-17-metallic",
-                    "format": "DXT5Crunched",
-                    "width": 512,
-                    "height": 512,
-                    "mipCount": 10
-                },
-                {
                     "asset": "sight-reflex-low-albedo",
                     "format": "DXT1Crunched",
                     "width": 1024,
@@ -664,8 +643,9 @@
         },
         {
             "bundle": "forge-energy-model-plasma-arc.bundle",
-            "sha256": "ad9207bb952109453e2a313623768c8ec35bcbd799583d1367c0271786b2190d",
-            "bytes": 8703742,
+            "sha256": "6be4ef14bc06204ea30476c036e9601d2015bf1e3f6302c1595b1de7c9a36f08",
+            "bytes": 8687052,
+            "dependencies": [],
             "weapon": {
                 "mode": "plasma-arc",
                 "sight": "holo-trap",
@@ -877,8 +857,11 @@
         },
         {
             "bundle": "forge-energy-model-blast.bundle",
-            "sha256": "78b68fc9fb529f9b310ef58958b220d18ad3eea22677ed2b635d49e7846251e7",
-            "bytes": 7869693,
+            "sha256": "bfc352f61507171f839797999e19ebe825cf3d2d0f7263ae31fde2800ad821e9",
+            "bytes": 7721292,
+            "dependencies": [
+                "forge-energy-model-shared.bundle"
+            ],
             "weapon": {
                 "mode": "blast",
                 "sight": "blast-reflex",
@@ -1045,20 +1028,6 @@
                     "mipCount": 11
                 },
                 {
-                    "asset": "rail-picatinny-17-albedo",
-                    "format": "DXT1Crunched",
-                    "width": 512,
-                    "height": 512,
-                    "mipCount": 10
-                },
-                {
-                    "asset": "rail-picatinny-17-metallic",
-                    "format": "DXT5Crunched",
-                    "width": 512,
-                    "height": 512,
-                    "mipCount": 10
-                },
-                {
                     "asset": "sight-blast-reflex-albedo",
                     "format": "DXT1Crunched",
                     "width": 1024,
@@ -1090,8 +1059,11 @@
         },
         {
             "bundle": "forge-energy-model-disc.bundle",
-            "sha256": "4df749659df28f593924066f9ad2b5fbc771c1fda28b972ac20ab5fa3886a26c",
-            "bytes": 8019571,
+            "sha256": "cb9cf74818c68a6bdf17bc9d20f3c353d9451c2e784d569f7222140ee90365c6",
+            "bytes": 7830500,
+            "dependencies": [
+                "forge-energy-model-shared.bundle"
+            ],
             "weapon": {
                 "mode": "disc",
                 "sight": "disc-delta",
@@ -1265,20 +1237,6 @@
                     "mipCount": 11
                 },
                 {
-                    "asset": "rail-picatinny-17-albedo",
-                    "format": "DXT1Crunched",
-                    "width": 512,
-                    "height": 512,
-                    "mipCount": 10
-                },
-                {
-                    "asset": "rail-picatinny-17-metallic",
-                    "format": "DXT5Crunched",
-                    "width": 512,
-                    "height": 512,
-                    "mipCount": 10
-                },
-                {
                     "asset": "sight-disc-delta-albedo",
                     "format": "DXT1Crunched",
                     "width": 1024,
@@ -1310,8 +1268,9 @@
         },
         {
             "bundle": "forge-energy-model-flame.bundle",
-            "sha256": "a77cf65aa6dc4038f5804c424e4081de74a33dca2875a0ff4bb40e997dcc728f",
-            "bytes": 7849390,
+            "sha256": "bf00d607bbf8df4700591937ddde724c2dddf8430d0545d639f68ea43ec9f8b6",
+            "bytes": 7841808,
+            "dependencies": [],
             "weapon": {
                 "mode": "flame",
                 "sight": "flame-ring",
@@ -1523,8 +1482,11 @@
         },
         {
             "bundle": "forge-energy-model-hole.bundle",
-            "sha256": "60aa2504a347f61a2c2086f1cbeb62313eeb3cbcaed9c1fd0bc8a21039c53e0a",
-            "bytes": 7960354,
+            "sha256": "aa325b569f48411e71d0b9ce74d53cb8df58535a6e8abc8ba4d708d2a23792ef",
+            "bytes": 7794630,
+            "dependencies": [
+                "forge-energy-model-shared.bundle"
+            ],
             "weapon": {
                 "mode": "hole",
                 "sight": "hole-octa",
@@ -1698,20 +1660,6 @@
                     "mipCount": 11
                 },
                 {
-                    "asset": "rail-picatinny-17-albedo",
-                    "format": "DXT1Crunched",
-                    "width": 512,
-                    "height": 512,
-                    "mipCount": 10
-                },
-                {
-                    "asset": "rail-picatinny-17-metallic",
-                    "format": "DXT5Crunched",
-                    "width": 512,
-                    "height": 512,
-                    "mipCount": 10
-                },
-                {
                     "asset": "sight-hole-octa-albedo",
                     "format": "DXT1Crunched",
                     "width": 1024,
@@ -1741,5 +1689,31 @@
                 }
             ]
         }
-    ]
+    ],
+    "shared": {
+        "bundle": "forge-energy-model-shared.bundle",
+        "sha256": "f7ae503d61575610eba73829489b029a33b2f8d977e51fe607dc8fb86dbb48e8",
+        "bytes": 200263,
+        "textures": [
+            {
+                "asset": "rail-picatinny-17-albedo",
+                "format": "DXT1Crunched",
+                "width": 512,
+                "height": 512,
+                "mipCount": 10
+            },
+            {
+                "asset": "rail-picatinny-17-metallic",
+                "format": "DXT5Crunched",
+                "width": 512,
+                "height": 512,
+                "mipCount": 10
+            }
+        ]
+    },
+    "unityManifest": {
+        "file": "forge-energy-unity-manifest.bundle",
+        "sha256": "81a8a7a457505bee5458e5a4419555e596586220ad298d366d7e4de5f132a93b",
+        "bytes": 1870
+    }
 }
