@@ -160,12 +160,10 @@ internal static class KeyBinds
         Save();
     }
 
-    /// <summary>The player picked the next allowed trigger mode for the action.</summary>
-    internal static void CycleMode(int index)
+    /// <summary>The player picked a trigger mode for the action (one the mod allows).</summary>
+    internal static void SetMode(int index, KeyMode mode)
     {
-        var entry = Book[index];
-        var next = KeyModeSet.Next(entry.Allowed, entry.Mode);
-        if (next == entry.Mode || !Book.SetMode(index, next)) return;
+        if (mode == Book[index].Mode || !Book.SetMode(index, mode)) return;
         Save();
     }
 

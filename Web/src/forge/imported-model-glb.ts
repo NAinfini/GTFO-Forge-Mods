@@ -117,6 +117,15 @@ const allowedAttributes = new Set(['POSITION', 'NORMAL', 'TEXCOORD_0', 'TANGENT'
 /** 蒙皮骨骼数上限：ForgeVisual 格式 2 的骨骼下标是 16 位。 */
 const maximumBones = importedModelLimits.bones;
 const isIndex = (value: unknown, length: number): value is number => Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) < length;
+/** A node whose name starts with this is a collision shape of a still model: its mesh becomes one collider in the game and is never drawn,
+ *  needs no material, normals or UVs, and takes no part in the faces, materials or textures counted. A character has no collision. */
+export const importedCollisionPrefix = 'COL_';
+const isCollisionNode = (name: unknown, character: GlbCharacter | undefined) =>
+    !character && typeof name === 'string' && name.startsWith(importedCollisionPrefix);
+/** A node whose name starts with this is a drawn part of a still model that turns about the world's vertical axis, on its own origin, so
+ *  its front (the node's +Z) faces the camera. Only the node's own mesh turns; its children stand by their own names. A character has none. */
+export const importedFacingPrefix = 'FACE_';
+const isFacingNode = (name: unknown, character: GlbCharacter | undefined) => !character && typeof name === 'string' && name.startsWith(importedFacingPrefix);
 
 /** GLB 容器：12 字节头、一个 JSON 段、可选的一个 BIN 段；长度处处核对，不读到外面。 */
 export function splitGlb(bytes: Uint8Array): {json: GlbJson; bin: Uint8Array} {
@@ -262,11 +271,26 @@ function inspect(json: GlbJson, bin: Uint8Array, character?: GlbCharacter): void
     const meshInstances = new Map<number, number>(),
         visited = new Set<number>(),
         skinnedMeshes = new Set<number>(),
-        rigidMeshes = new Set<number>();
+        rigidMeshes = new Set<number>(),
+        collisionMeshes = new Map<number, string>(),
+        facingNodes: string[] = [];
     const visit = (index: unknown) => {
         requireImported(isIndex(index, nodes.length) && !visited.has(index), 'glb-json');
         visited.add(index);
         const node = nodes[index]!;
+        if (isCollisionNode(node.name, character)) {
+            const name = node.name!;
+            requireImported(node.skin === undefined && node.weights === undefined, 'collision-skinned', {name});
+            requireImported(node.camera === undefined, 'camera');
+            requireImported(isIndex(node.mesh, meshes.length), 'collision-empty', {name});
+            collisionMeshes.set(node.mesh, name);
+            for (const child of node.children ?? []) visit(child);
+            return;
+        }
+        if (isFacingNode(node.name, character) && node.mesh !== undefined) {
+            requireImported(node.skin === undefined, 'facing-skinned', {name: node.name!});
+            facingNodes.push(node.name!);
+        }
         requireImported(node.camera === undefined && (character || node.weights === undefined), node.camera !== undefined ? 'camera' : 'morph');
         requireImported(
             node.skin === undefined || ((character ? isIndex(node.skin, skins.length) : node.skin === 0 && skins.length === 1) && node.mesh !== undefined),
@@ -287,6 +311,26 @@ function inspect(json: GlbJson, bin: Uint8Array, character?: GlbCharacter): void
     // A skinned model is skinned all through: every mesh follows the one skeleton, so every vertex has its bones. A character's rigid mesh follows its nearest bone.
     requireImported(character || !skinnedMeshes.size || (!rigidMeshes.size && skins.length === 1), 'skin-mixed');
     requireImported(![...skinnedMeshes].some(mesh => rigidMeshes.has(mesh)), 'skin-mixed');
+    // Collision is for still models: a collider stands where it was built and cannot follow a skeleton.
+    requireImported(!collisionMeshes.size || !skinnedMeshes.size, 'collision-skinned', {name: [...collisionMeshes.values()][0] ?? ''});
+    // A facing part turns on its own: a skinned model's parts follow its skeleton instead.
+    requireImported(!facingNodes.length || !skinnedMeshes.size, 'facing-skinned', {name: facingNodes[0] ?? ''});
+    // A collision mesh is read for its points and triangles only.
+    let collisionVertices = 0,
+        collisionIndices = 0;
+    for (const [meshIndex, name] of collisionMeshes) {
+        const mesh = meshes[meshIndex]!;
+        requireImported(Array.isArray(mesh.primitives) && mesh.primitives.length > 0, 'collision-empty', {name});
+        for (const primitive of mesh.primitives!) {
+            requireImported((primitive.mode ?? 4) === 4, 'primitive-mode');
+            const position = accessorFits(json, primitive.attributes?.POSITION, bin.length, [5126], ['VEC3']);
+            let indexCount = position.count;
+            if (primitive.indices !== undefined) indexCount = accessorFits(json, primitive.indices, bin.length, [5121, 5123, 5125], ['SCALAR']).count;
+            requireImported(indexCount % 3 === 0, 'accessor');
+            collisionVertices += position.count;
+            collisionIndices += indexCount;
+        }
+    }
 
     let faces = 0,
         vertices = 0;
@@ -336,7 +380,15 @@ function inspect(json: GlbJson, bin: Uint8Array, character?: GlbCharacter): void
         }
     }
     // The one bound: the mesh file the game reads as one byte array (an upper estimate here; the written mesh is checked again).
-    requireImported(importedMeshFits(vertices, faces * 3, skinnedMeshes.size > 0), 'mesh-too-large');
+    requireImported(
+        importedMeshFits(
+            vertices,
+            faces * 3,
+            skinnedMeshes.size > 0,
+            collisionMeshes.size ? [{vertices: collisionVertices, indices: collisionIndices}] : undefined
+        ),
+        'mesh-too-large'
+    );
 
     const images = new Set<number>(),
         textures = json.textures ?? [];
@@ -487,12 +539,85 @@ interface Collected {
     joints: number[];
     weights: number[];
     skeleton: Skeleton | null;
+    /** One shape per `COL_` node, in scene order. */
+    collision: {positions: number[]; indices: number[]}[];
+    /** One part per `FACE_` node, in scene order: its own vertices (in its own frame) and index lists. */
+    facing: {part: Collected; pivot: [number, number, number]; yaw: number}[];
+}
+
+/** A `FACE_` node's mesh as a part of its own: appended as the drawn mesh is, then moved into the part's frame, origin at the node's
+ *  origin and turned by minus the node's yaw (its +Z, in Unity's axes, about the vertical), so the game turns it from there. */
+function appendFacing(node: GltfNode, out: Collected, materialIds: Map<GltfMaterial, number>): void {
+    const world = node.getWorldMatrix(),
+        {n, flip} = normalMatrix(world),
+        part: Collected = {positions: [], normals: [], uvs: [], indices: new Map(), joints: [], weights: [], skeleton: null, collision: [], facing: []};
+    for (const primitive of node.getMesh()!.listPrimitives()) append(primitive, world, n, flip, part, materialIds, null, true, false, null);
+    const pivot: [number, number, number] = [Math.fround(0 - world[12]!), Math.fround(world[13]!), Math.fround(world[14]!)],
+        [fx, fz] = [0 - world[8]!, world[10]!],
+        // A node whose +Z stands (nearly) vertical, as a plane turned up in Blender, has no yaw of its own: it keeps the model's front.
+        yaw = Math.hypot(fx, fz) > 1e-3 * Math.hypot(world[8]!, world[9]!, world[10]!) ? Math.fround(Math.atan2(fx, fz)) : 0,
+        [cos, sin] = [Math.cos(yaw), Math.sin(yaw)];
+    // Turning by -yaw about +Y (Unity): x' = x cos - z sin, z' = x sin + z cos.
+    for (let at = 0; at < part.positions.length; at += 3) {
+        const [x, y, z] = [part.positions[at]! - pivot[0], part.positions[at + 1]! - pivot[1], part.positions[at + 2]! - pivot[2]];
+        [part.positions[at], part.positions[at + 1], part.positions[at + 2]] = [x * cos - z * sin, y, x * sin + z * cos];
+        const [a, c] = [part.normals[at]!, part.normals[at + 2]!];
+        [part.normals[at], part.normals[at + 2]] = [a * cos - c * sin, a * sin + c * cos];
+    }
+    out.facing.push({part, pivot, yaw});
+}
+
+/** A `COL_` node's mesh as one collision shape in the model's frame: the node's world matrix applied, X negated and the winding reversed
+ *  as for the drawn mesh. A shape with no triangle of any area cannot be cooked by the game's physics and is refused by name. */
+function appendCollision(node: GltfNode, out: Collected): void {
+    const world = node.getWorldMatrix(),
+        {flip} = normalMatrix(world),
+        name = node.getName(),
+        limit = importedModelLimits.extent,
+        positions: number[] = [],
+        indices: number[] = [];
+    for (const primitive of node.getMesh()!.listPrimitives()) {
+        const position = primitive.getAttribute('POSITION')!.getArray()!,
+            source = primitive.getIndices()?.getArray() ?? null,
+            count = position.length / 3,
+            base = positions.length / 3;
+        for (let vertex = 0; vertex < count; vertex++) {
+            const x = position[vertex * 3]!,
+                y = position[vertex * 3 + 1]!,
+                z = position[vertex * 3 + 2]!;
+            requireImported(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z), 'non-finite');
+            const wx = Math.fround(-(world[0]! * x + world[4]! * y + world[8]! * z + world[12]!)),
+                wy = Math.fround(world[1]! * x + world[5]! * y + world[9]! * z + world[13]!),
+                wz = Math.fround(world[2]! * x + world[6]! * y + world[10]! * z + world[14]!);
+            requireImported(Math.abs(wx) <= limit && Math.abs(wy) <= limit && Math.abs(wz) <= limit, 'extent', {limit});
+            positions.push(wx, wy, wz);
+        }
+        const total = source ? source.length : count;
+        for (let at = 0; at < total; at += 3) {
+            const a = source ? source[at]! : at,
+                b = source ? source[at + 1]! : at + 1,
+                c = source ? source[at + 2]! : at + 2;
+            requireImported(a < count && b < count && c < count, 'index-range');
+            indices.push(base + a, base + (flip ? b : c), base + (flip ? c : b));
+        }
+    }
+    let area = false;
+    for (let at = 0; at < indices.length && !area; at += 3) {
+        const [a, b, c] = [indices[at]! * 3, indices[at + 1]! * 3, indices[at + 2]! * 3];
+        const u = [positions[b]! - positions[a]!, positions[b + 1]! - positions[a + 1]!, positions[b + 2]! - positions[a + 2]!],
+            v = [positions[c]! - positions[a]!, positions[c + 1]! - positions[a + 1]!, positions[c + 2]! - positions[a + 2]!];
+        area = Math.hypot(u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!) > 1e-12;
+    }
+    requireImported(area, 'collision-degenerate', {name});
+    out.collision.push({positions, indices});
 }
 
 const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 function collect(node: GltfNode, out: Collected, materialIds: Map<GltfMaterial, number>, character: GlbCharacter | undefined): void {
     const mesh = node.getMesh();
-    if (mesh) {
+    if (mesh && isCollisionNode(node.getName(), character)) appendCollision(node, out);
+    else if (mesh && isFacingNode(node.getName(), character)) appendFacing(node, out, materialIds);
+    else if (mesh) {
         const skin = node.getSkin();
         // glTF places a skinned mesh by its joints alone: the node's own transform does not apply. A character's rigid mesh rides its nearest bone.
         const world = skin ? identity : node.getWorldMatrix(),
@@ -766,9 +891,11 @@ export async function convertGlbModel(bytes: Uint8Array, codec: ImportedImageCod
             [...(character?.follow ?? [])].flatMap(([bone, under]) => (nodeList[bone] && nodeList[under] ? [[nodeList[bone], nodeList[under]] as const] : []))
         ),
         skeleton = skins.length || extra.length ? readSkeleton(skins, [...extra, ...follow.values()], follow) : null;
-    const out: Collected = {positions: [], normals: [], uvs: [], indices: new Map(), joints: [], weights: [], skeleton},
+    const out: Collected = {positions: [], normals: [], uvs: [], indices: new Map(), joints: [], weights: [], skeleton, collision: [], facing: []},
         materialIds = new Map<GltfMaterial, number>();
     for (const node of scene!.listChildren()) collect(node, out, materialIds, character);
+    // The game builds the still part as the model's own mesh: a model needs one besides its facing parts.
+    requireImported(out.positions.length > 0 || !out.facing.length, 'facing-alone');
     requireImported(out.positions.length > 0, 'empty');
     // Turned half round about the vertical axis: X and Z change sign, for the points, the normals and every bone's rest pose (rows 0 and 2).
     if (character?.turn) {
@@ -895,17 +1022,42 @@ export async function convertGlbModel(bytes: Uint8Array, codec: ImportedImageCod
         submeshes.push({start: indices.length, count: list.length, material});
         for (const value of list) indices.push(value);
     }
+    // A material used only by facing parts leaves the still part without any triangle of its own.
+    requireImported(submeshes.length > 0, 'facing-alone');
+    // Facing parts: their vertices after the still part's, in order, each with its own submeshes over its own vertices.
+    const facing: NonNullable<ImportedModelDescriptor['facing']> = [];
+    for (const {part, pivot, yaw} of out.facing) {
+        const vertexStart = out.positions.length / 3,
+            own: ImportedModelDescriptor['submeshes'] = [];
+        for (const [into, from] of [
+            [out.positions, part.positions],
+            [out.normals, part.normals],
+            [out.uvs, part.uvs]
+        ] as const)
+            for (const value of from) into.push(value);
+        for (const material of materials.keys()) {
+            const list = part.indices.get(material);
+            if (!list?.length) continue;
+            own.push({start: indices.length, count: list.length, material});
+            for (const value of list) indices.push(vertexStart + value);
+        }
+        facing.push({vertexStart, vertexCount: part.positions.length / 3, pivot, yaw, submeshes: own});
+    }
     const faces = indices.length / 3,
         vertices = out.positions.length / 3;
-    requireImported(importedMeshFits(vertices, indices.length, !!skeleton), 'mesh-too-large');
+    const collision = out.collision.map(shape => ({vertices: shape.positions.length / 3, indices: shape.indices.length}));
+    requireImported(importedMeshFits(vertices, indices.length, !!skeleton, collision), 'mesh-too-large');
     const mesh = writeImportedMesh(
         Float32Array.from(out.positions),
         Float32Array.from(out.normals),
         Float32Array.from(out.uvs),
         Uint32Array.from(indices),
-        skeleton ? {joints: Uint16Array.from(out.joints), weights: Float32Array.from(out.weights)} : undefined
+        skeleton ? {joints: Uint16Array.from(out.joints), weights: Float32Array.from(out.weights)} : undefined,
+        out.collision.map(shape => ({positions: Float32Array.from(shape.positions), indices: Uint32Array.from(shape.indices)}))
     );
     const shape = {mesh: {sha256: await sha256Bytes(mesh), vertices, indices: indices.length}, submeshes, materials, textures};
-    const descriptor: ImportedModelDescriptor = skeleton ? {format: 2, ...shape, skin: {bones: skeleton.bones}} : {format: 1, ...shape};
+    const descriptor: ImportedModelDescriptor = skeleton
+        ? {format: 2, ...shape, skin: {bones: skeleton.bones}}
+        : {format: 1, ...shape, ...(collision.length ? {collision} : {}), ...(facing.length ? {facing} : {})};
     return {descriptor, mesh, textures: textureBytes, stats: {faces, vertices, materials: materials.length, textures: textures.length}};
 }

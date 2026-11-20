@@ -25,7 +25,7 @@ internal sealed class Plugin : BasePlugin
         // Before any package that depends on ForgeCore loads, so their own startup lines already follow it.
         var development = ForgeCore.Log.DevelopmentInstalled = DevelopmentInstalled();
         ForgeCore.Log.Developer = development || Settings.Bind(Id, "Logging", "DeveloperLogs", false,
-            "Write Forge's warning, information and debug lines (startup timings, progress, routine reports) to the BepInEx log. Off: only errors. Always on while ForgeDevelopment is installed.",
+            "Write Forge's information and debug lines (startup timings, progress, routine reports) to the BepInEx log. Off: only warnings and errors. Always on while ForgeDevelopment is installed.",
             on => ForgeCore.Log.Developer = on || development).Value;
         ForgeCore.Log.Sinks = id =>
         {
@@ -35,6 +35,7 @@ internal sealed class Plugin : BasePlugin
         Logger = ForgeCore.Log.For(Id);
         // Before any package that depends on ForgeCore loads: every Il2Cpp entry a Forge package patches gets the same prologue check.
         HarmonyLib.Public.Patching.PatchManager.ResolvePatcher += Hooks.Resolve;
+        SharedNativeBodies.Notice = message => { if (ForgeCore.Log.Developer) own.LogInfo(message); };
         if (HookBridgeBackend.Mismatch() is { } bridge) Logger.ErrorOnce("core-hook-bridge-mismatch", bridge);
         Store.Root = Path.Combine(Paths.BepInExRootPath, "ForgeCore", "Store");
         FileHashes.CacheFile = Path.Combine(Paths.CachePath, "ForgeCore", "file-sha256.txt");
@@ -110,9 +111,9 @@ internal sealed class CoreDriver : MonoBehaviour
         Frame.Stamp();
         try
         {
-            Net.Node!.Tick(Time.realtimeSinceStartup);
+            Net.Node!.Tick(Frame.UnscaledTime);
             SoloDrop.Tick();
-            Enemies.TickZones(Time.time);
+            Enemies.TickZones(Frame.GameTime);
             LandingWork.Tick();
         }
         catch (Exception error) { Failed("core", error); }

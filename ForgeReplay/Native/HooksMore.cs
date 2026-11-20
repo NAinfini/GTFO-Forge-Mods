@@ -249,8 +249,7 @@ internal static partial class Hooks
         Rec.EmitState(kind, key);
     }
 
-    // Sentry state: 0 standing, 1 gone. Shots: U object key, Pos.
-    [HarmonyPatch]
+    // Sentry state: 0 standing, 1 gone. Shots: U object key, Pos. Subscribed to ForgeCore's sentry brackets, no patch of its own.
     private static class Sentry
     {
         internal static void Placed(SentryGunInstance __instance)
@@ -450,6 +449,8 @@ internal static partial class Hooks
             {
                 var manager = ProjectileManager.Current;
                 var list = manager == null ? null : manager.m_projectiles;
+                // No projectile in the game and none known: nothing to write, nothing to end.
+                if ((list == null || list.Count == 0) && Flying.Count == 0 && Stopped.Count == 0) return;
                 Now.Clear();
                 if (list != null)
                     for (var i = 0; i < list.Count; i++)

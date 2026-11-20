@@ -65,6 +65,47 @@ static class Looks
     // What `owner`'s gear of `key` wears now (null: its original look).
     public static Worn? WornBy(ulong owner, string key) => Players.TryGetValue(owner, out var p) ? p.ByKey.GetValueOrDefault(key) : null;
 
+    // ---- characters this player gives other players' slots, shown on this machine only (PLAN §4.11) ----
+    // Kept per lobby slot in BepInEx/ForgeSkin/others.json (slot -> character skin id), never sent. A teammate's own character always
+    // wins (Look.CharacterSource); the slot's pick shows when their look names none or they have no ForgeSkin.
+
+    static readonly string OthersFile = Path.Combine(SkinFolders.Root(Paths.BepInExRootPath), "others.json");
+    static Dictionary<string, string>? _others;
+
+    static Dictionary<string, string> Others() =>
+        _others ??= Store.Read<Dictionary<string, string>>(ForgeSkinPlugin.Guid, OthersFile).Value ?? new();
+
+    // The character this player picked for the player in `slot` (null: none, or not installed here).
+    public static Skin? SlotPick(int slot) =>
+        Others().TryGetValue(slot.ToString(), out var id) && Skins.ById.TryGetValue(id, out var skin) && skin.Doc.Target.Key() == CharacterSkin.Target ? skin : null;
+
+    // This player's pick for the player in `slot` ("" = follow their own choice): kept and worn at the next check.
+    public static void ChooseSlot(int slot, string id)
+    {
+        var all = Others();
+        if (id == "") all.Remove(slot.ToString());
+        else all[slot.ToString()] = id;
+        ForgeSkinPlugin.Info($"picked for the player in slot {slot}, on this machine: {(id == "" ? "their own choice" : id)}");
+        Store.Write(ForgeSkinPlugin.Guid, OthersFile, all);
+        Characters.Dirty();
+        Picker.Changed();
+    }
+
+    // Whether `player`'s own look names a character (then a pick for their slot does not show).
+    public static bool HasOwnCharacter(SNet_Player player) => Players.TryGetValue(player.Lookup, out var mate) && mate.Look?.Character != null;
+
+    // The character another (human, not local) player wears here: their own pick, else this player's pick for their slot.
+    public static Skin? CharacterOf(SNet_Player player)
+    {
+        var mine = SlotPick(player.PlayerSlotIndex());
+        return Look.CharacterSource(Players.TryGetValue(player.Lookup, out var mate) ? mate.Look : null, mine != null) switch
+        {
+            CharacterFrom.Theirs => WornBy(player.Lookup, CharacterSkin.Target)?.Skin,
+            CharacterFrom.Local => mine,
+            _ => null,
+        };
+    }
+
     // Adds what every teammate's look has their `key` wear here.
     public static void Wearing(string key, HashSet<Skin> used)
     {

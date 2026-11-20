@@ -4,10 +4,11 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using ForgeSkin.Format;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace ForgeSkin.Tests;
 
-public class FormatTests
+public class FormatTests(ITestOutputHelper output)
 {
     static readonly byte[] Png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0];
 
@@ -118,11 +119,21 @@ public class FormatTests
         var files = Files();
         files["textures/a..b.png"] = files["textures/Front_UZI_2_Albedo.png"];
         doc.Materials[0].Textures[TextureChannel.Albedo] = "textures/a..b.png";
+        files[SkinPack.InspectName] = System.Text.Encoding.UTF8.GetBytes(InspectJson);
         var path = Write(doc, files);
         using var pack = SkinPack.Open(path);
         Assert.Equal(SkinJson.Write(doc), SkinJson.Write(pack.Manifest));
         Assert.Equal(Mesh(), pack.ReadBytes("meshes/m1.forgeskinmesh"));
         Assert.Equal(3, ForgeSkinMesh.Read(pack.ReadBytes("meshes/m1.forgeskinmesh")).Positions.Length / 3);
+
+        // The pack's own inspect motions join the pool of a gun that wears it, by its gear id and by the kinds its list names, under the
+        // skin's id and once each; a gun of another kind does not get them.
+        var table = new InspectTable();
+        table.Add(File.ReadAllText(Path.Combine(Repo(), "Mods/ForgeSkin/Core/inspect-motions.json")));
+        var worn = table.For(45, 0.26f, out _, [pack.Inspect!]);
+        Assert.Equal(table.For(45, 0.26f, out _).Count + 1, worn.Count);
+        Assert.Equal(doc.Id + "/look", worn[^1].Id);
+        Assert.DoesNotContain(table.For(40, 0.8f, out _, [pack.Inspect!]), m => m.Id.StartsWith(doc.Id + "/"));
 
         // The pack as a teammate's look (Core Look): the player's colour and code-effect changes travel and come back as the same picks
         // (to the byte the wire keeps); a value over the size limit is dropped whole, and a pack whose content differs shows the original.
@@ -153,7 +164,7 @@ public class FormatTests
     }
 
     // A deliberately broken pack per error-code family (document, path, resource, mesh content, screen, audio, sound event, player
-    // colour, code effect, reticle, sight) must be caught.
+    // colour, code effect, reticle, sight, inspect motions) must be caught.
     public static TheoryData<string, Action<SkinDocument, Dictionary<string, byte[]>>> Broken => new()
     {
         { "schema", (d, _) => d.Schema = 99 },
@@ -183,7 +194,14 @@ public class FormatTests
         { "bad-reticle", (d, _) => d.Materials[0].Params.Reticles![TextureChannel.Albedo] = new Reticle { Scale = 2 } },
         // A sight lens with no vanilla lens to borrow its look from.
         { "bad-sight", (d, _) => d.Sight!.Style = null },
+        // An inspect.json whose gun list names a motion the pack does not have.
+        { "bad-inspect", (_, f) => f[SkinPack.InspectName] = System.Text.Encoding.UTF8.GetBytes(InspectJson.Replace("\"45\": [\"look\"]", "\"45\": [\"gone\"]")) },
     };
+
+    // A skin pack's inspect.json: one motion of its own, added to the pistol kind and to gear 45.
+    const string InspectJson = """
+        { "motions": { "look": { "gun": [{ "t": 0 }, { "t": 1, "turn": -40, "roll": 20 }, { "t": 2 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 1, "on": "open", "cue": "tap" }, { "t": 2, "on": "grip" }] } }, "kinds": { "pistol": ["look"] }, "gear": { "45": ["look"] } }
+        """;
     [Theory]
     [MemberData(nameof(Broken))]
     public void BrokenPackIsRejected(string code, Action<SkinDocument, Dictionary<string, byte[]>> breakIt)
@@ -555,6 +573,13 @@ public class FormatTests
         Assert.Equal(LookFit.Fits, Look.Fit(back.Character!, doc, 42, out var shown, out _));
         Assert.Equal(new[] { 0f, 0, 1 }, shown!["suit"]);
 
+        // Whose character a teammate wears here: their own pick first (installed or not), then this player's pick for their slot, then
+        // the original person; a look without a character, or none at all (no ForgeSkin), leaves it to the slot's pick.
+        Assert.Equal(CharacterFrom.Theirs, Look.CharacterSource(back, localPick: true));
+        Assert.Equal(CharacterFrom.Local, Look.CharacterSource(new Look(), localPick: true));
+        Assert.Equal(CharacterFrom.Local, Look.CharacterSource(null, localPick: true));
+        Assert.Equal(CharacterFrom.Original, Look.CharacterSource(null, localPick: false));
+
         foreach (var (code, breakIt) in new (string, Action<SkinDocument>)[]
         {
             ("bad-character-bones", d => d.Character!.Bones.Remove("hip")),
@@ -569,7 +594,8 @@ public class FormatTests
     }
 
     // The inspect motion table and its solve (core algorithm, PLAN §4.14): the shipped table reads; a gun it names plays its own list,
-    // one it does not name gets the fallback for its length; a later table replaces an entry by id; a broken motion is refused with the
+    // one it does not name gets the fallback for its length (a melee weapon among the melee pools, its keys turning it from the game's
+    // hold); a later table replaces an entry by id; a broken motion is refused with the
     // table left as it was. Solved for two rigs read in game (a pistol in a 36-degree item camera, a 0.8 m rifle in a 33-degree one):
     // every frame of every motion such a gun plays, sampled at 60 a second, keeps the frame rules (InspectShot: most of the gun in the
     // view, not filling it, not at the eye or through the near plane, its centre and its shown part in the view, both hands within reach),
@@ -582,21 +608,104 @@ public class FormatTests
     {
         var table = new InspectTable();
         table.Add(File.ReadAllText(Path.Combine(Repo(), "Mods/ForgeSkin/Core/inspect-motions.json")));
-        Assert.Equal(new[] { "pistol" }, table.For(3, 0.26f, out var fallback).Select(m => m.Id));
+        var own = table.For(15, 0.26f, out var fallback).Select(m => m.Id).ToArray();
         Assert.False(fallback);
+        Assert.Equal("revolver", own[0]); // its kind ("@revolver"), each motion once
+        Assert.Equal(own.Length, own.Distinct().Count());
         Assert.Equal("long", table.For(14, 0.3f, out _)[0].Id); // the table's entry wins over the length
         Assert.Equal("compact", table.For(9999, 0.5f, out fallback)[0].Id);
         Assert.True(fallback);
         Assert.Equal("long", table.For(9999, 1.4f, out _)[0].Id);
+        var blade = table.For(9999, 0.3f, out fallback, null, melee: true)[0];
+        Assert.True(fallback && blade.FromHold && blade.Id == "knife-look", blade.Id);
+        // The default look, of anything held that has no motion of its own: from the hold the game has it in, with its kind's feel; a
+        // skin pack's table has none.
+        Assert.True(table.Default.Count > 0 && table.Default.All(m => m.FromHold) && table.DefaultFeel.Slow > 0f && table.Kinds.Contains(table.DefaultKind), table.DefaultKind);
+        Assert.Throws<FormatException>(() => new InspectTable("pack").Add("""{ "default": ["spin"] }"""));
+        // A press plays a motion of the pool at random, never the one played last, and in time every other one.
+        var pool = table.For(63, 0.3f, out _);
+        var random = new Random(7);
+        var last = pool[0].Number;
+        var seen = new HashSet<uint>();
+        for (var i = 0; i < 400; i++)
+        {
+            var next = InspectTable.Pick(pool, last, random);
+            Assert.NotEqual(last, next.Number);
+            seen.Add(last = next.Number);
+        }
+        Assert.Equal(pool.Count, seen.Count);
+        Assert.Same(pool[0], InspectTable.Pick(new[] { pool[0] }, pool[0].Number, random)); // a pool of one plays it again
 
-        table.Add("""{ "motions": { "spin": { "gun": [{ "t": 0 }, { "t": 1, "roll": 90 }, { "t": 2 }] } }, "gear": { "3": ["spin"] } }""");
+        // J's detection (the owner's "the fingers twitch, the hand moves in hitches"): a finger closing 60 degrees in 0.3 s, eased, on
+        // frames of uneven length as the game gives them, does not jerk; the same closing held sample by sample at 30 a second (steps),
+        // and one held still that then moves at once (a stop and start), are caught.
+        var (smooth, stepped, started, times) = (new float[60], new float[60], new float[60], new float[60]);
+        for (var f = 0; f < 60; f++)
+        {
+            times[f] = f / 60f + (f % 3 == 1 ? 0.003f : 0f);
+            float Eased(float t) => 60f * MathF.Pow(Math.Clamp((t - 0.25f) / 0.3f, 0f, 1f), 2f) * (3f - 2f * Math.Clamp((t - 0.25f) / 0.3f, 0f, 1f));
+            (smooth[f], stepped[f], started[f]) = (Eased(times[f]), Eased(MathF.Floor(times[f] * 30f) / 30f), times[f] < 0.4f ? 0f : (times[f] - 0.4f) * 300f);
+        }
+        Assert.Equal(0, InspectLook.Jerks(smooth, times, out _));
+        Assert.True(InspectLook.Jerks(stepped, times, out _) > 3);
+        Assert.True(InspectLook.Jerks(started, times, out var start) > 0 && Math.Abs(times[start] - 0.4f) < 0.04f, $"{start}");
+
+        // A table of the test's own: its motions, a sound to cue and a feel for its kind.
+        const string Sounds = """ "sounds": { "roles": { "test-tap": { "default": "generic_reload_foley_quick" } }, "cues": { "tap": ["test-tap"] } } """;
+        table.Add("""{ "motions": { "spin": { "gun": [{ "t": 0 }, { "t": 1, "roll": 90 }, { "t": 2 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 1, "on": "open", "cue": "tap" }, { "t": 2, "on": "grip" }] } }, "gear": { "3": ["spin"] }, """ + Sounds + "}");
         var spin = table.For(3, 0.26f, out _).Single();
         spin.Intent(1f, out _, out var roll);
         Assert.Equal(90f, roll);
         Assert.Throws<FormatException>(() => table.Add("""{ "motions": { "spin": { "gun": [{ "t": 0 }, { "t": 1, "roll": 90 }] } } }"""));
         Assert.Throws<FormatException>(() => table.Add("""{ "motions": { "spin": { "gun": [{ "t": 0 }, { "t": 2 }], "hand": [{ "t": 0, "on": "top" }] } } }"""));
         Assert.Throws<FormatException>(() => table.Add("""{ "gear": { "3": ["nothing"] } }"""));
+        Assert.Throws<FormatException>(() => table.Add("""{ "gear": { "3": ["@nothing"] } }"""));
+        // `clasp` is for a hand on a node: on the grip it is refused.
+        Assert.Throws<FormatException>(() => table.Add("""{ "motions": { "spin": { "gun": [{ "t": 0 }, { "t": 2 }], "hand": [{ "t": 0, "on": "grip", "clasp": true }] } } }"""));
         Assert.Equal(2f, table.For(3, 0.26f, out _).Single().Seconds);
+        // Parts, the grip hand under the stock, the off hand on a part and waiting under a tossed gun: read, and refused when broken.
+        const string Parted = """
+            { "motions": { "parted": { "gun": [{ "t": 0 }, { "t": 0.5, "turn": -40, "roll": 20 }, { "t": 1, "turn": -40, "roll": 20, "hold": "stock" }, { "t": 1.5, "turn": -40, "roll": 20 }, { "t": 2 }],
+              "hand": [{ "t": 0, "on": "grip" }, { "t": 0.4, "on": "node", "node": "a_slide", "offset": [0, 0.02, -0.05], "fingers": [0.6, 0.6, 0.85, 0.9, 0.9], "cue": "tap" }, { "t": 1.2, "on": "open", "along": 0.5 }, { "t": 1.4, "on": "mag" }, { "t": 1.9, "on": "grip" }],
+              "parts": [{ "node": "@mag", "about": "side", "keys": [{ "t": 0.2 }, { "t": 0.8, "out": 0.08, "turn": -40 }, { "t": 1.2 }] },
+                        { "node": "a_slide", "keys": [{ "t": 0.4 }, { "t": 0.8, "move": [0, 0, -0.03] }, { "t": 1 }] },
+                        { "node": "a_round", "follow": "a_slide", "optional": true, "keys": [{ "t": 0 }, { "t": 2 }] }] } }, "kinds": { "parts": ["parted"] }, "gear": { "3": ["@parts"] },
+              "feel": { "parts": { "f": 2, "zeta": 0.6, "spin": 400 } }, SOUNDS }
+            """;
+        var partedTable = new InspectTable();
+        partedTable.Add(Parted.Replace("SOUNDS", Sounds));
+        var parted = partedTable.For(3, 0.26f, out _).Single();
+        Assert.Equal(InspectGrip.Stock, parted.Gun[2].Hold);
+        Assert.Equal((InspectHold.Node, 1, new Vector3(0f, 0.02f, -0.05f)), (parted.Hand[1].On, parted.Hand[1].Part, parted.Hand[1].Offset));
+        Assert.Equal((InspectHold.Mag, 0), (parted.Hand[3].On, parted.Hand[3].Part)); // the hand on the magazine goes with the magazine part
+        Assert.Equal((1, true), (parted.Parts[2].Follow, parted.Parts[2].Optional));
+        Assert.Equal(new Vector3(0f, 0f, -0.03f), parted.PartAt(1, 0.8f).Move);
+        Assert.Equal(default, parted.PartAt(1, 1.5f)); // at rest after its last key
+        // The off hand's fingers: the key's shape at the key, fading in from the game's grip before it; a key without one on the gun holds it.
+        Assert.Equal(1f, parted.FingersAt(0.4f, out var pinch));
+        Assert.Equal(0.6f, pinch.Index);
+        Assert.InRange(parted.FingersAt(0.2f, out _), 0.1f, 0.9f);
+        Assert.Equal(1f, parted.FingersAt(1.2f, out var holding));
+        Assert.Equal(InspectMotion.HoldShape.Index, holding.Index);
+        foreach (var bad in new[]
+        {
+            Parted.Replace("""{ "t": 0.2 }, { "t": 0.8""", """{ "t": 0.2, "out": 0.01 }, { "t": 0.8"""), // a part's first key not at rest
+            Parted.Replace("\"node\": \"a_slide\", \"offset\"", "\"node\": \"a_bolt\", \"offset\""),       // a hand on a part the motion lacks
+            Parted.Replace("\"follow\": \"a_slide\"", "\"follow\": \"a_bolt\""),                           // following a part not named before
+            Parted.Replace("{ \"t\": 0.5, \"turn\": -40, \"roll\": 20 }", "{ \"t\": 0.5, \"turn\": -40, \"roll\": 20, \"hold\": \"stock\" }"), // off the grip next to the game's pose
+            Parted.Replace("\"@mag\"", "\"@clip\""),
+            Parted.Replace("{ \"t\": 0.5, \"turn\": -40, \"roll\": 20 }", "{ \"t\": 0.5, \"turn\": -40, \"roll\": 20, \"settle\": 0.5 }"), // an overshoot past its bound
+            Parted.Replace("[0.6, 0.6, 0.85, 0.9, 0.9]", "[0.6, 0.6, 0.85, 0.9]"),                         // a hand of four fingers
+            Parted.Replace("{ \"t\": 0, \"on\": \"grip\" }", "{ \"t\": 0, \"on\": \"grip\", \"fingers\": [0, 0, 0, 0, 0] }"), // a shape on the first key
+            Parted.Replace("\"cue\": \"tap\"", "\"cue\": \"knock\""),                                       // a cue the sounds do not have
+            Parted.Replace("\"feel\": { \"parts\"", "\"feel\": { \"other\""),                               // a kind with no feel
+            Parted.Replace("{ \"t\": 0.8, \"out\": 0.08, \"turn\": -40 }", "{ \"t\": 0.8, \"out\": 0.08, \"carry\": { \"at\": [0, 0], \"dist\": 0.3 } }"), // a carried part also moved on the gun
+            Parted.Replace("{ \"t\": 1.4, \"on\": \"mag\" }", "{ \"t\": 1.4, \"on\": \"mag\" }, { \"t\": 1.6, \"on\": \"mag\", \"at\": [0.6, 0.4], \"regrip\": true }"), // a regrip that keeps the hold (same face, at moved under a quarter)
+            Parted.Replace("{ \"t\": 1.2, \"on\": \"open\", \"along\": 0.5 }", "{ \"t\": 1.2, \"on\": \"open\", \"along\": 0.5, \"spin\": 90 }"), // a hand turned on a face while it is on none
+            Parted.Replace("{ \"t\": 0.5, \"turn\": -40, \"roll\": 20 }", "{ \"t\": 0.5, \"turn\": -40, \"roll\": 20, \"palm\": true }"), // the palm turned up from a hold the motion does not start from
+            Parted.Replace("\"gear\": { \"3\": [\"@parts\"] }", "\"gear\": { \"3\": [\"@parts\"] }, \"default\": [\"@parts\"]"), // a default that is not from the hold
+        })
+            Assert.Throws<FormatException>(() => new InspectTable().Add(bad.Replace("SOUNDS", Sounds)));
 
         // The rig as the game had it for an assault rifle (Malatack LX), read in game: item camera, the gun's bounds and pose, both arms.
         var gunAt = new Vector3(0.0845f, -0.1053f, 0.3599f);
@@ -633,53 +742,224 @@ public class FormatTests
         };
         pistol.GripArm = new InspectArm(new(0.2048f, -0.4233f, 0.0154f), new(0.1879f, -0.4544f, 0.3435f), new(0.0899f, -0.1814f, 0.3452f), pistol.GripAt, pistol.Grip);
         pistol.OffArm = new InspectArm(new(-0.201f, -0.4125f, 0.123f), new(-0.051f, -0.4594f, 0.4132f), new(0.0133f, -0.1851f, 0.3445f), pistol.OffAt, pistol.Off);
-        foreach (var motion in table.Motions)
+        // A motion's parts and meshes as these guns would give them: the body (receiver and barrel) in the upper part of the bounds, the
+        // magazine hanging from its mount low in the middle of the gun, any other node on its top; the feel of the kind its length gives.
+        static InspectRig WithParts(InspectRig on, InspectMotion motion, InspectTable feel)
         {
-            var onPistol = new InspectLook(motion, pistol);
-            Assert.True(float.IsNaN(onPistol.Fault), $"{motion.Id} on the pistol: at {onPistol.Fault} {onPistol.FaultRule}");
-            if (motion.Id is "pistol" or "revolver") continue; // one-handed motions a rifle never plays
-            var onRifle = new InspectLook(motion, rig);
-            Assert.True(float.IsNaN(onRifle.Fault), $"{motion.Id} on the rifle: at {onRifle.Fault} {onRifle.FaultRule}");
+            var (c, e) = (on.Centre, on.Extents);
+            var parts = motion.Parts.Select(p =>
+            {
+                if (p.Node == InspectPart.Magazine)
+                {
+                    var mount = c - new Vector3(0f, e.Y * 0.3f, e.Z * 0.3f);
+                    return new InspectPartRig { Pivot = mount, Down = -Vector3.UnitY, Lo = mount - new Vector3(e.X * 0.6f, e.Y * 0.7f, e.Z * 0.1f), Hi = mount + new Vector3(e.X * 0.6f, 0f, e.Z * 0.1f), Under = -1 };
+                }
+                var top = c + new Vector3(0f, e.Y * 0.5f, 0f);
+                return new InspectPartRig { Pivot = top, Down = -Vector3.UnitY, Lo = top - new Vector3(e.X * 0.8f, e.Y * 0.1f, e.Z * 0.4f), Hi = top + new Vector3(e.X * 0.8f, e.Y * 0.3f, e.Z * 0.4f), Under = -1 };
+            }).ToArray();
+            var meshes = parts.Select((p, i) => new InspectBox { Lo = p.Lo, Hi = p.Hi, Part = i })
+                .Prepend(new InspectBox { Lo = c - new Vector3(e.X, e.Y * 0.3f, e.Z), Hi = c + e, Part = -1 }).ToArray();
+            return on with { Parts = parts, Meshes = meshes, Feel = feel.Feel(0, e.Z * 2f) };
         }
-        var broken = new InspectTable();
-        broken.Add("""{ "motions": { "face": { "gun": [{ "t": 0 }, { "t": 1, "turn": -170, "tilt": 10 }, { "t": 2 }] } } }""");
-        Assert.False(float.IsNaN(new InspectLook(broken.Motions.Single(), rig).Fault));
-        // A rifle rolled over in both hands: the off hand under it turns past its wrist's half turn and would flip round.
-        broken.Add("""{ "motions": { "face": { "gun": [{ "t": 0 }, { "t": 0.6, "turn": -45, "roll": 30 }, { "t": 1.3, "turn": -43, "tilt": 2, "roll": 32 }, { "t": 2.0, "turn": -45, "roll": -170 }, { "t": 2.7, "turn": -43, "roll": -173 }, { "t": 3.35 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.4, "on": "under" }, { "t": 1.4, "on": "under" }, { "t": 1.9, "on": "under", "along": 0.45 }, { "t": 2.8, "on": "under", "along": 0.45 }, { "t": 3.2, "on": "grip" }] } } }""");
-        var wrapped = new InspectLook(broken.Motions.Single(), rig);
-        Assert.True(wrapped.FaultRule?.Contains("wrist") == true || wrapped.FaultRule?.Contains("forearm") == true, $"a wrapping wrist was not caught: {wrapped.Fault} {wrapped.FaultRule}");
+        // A part moves the nodes the plugin writes: the slide drawn back.
+        var partedRig = WithParts(pistol, parted, partedTable);
+        var partedLook = InspectLook.Solve(parted, partedRig);
+        partedLook.PartDelta(1, 0.8f * partedLook.Slow, 1f, out var slideTurn, out var slideShift, out _);
+        Assert.True(Vector3.Distance(Vector3.Transform(partedRig.Parts![1].Pivot, slideTurn) + slideShift, partedRig.Parts[1].Pivot + new Vector3(0f, 0f, -0.03f)) < 1e-4f);
+        // The hand holding the magazine stays where it holds it on the magazine, within 2 cm of its mesh box (what R1 measures: the
+        // middle of the palm, 6 cm from the wrist toward the fingers, under its base; the thumb's pad where it is held round its
+        // side), while the magazine is pulled clear and carried into the view.
+        var magMotion = table.Motions.Single(m => m.Id == "handgun-mag");
+        var check = WithParts(pistol, magMotion, table);
+        var magLook = InspectLook.Solve(magMotion, check);
+        Vector3 OnMagazine(float time, float along = -0.06f) => OnPart(magLook, check, time, along);
+        static Vector3 OnPart(InspectLook look, InspectRig on, float time, float along = -0.06f)
+        {
+            time *= look.Slow;
+            look.GunPose(time, 1f, on.GunAt, on.Gun, on.TanHalf, out var gunAt, out var gun, out _);
+            look.HandPose(time, 1f, gunAt, gun, on.OffAt, on.Off, out var hand, out var handTurn);
+            look.PartDelta(0, time, 1f, out var r, out var t, out _);
+            var palm = hand + Vector3.Transform(new Vector3(along, 0f, 0f), handTurn);
+            return Vector3.Transform(Vector3.Transform(palm - gunAt, Quaternion.Inverse(gun)) - t, Quaternion.Inverse(r));
+        }
+        float Touch(float time)
+        {
+            time *= magLook.Slow;
+            magLook.GunPose(time, 1f, check.GunAt, check.Gun, check.TanHalf, out var gunAt, out var gun, out _);
+            magLook.HandPose(time, 1f, gunAt, gun, check.OffAt, check.Off, out var hand, out var handTurn);
+            return magLook.ContactGap(time, hand, handTurn, gunAt, gun);
+        }
+        // (Every 0.05 s while the hand holds it: a span of the hand on one part rides with it, never round the gun, wherever it is carried;
+        // a declared regrip moves the hand on the part, and the hold it ends in rides on from there.)
+        Vector3? held = null;
+        for (var time = 0.6f; time <= 2.2f; time += 0.05f)
+        {
+            magMotion.HandSpan(time, out var ha, out var hb, out _);
+            if (ha != hb && magMotion.Hand[hb].Regrip) { held = null; continue; }
+            var on = OnMagazine(time);
+            if (held is not { } from)
+            {
+                var gap = Touch(time);
+                Assert.True(gap < 0.02f, $"the hand is {gap * 100f:0.0} cm off the magazine at {time:0.00} s");
+                held = on;
+            }
+            else Assert.True(Vector3.Distance(on, from) < 1e-3f, $"the hand on the magazine left it by {Vector3.Distance(on, from) * 100f:0.0} cm at {time:0.00} s");
+        }
 
-        var look = new InspectLook(table.Motions.Single(m => m.Id == "rifle"), rig);
+        // Detection: each frame rule catches a motion made to break it, measured on the pose the player sees (with the follow).
+        var rifleFeel = rig with { Feel = new InspectFeel(1.8f, 0.65f, 1f, 5f, 2.5f, 0.008f, 260f, 1f) };
+        InspectLook Broken(string motion, InspectRig on, string sounds = Sounds) => BrokenOn(motion, on, sounds).Look;
+        (InspectLook Look, InspectRig Rig) BrokenOn(string motion, InspectRig on, string sounds = Sounds)
+        {
+            var t = new InspectTable();
+            t.Add("""{ "motions": { "face": """ + motion + " }, " + sounds + "}");
+            var m = t.Motions.Single();
+            var solved = on.Parts == null ? WithParts(on, m, t) with { Feel = on.Feel } : on;
+            return (InspectLook.Solve(m, solved), solved);
+        }
+        const string Tap = """ "hand": [{ "t": 0, "on": "grip" }, { "t": 0.3, "on": "open", "cue": "tap" }, { "t": 0.6, "on": "grip" }] """;
+        void Caught(string rule, InspectLook look) => Assert.True(look.FaultRule?.StartsWith(rule) == true, $"{rule} was not caught: {look.Fault} {look.FaultRule}");
+        // The muzzle turned at the eye.
+        Assert.False(float.IsNaN(Broken("""{ "gun": [{ "t": 0 }, { "t": 1, "turn": -170, "tilt": 10 }, { "t": 2 }], """ + Tap + "}", rifleFeel).Fault));
+        // A rifle rolled over in both hands: the off hand under it turns past its wrist's half turn and would flip round.
+        var wrapped = Broken("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -45, "roll": 30 }, { "t": 1.3, "turn": -43, "tilt": 2, "roll": 32 }, { "t": 2.0, "turn": -45, "roll": -170 }, { "t": 2.7, "turn": -43, "roll": -173 }, { "t": 3.35 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.4, "on": "under", "cue": "tap" }, { "t": 1.4, "on": "under" }, { "t": 1.9, "on": "under", "along": 0.45 }, { "t": 2.8, "on": "under", "along": 0.45 }, { "t": 3.2, "on": "grip" }] }""", rifleFeel);
+        Assert.True(wrapped.FaultRule?.Contains("wrist") == true || wrapped.FaultRule?.Contains("forearm") == true, $"a wrapping wrist was not caught: {wrapped.Fault} {wrapped.FaultRule}");
+        // R5: a pose shown for a moment and gone.
+        Caught("R5:", Broken("""{ "gun": [{ "t": 0 }, { "t": 0.7, "turn": -30, "roll": 15 }, { "t": 1.0, "turn": -15, "roll": 2 }, { "t": 1.8 }], """ + Tap + "}", rifleFeel));
+        // speed: the gun swung a quarter turn across the view in half a second, faster than a rifle turns.
+        Caught("speed:", Broken("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 20 }, { "t": 1.4, "turn": -30, "roll": 20 }, { "t": 1.9, "turn": 60, "roll": 20 }, { "t": 2.7, "turn": 60, "roll": 20 }, { "t": 3.5 }], """ + Tap + "}", rifleFeel));
+        // R6: the off hand pressed into the top of the gun.
+        Caught("R6:", Broken("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 20 }, { "t": 1.6, "turn": -30, "roll": 20 }, { "t": 2.4 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.7, "on": "node", "node": "a_top", "face": "top", "offset": [-0.06, 0, 0], "cue": "tap" }, { "t": 1.5, "on": "node", "node": "a_top", "face": "top", "offset": [-0.06, 0, 0] }, { "t": 2.3, "on": "grip" }], "parts": [{ "node": "a_top", "keys": [{ "t": 0 }, { "t": 2.4 }] }] }""", rifleFeel));
+        // R1: the off hand held 6 cm off the left of the gun it is said to touch (the gap is absolute, not past the game's hold).
+        Caught("R1:", Broken("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 20 }, { "t": 1.6, "turn": -30, "roll": 20 }, { "t": 2.4 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.7, "on": "node", "node": "a_top", "face": "left", "offset": [0.045, 0, 0], "cue": "tap" }, { "t": 1.5, "on": "node", "node": "a_top", "face": "left", "offset": [0.045, 0, 0] }, { "t": 2.3, "on": "grip" }], "parts": [{ "node": "a_top", "keys": [{ "t": 0 }, { "t": 2.4 }] }] }""", rifleFeel));
+        // R1 on a key's own frame: the hand leaves the gun only for a key between the frames the rules sample (1.105–1.115 s).
+        Caught("R1:", Broken("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 20 }, { "t": 1.6, "turn": -30, "roll": 20 }, { "t": 2.4 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.7, "on": "node", "node": "a_top", "face": "left", "cue": "tap" }, { "t": 1.105, "on": "node", "node": "a_top", "face": "left" }, { "t": 1.11, "on": "node", "node": "a_top", "face": "left", "offset": [0.045, 0, 0] }, { "t": 1.115, "on": "node", "node": "a_top", "face": "left" }, { "t": 1.5, "on": "node", "node": "a_top", "face": "left" }, { "t": 2.3, "on": "grip" }], "parts": [{ "node": "a_top", "keys": [{ "t": 0 }, { "t": 2.4 }] }] }""", rifleFeel));
+        // R3: the hand moving from under the magazine to its side without declaring the regrip slides over the part.
+        Caught("R3:", Broken("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 20 }, { "t": 2.4, "turn": -30, "roll": 20 }, { "t": 3.0 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.5, "on": "mag", "face": "bottom", "cue": "tap" }, { "t": 1.4, "on": "mag", "face": "left", "at": [0.5, 0.5] }, { "t": 2.5, "on": "mag", "face": "left", "at": [0.5, 0.5] }, { "t": 2.9, "on": "grip" }], "parts": [{ "node": "@mag", "keys": [{ "t": 0.6 }, { "t": 0.9, "clear": 1.1 }, { "t": 2.3, "clear": 1.1 }, { "t": 2.5 }] }] }""", rifleFeel));
+        // R7: a part held up against the eye.
+        Caught("R7:", Broken("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 20 }, { "t": 2.4, "turn": -30, "roll": 20 }, { "t": 3.0 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.5, "on": "mag", "cue": "tap" }, { "t": 2.5, "on": "mag" }, { "t": 2.9, "on": "grip" }], "parts": [{ "node": "@mag", "keys": [{ "t": 0.6 }, { "t": 0.9, "clear": 1.1 }, { "t": 1.6, "carry": { "at": [0, 0], "dist": 0.2 } }, { "t": 2.0, "carry": { "at": [0, 0], "dist": 0.2 } }, { "t": 2.3, "clear": 1.1 }, { "t": 2.5 }] }] }""", rifleFeel));
+        // W: the off hand laid across the top of the gun, a quarter turn from the way its wrist can lay it there: it is turned back off its
+        // hold. (A part carried in the hand is rolled to suit the wrist, CarryRoll: only a hand on the gun can be asked what no wrist does.)
+        Caught("W:", Broken("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 20 }, { "t": 1.6, "turn": -30, "roll": 20 }, { "t": 2.4 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.7, "on": "node", "node": "a_top", "face": "top", "spin": 90, "cue": "tap" }, { "t": 1.5, "on": "node", "node": "a_top", "face": "top", "spin": 90 }, { "t": 2.3, "on": "grip" }], "parts": [{ "node": "a_top", "keys": [{ "t": 0 }, { "t": 2.4 }] }] }""", rifleFeel));
+        // W: the off hand laid flat on the top of the gun from a forearm that comes up from below hangs off it past a right angle (the
+        // fold: InspectLook.WristFold), though its joint is within the limits counted from the game's hold.
+        Assert.Contains(Broken("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -36, "tilt": 10, "roll": -34 }, { "t": 1.6, "turn": -36, "tilt": 10, "roll": -34 }, { "t": 2.4 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.7, "on": "node", "node": "a_top", "face": "top", "cue": "tap" }, { "t": 1.5, "on": "node", "node": "a_top", "face": "top" }, { "t": 2.3, "on": "grip" }], "parts": [{ "node": "a_top", "keys": [{ "t": 0 }, { "t": 2.4 }] }] }""", rifleFeel).Audit(),
+            a => a.Rule.Contains("degrees off its forearm's line"));
+        // F: the palm under a magazine has its fingers stop on it (none lies in it); moved 3 cm to the magazine's right under it (a
+        // magazine key's offset is to its left, up it and to its front), a finger lies inside.
+        const string UnderMag = """{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 20 }, { "t": 2.4, "turn": -30, "roll": 20 }, { "t": 3.0 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.5, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7], "cue": "tap" }, { "t": 2.5, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7] }, { "t": 2.9, "on": "grip" }], "parts": [{ "node": "@mag", "keys": [{ "t": 0.6 }, { "t": 3.0 }] }] }""";
+        Assert.DoesNotContain(Broken(UnderMag, rifleFeel).Audit(), a => a.Rule.StartsWith("F:"));
+        Assert.Contains(Broken(UnderMag.Replace("\"face\": \"bottom\"", "\"face\": \"bottom\", \"offset\": [-0.03, 0, 0]"), rifleFeel).Audit(), a => a.Rule.StartsWith("F: the off hand's"));
+        // P: a gun tossed 5 cm and flipped two turns about its length turns through the hand it left.
+        const string TossSounds = """ "sounds": { "roles": { "test-tap": { "default": "generic_reload_foley_quick" } }, "cues": { "tap": ["test-tap"], "toss": ["test-tap"], "catch": ["test-tap"] } } """;
+        Assert.Contains(Broken("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 15, "through": true }, { "t": 1.0, "turn": -30, "tilt": 3, "roll": 25, "through": true }, { "t": 1.75, "turn": -30, "tilt": 3, "roll": 25, "flip": 720, "toss": 0.05, "through": true }, { "t": 2.3, "turn": -28, "tilt": 4, "roll": 14, "flip": 720 }, { "t": 3.0 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.5, "on": "away" }, { "t": 2.5, "on": "away", "cue": "tap" }, { "t": 2.95, "on": "grip" }] }""", rifleFeel, TossSounds).Audit(),
+            a => a.Rule.StartsWith("P: the gun, free of the hand, passes"));
+        // P: an item the game holds with the palm down (a reverse grip: the pistol's hold turned over about its grip), tossed from that
+        // hold, goes up through the back of the hand and lands on it; tossed from the palm turned up (the key's palm), it does not.
+        var palmNow = Vector3.Transform(Vector3.UnitY, pistol.Grip);
+        var over = Quaternion.CreateFromAxisAngle(Vector3.Normalize(Vector3.Cross(palmNow, -Vector3.UnitY)), MathF.Acos(Vector3.Dot(palmNow, -Vector3.UnitY)));
+        var fist = pistol with { Gun = over * pistol.Gun, Grip = over * pistol.Grip, GunAt = pistol.GripAt + Vector3.Transform(pistol.GunAt - pistol.GripAt, over), Feel = table.Feel(0, 0.25f) };
+        fist.GripArm = new InspectArm(new(0.2048f, -0.4233f, 0.0154f), new(0.1879f, -0.4544f, 0.3435f), new(0.0899f, -0.1814f, 0.3452f), fist.GripAt, fist.Grip);
+        const string FromFist = """{ "from": "hold", "gun": [{ "t": 0 }, { "t": 0.55, "fill": 0.3, "through": true }, { "t": 1.5, "fill": 0.3, "spin": 360, "toss": 0.2, "through": true }, { "t": 2.0, "fill": 0.3, "spin": 360 }, { "t": 2.7 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.3, "on": "away", "cue": "tap" }, { "t": 2.2, "on": "away" }, { "t": 2.65, "on": "grip" }] }""";
+        Assert.Equal(2, Broken(FromFist, fist, TossSounds).Audit().Count(a => a.Rule.Contains("through the back of the hand"))); // where it leaves and where it lands
+        Assert.DoesNotContain(Broken(FromFist.Replace("\"fill\": 0.3", "\"palm\": true, \"fill\": 0.3"), fist, TossSounds).Audit(), a => a.Rule.Contains("through the back of the hand"));
+        // I: the gun brought from one held pose to the next in a tenth of a second, starting and stopping at once.
+        Caught("I:", Broken("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 20 }, { "t": 1.4, "turn": -30, "roll": 20 }, { "t": 1.5, "turn": -15, "roll": 20 }, { "t": 2.3, "turn": -15, "roll": 20 }, { "t": 3.0 }], """ + Tap + "}", rifleFeel));
+        // S: a look whose hands keep the game's grip all through moves no finger; the tap's open hand does.
+        Assert.Contains(Broken("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 20 }, { "t": 1.6, "turn": -30, "roll": 20 }, { "t": 2.4 }], "hand": [{ "t": 0, "on": "grip" }] }""", rifleFeel).Audit(), a => a.Rule.StartsWith("S:"));
+        Assert.DoesNotContain(Broken("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 20 }, { "t": 1.6, "turn": -30, "roll": 20 }, { "t": 2.4 }], """ + Tap + "}", rifleFeel).Audit(), a => a.Rule.StartsWith("S:"));
+        // J: the off hand's fingers snapped shut and open again from one finger sample to the next (a 30th of a second), over and over.
+        Assert.Contains(Broken("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 20 }, { "t": 2.4, "turn": -30, "roll": 20 }, { "t": 3.0 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.5, "on": "side", "cue": "tap" }, { "t": 1, "on": "side", "fingers": [0, 0, 0, 0, 0] }, { "t": 1.0333, "on": "side", "fingers": [1, 1, 1, 1, 1] }, { "t": 1.0667, "on": "side", "fingers": [0, 0, 0, 0, 0] }, { "t": 1.1, "on": "side", "fingers": [1, 1, 1, 1, 1] }, { "t": 1.1333, "on": "side", "fingers": [0, 0, 0, 0, 0] }, { "t": 1.1667, "on": "side", "fingers": [1, 1, 1, 1, 1] }, { "t": 1.2, "on": "side", "fingers": [0, 0, 0, 0, 0] }, { "t": 1.2333, "on": "side", "fingers": [1, 1, 1, 1, 1] }, { "t": 1.2667, "on": "side", "fingers": [0, 0, 0, 0, 0] }, { "t": 2.5, "on": "side" }, { "t": 2.9, "on": "grip" }] }""", rifleFeel).Audit(),
+            a => a.Rule.StartsWith("J: the off hand's"));
+        // T: a toss that asks one flip, with another tossed flip at once after its catch, turns about two turns while it settles; the toss alone does not.
+        const string Flipped = """{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 15, "through": true }, { "t": 1.0, "turn": -30, "tilt": 3, "roll": 25, "through": true }, { "t": 1.75, "turn": -30, "tilt": 3, "roll": 25, "flip": 360, "toss": 0.05, "through": true }, AFTER{ "t": 2.3, "turn": -28, "tilt": 4, "roll": 14, "flip": 720 }, { "t": 3.0 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.5, "on": "away" }, { "t": 2.5, "on": "away", "cue": "tap" }, { "t": 2.95, "on": "grip" }] }""";
+        Assert.Contains(Broken(Flipped.Replace("AFTER", """{ "t": 2.25, "turn": -30, "tilt": 3, "roll": 25, "flip": 720, "toss": 0.03, "through": true }, """), rifleFeel, TossSounds).Audit(), a => a.Rule.StartsWith("T: the toss"));
+        Assert.DoesNotContain(Broken(Flipped.Replace("AFTER", "").Replace("\"flip\": 720", "\"flip\": 360"), rifleFeel, TossSounds).Audit(), a => a.Rule.StartsWith("T: the toss"));
+        // The hand on a magazine carried through the gun's bounds rides with it, never round the gun.
+        var (ridden, riddenRig) = BrokenOn("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 20 }, { "t": 2.4, "turn": -30, "roll": 20 }, { "t": 3.0 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.5, "on": "mag", "cue": "tap" }, { "t": 2.5, "on": "mag" }, { "t": 2.9, "on": "grip" }], "parts": [{ "node": "@mag", "keys": [{ "t": 0.6 }, { "t": 0.9, "clear": 1.1 }, { "t": 1.3, "carry": { "at": [0, -0.45], "dist": 0.45 } }, { "t": 2.0, "carry": { "at": [0, -0.45], "dist": 0.45 } }, { "t": 2.3, "clear": 1.1 }, { "t": 2.5 }] }] }""", rifleFeel);
+        for (var time = 0.5f; time <= 2.5f; time += 0.05f)
+            Assert.True(Vector3.Distance(OnPart(ridden, riddenRig, time), OnPart(ridden, riddenRig, 0.5f)) < 1e-3f, $"the hand on a carried magazine left it at {time:0.00} s");
+
+        InspectLook Solved(string id, InspectRig on) => InspectLook.Solve(table.Motions.Single(m => m.Id == id), WithParts(on, table.Motions.Single(m => m.Id == id), table));
+        var look = Solved("rifle", rig);
         var keys = look.Motion.Gun;
         for (var k = 0; k < keys.Length; k++)
         {
-            look.GunPose(keys[k].Time, 1f, gunAt, Quaternion.Identity, rig.TanHalf, out var at, out var turn, out var view);
-            if (keys[k].Rest) { Assert.True(Vector3.Distance(gunAt, at) < 1e-4f && view == rig.TanHalf); continue; }
-            Assert.True(view >= rig.TanHalf && view <= MathF.Tan(InspectLook.WideDegrees * MathF.PI / 360f) + 1e-5f, $"key {k}: view {view}");
-            var hand = at + Vector3.Transform(rig.GripAt - gunAt, turn);
-            Assert.True(Vector3.Distance(hand, rig.GripArm.Shoulder) <= rig.GripArm.Reach + 1e-4f);
-            var held = turn * rig.Grip;
-            var bent = 2f * MathF.Acos(MathF.Min(1f, MathF.Abs(Quaternion.Dot(rig.GripArm.Comfort(hand, held, look.Swivel[k]), held)))) * 180f / MathF.PI;
-            Assert.True(bent < 2f, $"key {k}: the wrist is {bent} degrees outside its limits");
+            if (!keys[k].Rest) continue;
+            look.GunPose(keys[k].Time * look.Slow, 1f, gunAt, Quaternion.Identity, rig.TanHalf, out var at, out _, out var view);
+            Assert.True(Vector3.Distance(gunAt, at) < 1e-4f && view == rig.TanHalf, $"rest key {k}");
         }
-        look = new InspectLook(table.Motions.Single(m => m.Id == "heavy"), rig);
-        look.GunPose(1.0f, 1f, gunAt, Quaternion.Identity, rig.TanHalf, out var gunNow, out var gunTurn, out _);
-        Assert.True(look.HandOff(1.0f));
-        look.HandPose(1.0f, 1f, gunNow, gunTurn, rig.OffAt, rig.Off, out var under, out _);
+        look = Solved("heavy", rig);
+        var underAt = look.Motion.Hand.First(h => h.On == InspectHold.Under).Time * look.Slow + 0.05f;
+        look.GunPose(underAt, 1f, gunAt, Quaternion.Identity, rig.TanHalf, out var gunNow, out var gunTurn, out _);
+        Assert.True(look.HandOff(underAt));
+        look.HandPose(underAt, 1f, gunNow, gunTurn, rig.OffAt, rig.Off, out var under, out _);
         Assert.True(Vector3.Transform(under - gunNow, Quaternion.Inverse(gunTurn)).Y < rig.Centre.Y);
         Assert.True(Vector3.Distance(under, rig.OffArm.Shoulder) <= rig.OffArm.Reach + 1e-4f);
 
-        // The revolver's twirl: mid-turn the gun is turned away from the hand that carries it, and at a whole turn it is back in the
-        // hand's hold exactly, so the hand takes the grip without a jump.
-        look = new InspectLook(table.Motions.Single(m => m.Id == "revolver"), rig);
-        look.GunPose(3.3f, 1f, gunAt, Quaternion.Identity, rig.TanHalf, out var spunAt, out var spun, out _);
+        // The revolver's twirl: mid-turn the gun is turned away from the hand that carries it, and past its stop and its settle it is back
+        // in the hand's hold, so the hand takes the grip without a jump.
+        look = Solved("revolver", pistol);
+        var twirl = Enumerable.Range(0, look.Motion.Gun.Length).First(look.Motion.IsTwirl);
+        float twirlFrom = look.Motion.Gun[twirl - 1].Time * look.Slow, twirlTo = look.Motion.Gun[twirl].Time * look.Slow;
+        look.GunPose((twirlFrom + twirlTo) / 2f + 0.03f, 1f, pistol.GunAt, pistol.Gun, pistol.TanHalf, out _, out var spun, out _);
         Assert.True(look.Free);
         Assert.InRange(MathF.Abs(Quaternion.Dot(spun, look.HeldTurn)), 0f, 0.99f);
-        look.GunPose(3.7f, 1f, gunAt, Quaternion.Identity, rig.TanHalf, out spunAt, out spun, out _);
-        Assert.True(Vector3.Distance(spunAt, look.HeldAt) < 1e-4f && MathF.Abs(Quaternion.Dot(spun, look.HeldTurn)) > 0.99999f);
+        look.GunPose(twirlTo + 0.12f, 1f, pistol.GunAt, pistol.Gun, pistol.TanHalf, out _, out _, out _);
+        Assert.False(look.Free);
+        // A toss rises its height above where it leaves the hand at the top of its flight (half its time in the air) and is caught back
+        // in the hand's hold once it has turned in the fingers.
+        look = Solved("handgun-toss", pistol);
+        var landing = look.Motion.Gun.Single(k => k.Toss > 0f);
+        var flight = InspectMotion.TossFlight(landing.Toss, landing.Gravity);
+        var release = landing.Time * look.Slow - flight;
+        look.GunPose(release, 1f, pistol.GunAt, pistol.Gun, pistol.TanHalf, out var thrownAt, out var thrown, out _);
+        look.GunPose(release + flight / 2f, 1f, pistol.GunAt, pistol.Gun, pistol.TanHalf, out var topAt, out var top, out _);
+        Assert.True(look.Free && look.Beating);
+        look.GunPose(landing.Time * look.Slow, 1f, pistol.GunAt, pistol.Gun, pistol.TanHalf, out var landsAt, out var lands, out _);
+        var up = Vector3.Transform(pistol.Centre, top) + topAt - (Vector3.Transform(pistol.Centre, thrown) + thrownAt + Vector3.Transform(pistol.Centre, lands) + landsAt) / 2f;
+        Assert.True(MathF.Abs(up.Y - landing.Toss) < 0.01f, $"toss top {up}");
+        look.GunPose(landing.Time * look.Slow + 0.08f, 1f, pistol.GunAt, pistol.Gun, pistol.TanHalf, out var caughtAt, out var caught, out _);
+        Assert.True(!look.Free && Vector3.Distance(caughtAt, look.HeldAt) < 1e-4f && MathF.Abs(Quaternion.Dot(caught, look.HeldTurn)) > 0.99999f);
+        // Its sound beats: the throw when the gun leaves the hand, the catch when it lands, each once in time order.
+        var cues = look.Cues;
+        Assert.Contains(cues, c => c.Cue == InspectMotion.TossCue && MathF.Abs(c.Time - release) < 1e-4f);
+        Assert.Contains(cues, c => c.Cue == InspectMotion.CatchCue && MathF.Abs(c.Time - landing.Time * look.Slow) < 1e-4f);
+        Assert.Equal(cues.OrderBy(c => c.Time), cues);
 
         var wrung = Quaternion.CreateFromAxisAngle(Vector3.Normalize(rig.GripAt - rig.GripArm.Elbow(rig.GripAt)), MathF.PI / 2f) * rig.Grip;
         var back = rig.GripArm.Comfort(rig.GripAt, wrung);
         Assert.InRange(2f * MathF.Acos(MathF.Min(1f, MathF.Abs(Quaternion.Dot(back, rig.Grip)))) * 180f / MathF.PI, InspectArm.Twist - 1f, InspectArm.Twist + 1f);
+        // Each motion is solved on the guns of the kinds that play it: a handgun's on the pistol, a long gun's on the rifle and the pump
+        // (a melee weapon's on neither: no hold of one was read in game).
+        HashSet<InspectMotion> handguns = [], longGuns = [], blades = [];
+        foreach (var (gear, length) in Enumerable.Range(0, 400).Select(g => ((uint)g, 0.5f)).Concat(new[] { 0.26f, 0.5f, 0.8f, 1.4f }.Select(l => (9999u, l))))
+            (table.Kind(gear, length) switch { "pistol" or "highcal" or "revolver" => handguns, "knife" or "bat" or "hammer" or "spear" => blades, _ => longGuns }).UnionWith(table.For(gear, length, out _));
+        blades.UnionWith(new[] { 0.3f, 0.6f, 0.9f, 1.4f }.SelectMany(l => table.For(9999, l, out _, null, melee: true)));
+        // The off hand of every motion (the owner's rule; spin is this test's own): it holds the item up from under it, is out of the
+        // view or, on a gun, works a part of it (the magazine, the slide, the cylinder); it never takes another hold of the gun.
+        foreach (var motion in handguns.Concat(longGuns).Distinct().Where(m => m.Id != "spin"))
+            Assert.True(motion.Hand.All(k => k.On is InspectHold.Grip or InspectHold.Away or InspectHold.Under or InspectHold.Node or InspectHold.Mag), $"{motion.Id}: the off hand takes a hold of the gun that works no part");
+        Assert.Equal(12, blades.Count);
+        foreach (var motion in blades)
+            Assert.True(motion.FromHold && motion.Hand.All(k => k.On is InspectHold.Grip or InspectHold.Away or InspectHold.Under), $"{motion.Id}: the off hand does more than hold the weapon up or stay out of the view");
+        var faults = new List<string>();
+        void Keeps(InspectLook look, string on) { if (!float.IsNaN(look.Fault)) faults.Add($"{look.Motion.Id} on the {on}: at {look.Fault:0.00} s {look.FaultRule}"); }
+        foreach (var motion in table.Motions.Where(m => m.Id != "spin"))
+        {
+            if (handguns.Contains(motion)) Keeps(InspectLook.Solve(motion, WithParts(pistol, motion, table)), "pistol");
+            if (!longGuns.Contains(motion)) continue;
+            Keeps(InspectLook.Solve(motion, WithParts(rig, motion, table)), "rifle");
+            // A pump shotgun (Buckland s870, its bounds and left-hand point read from the game files) held where the rifle is: its
+            // off hand on the pump far up the gun slides back to where the arm reaches when the gun turns away.
+            Keeps(InspectLook.Solve(motion, WithParts(rig with
+            {
+                Centre = new Vector3(-0.0287f, -0.1025f, 0.048f),
+                Extents = new Vector3(0.0563f, 0.1936f, 0.4745f),
+                OffAt = gunAt + new Vector3(-0.046f, -0.078f, 0.286f),
+            }, motion, table)), "pump shotgun");
+        }
+        // What the rules find on the shipped motions is a report for the owner, who decides which motions are good; it gates nothing.
+        output.WriteLine($"{faults.Count} rule findings on the shipped motions:\n" + string.Join("\n", faults));
     }
 }

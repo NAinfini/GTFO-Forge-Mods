@@ -155,6 +155,15 @@ static class FireHook
     static void Postfix(ItemEquippable __instance) => SkinnedGear.Event(__instance.Pointer, Trigger.Fire);
 }
 
+// A lobby bar given its player (CM_PageLoadout.SetPlayerSlot: the page shown, the slots, the host or a backpack changed), which spawns
+// the bar's figure when the player's character is new (SpawnPlayerModel): who wears which character model is looked at again, in any
+// game state. Only ForgeSkin reads it; nothing of the bar is read here, so a folded body running for another class only asks once more.
+[HarmonyPatch(typeof(CellMenu.CM_PlayerLobbyBar), nameof(CellMenu.CM_PlayerLobbyBar.UpdatePlayer))]
+static class LobbyBarHook
+{
+    static void Postfix() => Characters.Dirty();
+}
+
 // dump.cs 565473: the item kinds' own unwield overrides, which only ForgeSkin reads.
 [HarmonyPatch]
 static class UnwieldHook
@@ -168,7 +177,11 @@ static class UnwieldHook
         AccessTools.DeclaredMethod(typeof(SentryGunFirstPerson), nameof(SentryGunFirstPerson.OnUnWield)),
     }.Where(m => m != null && ForgeCore.Hooks.Unsupported(m) == null)!;
 
-    static void Postfix(ItemEquippable __instance) => SkinnedGear.Event(__instance.Pointer, Trigger.Unequip);
+    static void Postfix(ItemEquippable __instance)
+    {
+        SkinnedGear.Event(__instance.Pointer, Trigger.Unequip);
+        Inspect.Unwielded(__instance.Pointer);
+    }
 }
 
 // Fire for gear without a gun's fire animation: a melee attack (dump.cs 615568 class), a mine placed (568870 class) and a

@@ -496,8 +496,8 @@ public static class AssetPatch
         {
             var current = Entry("m_Colors", "_EmissiveColor");
             float k = p.EmissiveIntensity ?? 1;
-            // The skin's colour is in "as itself" units (MaterialParams.EmissionUnit); the material's own is in the game's.
-            const float u = MaterialParams.EmissionUnit;
+            // The skin's colour is in "as itself" units (ForgeVisual.ColourSpace.EmissionPerUnit); the material's own is in the game's.
+            const float u = ForgeVisual.ColourSpace.EmissionPerUnit;
             float[]? c = p.EmissiveColor is { } e ? [.. ForgeVisual.ColourSpace.Glow(e, u * k, hdr.Contains("_EmissiveColor")), 1]
                 : current is { } cur ? [cur["r"].AsFloat * k, cur["g"].AsFloat * k, cur["b"].AsFloat * k, cur["a"].AsFloat * k] : null;
             if (c != null)

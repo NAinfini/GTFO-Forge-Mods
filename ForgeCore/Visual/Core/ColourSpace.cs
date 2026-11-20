@@ -10,6 +10,11 @@ namespace ForgeVisual;
 /// </summary>
 public static class ColourSpace
 {
+    /// <summary>The game's gear shaders' glow unit, the one for every package: an <c>_EmissiveColor</c> of this value shows a linear colour of 1 as
+    /// itself (measured in game on S8-MESH, orange 1 / 0.35 / 0 in an unlit room: 0.03 already shifts it to yellow, 0.1 or more washes it out to white).
+    /// A glow "in units" (a skin's emissive intensity, a glTF emission factor, a screen's glow) reaches the shader times this.</summary>
+    public const float EmissionPerUnit = 0.01f;
+
     /// <summary>One sRGB component as linear (the extended transfer: above one stays above one).</summary>
     public static float ToLinear(float c) => c <= 0.04045f ? c / 12.92f : MathF.Pow((c + 0.055f) / 1.055f, 2.4f);
 

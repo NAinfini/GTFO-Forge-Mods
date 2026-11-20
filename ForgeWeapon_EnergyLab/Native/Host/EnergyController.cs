@@ -58,9 +58,14 @@ internal sealed class EnergyController
     // The game is in a level (read when its state changes, not every frame).
     private bool _inLevel;
     // Muzzle-anchored first-person effects are drawn as the look camera starts to render (PreCull).
-    private bool _streamHeld, _chargeHeld;
+    // ForgeCore's pre-cull subscription is held only while a beam, flame or charge is drawn: a press subscribes in the late update that sets
+    // the flag, before the frame's culling, so its first frame is drawn; the release lets go.
+    private bool _streamOn, _chargeOn;
+    private bool _streamHeld { get => _streamOn; set { _streamOn = value; SyncPreCull(); } }
+    private bool _chargeHeld { get => _chargeOn; set { _chargeOn = value; SyncPreCull(); } }
     private float _chargePower;
-    private Camera.CameraCallback? _preCull;
+    private string _modId = "";
+    private IDisposable? _preCull;
 
     private EnergyController() { }
 
@@ -68,22 +73,29 @@ internal sealed class EnergyController
     internal static EnergyController Start(string modId)
     {
         var controller = new EnergyController();
-        controller.Awake();
+        controller.Awake(modId);
         ForgeCore.Frame.OnLateUpdate(modId, controller.LateUpdate);
         ForgeCore.Frame.OnQuit(modId, controller.Shutdown);
         return controller;
     }
 
-    private void Awake()
+    private void Awake(string modId)
     {
         _instance = this;
         ForgeCore.GameEvents.LevelEnded += OnLevelEnded;
         ForgeCore.GameEvents.CheckpointReloaded += ForgetPlayer;
         ForgeCore.GameEvents.StateChanged += ReadState;
         ForgeCore.Net.WorldChanged += WorldChanged;
-        _preCull = DelegateSupport.ConvertDelegate<Camera.CameraCallback>(new Action<Camera>(PreCull));
-        Camera.onPreCull = Camera.onPreCull == null ? _preCull
-            : Il2CppSystem.Delegate.Combine(Camera.onPreCull, _preCull).Cast<Camera.CameraCallback>();
+        _modId = modId;
+    }
+
+    // ForgeCore owns the one native pre-cull subscription; this is a handle on it, held while a stream or charge is drawn.
+    private void SyncPreCull()
+    {
+        var want = _streamOn || _chargeOn;
+        if (want == (_preCull != null)) return;
+        if (want) _preCull = ForgeCore.Frame.OnPreCull(_modId, PreCull);
+        else { _preCull!.Dispose(); _preCull = null; }
     }
 
     // The level's weapons are destroyed with it; the next wield names the next gun.
@@ -193,7 +205,7 @@ internal sealed class EnergyController
             if (!_simulationsReady && !_preparationFailed) { PrepareVisuals(); PrepareSimulations(); }
             Tick();
             // Energy lights follow this frame's effects (local and remote) and fade on their own.
-            PointLights.Tick(Time.time);
+            PointLights.Tick(ForgeCore.Frame.GameTime);
         }
         catch (Exception error) { Fault(error); }
     }
@@ -218,12 +230,13 @@ internal sealed class EnergyController
     {
         var controller = _instance;
         // The managed flags decide first; the game's camera and holder are read only while a stream or charge is drawn.
-        if (controller == null || !controller._streamHeld && !controller._chargeHeld) return;
+        if (controller == null || !controller._streamOn && !controller._chargeOn) return;
         var holder = controller.LocalPlayer()?.FPItemHolder;
-        if (controller._faulted || controller._weapon == null || holder == null ||
-            holder.m_LookCamera == null || camera.Pointer != holder.m_LookCamera.Pointer ||
+        // The camera pointer first: most calls are other cameras.
+        if (holder == null || holder.m_LookCamera == null || camera.Pointer != holder.m_LookCamera.Pointer) return;
+        if (controller._faulted || controller._weapon == null ||
             holder.WieldedItem == null || holder.WieldedItem.Pointer != controller._weapon.Pointer) return;
-        try { controller.PresentHeld(Time.time, holder.ItemAimTrigger ? new Ray(camera.transform.position, camera.transform.forward) : null); }
+        try { controller.PresentHeld(ForgeCore.Frame.GameTime, holder.ItemAimTrigger ? new Ray(camera.transform.position, camera.transform.forward) : null); }
         catch (Exception error) { controller.Fault(error); }
     }
 
@@ -265,20 +278,20 @@ internal sealed class EnergyController
             return;
         }
         if (!EnergyGearRegistry.Ready) return;
-        var now = Time.time;
+        var now = ForgeCore.Frame.GameTime;
         // Released projectiles and a released beam's fading hold keep their own lifetime when switching guns or opening the map.
         if (!_faulted)
         {
             _effects?.Tick(now);
-            _plasma?.Tick(Time.deltaTime, now);
+            _plasma?.Tick(ForgeCore.Frame.DeltaTime, now);
             if (_special != null && (_mode != EnergyMode.Off || !_special.Idle))
-                _special.Tick(Time.deltaTime, now, LookRotation(LocalPlayer()));
+                _special.Tick(ForgeCore.Frame.DeltaTime, now, LookRotation(LocalPlayer()));
         }
         foreach (var pair in _remotes)
         {
             if (!SNet.TryGetPlayer(pair.Key, out var member) || member == null)
             { _departed.Add(pair.Key); continue; }
-            try { pair.Value.Tick(Time.deltaTime, now); }
+            try { pair.Value.Tick(ForgeCore.Frame.DeltaTime, now); }
             catch (Exception error)
             {
                 Plugin.Logger.ErrorOnce("Remote energy simulation stopped; committed damage will not be retried: " + error);
@@ -803,11 +816,8 @@ internal sealed class EnergyController
         ForgeCore.GameEvents.CheckpointReloaded -= ForgetPlayer;
         ForgeCore.GameEvents.StateChanged -= ReadState;
         ForgeCore.Net.WorldChanged -= WorldChanged;
-        if (_preCull != null)
-        {
-            Camera.onPreCull = Il2CppSystem.Delegate.Remove(Camera.onPreCull, _preCull)?.Cast<Camera.CameraCallback>();
-            _preCull = null;
-        }
+        _preCull?.Dispose();
+        _preCull = null;
         WeaponBindings.Clear();
         _warmEffects?.Dispose(); _warmVisuals?.Dispose(); _warmPlasma?.Dispose(); _warmSpecial?.Dispose();
         _warmEffects = null; _warmVisuals = null; _warmPlasma = null; _warmSpecial = null;

@@ -1,12 +1,20 @@
 # Changelog
 
+## 1.0.3
+
+Needs ForgeCore 1.0.3.
+
+- Fixed: an exosuit's arms reach the grips better: each hand is placed from the suit's own shoulder at the suit's arm lengths, and the left hand rests on the held item where the body's hand does. The weapon in the pilot's hand moves with the hand when the charge leans the body, and a replay shows the suit holding it.
+- Changed: a claim on a delivery that the host turns down because of the player's state (already borrowing a heavy weapon, for example) no longer writes an error to the log; only a check that itself fails is reported, once.
+- Changed: map and call-in labels (the trigger zone label, the placed-model label, the air strike's "no target" hint) turn to the camera just before the frame is drawn, so they no longer lag a frame behind a fast turn.
+- Changed: less work every frame: the barrier dome check resolves each dome once per frame, and time reads come from ForgeCore's per-frame value.
+- Changed: a new icon.
 ## 1.0.2
 
 ForgeOrdnance_Arsenal and ForgeOrdnance_Frames are now part of this package and are no longer updated. Uninstall both before you install it; their own changelogs are at the end of this file.
 
 - Needs ForgeCore 1.0.1.
 - Multiplayer: this version cannot play together with earlier ones. Its messages changed, so the two refuse each other (a line in each log) and every player needs the same version.
-- A claim on a delivery that the host turns down because of the player's state (already borrowing a heavy weapon, for example) no longer writes an error to the log; only a check that itself fails is reported, once.
 - Less network traffic, the same effects: an exosuit's shot is 24 bytes instead of 37 and names no suit (the sender's own suit is meant); when a player joins, the rows and kept states whose times count from when they were written are rewritten for that player alone instead of being sent again to everyone.
 - Add-ons: the bytes `IOrdnancePayload.RefreshState` returns reach only the player who joined; the other peers keep the state they hold.
 - The grenade launcher's explosion ships in this package (`Vfx/HeavyBlast/`) instead of with ForgeCore.

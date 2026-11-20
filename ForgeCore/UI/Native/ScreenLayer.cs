@@ -414,7 +414,13 @@ internal static class ScreenLayer
         Width = ForgeCore.Frame.ScreenWidth;
         Height = ForgeCore.Frame.ScreenHeight;
         Aspect = Width / (float)Math.Max(1, Height);
-        Layer = FreeLayer();
+        Layer = ForgeCore.SpareLayers.Unseen();
+        if (Layer < 0)
+        {
+            // Every layer is drawn by some camera: the full-screen layer keeps 31, so the cameras that draw 31 also see its pieces.
+            Plugin.Error("ui-screen-layer-no-spare-layer", "No layer is left that no camera draws; full-screen effects use layer 31, which other cameras also draw.");
+            Layer = 31;
+        }
         _root = new GameObject("ForgeUI.Screen") { layer = Layer };
         Object.DontDestroyOnLoad(_root);
         var cameraObject = new GameObject("Camera") { layer = Layer };
@@ -439,14 +445,6 @@ internal static class ScreenLayer
         _root.SetActive(false);
         _users = 0;
         Generation++;
-    }
-
-    /// <summary>The first unnamed layer from the top (spare layers are unnamed, nothing else renders them).</summary>
-    private static int FreeLayer()
-    {
-        for (var layer = 31; layer >= 8; layer--)
-            if (string.IsNullOrEmpty(LayerMask.LayerToName(layer))) return layer;
-        return 31;
     }
 
     internal static Material Material(Shader shader, Color colour, int queue)

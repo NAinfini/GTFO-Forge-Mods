@@ -228,11 +228,12 @@ public sealed class GlowSpot
         var k = _steady ? 0f : (now - _start) / _seconds;
         if (k >= 1f) { Hide(); return false; }
         var ease = 1f - (1f - k) * (1f - k);
-        _object.transform.localScale = Vector3.one * (_size0 + (_size1 - _size0) * ease);
+        var t = _object.transform;
+        t.localScale = Vector3.one * (_size0 + (_size1 - _size0) * ease);
         if (Scene.HasEye)
         {
-            var facing = _object.transform.position - Scene.Eye;
-            if (facing.sqrMagnitude > 1e-6f) _object.transform.rotation = Quaternion.LookRotation(facing);
+            var facing = t.position - Scene.Eye;
+            if (facing.sqrMagnitude > 1e-6f) t.rotation = Quaternion.LookRotation(facing);
         }
         _block.SetColor(ColorId, new Color(_colour.r, _colour.g, _colour.b, _alpha * (1f - k)));
         _renderer.SetPropertyBlock(_block);

@@ -182,7 +182,7 @@ public sealed class HudWaypoints : HudWidget
     internal override void Tick(HudElement hud, float now, float dt)
     {
         if (_canvas == null || !_canvas.Begin()) return;
-        _tickFrame = Time.frameCount;
+        _tickFrame = ForgeCore.Frame.Count;
         if (_book.Count == 0 || !WorldView.Read(out var clip, out var eye) || hud.HalfWidth <= 0f) { _canvas.End(); return; }
         // Marks are sized in HUD units (as the world markers they replace were); texts in 1080p pixels.
         var inset = Plugin.HudSafeMargin + ArrowSize;
@@ -255,7 +255,7 @@ public sealed class HudWaypoints : HudWidget
     /// not-yet-built groups are left out), into the compass reading; false once the reading is full.</summary>
     internal static bool AddToCompass(CompassReading reading)
     {
-        var frame = Time.frameCount;
+        var frame = ForgeCore.Frame.Count;
         for (var g = 0; g < All.Count; g++)
         {
             var group = All[g];

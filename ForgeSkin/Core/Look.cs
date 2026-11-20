@@ -20,6 +20,10 @@ public enum LookChange : byte { Param = 0, EffectColor = 1, Transform = 2, Playe
 
 public enum LookFit { Fits, Missing, Mismatch, BadValue }
 
+// Which character another player's body wears on this machine (PLAN §4.11): their own pick, else the one this player gave their slot,
+// else the original person.
+public enum CharacterFrom { Theirs, Local, Original }
+
 public readonly record struct LookTweak(LookChange Kind, ushort Slot, ushort Name, uint Value)
 {
     public static LookTweak Of(int slot, LookChange kind, int name, uint value) => new(kind, (ushort)slot, (ushort)name, value);
@@ -148,6 +152,12 @@ public sealed class Look
         }
         return at == data.Length ? look : null;
     }
+
+    // Whose character a teammate wears here. A character in their look always wins, also when it is not installed here (then the
+    // original person shows and skin-look-missing names it); this player's pick for their slot shows only when their look names no
+    // character or never came (no ForgeSkin, or a look that cannot be read).
+    public static CharacterFrom CharacterSource(Look? theirs, bool localPick) =>
+        theirs?.Character != null ? CharacterFrom.Theirs : localPick ? CharacterFrom.Local : CharacterFrom.Original;
 
     // Whether a teammate's `entry` can be shown with the skin installed here under its number (`doc` null: none is), whose pack hashes to
     // `hash`; when it can, `picks` are the teammate's changes (Picks). Anything else shows that gear in its original look.

@@ -37,7 +37,10 @@ sealed class Skin
     public string Pack = "";
     Task<ulong>? _hashing;
 
-    Skin(SkinDocument doc, string file, DateTime stamp) { Doc = doc; File = file; Stamp = stamp; Number = Look.SkinNumber(doc.Id); }
+    // The pack's own weapon inspect motions (SkinPack.Inspect), added to the pool of a gun that shows this skin; null: none.
+    public readonly InspectTable? Inspect;
+
+    Skin(SkinDocument doc, string file, DateTime stamp, InspectTable? inspect) { Doc = doc; File = file; Stamp = stamp; Number = Look.SkinNumber(doc.Id); Inspect = inspect; }
 
     // The pack file's FNV-1a 64, which a look names the pack's content by: read on a worker the first time it is asked for (only for a
     // skin the local player wears or a teammate's look names), then kept with this skin (a pack changed on disk is a new Skin). Null
@@ -68,7 +71,7 @@ sealed class Skin
     public static Skin Read(string file, DateTime stamp)
     {
         using var pack = SkinPack.Open(file);
-        return new Skin(pack.Manifest, file, stamp);
+        return new Skin(pack.Manifest, file, stamp, pack.Inspect);
     }
 
     // What the worker read out of the zip.
@@ -219,9 +222,13 @@ sealed class Skin
             return new SkinFormatException(result.Failure.Code == ImportedModelCodes.CutoutUnsupported ? "unsupported-character-material" : "bad-character-model", result.Failure.ToString());
         try { Links = CharacterRig.Links(Doc.Character!, _model.Model!); }
         catch (ArgumentException e) { return new SkinFormatException("bad-character-bones", e.Message); }
-        // Never silent: the joints this model has no bone for, once per load.
-        if (HumanRig.Unposed(Links) is { Length: > 0 } unposed)
+        // Never silent: the joints this model has no bone for, once per load. An upper chest or shoulder many skeletons lack is a
+        // fact at info; any other joint is a content notice the author can fix.
+        var unposed = HumanRig.Unposed(Links, optional: false);
+        if (unposed.Length > 0)
             ForgeSkinPlugin.Fail("skin-character-part-skipped", $"character {Doc.Id} has no bone for {string.Join(", ", unposed)}: those parts keep their rest pose and move with the bone above them");
+        if (HumanRig.Unposed(Links).Except(unposed).ToArray() is { Length: > 0 } common)
+            ForgeSkinPlugin.Info($"character {Doc.Id} has no bone for {string.Join(", ", common)}, which many skeletons lack: the bone above carries those parts");
         Character = built;
         _model = null;
         return null;
@@ -648,7 +655,10 @@ static class Skins
         ByFile.Clear();
         foreach (var (file, skin) in byFile) ByFile[file] = skin;
         foreach (var skin in read)
-            ForgeSkinPlugin.Note($"found {Path.GetFileName(skin.File)}: id {skin.Doc.Id}, {skin.Doc.Materials.Count} materials, {skin.Doc.Attachments.Count} attachments, {skin.Doc.Sounds.Count} sounds (loaded when first worn)");
+        {
+            ForgeSkinPlugin.Note($"found {Path.GetFileName(skin.File)}: id {skin.Doc.Id}, {skin.Doc.Materials.Count} materials, {skin.Doc.Attachments.Count} attachments, {skin.Doc.Sounds.Count} sounds, {skin.Inspect?.Motions.Count() ?? 0} inspect motions (loaded when first worn)");
+            Inspect.Learn(skin);
+        }
         var before = _activeTargets;
         (_activeTargets, _activeGlobals) = (targets, globals);
         Index();

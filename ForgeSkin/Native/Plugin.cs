@@ -64,12 +64,25 @@ public sealed class ForgeSkinPlugin : BasePlugin
         public string Text() => _text.ToStringAndClear();
     }
 
-    /// <summary>An error: a feature failed or data leaves something unusable. Written once per exact text under its registered code.</summary>
+    // A skin's own content that the game shows without one part (a model with no bone for a part, a hand pose that is not a full set
+    // of rows, a material or sight part with no place for the skin's addition): the author fixes the skin, nothing failed. These codes
+    // are a Warning in BepInEx, once per text, like the warn forgeskin.log gives them; every other code is an error and stays one.
+    static readonly HashSet<string> ContentNotices = new(StringComparer.Ordinal)
+        { "skin-character-part-skipped", "skin-hand-fingers-skipped", "skin-reticle-skipped", "skin-sight-skipped" };
+    static readonly HashSet<string> Warned = new(StringComparer.Ordinal);
+    static BepInEx.Logging.ManualLogSource _bepInEx = null!;
+
+    /// <summary>An error: a feature failed or data leaves something unusable. Written once per exact text under its registered code;
+    /// a content notice (<see cref="ContentNotices"/>) is written once as a Warning instead.</summary>
     internal static void Fail(string code, string message, Exception? error = null)
     {
-        Logger.ErrorOnce(code, error == null ? message : message + ": " + error);
+        var text = code + ": " + (error == null ? message : message + ": " + error);
+        if (!ContentNotices.Contains(code)) Logger.ErrorOnce(text);
+        else if (FirstWarning(text)) _bepInEx.LogWarning(text);
         Own("warn", message);
     }
+
+    static bool FirstWarning(string text) { lock (Warned) return Warned.Add(text); }
 
     static void Own(string level, string message)
     {
@@ -102,6 +115,7 @@ public sealed class ForgeSkinPlugin : BasePlugin
     public override void Load()
     {
         Logger = ForgeCore.Log.For(Guid);
+        _bepInEx = Log;
         Settings.Adopt(Guid, Config);
         Development = Settings.Bind(Guid, "General", "Development", false,
             "Author mode, for skin mod authors: also reload the skins whenever a skin mod in the plugins folder changes, and write every detail to forgeskin.log. The skins folder the editor installs into is followed, and what loaded or failed logged, either way.",

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
 using Il2CppInterop.Runtime;
 using Il2CppInterop.Runtime.InteropTypes;
 
@@ -13,6 +14,18 @@ public static class NativeObjects
 {
     /// <summary>True when <paramref name="target"/> is null, its managed wrapper was collected, or its native object was destroyed (the one definition of "gone" for every package).</summary>
     public static bool Gone([NotNullWhen(false)] UnityEngine.Object? target) => target is null || target.WasCollected || target.m_CachedPtr == IntPtr.Zero;
+
+    /// <summary><see cref="Gone(UnityEngine.Object?)"/> from the object's own pointer (its wrapper's <c>Pointer</c>, kept while the caller
+    /// holds that wrapper, which keeps the object from being collected): a zero pointer or a destroyed native object. One memory read, no
+    /// call into the runtime or the game: for loops that test hundreds of held objects a frame (enemy slots, bones). Check it before every
+    /// <see cref="EngineCalls"/> call on a held object: the engine's own call on a destroyed object raises in native code.</summary>
+    public static bool GoneAt(IntPtr pointer) => pointer == IntPtr.Zero || Marshal.ReadIntPtr(pointer, CachedPtr.Offset) == IntPtr.Zero;
+
+    // Resolved on first use (the game's metadata is loaded by then).
+    private static class CachedPtr
+    {
+        internal static readonly int Offset = FieldOffset<UnityEngine.Object>("m_CachedPtr");
+    }
 
     /// <summary>True when the native object behind <paramref name="target"/> really is a <typeparamref name="T"/>, read from its IL2CPP class
     /// without making a wrapper (<c>TryCast</c> makes one). IL2CPP folds identical native bodies into one function, so a patched method
@@ -51,4 +64,10 @@ public static class NativeObjects
         if (field == IntPtr.Zero) throw new MissingFieldException(typeof(T).Name, name);
         return checked((int)IL2CPP.il2cpp_field_get_offset(field));
     }
+
+    /// <summary>A new boxed game struct <typeparamref name="T"/> with every field zero, for <c>new T(NativeObjects.Zeroed&lt;T&gt;())</c>.
+    /// The interop's own <c>new T()</c> of a struct that holds a reference (a string, a list, an object) boxes uninitialized stack memory
+    /// (<c>localloc</c> without zeroing), so every field left unset is garbage the game later reads as a pointer: the game's tooltip
+    /// crashed on such a header. A struct of plain values is a C# struct and needs none of this.</summary>
+    public static IntPtr Zeroed<T>() where T : Il2CppSystem.ValueType => IL2CPP.il2cpp_object_new(Il2CppClassPointerStore<T>.NativeClassPtr);
 }

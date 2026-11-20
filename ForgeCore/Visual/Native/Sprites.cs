@@ -218,6 +218,10 @@ internal sealed class SpriteParticle
     internal int FlipCount, Cell;
     internal Color C0, C1;
     internal SpriteEnd? OnEnd;
+    // What the step last wrote: a still floor mark is not placed again, and the tint goes to the renderer only when it changed (NaN: write next step).
+    internal Vector3 PlacedAt;
+    internal float PlacedTurn, PlacedSize;
+    internal Color Tint;
 }
 
 /// <summary>
@@ -432,6 +436,8 @@ public static class SpritePool
         }
         p.F.sharedMesh = cells[p.Cell];
         p.R.enabled = false;
+        p.PlacedTurn = float.NaN;
+        p.Tint.a = float.NaN;
     }
 
     private static void Hide(SpriteParticle p)
@@ -521,8 +527,14 @@ public static class SpritePool
         {
             case SpriteFace.Floor:
                 {
+                    // A mark that neither spins, moves, turns nor grows (a decal holding still) keeps the place it was given.
+                    var turn = p.Rot + age * p.Spin;
+                    if (turn == p.PlacedTurn && size == p.PlacedSize && p.Pos.x == p.PlacedAt.x && p.Pos.y == p.PlacedAt.y && p.Pos.z == p.PlacedAt.z) break;
+                    p.PlacedTurn = turn;
+                    p.PlacedSize = size;
+                    p.PlacedAt = p.Pos;
                     var up = Math.Abs(p.Normal.y) > 0.98f ? Vector3.forward : Vector3.up;
-                    p.T.SetPositionAndRotation(p.Pos, Quaternion.LookRotation(p.Normal, up) * Quaternion.Euler(0f, 0f, (p.Rot + age * p.Spin) * 57.29578f));
+                    p.T.SetPositionAndRotation(p.Pos, Quaternion.LookRotation(p.Normal, up) * Quaternion.Euler(0f, 0f, turn * 57.29578f));
                     p.T.localScale = new Vector3(size, size, 1f);
                     break;
                 }
@@ -546,8 +558,12 @@ public static class SpritePool
                     break;
                 }
         }
-        _block!.SetColor(_colorId, colour);
-        p.R.SetPropertyBlock(_block);
+        if (colour.r != p.Tint.r || colour.g != p.Tint.g || colour.b != p.Tint.b || colour.a != p.Tint.a)
+        {
+            p.Tint = colour;
+            _block!.SetColor(_colorId, colour);
+            p.R.SetPropertyBlock(_block);
+        }
         if (!p.Drawn) { p.Drawn = true; p.R.enabled = true; }
         return true;
     }

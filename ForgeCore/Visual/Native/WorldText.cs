@@ -1,3 +1,4 @@
+using ForgeUI;
 using TMPro;
 using UnityEngine;
 
@@ -30,8 +31,8 @@ public sealed class WorldText
     private readonly TextMeshPro _text;
     private Material? _material;
     private Transform? _camera;
-    private Quaternion _rotation;
-    private bool _rotationKnown, _shown;
+    private System.IDisposable? _facing;
+    private bool _shown;
     private Vector3 _position;
     private bool _positionKnown;
 
@@ -57,6 +58,7 @@ public sealed class WorldText
         var result = new WorldText(target, text);
         try
         {
+            UseKitFont(text);
             text.richText = false; text.enableAutoSizing = false; text.enableWordWrapping = true;
             text.alignment = style.Alignment; text.fontSize = style.FontSize; text.color = style.Color;
             text.lineSpacing = style.LineSpacing; text.rectTransform.pivot = style.Pivot;
@@ -69,6 +71,16 @@ public sealed class WorldText
         catch { result.Destroy(); throw; }
         target.SetActive(false);
         return result;
+    }
+
+    /// <summary>Draws with the kit's own SDF faces (<see cref="UIKitFonts"/>, with the wider world margin) over the default text
+    /// material, so the glyphs keep the world-space shader; when the kit's fonts are missing the default font stays.</summary>
+    private static void UseKitFont(TextMeshPro text)
+    {
+        var kit = UIKitFonts.For(text.font, text.fontSharedMaterial, UIKitFonts.WorldPadding);
+        if (kit == null) return;
+        text.font = kit.Regular;
+        text.fontSharedMaterial = kit.Regular.material;
     }
 
     /// <summary>The object that carries the text component.</summary>
@@ -127,15 +139,15 @@ public sealed class WorldText
         _transform.localPosition = position; _position = position; _positionKnown = true;
     }
 
-    /// <summary>Turns the text to the camera's rotation, writing only when the camera or its rotation changed. A null camera forgets the last rotation.</summary>
-    public void FaceCamera(Transform? camera, Quaternion cameraRotation)
+    /// <summary>Keeps the text turned to <paramref name="camera"/>'s rotation (<see cref="CameraFacing.Follow(Transform, Facing, Transform?)"/>
+    /// with <see cref="Facing.CameraTurn"/>, turned with every other follower just before the cameras render). The same camera again does
+    /// nothing, so a caller may pass the current camera every frame; another camera replaces it; null stops the turning.</summary>
+    public void FaceCamera(Transform? camera)
     {
-        if (camera == null || camera.WasCollected) { _camera = null; _rotationKnown = false; return; }
-        if (!_rotationKnown || _camera == null || _camera.WasCollected || _camera.Pointer != camera.Pointer
-            || _rotation.x != cameraRotation.x || _rotation.y != cameraRotation.y || _rotation.z != cameraRotation.z || _rotation.w != cameraRotation.w)
-        {
-            _transform.rotation = cameraRotation; _rotation = cameraRotation; _rotationKnown = true;
-        }
+        if (camera == null || camera.WasCollected) { _facing?.Dispose(); _facing = null; _camera = null; return; }
+        if (_facing != null && _camera != null && _camera.Pointer == camera.Pointer) return;
+        _facing?.Dispose();
+        _facing = CameraFacing.Follow(_transform, Facing.CameraTurn, camera);
         _camera = camera;
     }
 
@@ -145,5 +157,6 @@ public sealed class WorldText
         if (_object != null && !_object.WasCollected) UnityEngine.Object.Destroy(_object);
         if (_material != null && !_material.WasCollected) UnityEngine.Object.Destroy(_material);
         _material = null; _shown = false;
+        _facing?.Dispose(); _facing = null; _camera = null;
     }
 }

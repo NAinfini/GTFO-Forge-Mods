@@ -18,7 +18,10 @@ public sealed class Node
     public List<MaterialRef> Materials = new();
     public bool Active = true;
     public string? Part; // catalog part id on part roots
-    public string? Point; // which of the gear's hold points this node is (Assembly.Points), else null
+    public string? Point; // which of the gear's hold points this node is (Assembly.Points), or "light" (Unity.LightPoint), else null
+    public bool Skinned; // its renderer is a SkinnedMeshRenderer (a part layout cannot swap its model: the plugin swaps MeshFilters)
+    public long TransformId; // its Transform's path id in its file (references from the prefab's scripts name it)
+    public long[]? LightAlign; // on a GearPartFlashlight's object: the path ids its m_lightAlign may be (Unity.LightPoint picks)
 
     public void ResetRoot(string part)
     {
@@ -76,7 +79,30 @@ public sealed record TexRef(AssetsFileInstance File, long PathId, float[] Scale,
 
 public static class Unity
 {
-    public static Node LoadPrefab(GameAssets g, GameAssets.AssetRef prefab) => LoadGameObject(g, g.Load(prefab.File), prefab.PathId, null);
+    public static Node LoadPrefab(GameAssets g, GameAssets.AssetRef prefab)
+    {
+        var root = LoadGameObject(g, g.Load(prefab.File), prefab.PathId, null);
+        LightPoint(root);
+        return root;
+    }
+
+    // The flashlight's light: the game moves the player's light to the node GearPartFlashlight.m_lightAlign names, every frame. The
+    // script's fields are read by hand (no type tree): m_lightAlign is the first serialized PPtr, after the m_emitterMeshes array
+    // when that is serialized, so both places are tried and the one that names a Transform of this prefab wins. When neither does,
+    // the node named Spot (where the game's flashlights keep it) is taken and that is logged.
+    static void LightPoint(Node root)
+    {
+        foreach (var owner in root.All().Where(n => n.LightAlign != null).ToList())
+        {
+            var light = owner.LightAlign!.Select(id => root.All().FirstOrDefault(n => n.TransformId == id)).FirstOrDefault(n => n != null);
+            if (light == null)
+            {
+                light = root.Find("Spot");
+                Log.Write($"flashlight {root.Name}: m_lightAlign of {owner.Name} names no transform of the prefab; " + (light != null ? "took the node named Spot" : "no node named Spot either, so no light point"));
+            }
+            if (light != null) light.Point = "light";
+        }
+    }
 
     static Node LoadGameObject(GameAssets g, AssetsFileInstance file, long pathId, Node? parent)
     {
@@ -93,6 +119,7 @@ public static class Unity
                     node.Position = V3(t["m_LocalPosition"]);
                     node.Rotation = new Quaternion(t["m_LocalRotation.x"].AsFloat, t["m_LocalRotation.y"].AsFloat, t["m_LocalRotation.z"].AsFloat, t["m_LocalRotation.w"].AsFloat);
                     node.Scale = V3(t["m_LocalScale"]);
+                    node.TransformId = at.PathId;
                     foreach (var child in t["m_Children.Array"].Children)
                     {
                         var ct = g.Resolve(at.File, child);
@@ -107,6 +134,10 @@ public static class Unity
                     var smr = g.Field(at);
                     node.Mesh = MeshRefOf(g, at.File, smr["m_Mesh"]);
                     node.Materials = MaterialsOf(g, at.File, smr);
+                    node.Skinned = true;
+                    break;
+                case AssetClassID.MonoBehaviour:
+                    if (g.ScriptName(at.File, g.Field(at)) == "GearPartFlashlight") node.LightAlign = LightAlignIds(at.File, info);
                     break;
                 case AssetClassID.MeshRenderer:
                     var mr = g.Field(at);
@@ -115,6 +146,27 @@ public static class Unity
             }
         }
         return node;
+    }
+
+    // Where m_lightAlign may sit after the script header: first, or after a PPtr array (count, then 12 bytes each). A reference to
+    // another file cannot be a node of the prefab and is left out.
+    static long[] LightAlignIds(AssetsFileInstance file, AssetFileInfo info)
+    {
+        var r = GameAssets.MonoReader(file, info);
+        long start = r.Position, end = info.GetAbsoluteByteOffset(file.file) + info.ByteSize;
+        var ids = new List<long>();
+        void PPtrAt(long at)
+        {
+            if (at + 12 > end) return;
+            r.Position = at;
+            int fileId = r.ReadInt32();
+            long pathId = r.ReadInt64();
+            if (fileId == 0 && pathId != 0) ids.Add(pathId);
+        }
+        PPtrAt(start);
+        r.Position = start;
+        if (start + 4 <= end && r.ReadInt32() is var count and >= 0 && start + 4 + count * 12L <= end) PPtrAt(start + 4 + count * 12L);
+        return ids.ToArray();
     }
 
     static MeshRef? MeshRefOf(GameAssets g, AssetsFileInstance file, AssetTypeValueField pptr)

@@ -1,5 +1,6 @@
 <#
-Offline load check for a set of Forge assemblies; never loads or runs them.
+Offline load check for a set of Forge assemblies; never loads or runs them. A dll of the list without managed metadata (a native
+library such as ForgeFrameGen.Native.dll) references no assembly: it is named in a NATIVE line and left out.
 
 For every dll listed in -List, each type reference that points at another assembly of the same set must exist there
 (namespace, nested name), each member reference on such a type must exist by name (method or field, searched up the
@@ -40,6 +41,11 @@ function Get-Scope($reader, $refAsm, $handle) {
 $set = @{}
 foreach ($path in $Paths) {
     $pe = [System.Reflection.PortableExecutable.PEReader]::new([IO.File]::OpenRead($path))
+    if (-not $pe.HasMetadata) {
+        $pe.Dispose()
+        "NATIVE $([IO.Path]::GetFileName($path)) is a native library: it has no assembly references to check"
+        continue
+    }
     $r = [System.Reflection.Metadata.PEReaderExtensions]::GetMetadataReader($pe)
     $refAsm = @{}
     foreach ($h in $r.AssemblyReferences) { $refAsm[(Get-Row $h)] = $r.GetString($r.GetAssemblyReference($h).Name) }

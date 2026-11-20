@@ -1,6 +1,7 @@
 // The gun's hold points in the 3D view, shown while one of them is selected: a dot on each point's node (the selected one solid),
-// a line through the muzzle and the aim line along their direction, and a hand on each grip point. Drawn over the gun so a point
-// inside a part can be seen; never picked.
+// a line through the muzzle and the aim line along their direction, and a hand on each grip point. The flashlight's light is
+// drawn the same way (dot and line), alone while it is selected. Drawn over the gun so a point inside a part can be seen; never
+// picked.
 //
 // The hand is the game's own (gameHands.ts): its glove on the hand point, the fingers in the grip animation the hand takes on this
 // gun (the skin's choice, else the gun's own) with the skin's finger turns on top. On the selected hand every finger segment has a
@@ -9,14 +10,14 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import type { Group } from 'three';
-import type { HoldPoint } from '../protocol';
+import type { GearPoint } from '../protocol';
 import { useStore } from '../store';
 import { buildHand, dragDot, poseHand, storeTurn, useFinger, useGameHands } from './gameHands';
 import { newGesture } from './ModalTransform';
 import { hitsAt, partTarget, useSceneVersion, viewRefs } from './refs';
 
-/** Each hold point's colour, in the 3D view and in the parts list. */
-export const HOLD_COLOR: Record<HoldPoint, string> = { rightHand: '#ff8a3d', leftHand: '#3db8ff', muzzle: '#ff4d6a', sight: '#6dff8f' };
+/** Each point's colour, in the 3D view and in the parts list. */
+export const HOLD_COLOR: Record<GearPoint, string> = { rightHand: '#ff8a3d', leftHand: '#3db8ff', muzzle: '#ff4d6a', sight: '#6dff8f', light: '#ffd84d' };
 
 function Hand({ side, color, strong }: { side: 'rightHand' | 'leftHand'; color: string; strong: boolean }) {
   const hands = useGameHands();
@@ -71,11 +72,14 @@ function Hand({ side, color, strong }: { side: 'rightHand' | 'leftHand'; color: 
   return <primitive object={built.root} />;
 }
 export function HoldPointMarks() {
-  const points = useStore((s) => s.preview?.points) ?? [];
+  const all = useStore((s) => s.preview?.points) ?? [];
   const selection = useStore((s) => s.selection);
   const group = useRef<Group>(null);
   useSceneVersion();
   const on = (p: { part: string; path: string }) => selection?.kind === 'part' && selection.id === p.part && selection.sub === p.path;
+  // The flashlight's light shows on its own; the hold points together.
+  const light = all.some((p) => p.point === 'light' && on(p));
+  const points = all.filter((p) => (p.point === 'light') === light);
   const shown = points.some(on);
   useFrame(() => {
     group.current?.children.forEach((mark, i) => {
@@ -95,7 +99,7 @@ export function HoldPointMarks() {
             <sphereGeometry args={[on(p) ? 0.007 : 0.005, 16, 12]} />
             <meshBasicMaterial color={HOLD_COLOR[p.point]} depthTest={false} transparent opacity={on(p) ? 1 : 0.45} toneMapped={false} />
           </mesh>
-          {(p.point === 'muzzle' || p.point === 'sight') && (
+          {(p.point === 'muzzle' || p.point === 'sight' || p.point === 'light') && (
             <mesh renderOrder={10} rotation={[Math.PI / 2, 0, 0]}>
               <cylinderGeometry args={[0.0008, 0.0008, 0.12, 6]} />
               <meshBasicMaterial color={HOLD_COLOR[p.point]} depthTest={false} transparent opacity={on(p) ? 0.9 : 0.35} toneMapped={false} />

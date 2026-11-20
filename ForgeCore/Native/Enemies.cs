@@ -365,18 +365,26 @@ public static class Enemies
 
     /// <summary><see cref="Alert(EnemyAgent)"/> from parts the caller already holds: a reader that samples many enemies every tick keeps
     /// each enemy's <c>AI</c> and <c>Locomotion</c> (every property read makes a new interop wrapper) and says whether it is alive, so a
-    /// read allocates nothing. A null <paramref name="ai"/> or a dead enemy is <see cref="EnemyAlert.Off"/>.</summary>
+    /// read allocates nothing. A null <paramref name="ai"/> or a dead enemy is <see cref="EnemyAlert.Off"/>. The parts are tested with a
+    /// managed null check, not Unity's <c>==</c> (a call into the game per test): a caller holds them only while their enemy lives.</summary>
     public static EnemyAlert Alert(bool alive, EnemyAI? ai, EnemyLocomotion? locomotion)
     {
-        if (!alive || ai == null) return EnemyAlert.Off;
-        var mode = ai.Mode switch
+        if (!alive || ai is null) return EnemyAlert.Off;
+        return Alert(ai.Mode, locomotion is not null ? (int)locomotion.CurrentStateEnum : 0);
+    }
+
+    /// <summary><see cref="Alert(bool, EnemyAI?, EnemyLocomotion?)"/> of a living enemy from its AI mode and locomotion state as read: a
+    /// sampler that reads both fields in place (<see cref="NativeObjects.FieldOffset{T}"/>) calls nothing in the game.</summary>
+    public static EnemyAlert Alert(AgentMode mode, int locomotionState)
+    {
+        var alert = mode switch
         {
             AgentMode.Off => EnemyAlert.Off,
             AgentMode.Hibernate => EnemyAlert.Sleeping,
             AgentMode.Agressive => EnemyAlert.Hunting,
             _ => EnemyAlert.Awake,
         };
-        return EnemyAlerts.Settle(mode, locomotion != null ? (int)locomotion.CurrentStateEnum : 0);
+        return EnemyAlerts.Settle(alert, locomotionState);
     }
 
     /// <summary>Takes a slot for a spawned enemy. Whether it lives is not asked here: the game's alive flag may not be set yet when its

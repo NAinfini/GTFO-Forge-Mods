@@ -99,8 +99,9 @@ public static partial class Log
     public static string Num(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 
     /// <summary>Developer logs: true when <c>NAinfini.ForgeCore.cfg</c> [Logging] DeveloperLogs is on or ForgeDevelopment is installed.
-    /// Every Forge package writes an Info, Debug or Warning line to its BepInEx log only while this is true (<c>if (Log.Developer)
-    /// source.LogInfo(...)</c>, so nothing is built when it is false); errors are always written. Info a player turns on by a named
+    /// Errors and Warnings are always written to a package's BepInEx log; a Warning is a real deviation, written once per kind
+    /// (<see cref="OnceReporter"/>), never a routine state. Every Forge package writes an Info or Debug line only while this is true
+    /// (<c>if (Log.Developer) source.LogInfo(...)</c>, so nothing is built when it is false). Info a player turns on by a named
     /// setting (default off) writes as that setting says.</summary>
     public static bool Developer { get; internal set; }
 

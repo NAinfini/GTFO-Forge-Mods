@@ -35,8 +35,9 @@ SHARED_ROUTES = ("config", "Assets")
 
 def zip_entry(name: str, path: str) -> str:
     """The zip entry of package <name>'s file <path> (relative to its DLL folder): the root files stay, the rest go under plugins/<name>/,
-    so a mod manager installs them in BepInEx/plugins/<Team>-<name>/<name>/ and a manual unzip into BepInEx in plugins/<name>/."""
-    return path if path in ROOT_FILES else "plugins/" + name + "/" + path
+    so a mod manager installs them in BepInEx/plugins/<Team>-<name>/<name>/ and a manual unzip into BepInEx in plugins/<name>/. A path under
+    patchers/ (a BepInEx preloader patcher) stays at the zip root, so it lands in BepInEx/patchers/<Team>-<name>/."""
+    return path if path in ROOT_FILES or path.startswith("patchers/") else "plugins/" + name + "/" + path
 
 
 def manager_install(package: str, entry: str) -> str:

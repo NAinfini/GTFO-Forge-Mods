@@ -48,7 +48,7 @@ await forgeAI.get('materials/0/livery')                  // one value of the doc
 |---|---|
 | `state` | `weaponId`, `skinId`, `selection`, `busy`, `undoSteps`, `redoSteps`, `item` (parts with id, role, label, materials), `skins`, `problems` (what blocks a build), `camera`, `doc` (the skin document, the JSON of the project file) |
 | `help` | every command with its arguments |
-| `listWeapons {query?}`, `selectWeapon {id}` | the catalog; open an item and wait for its 3D view |
+| `listWeapons {query?}`, `selectWeapon {id}` | the catalog; open an item in the weapon view (also from a character model) and wait for its 3D view |
 | `switchSkin {id}`, `newSkin {copy?}` | skins of the open item |
 | `select {kind, id, material?, sub?}` or `{clear: true}` | selection: `part`, `attachment`, `layer`, `livery`, `sound`, `fx` |
 | `get {path}`, `patch {ops, key?}` | read or change **any** field of the skin document; see below |
@@ -183,7 +183,7 @@ Each step lists the control and what tells you it worked.
 5. **Add a paint layer.** Right edge **Livery**; pick a finish, or click **Base coat**, **Decal**, **Brush**, **Pattern** or
    **Wear**. Success: a row with that layer's name appears under the part in the tree and the right panel switches to
    **Paint layer · <kind>** with its settings (colour, opacity, blend, mask). Select the part row again to go back.
-6. **Add an attachment.** Right edge **Attach**, **Add attachment**, then **Ammo screen** (a live screen), **Import model
+6. **Add an attachment.** Right edge **Attach**, **Add**, then **Ammo screen** (a live screen), **Import model
    (.glb)** (a file dialog: `pickNext` first) or **Shapes** (hologram shapes). Success: a row such as `Ammo screen 1` appears under the part and
    the right panel shows **Screen** with **Mount**, **Position & size** fields; its tabs **Look**, **Screen**, **Effects**
    configure it. Delete it with **Delete this attachment**. The part's **+** button in the tree opens the same add menu plus

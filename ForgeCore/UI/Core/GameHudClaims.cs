@@ -41,7 +41,7 @@ public enum GameHudPart
     /// text and shape, offset towards the middle of the screen). Hidden, the copies go; the HUD itself stays.</summary>
     GlassReflection = 8192,
     /// <summary>The game's stamina read-out: it has no pieces of its own (it tints the vitals bar and pulses its warning), so hidden, the
-    /// game's stamina update and low-stamina warning (<c>PUI_LocalPlayerStatus.UpdateStamina</c>, <c>StartStaminaWarning</c>) stop and the
+    /// game's stamina update and low-stamina warning (<c>PUI_LocalPlayerStatus.UpdateStamina</c>, which starts the warning) stop and the
     /// bar keeps its last look until released. Stamina itself is untouched.</summary>
     Stamina = 16384,
     /// <summary>The game's version label at the bottom right (the watermark layer's version text, <c>PUI_Watermark.m_watermarkText</c>,

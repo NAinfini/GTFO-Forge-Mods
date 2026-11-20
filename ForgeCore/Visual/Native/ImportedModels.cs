@@ -20,6 +20,33 @@ public sealed class ImportedModelResult
     public bool Ok => Model != null;
 }
 
+/// <summary>A camera-facing part of an imported model (<see cref="ImportedFacingPart"/>): its own mesh, origin at its pivot, front along +Z.</summary>
+public sealed class ImportedModelPart
+{
+    internal ImportedModelPart(Mesh mesh, Vector3 pivot, Quaternion stand, IReadOnlyList<ImportedSubmesh> runs)
+    {
+        Mesh = mesh;
+        Pivot = pivot;
+        Stand = stand;
+        Submeshes = runs;
+    }
+
+    public Mesh Mesh { get; }
+
+    /// <summary>Where the part turns, in the model's frame.</summary>
+    public Vector3 Pivot { get; }
+
+    /// <summary>How the part stands as authored, before anything turns it (the descriptor's yaw).</summary>
+    public Quaternion Stand { get; }
+
+    /// <summary>The materials in this part's submesh order; the same objects the model built for its descriptor's materials.</summary>
+    public IReadOnlyList<Material> Materials => Slots;
+
+    /// <summary>This part's submeshes (indices into its own mesh's runs as stored in the descriptor); a slot's descriptor material is its <c>Material</c>.</summary>
+    public IReadOnlyList<ImportedSubmesh> Submeshes { get; }
+    internal Material[] Slots = Array.Empty<Material>();
+}
+
 /// <summary>A built imported model: one Unity mesh with a submesh per run of its descriptor and one lit material per submesh. Every
 /// instance made by <see cref="Spawn"/> shares them. The cache that made it owns it; do not destroy its parts.</summary>
 public sealed class ImportedModel
@@ -29,9 +56,11 @@ public sealed class ImportedModel
     private readonly Matrix4x4[]? _rest;
     private readonly List<GameObject> _spawned = new();
 
-    internal ImportedModel(ImportedModelDescriptor descriptor, Mesh mesh, Material[] slots, List<Object> owned, Matrix4x4[]? rest)
+    internal ImportedModel(ImportedModelDescriptor descriptor, Mesh mesh, Material[] slots, List<Object> owned, Matrix4x4[]? rest, Mesh[] collision, ImportedModelPart[] facing)
     {
         Descriptor = descriptor;
+        CollisionMeshes = collision;
+        FacingParts = facing;
         _mesh = mesh;
         _slots = slots;
         _rest = rest;
@@ -49,6 +78,16 @@ public sealed class ImportedModel
     /// <summary>The materials in submesh order; shared by every instance. <c>Glow</c> and tints are written on copies.</summary>
     public IReadOnlyList<Material> Materials => _slots;
 
+    /// <summary>One readable collision mesh per descriptor collision shape (the source's <c>COL_</c> nodes), in the model's own frame, built
+    /// once with the model (<c>ForgeCore.StaticColliders.Mesh</c>) and shared by every placement: hand each to
+    /// <c>StaticColliders.MeshCollider</c> on a node posed like the drawn model. Empty for a model that only decorates. Never drawn.</summary>
+    public IReadOnlyList<Mesh> CollisionMeshes { get; }
+
+    /// <summary>The parts that turn to face the camera (the source's <c>FACE_</c> nodes), each its own mesh in its own frame; not part of
+    /// <see cref="Mesh"/>. Draw each on a node at <see cref="ImportedModelPart.Pivot"/> in the model's frame and keep that node turned with
+    /// <see cref="CameraFacing.Follow(Transform, Facing, Transform?)"/> and <see cref="Facing.YawToCamera"/>. <see cref="Spawn"/> does both.</summary>
+    public IReadOnlyList<ImportedModelPart> FacingParts { get; }
+
     internal List<Object> Owned { get; }
 
     /// <summary>A new object (under <paramref name="parent"/> when given) that draws the model, no collider: a mesh filter and a mesh renderer,
@@ -62,6 +101,16 @@ public sealed class ImportedModel
         {
             o.AddComponent<MeshFilter>().sharedMesh = _mesh;
             o.AddComponent<MeshRenderer>().sharedMaterials = new Il2CppReferenceArray<Material>(_slots);
+            foreach (var part in FacingParts)
+            {
+                var turning = new GameObject(o.name + " facing");
+                turning.transform.SetParent(o.transform, false);
+                turning.transform.localPosition = part.Pivot;
+                turning.transform.localRotation = part.Stand;
+                turning.AddComponent<MeshFilter>().sharedMesh = part.Mesh;
+                turning.AddComponent<MeshRenderer>().sharedMaterials = new Il2CppReferenceArray<Material>(part.Slots);
+                CameraFacing.Follow(turning.transform, Facing.YawToCamera);
+            }
         }
         else
         {
@@ -102,7 +151,7 @@ public sealed class ImportedModel
 /// lit material (<see cref="LitMaterial"/>) per material record. One cache is one level's models: the same descriptor (<see cref="ImportedModelDescriptor.Key"/>,
 /// so two models sharing a mesh with other materials stay apart) is built once, a bad one is refused the same way every time, and <see cref="Dispose"/> destroys every instance, mesh, material and texture it made.
 /// The library reads no file and computes no hash: the caller (ForgeEngine) found the bytes, matched them to the descriptor's hashes and
-/// decided what a level may hold. Only the draw is here, no collider.
+/// decided what a level may hold. The draw and the shared collision meshes are here; colliders are the placing caller's.
 /// </summary>
 public sealed class ImportedModels : IDisposable
 {
@@ -190,12 +239,19 @@ public sealed class ImportedModels : IDisposable
     private ImportedModel? Build(ImportedModelDescriptor d, ImportedMesh data, IReadOnlyList<byte[]> pngs, List<Object> owned, out ImportedModelFailure failure)
     {
         failure = default;
-        // The mesh file carries no tangents: they are computed for a normal map only.
-        var runs = new (int, int)[d.Submeshes.Count];
-        for (var i = 0; i < runs.Length; i++) runs[i] = (d.Submeshes[i].IndexStart, d.Submeshes[i].IndexCount);
-        var mesh = MeshArrays.Build("Forge imported " + d.MeshSha256[..8], data.Positions, data.Normals, data.Uvs, null, data.Indices,
-            runs, computeTangents: d.HasNormalMap);
+        // The mesh file carries no tangents: MeshArrays computes them, also for a model without a normal map.
+        // The still part draws the vertices before the facing parts; each facing part is its own mesh over its own vertex run, so it can turn.
+        var mesh = Part("Forge imported " + d.MeshSha256[..8], data, 0, d.StillVertices, d.Submeshes);
         owned.Add(mesh);
+        var facing = new ImportedModelPart[d.Facing.Count];
+        for (var f = 0; f < facing.Length; f++)
+        {
+            var spec = d.Facing[f];
+            var own = Part("Forge imported " + d.MeshSha256[..8] + " facing " + f, data, spec.VertexStart, spec.VertexCount, spec.Submeshes);
+            own.UploadMeshData(true);
+            owned.Add(own);
+            facing[f] = new ImportedModelPart(own, new Vector3(spec.Pivot[0], spec.Pivot[1], spec.Pivot[2]), Quaternion.AngleAxis(spec.Yaw * Mathf.Rad2Deg, Vector3.up), spec.Submeshes);
+        }
         Matrix4x4[]? rest = null;
         if (d.Bones != null)
         {
@@ -260,7 +316,11 @@ public sealed class ImportedModels : IDisposable
                 surface = Flat(spec.Name + " surface", linear: true, ImportedColour.UnitToByte(spec.Metallic), ImportedColour.UnitToByte(1f - spec.Roughness), 255, 255);
                 owned.Add(surface);
             }
-            var material = LitMaterial.Create("Forge imported " + spec.Name, albedo, surface, spec.Cutout, spec.Cutoff, out var why);
+            // A skinned model (a character) is drawn with this library's lit shader, its opaque materials too (a cut-off of 0 keeps every
+            // pixel): on the game's gear shader a character's first-person arms took on the colour of the gun beside them in fast motion and
+            // inspecting (Tda Miku Append), the same materials on this shader did not. The cause in the game's shader was not found.
+            var own = spec.Cutout || rest != null;
+            var material = LitMaterial.Create("Forge imported " + spec.Name, albedo, surface, own, spec.Cutout ? spec.Cutoff : 0f, out var why);
             if (material == null)
             {
                 failure = new ImportedModelFailure(spec.Cutout ? ImportedModelCodes.CutoutUnsupported : ImportedModelCodes.ShaderUnavailable, spec.Name + ": " + why);
@@ -281,14 +341,51 @@ public sealed class ImportedModels : IDisposable
                     map = Decode(spec, spec.EmissiveTexture, false, out failure);
                     if (map == null) return null;
                 }
-                const float gain = LitMaterial.EmissionPerUnit;
+                const float gain = ColourSpace.EmissionPerUnit;
                 Glow.Write(material, new Color(spec.EmissiveColor[0] * gain, spec.EmissiveColor[1] * gain, spec.EmissiveColor[2] * gain, 1f), map);
             }
             made[m] = material;
         }
         var slots = new Material[d.Submeshes.Count];
         for (var i = 0; i < slots.Length; i++) slots[i] = made[d.Submeshes[i].Material];
-        return new ImportedModel(d, mesh, slots, owned, rest);
+        foreach (var part in facing)
+        {
+            part.Slots = new Material[part.Submeshes.Count];
+            for (var i = 0; i < part.Slots.Length; i++) part.Slots[i] = made[part.Submeshes[i].Material];
+        }
+        // Collision meshes stay readable: the physics engine cooks a MeshCollider from the CPU copy.
+        var collision = new Mesh[data.Collision.Length];
+        for (var i = 0; i < collision.Length; i++)
+            owned.Add(collision[i] = ForgeCore.StaticColliders.Mesh("Forge imported collision " + d.MeshSha256[..8] + "." + i, data.Collision[i].Positions, data.Collision[i].Indices));
+        return new ImportedModel(d, mesh, slots, owned, rest, collision, facing);
+    }
+
+    /// <summary>A mesh over the vertex run <paramref name="first"/>..+<paramref name="count"/> drawn by <paramref name="runs"/> (whose indices the
+    /// mesh file check kept inside that run), the indices rebased to the run.</summary>
+    private static Mesh Part(string name, ImportedMesh data, int first, int count, IReadOnlyList<ImportedSubmesh> runs)
+    {
+        if (first == 0 && count * 3 == data.Positions.Length)
+        {
+            var whole = new (int, int)[runs.Count];
+            for (var i = 0; i < whole.Length; i++) whole[i] = (runs[i].IndexStart, runs[i].IndexCount);
+            return MeshArrays.Build(name, data.Positions, data.Normals, data.Uvs, null, data.Indices, whole);
+        }
+        var positions = new float[count * 3];
+        var normals = new float[count * 3];
+        var uvs = new float[count * 2];
+        Array.Copy(data.Positions, first * 3, positions, 0, positions.Length);
+        Array.Copy(data.Normals, first * 3, normals, 0, normals.Length);
+        Array.Copy(data.Uvs, first * 2, uvs, 0, uvs.Length);
+        var total = 0;
+        foreach (var run in runs) total += run.IndexCount;
+        var indices = new int[total];
+        var spans = new (int, int)[runs.Count];
+        for (int i = 0, at = 0; i < spans.Length; i++)
+        {
+            spans[i] = (at, runs[i].IndexCount);
+            for (var k = 0; k < runs[i].IndexCount; k++) indices[at++] = data.Indices[runs[i].IndexStart + k] - first;
+        }
+        return MeshArrays.Build(name, positions, normals, uvs, null, indices, spans);
     }
 
     /// <summary>Unity's bone weights: each vertex's four, heaviest first.</summary>

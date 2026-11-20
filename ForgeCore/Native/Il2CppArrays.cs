@@ -29,6 +29,16 @@ public static class Il2CppArrays
         return result;
     }
 
+    /// <summary>Overwrites a game array of value types with the same bytes as <paramref name="source"/>, one copy and no allocation
+    /// (a Vector3 array from xyz floats, for a mesh rewritten every frame; element by element each Vector3 is built through a call into
+    /// the game). The byte lengths must match.</summary>
+    public static unsafe void Overwrite<T, S>(Il2CppStructArray<T> target, S[] source) where T : unmanaged where S : unmanaged
+    {
+        var bytes = System.Runtime.InteropServices.MemoryMarshal.AsBytes(source.AsSpan());
+        if (bytes.Length != target.Length * sizeof(T)) throw new ArgumentException($"{bytes.Length} bytes do not fill {target.Length} elements of {sizeof(T)} bytes");
+        bytes.CopyTo(new Span<byte>((void*)IntPtr.Add(target.Pointer, 4 * IntPtr.Size), bytes.Length));
+    }
+
     /// <summary>Stores <paramref name="value"/> at <paramref name="index"/> of a game array of references with the collector's write
     /// barrier, as the game's own stores do. The game runs the incremental collector (boot.config gc-max-time-slice) and
     /// Il2CppInterop's indexer (and its array-copying constructor) writes the pointer without the barrier: an object only that array

@@ -71,18 +71,15 @@ internal static class StrikeBursts
         _noTarget.SetContent(OrdnanceText.T("strike.noTarget"), 8f);
         _noTarget.SetLocalPosition(floor + Vec.Up * 1.6f);
         _noTarget.SetShown(true);
+        // ForgeVisual keeps the words turned to the player's view until they are destroyed.
+        var view = agent.FPSCamera;
+        if (view != null && !view.WasCollected) _noTarget.FaceCamera(view.transform);
         _noTargetEnds = now + NoTargetSeconds;
     }
 
     private static void TickNoTarget(float now)
     {
-        if (now >= _noTargetEnds || !_noTarget!.Alive) { EndNoTarget(); return; }
-        var agent = ForgeCore.Players.Local;
-        if (agent == null || agent.WasCollected) return;
-        var view = agent.FPSCamera;
-        if (view == null) return;
-        var camera = view.transform;
-        _noTarget.FaceCamera(camera, camera.rotation);
+        if (now >= _noTargetEnds || !_noTarget!.Alive) EndNoTarget();
     }
 
     private static void EndNoTarget()

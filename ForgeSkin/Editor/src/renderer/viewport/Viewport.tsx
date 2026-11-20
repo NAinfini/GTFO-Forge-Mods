@@ -228,7 +228,21 @@ function CameraRig() {
 
 const idle = new Object3D();
 
+/** Whether `o` is still in a scene (an undone attachment's object is not, for a moment, while the gizmo still holds it). */
+function inScene(o: Object3D): boolean {
+  let x = o;
+  while (x.parent) x = x.parent;
+  return (x as Object3D & { isScene?: boolean }).isScene === true;
+}
+
 function Gizmo() {
+  const controls = useRef<{ object?: Object3D; attach(o: Object3D): unknown } | null>(null);
+  // Undo or redo can take the gizmo's object out of the scene before the selection catches up: park the gizmo on the idle
+  // target before the frame draws, or the controls complain every frame. A new target re-attaches it.
+  useFrame(() => {
+    const c = controls.current;
+    if (c?.object && c.object !== idle && !inScene(c.object)) c.attach(idle);
+  });
   const selection = useStore((s) => s.selection);
   const doc = useStore((s) => s.doc);
   const view = useViewStore();
@@ -265,7 +279,10 @@ function Gizmo() {
         mode={finger ? 'rotate' : view.gizmo}
         space="local"
         size={finger ? 0.22 : 0.8}
-        ref={(c) => void (viewRefs.gizmo = c as unknown as typeof viewRefs.gizmo)}
+        ref={(c) => {
+          viewRefs.gizmo = c as unknown as typeof viewRefs.gizmo;
+          controls.current = c as unknown as typeof controls.current;
+        }}
         onMouseDown={() => (gesture.current = newGesture())}
         onObjectChange={() => aim?.commit(gesture.current)}
       />

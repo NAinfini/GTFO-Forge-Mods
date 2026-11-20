@@ -12,7 +12,7 @@ namespace ForgeUI;
 /// instance) before any game code runs for it, so it looks, drags and scrolls like the game's; its handle gets a menu id as the game's
 /// setup gives one (<c>CM_PageBase.NextCellItemID</c>). A drag moves the handle and writes the value at once. For the copies alone (decided
 /// per instance, the game's own rows run untouched) the game's slider code never runs: their <c>DoScrollDelta</c>, <c>UpdateText</c> and
-/// <c>ResetValue</c> and the row's <c>UpdateText</c> are skipped (each a native body of its own in this build).
+/// <c>ResetValue</c> and the row's <c>UpdateText</c> (<see cref="SettingsPages.Copies"/>) are skipped (each a native body of its own in this build).
 /// </summary>
 internal sealed class SliderRows : PageRows
 {
@@ -27,7 +27,6 @@ internal sealed class SliderRows : PageRows
 
     private const float RefreshInterval = .5f;
     private static readonly Dictionary<IntPtr, Row> BySlider = new();
-    private static readonly HashSet<IntPtr> Copies = new();
 
     private readonly eSettingsSubMenuId _page;
     private readonly eCellSettingID _template;
@@ -116,7 +115,7 @@ internal sealed class SliderRows : PageRows
         var item = go.GetComponent<CM_SettingsItem>();
         var slider = go.GetComponentInChildren<CM_SettingScrollReceiver>(true);
         var row = new Row { Group = this, Item = item, Slider = source == null ? null : slider, Source = source };
-        Copies.Add(item.Pointer);
+        SettingsPages.Copies.Add(item.Pointer);
         if (slider != null)
         {
             BySlider[slider.Pointer] = row;
@@ -135,21 +134,9 @@ internal sealed class SliderRows : PageRows
     /// <summary>Takes the rows of an earlier build of the page out of the window's list and destroys them.</summary>
     private void Release()
     {
-        if (_window != null && !_window.WasCollected && _window.m_contentItems != null)
-        {
-            var kept = new Il2CppSystem.Collections.Generic.List<iScrollWindowContent>();
-            var items = _window.m_contentItems;
-            for (var i = 0; i < items.Count; i++)
-                if (items[i] != null && !Copies.Contains(items[i].Pointer)) kept.Add(items[i]);
-            if (kept.Count != items.Count) _window.m_contentItems = kept;
-        }
         foreach (var row in _rows)
-        {
-            if (row.Item.WasCollected) continue;
-            Copies.Remove(row.Item.Pointer);
             if (row.Slider != null && !row.Slider.WasCollected) BySlider.Remove(row.Slider.Pointer);
-            Object.Destroy(row.Item.gameObject);
-        }
+        SettingsPages.Drop(_window, _rows.ConvertAll(row => row.Item));
         _rows.Clear();
         _window = null;
     }
@@ -226,19 +213,5 @@ internal sealed class SliderRows : PageRows
 
         [HarmonyPrefix]
         private static bool Prefix(CM_SettingScrollReceiver __instance) => !BySlider.ContainsKey(__instance.Pointer);
-    }
-
-    /// <summary>The copied rows keep the titles written here.</summary>
-    [PatchGroup(PatchGroup.Settings)]
-    [HarmonyPatch]
-    private static class RowSkip
-    {
-        private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
-        {
-            yield return AccessTools.Method(typeof(CM_SettingsItem), nameof(CM_SettingsItem.UpdateText));
-        }
-
-        [HarmonyPrefix]
-        private static bool Prefix(CM_SettingsItem __instance) => !Copies.Contains(__instance.Pointer);
     }
 }

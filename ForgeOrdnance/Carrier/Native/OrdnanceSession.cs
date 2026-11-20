@@ -67,7 +67,7 @@ internal sealed class OrdnanceSession
     internal event Action<bool>? PresentationReset;
 
     internal SlotBook Book => _book;
-    internal static ulong Local => SNet.LocalPlayer?.Lookup ?? 0UL;
+    internal static ulong Local => ForgeCore.Session.LocalLookup;
     private static double Now => Time.time;
     internal bool InLevel => _inLevel;
 

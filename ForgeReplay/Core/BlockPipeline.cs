@@ -35,7 +35,9 @@ internal sealed class BlockPipeline
     private readonly object _gate = new();
     private byte[] _current;
     private uint _blockStart, _lastKeyframe;
-    private bool _currentIsKeyframe, _keyframeNext, _finishing, _failed;
+    private bool _currentIsKeyframe, _keyframeNext, _finishing;
+    // Written under the gate, read by the main thread on every sample and event without it.
+    private volatile bool _failed;
     private int _lostSamples, _lostEvents, _buffers, _maxQueue;
 
     // writer: the chunk file to append to. error: called, from either thread, with a message for each failure (once per kind).
@@ -52,7 +54,7 @@ internal sealed class BlockPipeline
         BeginBlock(startMs, keyframe: true);
     }
 
-    internal bool Failed { get { lock (_gate) return _failed; } }
+    internal bool Failed => _failed;
     internal int LostSamples => _lostSamples;
     internal int LostEvents => _lostEvents;
     /// <summary>The most closed blocks that ever waited for the writer at once.</summary>

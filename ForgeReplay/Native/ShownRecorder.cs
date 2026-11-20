@@ -161,7 +161,7 @@ internal sealed class ShownRecorder : IShownObserver
     internal static void Tick()
     {
         if (_subscription == null || !Rec.On) return;
-        var frame = Time.frameCount;
+        var frame = ForgeCore.Frame.Count;
         if (Declared.Count > 0) SweepDeclared(frame);
         if (HeldNow.Count > 0)
         {
@@ -287,7 +287,7 @@ internal sealed class ShownRecorder : IShownObserver
                 Size = float.IsNaN(e.Size) ? long.MinValue : (long)MathF.Round(e.Size * 1000f),
                 Colour = Pack(e.Colour),
                 Seconds = (long)MathF.Round(e.Seconds * 100f),
-                Frame = Time.frameCount,
+                Frame = ForgeCore.Frame.Count,
             };
             ref var held = ref CollectionsMarshal.GetValueRefOrAddDefault(HeldNow, e.Key, out var exists);
             var same = exists && held.Kind == now.Kind && held.Name == now.Name && held.Ax == now.Ax && held.Ay == now.Ay && held.Az == now.Az && held.Bx == now.Bx && held.By == now.By
@@ -378,12 +378,13 @@ internal sealed class ShownRecorder : IShownObserver
                     break;
                 }
             case ShownModelKind.Shown:
-                for (var i = 0; i < Tokens.Count; i++)
+                // A list is reported hidden again each time its holder took renderers that appeared since (a person's newly drawn gun), each
+                // report its own state: drawn again ends every one of them, or the person stays hidden in the replay after the holder let go.
+                for (var i = Tokens.Count - 1; i >= 0; i--)
                 {
                     if (!ReferenceEquals(Tokens[i].Token, m.Token)) continue;
                     WriteEnd(ShownCodec.ModelKey((ulong)Tokens[i].Id, true));
                     Tokens.RemoveAt(i);
-                    break;
                 }
                 break;
         }

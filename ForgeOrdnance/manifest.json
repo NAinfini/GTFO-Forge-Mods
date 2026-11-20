@@ -1,12 +1,12 @@
 {
   "name": "ForgeOrdnance",
-  "version_number": "1.0.2",
+  "version_number": "1.0.3",
   "website_url": "https://github.com/NAinfini/GTFO-Forge-Mods",
   "description": "Call-in support for GTFO: hold a key, enter a directional code and throw a beacon. Includes the call-in platform, the Arsenal (supply pods, turrets, strikes, heavy weapons) and four powered exosuits. Add your own call-ins with simple files.",
   "dependencies": [
     "BepInEx-BepInExPack_GTFO-3.2.4",
     "GTFOModding-GTFO_API-0.6.1",
     "dakkhuza-MTFO-4.6.3",
-    "NAinfini-ForgeCore-1.0.2"
+    "NAinfini-ForgeCore-1.0.3"
   ]
 }

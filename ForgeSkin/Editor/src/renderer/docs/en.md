@@ -71,7 +71,7 @@ Each item can have several skins. Click **Works** on the left edge to see the wo
 ![The works list](shot:skins-panel)
 
 - Click a card to switch to that work.
-- **+ New** makes a new work on the gear you pick; the arrow beside it holds **Copy the open one**, **Open project or old preset…** (<kbd>Ctrl</kbd>+<kbd>O</kbd>) and **Import a Skins skin group…**.
+- **+ New** makes a new work on the gear you pick, and the left panel turns to its parts (to the steps once a character is imported); the arrow beside it holds **Copy the open one**, **Open project or old preset…** (<kbd>Ctrl</kbd>+<kbd>O</kbd>) and **Import a Skins skin group…**.
 - A card's **⋯** menu: **Put in profile**, **Copy**, **Rename**, **Export pack…**, **Snapshots**, **Save to file…**, **Clear current changes**, **Delete work**. Double-click a name to rename it.
 - A card says what the work is in the chosen profile (Only in the editor, In the profile, In use); see [Install](#save).
 
@@ -89,9 +89,9 @@ This page makes one gun skin from start to finish: **Ember Line**, a clean sci-f
 
 ## 1. Open the rifle and make a new skin
 
-1. Make sure **Weapons** is picked at the left of the top bar.
-2. Press <kbd>Ctrl</kbd>+<kbd>P</kbd>, type `LRG` and click the **Omneco LRG**.
-3. **Skins** on the left edge → **New skin** → **New blank skin**. Rename it **Ember Line** (double-click the name).
+1. Click **Works** on the left edge, pick **Weapon skins** and click **+ New**.
+2. Type `LRG` in the search box and click the **Omneco LRG**. Once the new work is made, the left panel turns to its parts.
+3. Click **Info** on the right edge and rename it **Ember Line**.
 
 ## 2. Base coats and finishes
 
@@ -127,7 +127,7 @@ Palette: white-grey `#949699`, grey `#5C6166`, black `#0D0E0F`, orange `#FF6B14`
 
 ## 5. Ammo screen
 
-1. Select **Receiver**, **Attach** → **Add attachment** → **Ammo screen**.
+1. Select **Receiver**, **Attach** → **Add** → **Ammo screen**.
 2. Move it onto the left side of the receiver, below the rail, and turn it to face out (<kbd>R</kbd>, or **Rotation °** 0, 90, 0 under **Place**).
 3. **Screen**: **Show** Rounds in mag, **Digits** 2, size 40 × 18 mm.
 4. **Look** → **Colour**: text orange, background black at 90 %, border orange, **Border style** **Corners**. Keep **Low ammo colour** on.
@@ -135,7 +135,7 @@ Palette: white-grey `#949699`, grey `#5C6166`, black `#0D0E0F`, orange `#FF6B14`
 
 ## 6. Hologram reticle ring
 
-1. Select **Sight**, **Attach** → **Add attachment** → **Shapes** → **Reticle ring**. It is orange already (the skin's first colourful layer).
+1. Select **Sight**, **Attach** → **Add** → **Shapes** → **Reticle ring**. It is orange already (the skin's first colourful layer).
 2. Move it just in front of the scope lens.
 3. **Look**: **Radius** 16 mm, **Ticks** 36.
 4. **Hologram**: **Flicker** 0.15, **Brightness** 0.9, **Two-colour fade** on with a warm white top colour, **Scanlines** 0.5, **Edge glow** 0.6.
@@ -147,7 +147,7 @@ Palette: white-grey `#949699`, grey `#5C6166`, black `#0D0E0F`, orange `#FF6B14`
 
 ## 7. A small hologram charm
 
-1. Select **Front**, **Add attachment** → **Charm** → **Hex shield**. It hangs from the underside of the front part.
+1. Select **Front**, **Attach** → **Add** → **Charm** → **Hex shield**. It hangs from the underside of the front part.
 2. In **Place**, set the rope: **Chain**, **Length** 3.5 cm, dark grey colour. Click **Run** and **Turn** to see it swing.
 3. Open **Look** and turn on **Hologram** (flicker 0.3) so it glows like the reticle.
 
@@ -470,7 +470,7 @@ The 3D view draws the three layers on the lens with these values (depth is not s
 
 A model you imported (a replaced part or an attachment) can be a sight too, with the game's own lens, reticle and zoom. Select **Whole gun** and click **Sight** on the right edge. Four sections:
 
-- **Lens**: **Pick from model**, then click the lens mesh in the 3D view (clicking an attachment uses the whole attachment); when the model has no separate lens mesh, **Add a lens** puts a small pane in front of the aim point, which you place and size with **Move and size**. **Lens style** picks a game sight whose lens it looks like. **Remove lens** takes it off.
+- **Lens**: **From model**, then click the lens mesh in the 3D view (clicking an attachment uses the whole attachment); when the model has no separate lens mesh, **Add a lens** puts a small pane in front of the aim point, which you place and size with **Move and size**. **Lens style** picks a game sight whose lens it looks like. **Remove lens** takes it off.
 - **Reticle**: the same as the sight reticle above, starting with the chosen style's reticle.
 - **Zoom**: one of the game sights' zoom steps, used when you aim in game; **Unchanged** keeps the gun's own. It works without a lens too.
 - **Aim**: **Aim preview** looks out from the aim point at the chosen zoom, to check that the reticle is centred and the sight body does not block the view; click again to leave. **Line up with lens** moves the aim point right behind the lens; **Select aim point** lets you drag it yourself.
@@ -871,7 +871,7 @@ The 3D view uses the same pattern code as the game.
 
 # Attachments and part layout {#attach}
 
-Attachments are extra things mounted on the gun: ammo screens, your own models, built-in shapes and charms. Select a part, then [Attach](editor:attach), **Add attachment**:
+Attachments are extra things mounted on the gun: ammo screens, your own models, built-in shapes and charms. Select a part, then [Attach](editor:attach), **Add**:
 
 - **Ammo screen**: a live number or bar; see [Ammo screen](#screen).
 - **Import model (.glb / .gltf)**: any .glb or .gltf model. Its own pictures (base colour, and its emissive, normal and metallic-roughness ones if it has them) come along at their own size and show in the editor and in game (only a picture over 16384 is scaled down); **Colour** tints them, and as a hologram the base-colour picture is what glows.
@@ -902,7 +902,9 @@ A new attachment mounts just above the selected part; **Mount** → **On part** 
 
 ## Change a part itself
 
-A part's [Place](editor:place) tab moves, turns, scales or hides the part (**Hide (also in game)**); **Reset all** and **Restore original** put it back. A part with its own model shows **Replace model…** under **Attach** → **Model**: your .glb replaces only that part's model; child parts stay, textures and materials still apply, and position, rotation and scale stay editable. **Restore original model** undoes it. Hiding a part hides only the game's own model; your attachments on it stay visible.
+A part's [Place](editor:place) tab moves, turns, scales or hides the part (**Hide (also in game)**); **Reset all** and **Restore original** put it back. A part with its own model shows **Replace model…** under **Attach** → **Model**: your .glb replaces only that part's model; child parts stay, textures and materials still apply, and position, rotation and scale stay editable. **Restore original model** undoes it. Many parts are an empty node with their models on the pieces under it (a flashlight's **Lamp body** and **Lens**, say): then **Model** lists those pieces one by one, and the **+** menu on the part's row has **Replace model ›**, so each piece can be replaced on its own. A part's root also offers **Replace the whole part…**: the original part is hidden and your model hangs on the part the way a whole-gun model does, to be placed under Attach. Pieces that cannot be replaced are still listed, greyed out with the reason: a node without a model, or a deforming model the game cannot replace. Hiding a part hides only the game's own model; your attachments on it stay visible.
+
+Under a flashlight is a **Light point** row; in the game the light shines from there along its direction. After you replace or move the lamp body the light stays where it was, so the editor says so (after a replacement it selects the light point for you; after a move the Place tab offers **Select the light point**): drag it onto the new lamp head in 3D (it has a direction line, like the muzzle). If your model has a node named `light`, the light point goes there by itself. Replacing the lamp body also asks whether to hide the old lens with it.
 
 ## Whole-gun model
 
@@ -927,17 +929,17 @@ Shapes are built-in models made from a few numbers: lines, rings, reticles, grid
 
 ## Add a hologram shape
 
-1. Select a part, then [Attach](editor:attach), **Add attachment**, **Shapes**, and a shape. (Or **Hologram shapes** in **Overview**.)
+1. Select a part, then [Attach](editor:attach), **Add**, **Shapes**, and a shape. (Or **Hologram shapes** in **Overview**.)
 2. Move it into place with <kbd>G</kbd> / <kbd>R</kbd> / <kbd>S</kbd> or the **Place** numbers.
 3. Open **Look**: set the shape's numbers, then the **Hologram** settings.
 
 ## Picture hologram {#holo-image}
 
-**Add attachment** → **Picture hologram…**, then a png, jpg or webp picture. The editor copies the picture next to the skin at its own size (scaled down only over 16384) and makes a hologram screen 30 mm wide with the picture's proportions, named after the file. The picture is what glows: black is see-through, a white **Colour** keeps the picture's own colours and any other colour tints it. Change **Width** and **Height** under **Picture** in **Look**; use **Snap to surface** to lay it on the gun.
+**Attach** → **Add** → **Picture hologram…**, then a png, jpg or webp picture. The editor copies the picture next to the skin at its own size (scaled down only over 16384) and makes a hologram screen 30 mm wide with the picture's proportions, named after the file. The picture is what glows: black is see-through, a white **Colour** keeps the picture's own colours and any other colour tints it. Change **Width** and **Height** under **Picture** in **Look**; use **Snap to surface** to lay it on the gun.
 
 ## Hologram sets {#holo-sets}
 
-**Add attachment** → **Hologram sets** adds several holograms in one style: the same line width and tick length, the same fade from the skin's colour to a lighter one, the same flicker and edge glow. The editor places them from the open item's parts:
+**Attach** → **Add** → **Hologram sets** adds several holograms in one style: the same line width and tick length, the same fade from the skin's colour to a lighter one, the same flicker and edge glow. The editor places them from the open item's parts:
 
 | Set | What is in it | Where it goes |
 | --- | --- | --- |
@@ -998,7 +1000,7 @@ A charm hangs an attachment on a cord, chain or beads from a point on the gun. I
 
 ## Hang a charm
 
-1. Select a part, then **Add attachment** → **Charm** → **Import model (.glb / .gltf)** or a shape. The new charm is selected with **Place** open. (Any attachment can become a charm: turn on the **Charm** switch at the top of **Place**.)
+1. Select a part, then **Attach** → **Add** → **Charm** → **Import model (.glb / .gltf)** or a shape. The new charm is selected with **Place** open. (Any attachment can become a charm: turn on the **Charm** switch at the top of **Place**.)
 2. The orange dot in the 3D view is where the rope is fixed; a new charm's sits under the middle of its part. Move it with the gizmo or the position fields; the model hangs at the rope's end.
 3. Pick **Cord**, **Chain** or **Beads** and set the sliders.
 4. Click **Shake**, **Run** or **Turn** to see it move.
@@ -1019,7 +1021,7 @@ A charm hangs an attachment on a cord, chain or beads from a point on the gun. I
 
 # Ammo screen {#screen}
 
-An ammo screen is a small screen on the gun that shows a live number or a bar. Add one with **Add attachment** → **Ammo screen**, then set it up under **Screen** and **Look**.
+An ammo screen is a small screen on the gun that shows a live number or a bar. Add one with **Attach** → **Add** → **Ammo screen**, then set it up under **Screen** and **Look**.
 
 ![The Screen tab of an ammo screen](shot:screen-tab)
 

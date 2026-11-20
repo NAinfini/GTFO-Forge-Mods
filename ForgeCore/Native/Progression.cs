@@ -6,8 +6,8 @@ using HarmonyLib;
 
 namespace ForgeCore;
 
-/// <summary>Local clear progress for every custom Rundown (<see cref="IsCustom"/>: MTFO-supplied game data or a Forge Rundown; the game's own
-/// Rundowns keep the player's own progress from the game's drop server, untouched): each machine records its own clears and the game's own Rundown page, unlock rules and lobby read them, so a Rundown needs no code
+/// <summary>Local clear progress for every Forge Rundown (<see cref="IsCustom"/>: a package registered the block; the game's own
+/// Rundowns keep the player's own progress from the game's drop server, and another mod's Rundown its own, untouched): each machine records its own clears and the game's own Rundown page, unlock rules and lobby read them, so a Rundown needs no code
 /// to have progress. The unlock rules are the Rundown data block's own fields (tier requirements, each level's accessibility, the level
 /// that unlocks it, hide while locked); this class only supplies the record the game otherwise asks its drop server for.
 /// The records are kept per Rundown block id (<see cref="ProgressionBook"/>). Main thread only.</summary>
@@ -28,19 +28,13 @@ public static class Progression
     }
 
     private static readonly System.Collections.Generic.HashSet<uint> Supplied = new();
-    private static bool? _gameDataReplaced;
 
     /// <summary>Called by a package that loads a Rundown block of its own (ForgeEngine for a Forge Rundown): that Rundown is custom.</summary>
     public static void SuppliedByMod(uint rundownId) => Supplied.Add(rundownId);
 
-    /// <summary>Whether a Rundown's content is custom: a package said it supplied the block, or MTFO loaded the game data from a folder of
-    /// its own (MTFO's public <c>ConfigManager.HasGameDataPath</c>), and then no block is the game's own. A custom Rundown follows this
-    /// machine's records; the game's own Rundowns are left to the game and its drop server, untouched.</summary>
-    internal static bool IsCustom(uint rundownId)
-    {
-        _gameDataReplaced ??= Type.GetType("MTFO.Managers.ConfigManager, MTFO")?.GetField("HasGameDataPath")?.GetValue(null) is true;
-        return _gameDataReplaced == true || Supplied.Contains(rundownId);
-    }
+    /// <summary>Whether a Forge package said it supplied this Rundown's block. Only such a Rundown follows this machine's records; every
+    /// other one, the game's own and one another mod loaded (MTFO game data) alike, is left to the game and whatever else answers it.</summary>
+    internal static bool IsCustom(uint rundownId) => Supplied.Contains(rundownId);
 
     internal static void Start()
     {

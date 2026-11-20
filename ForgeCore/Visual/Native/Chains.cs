@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using NVector3 = System.Numerics.Vector3;
 
 namespace ForgeVisual;
 
@@ -20,6 +21,7 @@ public readonly struct ChainCapsule
 /// from the local eye is not stepped (its bones keep the animated pose) and starts again at rest when it comes back.</summary>
 public sealed class ChainBinding
 {
+    // Held so the objects at _anchorAt and _bodyAt stay where they are (the wrapper keeps the object from being collected).
     private readonly Transform _anchor;
     private readonly Transform? _body;
     private readonly Renderer? _seenBy;
@@ -30,13 +32,20 @@ public sealed class ChainBinding
     private readonly ChainCapsule[] _capsules;
     private readonly ChainState _state;
     private readonly double[] _matrix = new double[16], _body3 = new double[3];
+    // The native objects of the anchor, the body, the bones and the capsules' bones, read once: every frame reads and turns them through
+    // the engine's own calls (EngineCalls), with their liveness read in place, and asks the runtime for none of them.
+    private readonly IntPtr _anchorAt, _bodyAt;
+    private readonly IntPtr[] _boneAt, _capsuleAt;
     internal bool Bound = true;
 
     internal ChainBinding(Transform anchor, IReadOnlyList<Transform[]> strands, ChainSpec spec, IReadOnlyList<ChainCapsule>? capsules, bool linkSide, bool loop, Transform? body, Renderer? seenBy)
     {
+        if (!ForgeCore.EngineCalls.Prepare(out var why)) throw new InvalidOperationException("an engine call is missing (" + why + ")");
         _anchor = anchor;
         _body = body;
         _seenBy = seenBy;
+        _anchorAt = anchor.Pointer;
+        _bodyAt = body is null ? IntPtr.Zero : body.Pointer;
         var shape = new ChainShape();
         var bones = new List<Transform>();
         var children = new List<int>();
@@ -73,33 +82,39 @@ public sealed class ChainBinding
         _rest = new Quaternion[_bones.Length];
         for (int i = 0; i < _bones.Length; i++) _rest[i] = _bones[i].localRotation;
         _capsules = capsules == null ? Array.Empty<ChainCapsule>() : new List<ChainCapsule>(capsules).ToArray();
+        _boneAt = new IntPtr[_bones.Length];
+        for (int i = 0; i < _bones.Length; i++) _boneAt[i] = _bones[i].Pointer;
+        _capsuleAt = new IntPtr[_capsules.Length];
+        for (int c = 0; c < _capsules.Length; c++) _capsuleAt[c] = _capsules[c].Bone is { } bone ? bone.Pointer : IntPtr.Zero;
         _state = new ChainState(shape, spec) { Capsules = _capsules.Length };
     }
 
-    /// <summary>One frame: false once the anchor or a bone is gone (the binding then stops).</summary>
+    /// <summary>One frame: false once the anchor or a bone is gone (the binding then stops). The vector maths is managed: the interop's
+    /// operators and Transform helpers are calls into the game.</summary>
     internal bool Step(double time, Vector3 eye)
     {
-        if (ForgeCore.NativeObjects.Gone(_anchor)) return false;
-        var m = _anchor.localToWorldMatrix;
+        if (ForgeCore.NativeObjects.GoneAt(_anchorAt)) return false;
+        var m = ForgeCore.EngineCalls.LocalToWorld(_anchorAt);
         // Not stepped far away or unseen: it comes back at rest (the gap).
         float ex = m.m03 - eye.x, ey = m.m13 - eye.y, ez = m.m23 - eye.z;
         if (ex * ex + ey * ey + ez * ez > Chains.CullDistance * Chains.CullDistance) return true;
-        if (_seenBy != null && !ForgeCore.NativeObjects.Gone(_seenBy) && !_seenBy.isVisible) return true;
+        if (_seenBy is not null && !ForgeCore.NativeObjects.Gone(_seenBy) && !_seenBy.isVisible) return true;
         _matrix[0] = m.m00; _matrix[1] = m.m10; _matrix[2] = m.m20; _matrix[3] = m.m30;
         _matrix[4] = m.m01; _matrix[5] = m.m11; _matrix[6] = m.m21; _matrix[7] = m.m31;
         _matrix[8] = m.m02; _matrix[9] = m.m12; _matrix[10] = m.m22; _matrix[11] = m.m32;
         _matrix[12] = m.m03; _matrix[13] = m.m13; _matrix[14] = m.m23; _matrix[15] = m.m33;
-        if (_body != null && !ForgeCore.NativeObjects.Gone(_body))
+        if (!ForgeCore.NativeObjects.GoneAt(_bodyAt))
         {
-            var b = _body.position;
+            var b = ForgeCore.EngineCalls.Position(_bodyAt);
             _body3[0] = b.x; _body3[1] = b.y; _body3[2] = b.z;
         }
         else { _body3[0] = m.m03; _body3[1] = m.m13; _body3[2] = m.m23; }
         for (int c = 0; c < _capsules.Length; c++)
         {
             var cap = _capsules[c];
-            if (ForgeCore.NativeObjects.Gone(cap.Bone)) { _state.SetCapsule(c, 0, -1e6, 0, 0, -1e6, 0, 0); continue; }
-            Vector3 pa = cap.Bone.TransformPoint(cap.A), pb = cap.Bone.TransformPoint(cap.B);
+            if (ForgeCore.NativeObjects.GoneAt(_capsuleAt[c])) { _state.SetCapsule(c, 0, -1e6, 0, 0, -1e6, 0, 0); continue; }
+            var cm = ForgeCore.EngineCalls.LocalToWorld(_capsuleAt[c]);
+            Vector3 pa = ForgeCore.EngineCalls.Point(cm, cap.A), pb = ForgeCore.EngineCalls.Point(cm, cap.B);
             _state.SetCapsule(c, pa.x, pa.y, pa.z, pb.x, pb.y, pb.z, cap.Radius);
         }
         _state.Update(time, _matrix, _body3);
@@ -107,13 +122,15 @@ public sealed class ChainBinding
         var p = _state.Nodes;
         for (int i = 0; i < _bones.Length; i++)
         {
-            var bone = _bones[i];
-            if (ForgeCore.NativeObjects.Gone(bone)) return false;
+            var bone = _boneAt[i];
+            if (ForgeCore.NativeObjects.GoneAt(bone)) return false;
             int k = _child[i] * 3;
-            var from = bone.position;
-            var now = bone.TransformPoint(_tip[i]);
-            var want = new Vector3((float)p[k], (float)p[k + 1], (float)p[k + 2]);
-            bone.rotation = Quaternion.FromToRotation(now - from, want - from) * bone.rotation;
+            var bm = ForgeCore.EngineCalls.LocalToWorld(bone);
+            var from = new NVector3(bm.m03, bm.m13, bm.m23);
+            var now = BodyConvert.N(ForgeCore.EngineCalls.Point(bm, _tip[i]));
+            var want = new NVector3((float)p[k], (float)p[k + 1], (float)p[k + 2]);
+            var turned = BodyMath.FromTo(now - from, want - from) * BodyConvert.N(ForgeCore.EngineCalls.Rotation(bone));
+            ForgeCore.EngineCalls.SetRotation(bone, BodyConvert.U(turned));
         }
         return true;
     }

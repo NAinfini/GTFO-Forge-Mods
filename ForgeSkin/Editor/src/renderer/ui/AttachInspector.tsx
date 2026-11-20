@@ -359,7 +359,7 @@ function AttachmentPanel({ a }: { a: Attachment }) {
             data={
               item?.parts.map((p) => ({
                 group: partLabel(p),
-                items: [{ value: `${p.id}|`, label: partLabel(p) }, ...(subParts[p.id] ?? []).map((sp) => ({ value: `${p.id}|${sp.path}`, label: `${partLabel(p)} · ${pieceLabel(sp.path)}` }))],
+                items: [{ value: `${p.id}|`, label: partLabel(p) }, ...(subParts[p.id] ?? []).map((sp) => ({ value: `${p.id}|${sp.path}`, label: `${partLabel(p)} · ${pieceLabel(p.id, sp.path)}` }))],
               })) ?? []
             }
           />

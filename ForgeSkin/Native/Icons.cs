@@ -4,22 +4,15 @@ using Gear;
 namespace ForgeSkin.Plugin;
 
 // Gear icons (lobby loadout, inventory) are rendered by the game from a gear it builds for the render job and kept in
-// memory and on disk by the gear's checksum. The job's gear is skinned the moment its parts spawn (IsJob), and a gear
-// whose active skin changed (another skin, a rebuilt pack, back to vanilla) has its cached icons dropped and re-rendered.
+// memory and on disk by the gear's checksum. The job's gear is skinned the moment its parts spawn (ForgeUI
+// GearIcons.IsBuilding), and a gear whose active skin changed (another skin, a rebuilt pack, back to vanilla) has its cached
+// icons dropped and re-rendered.
 static class Icons
 {
     static Dictionary<string, string> _shown = new(); // target key -> active skin id and pack time the icons show
     static readonly HashSet<string> Due = new(); // target keys whose icons are to be rendered again
     static bool _globalsChanged;
     static string _globals = "";
-
-    /// <summary>True while the game's icon renderer is building this gear.</summary>
-    public static bool IsJob(GearPartHolder holder)
-    {
-        var job = GearIconRendering.Current?.m_currentJob;
-        var range = holder.GearIDRange;
-        return job?.gearToRender != null && range != null && job.gearToRender.GetChecksum() == range.GetChecksum();
-    }
 
     /// <summary>After a reload or a pick: notes every target whose shown skin changed.</summary>
     public static void SkinsChanged()

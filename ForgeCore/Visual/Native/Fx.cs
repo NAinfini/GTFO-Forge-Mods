@@ -693,6 +693,12 @@ internal sealed class FxPrefab
     private readonly GameObject?[] _objects;
     private readonly Transform?[] _transforms;
     private readonly ParticleSystem?[] _systems;
+    /// <summary>Per copy, the native objects of <see cref="_objects"/> and <see cref="_systems"/> (zero: none), held by those wrappers: whether the copy is
+    /// still there is read in place (<see cref="Ready"/>).</summary>
+    private readonly IntPtr[] _objectAt, _systemAt;
+    /// <summary>Per copy, when its particles are next asked whether any is alive (<see cref="AliveCheck"/> apart).</summary>
+    private readonly float[] _nextAlive;
+    private const float AliveCheck = 0.1f;
     /// <summary>Every renderer of a copy (particles, kept meshes, lines, trails): each takes the caller's colour.</summary>
     private readonly Renderer[]?[] _renderers;
     /// <summary>The copy's trail and line renderers and their authored widths: a width follows the copy's size, a trail is cleared when the copy starts again elsewhere.</summary>
@@ -729,6 +735,9 @@ internal sealed class FxPrefab
         _objects = new GameObject?[copies];
         _transforms = new Transform?[copies];
         _systems = new ParticleSystem?[copies];
+        _objectAt = new IntPtr[copies];
+        _systemAt = new IntPtr[copies];
+        _nextAlive = new float[copies];
         _renderers = new Renderer[copies][];
         _trails = new TrailRenderer[copies][];
         _lines = new LineRenderer[copies][];
@@ -764,6 +773,7 @@ internal sealed class FxPrefab
         var wasPlaying = _book.Playing(copy);
         _book.Start(copy, key, now, hold ? Options.HoldSeconds : _window);
         _stopped[copy] = 0f;
+        _nextAlive[copy] = 0f;
         _hold[copy] = hold;
         if (_hidden[copy]) Show(copy, false);
         Place(copy, position, rotation, scale, colour, stretch, head);
@@ -826,9 +836,10 @@ internal sealed class FxPrefab
         for (var i = 0; i < lines.Length; i++) lines[i].widthMultiplier = authored[i] * width;
     }
 
-    /// <summary>The copy still exists on the Unity side: `!=` is Unity's check, which sees an object destroyed while its managed wrapper lives on. A prefab whose Stop Action is Destroy
-    /// ends its own copy that way (the game's interop has no setter for it, so the converter clears it in the bundle); a dead copy is made again on its next play.</summary>
-    private bool Ready(int copy) => _objects[copy] != null && !_objects[copy]!.WasCollected && _systems[copy] != null;
+    /// <summary>The copy still exists on the Unity side, read in place from the native objects (an object destroyed while its managed wrapper lives on is
+    /// gone). A prefab whose Stop Action is Destroy ends its own copy that way (the game's interop has no setter for it, so the converter clears it in the
+    /// bundle); a dead copy is made again on its next play.</summary>
+    private bool Ready(int copy) => !ForgeCore.NativeObjects.GoneAt(_objectAt[copy]) && !ForgeCore.NativeObjects.GoneAt(_systemAt[copy]);
 
     /// <summary>A play failed part way: copies with a destroyed layer are made again on their next use.</summary>
     internal void Forget()
@@ -842,6 +853,7 @@ internal sealed class FxPrefab
                 if (renderers[r] != null) continue;
                 Object.Destroy(_objects[i]);
                 _objects[i] = null;
+                _objectAt[i] = IntPtr.Zero;
                 if (_book.Playing(i)) { _book.Finished(i); _playing--; }
                 break;
             }
@@ -859,7 +871,8 @@ internal sealed class FxPrefab
             o.SetActive(false);
             _objects[copy] = o;
             _transforms[copy] = o.transform;
-            _systems[copy] = o.GetComponent<ParticleSystem>();
+            var system = _systems[copy] = o.GetComponent<ParticleSystem>();
+            _systemAt[copy] = system == null ? IntPtr.Zero : system.Pointer;
             _renderers[copy] = o.GetComponentsInChildren<Renderer>(true);
             var trails = _trails[copy] = o.GetComponentsInChildren<TrailRenderer>(true);
             var lines = _lines[copy] = o.GetComponentsInChildren<LineRenderer>(true);
@@ -870,6 +883,7 @@ internal sealed class FxPrefab
             if (Options.LaserBodies != null) _lasers[copy] = new LaserParts(o.transform, Options, Name);
             if (_book.Playing(copy)) { _book.Finished(copy); _playing--; }
             _hidden[copy] = false;
+            _objectAt[copy] = o.Pointer;
             return true;
         }
         catch (Exception error)
@@ -878,6 +892,7 @@ internal sealed class FxPrefab
             // A copy that failed part way is not ready: the next play makes it again instead of playing it without its laser.
             if (o != null) Object.Destroy(o);
             _objects[copy] = null;
+            _objectAt[copy] = IntPtr.Zero;
             return false;
         }
     }
@@ -905,7 +920,13 @@ internal sealed class FxPrefab
                 system.Stop(true, ParticleSystemStopBehavior.StopEmitting);
                 _stopped[i] = now;
             }
-            if (system.IsAlive(true) && (_stopped[i] <= 0f || now - _stopped[i] < Options.Linger)) continue;
+            // Ends once no particle is alive (asked every AliveCheck seconds, not every frame) or its linger after the window is over.
+            if (_stopped[i] <= 0f || now - _stopped[i] < Options.Linger)
+            {
+                if (now < _nextAlive[i]) continue;
+                _nextAlive[i] = now + AliveCheck;
+                if (system.IsAlive(true)) continue;
+            }
             system.Clear(true);
             _objects[i]!.SetActive(false);
             _book.Finished(i);

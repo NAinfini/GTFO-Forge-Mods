@@ -73,12 +73,14 @@ internal sealed class ExtraCuts
         }
         if (_settings.GuiMirrorOff) ApplyMirror(true);
         IrfCulling.Configure(_settings);
+        TentacleErrorFold.Enabled = _settings.TentacleLimitErrorFold;
     }
 
     internal void Dispose()
     {
         _render.Dispose();
         IrfCulling.Reset();
+        TentacleErrorFold.Reset();
         MeleePacketReuse.Reset();
         if (_traceTrimmed)
         {
@@ -145,9 +147,8 @@ internal sealed class ExtraCuts
         }
     }
 
-    internal void Tick()
+    internal void Tick(float now)
     {
-        var now = Time.time;
         if (now < _nextTick) return;
         _nextTick = now + TickInterval;
         if (_decayQueue.Count != 0)
@@ -257,6 +258,11 @@ internal sealed class ExtraCuts
                 "cap_s=" + F(_settings.CorpseRecycleSeconds) + "\tdespawn=native");
             if (_settings.IrfOffscreenSkip) _owner.LogItem("irf-offscreen-skip", irfConsidered, irfSkipped, 0, "bounds=static_main_camera_frustum");
             if (_settings.IrfWorldCameraOnly) _owner.LogItem("irf-world-camera-only", irfRedirected, irfRedirected, 0, "camera=main");
+            if (_settings.IrfPhysicsHalfRate)
+            {
+                var (updates, skipped) = IrfCulling.PhysicsCounts;
+                _owner.LogItem("irf-physics-half-rate", updates + skipped, skipped, 0, "rate=every_other_frame\tskipped_time=added_to_next_update");
+            }
             if (_settings.MeleePacketReuse)
             {
                 var (setups, reused, adopted) = MeleePacketReuse.Counts;
@@ -264,6 +270,8 @@ internal sealed class ExtraCuts
             }
         }
         if (irfFailure != null) _owner.LogExtraFailure("irf-culling", irfFailure);
+        var tentacleErrors = TentacleErrorFold.Take();
+        if (tentacleErrors != 0) _owner.LogFoldedError(TentacleErrorFold.Code, "level-total", tentacleErrors, TentacleErrorFold.Message);
         if (_failedItems != 0) _owner.LogItem("extra-failures", _failedItems, 0, 0, "scope=level");
         _decayQueue.Clear(); _debrisQueue.Clear(); _frozenDebris.Clear(); _spitterMips.Clear(); _recycledGlue.Clear();
         _magazineQueue.Clear(); _magazines.Clear();

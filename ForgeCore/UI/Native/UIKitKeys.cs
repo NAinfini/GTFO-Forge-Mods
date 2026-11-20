@@ -5,8 +5,9 @@ namespace ForgeUI;
 /// <summary>Key names the way the game shows them, for key hints that follow what the player actually bound.</summary>
 public static class UIKitKeys
 {
-    /// <summary>The name of <paramref name="key"/>: the game's own mouse button names (the settings menu's) for mouse keys, a digit
-    /// for the number row, else the key code's name.</summary>
+    /// <summary>The name of <paramref name="key"/> as a player reads it: the game's own mouse button names (the settings menu's) for
+    /// mouse keys, else <see cref="KeyNames.Readable"/> (arrows for the arrow keys, a digit for the number row, the words of the key
+    /// code's name apart). Every key hint and the key settings page name keys through this one formatter.</summary>
     public static string Name(KeyCode key)
     {
         if (key >= KeyCode.Mouse0 && key <= KeyCode.Mouse6)
@@ -14,7 +15,7 @@ public static class UIKitKeys
             var name = CellSettingGlobals.GetMouseButtonName(key - KeyCode.Mouse0);
             if (!string.IsNullOrWhiteSpace(name)) return name;
         }
-        return key is >= KeyCode.Alpha0 and <= KeyCode.Alpha9 ? ((int)(key - KeyCode.Alpha0)).ToString() : key.ToString();
+        return KeyNames.Readable(key.ToString());
     }
 
     /// <summary>The player's current binding of a game action, as the game names it; <paramref name="fallback"/> when it has none.

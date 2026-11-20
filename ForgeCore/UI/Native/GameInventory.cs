@@ -129,6 +129,8 @@ public sealed class GameInventory
 
     internal void MarkNamesDirty() => _names = true;
 
+    internal void MarkNumbersDirty() => _numbers = true;
+
     /// <summary>The first read: its game hooks went on only now, so the list is read in full once instead of waiting for the game to change a row.</summary>
     internal void ReadInFull() => _numbers = _names = true;
 
@@ -340,8 +342,8 @@ public sealed class GameInventory
         private static IEnumerable<MethodBase> TargetMethods()
         {
             yield return AccessTools.Method(typeof(PUI_InventoryItem), nameof(PUI_InventoryItem.SetState));
-            // SetArchetypeName and SetDetailedName: the one patch class SlotNameCalls (GearNames.cs), shared with the gear names.
-            yield return AccessTools.Method(typeof(PUI_InventoryItem), nameof(PUI_InventoryItem.SetAllShowFlags));
+            // SetArchetypeName, SetDetailedName and SetAllShowFlags have no caller of their own (UpdateInfoForItem inlines them):
+            // the row's names are marked after UpdateInfoForItem in InventoryListCalls.
             yield return AccessTools.Method(typeof(PUI_InventoryItem), nameof(PUI_InventoryItem.SetIcon));
         }
 
@@ -357,10 +359,9 @@ public sealed class GameInventory
     {
         private static IEnumerable<MethodBase> TargetMethods()
         {
-            yield return AccessTools.Method(typeof(PUI_InventoryItem), nameof(PUI_InventoryItem.SetAll));
             yield return AccessTools.Method(typeof(PUI_InventoryItem), nameof(PUI_InventoryItem.OnAmmoUpdated));
-            yield return AccessTools.Method(typeof(PUI_Inventory), nameof(PUI_Inventory.UpdateAmmoForItem));
-            yield return AccessTools.Method(typeof(PUI_Inventory), nameof(PUI_Inventory.SetSlotAmmo));
+            // UpdateAmmoForItem and SetSlotAmmo on the list: the one patch class per call InventoryListCalls, shared with the
+            // hidden-item hold and the gear names. PUI_InventoryItem.SetAll has no caller of its own (SetSlotAmmo inlines it).
         }
 
         private static void Postfix() => UIKit.Inventory._numbers = true;
@@ -373,7 +374,7 @@ public sealed class GameInventory
     {
         private static IEnumerable<MethodBase> TargetMethods()
         {
-            yield return AccessTools.Method(typeof(PUI_InventoryItem), nameof(PUI_InventoryItem.SetMeleeStamina));
+            // PUI_InventoryItem.SetMeleeStamina has no caller of its own: the list's SetMeleeStamina inlines it.
             yield return AccessTools.Method(typeof(PUI_Inventory), nameof(PUI_Inventory.SetMeleeStamina));
         }
 

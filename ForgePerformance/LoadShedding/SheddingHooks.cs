@@ -14,11 +14,13 @@ namespace ForgePerformance.LoadShedding;
 internal sealed partial class SheddingHooks : IDisposable
 {
     private readonly Harmony _harmony = new("NAinfini.ForgePerformance.LoadShedding");
-    internal void Install(SheddingHookPlan plan)
+    internal void Install(SheddingHookPlan plan, Action<string> error)
     {
         // Only this lane's explicitly listed patches; never PatchAll on the
-        // collector assembly or another package's patch set.
-        plan.Install(id => _harmony.CreateClassProcessor(PatchType(id)).Patch());
+        // collector assembly or another package's patch set. Each entry is checked before it is written (EntryAdmission).
+        // A refused entry is written once by PatchClass (type=perf_native_hook, with its code) and skipped; the others are still put on,
+        // so the caller's quit cleanup always has what was installed to take off.
+        plan.Install(id => ForgePerformance.Crowd.EntryAdmission.PatchClass(_harmony, PatchType(id), error, sharersCheckedOffline: true));
     }
     internal static Type PatchType(SheddingHookId id) => id switch
     {
@@ -61,6 +63,8 @@ internal sealed partial class SheddingHooks : IDisposable
         SheddingHookId.MeleePacket => typeof(MeleePacket),
         SheddingHookId.IrfDraw => typeof(IrfDraw),
         SheddingHookId.IrfLateUpdate => typeof(IrfLateUpdate),
+        SheddingHookId.IrfPhysics => typeof(IrfPhysics),
+        SheddingHookId.TentacleError => typeof(TentacleError),
         SheddingHookId.MagazineDrop => typeof(MagazineDrop),
         SheddingHookId.RepellerState => typeof(RepellerState),
         _ => throw new ArgumentOutOfRangeException(nameof(id))
@@ -78,6 +82,16 @@ internal sealed partial class SheddingHooks : IDisposable
             Field("Modules-ASM.dll", "IRF", "InstancedRenderFeatureRenderer", "m_staticBounds", IrfCulling.RendererStaticBounds);
             Field("Modules-ASM.dll", "IRF", "InstancedRenderFeatureRenderer", "m_updatedTransformsOnce", IrfCulling.RendererUpdatedOnce);
             Field("Modules-ASM.dll", "IRF", "InstancedRenderFeatureRenderer", "m_gameObjectIsStatic", IrfCulling.RendererGameObjectIsStatic);
+        }
+        if (settings.IrfPhysicsHalfRate)
+        {
+            Field("Modules-ASM.dll", "IRF", "InstancedRenderFeature", "m_descriptor", IrfCulling.FeatureDescriptor);
+            Field("Modules-ASM.dll", "IRF", "InstancedRenderFeature", "m_dynamicTransforms", IrfCulling.FeatureDynamicTransforms);
+            Field("Modules-ASM.dll", "IRF", "InstancedRenderFeature", "m_disablePhysics", IrfCulling.FeatureDisablePhysics);
+            Field("Modules-ASM.dll", "IRF", "InstancedRenderFeature", "m_enemyRoot", IrfCulling.FeatureEnemyRoot);
+            Field("Modules-ASM.dll", "IRF", "InstancedRenderFeatureDescriptor", "SpringBehaviour", IrfCulling.DescriptorSpringBehaviour);
+            Field("Modules-ASM.dll", "IRF", "InstancedRenderFeatureRenderer", "m_irf", IrfCulling.RendererFeature);
+            Field("Modules-ASM.dll", "IRF", "InstancedRenderFeatureRenderer", "m_updatedTransformsOnce", IrfCulling.RendererUpdatedOnce);
         }
         if (settings.MeleePacketReuse)
         {
@@ -114,10 +128,16 @@ internal sealed partial class SheddingHooks : IDisposable
         private static void Prefix(EnemyAgent __instance)
         {
             if (LoadSheddingController.Current is not { } current) return;
-            current.RestoreStealthBodies(__instance);
-            current.RestoreCorpseShadows(__instance);
-            if (!current.IsRefused(SheddingCut.CorpseTimer)) current.Corpses.BeforeEnemySetup(__instance);
+            var started = ForgePerformance.Crowd.Probe.Begin();
+            if (current.Settings.FastCorpseHide || current.Settings.CorpseShadows)
+            {
+                current.EnemySetup(__instance);
+                if (!current.IsRefused(SheddingCut.CorpseTimer)) current.Corpses.BeforeEnemySetup(__instance);
+            }
+            ForgePerformance.Crowd.Probe.End(ForgePerformance.Crowd.ProbePoint.OwnSetupPrefix, started);
         }
+        [HarmonyPostfix]
+        private static void Postfix(EnemyAgent __instance) => LoadSheddingController.Current?.CrowdWork?.Spawned(__instance);
     }
     [HarmonyPatch(typeof(ES_Dead), nameof(ES_Dead.CommonEnter))]
     private static class DeadEnter
@@ -125,7 +145,10 @@ internal sealed partial class SheddingHooks : IDisposable
         [HarmonyPostfix]
         private static void Postfix(ES_Dead __instance)
         {
-            LoadSheddingController.Current?.EnemyDied(__instance.m_enemyAgent);
+            if (LoadSheddingController.Current is not { } current) return;
+            var enemy = __instance.m_enemyAgent;
+            current.CrowdWork?.Died(enemy);
+            if (current.Settings.FastCorpseHide || current.Settings.CorpseShadows) current.EnemyDied(enemy);
         }
     }
     [HarmonyPatch(typeof(ES_Dead._DecayDelayed_d__20), nameof(ES_Dead._DecayDelayed_d__20.MoveNext))]
@@ -140,10 +163,16 @@ internal sealed partial class SheddingHooks : IDisposable
     private static class RagdollToggle
     {
         // Whether the body was a ragdoll before the call: only a ragdoll that stops is refreshed, never a setup call.
-        [HarmonyPrefix] private static void Prefix(ES_Dead __instance, out bool __state) => __state = __instance.m_isRagdoll;
+        // The probe also times the call that turns a ragdoll on (it can instantiate a ragdoll body).
+        [HarmonyPrefix]
+        private static void Prefix(ES_Dead __instance, out (bool WasRagdoll, long Started) __state)
+            => __state = (__instance.m_isRagdoll, ForgePerformance.Crowd.Probe.Begin());
         [HarmonyPostfix]
-        private static void Postfix(ES_Dead __instance, bool enabled, bool __state)
-            => LoadSheddingController.Current?.Ragdoll(__instance, enabled, __state);
+        private static void Postfix(ES_Dead __instance, bool enabled, (bool WasRagdoll, long Started) __state)
+        {
+            if (enabled) ForgePerformance.Crowd.Probe.End(ForgePerformance.Crowd.ProbePoint.RagdollOn, __state.Started);
+            LoadSheddingController.Current?.Ragdoll(__instance, enabled, __state.WasRagdoll);
+        }
     }
     [HarmonyPatch(typeof(ES_Dead), nameof(ES_Dead.OnDecayRendererHidden))]
     private static class DecayHidden

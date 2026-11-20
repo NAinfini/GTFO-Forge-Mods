@@ -179,7 +179,7 @@ public static class PointLights
                 var left = age < 0f ? 0f : 1f - age / Life[slot];
                 envelope = age < 0f ? 0f : left * left;
             }
-            var flicker = 1f - Flicker[slot] * Mathf.PerlinNoise(now * 14f, slot * 3.7f);
+            var flicker = Flicker[slot] == 0f ? 1f : 1f - Flicker[slot] * Mathf.PerlinNoise(now * 14f, slot * 3.7f);
             light.m_intensity = Peak[slot] * Strength[slot] * envelope * flicker * LightSlots.Blink(now - Born[slot], Blink[slot]);
             light.m_position = Positions[slot];
             light.UpdateData();

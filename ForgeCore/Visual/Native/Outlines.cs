@@ -157,7 +157,7 @@ public sealed class EnemyOutline
 /// view are chosen (<see cref="EnemyOutlineTracker.Select"/>); outlines added to objects are claims (<see cref="OutlineClaims"/>) with
 /// one winner per object. Only when what is drawn changes (or an enemy goes in or out of the game's culling) is the camera's command buffer
 /// rebuilt. It runs after the camera's transparent pass and fills each target's silhouette and, for the line's strength, its visible area
-/// (or, X-ray, its whole silhouette) unlit into a screen-sized mask that shares the scene's depth. The game's <c>UI_Apply</c> adds its HUD
+/// (or, X-ray, its whole silhouette) unlit into a mask the size of the camera's picture that shares the scene's depth. The game's <c>UI_Apply</c> adds its HUD
 /// as the camera's last image effect; just before that the line is laid over the frame: only pixels outside every silhouette within the
 /// line's width are drawn, so a target gets one line round its outer edge, none inside it, and the HUD stays on top. Not in the scene
 /// because the game's exposure brightens its dark scenes many times over, and a colour drawn into the scene came out white.
@@ -173,7 +173,7 @@ internal static class OutlineDraw
     private static Body[] _tracked = new Body[64];
     private static Body[] _claimed = new Body[16];
     private static ClaimLook[] _looks = new ClaimLook[16];
-    private static int _version = -1, _cameraWait, _screenHeight, _settleFrames;
+    private static int _version = -1, _cameraWait, _pictureHeight, _settleFrames;
     private static bool _failed, _dirty, _warmTried, _patched, _shown;
     private static float _lineWidth;
     private static IntPtr _hud;
@@ -210,6 +210,9 @@ internal static class OutlineDraw
         public bool LimbHit;
         public bool Culled;
         public bool Known;
+        // What the last full read saw under the root (each renderer, whether drawn, whether shadow-only): a rescan that sees the same skips the read.
+        public long Layout;
+        public int LayoutCount;
         public ForgeCore.EnemyAlert Seen;
         public float WakeUntil, NextScan;
     }
@@ -225,7 +228,7 @@ internal static class OutlineDraw
     {
         if (_patched) return;
         _patched = true;
-        ForgeCore.Patches.Lazy(Plugin.Id, harmony => harmony.PatchAll(typeof(OutlineOverFramePatch))).Ensure();
+        ForgeCore.Frame.OnHudComposite(Plugin.Id, LayOverStep);
         ForgeCore.GameHooks.EnemyLimbDestroyed.After((limb, _) => OutlineLimbPatch.Destroyed(limb));
         ForgeCore.GameHooks.EnemyCustomLimbDestroyed.After((limb, _) => OutlineLimbPatch.Destroyed(limb));
     }
@@ -357,7 +360,7 @@ internal static class OutlineDraw
     private static void ExpireClaims()
     {
         if (Claims.Count == 0) return;
-        if (Claims.Expire(Time.time)) Stop();
+        if (Claims.Expire(ForgeCore.Frame.GameTime)) Stop();
         for (int slot = 0; slot < Claims.Capacity; slot++)
         {
             if (!Claims.Live(slot)) continue;
@@ -380,11 +383,10 @@ internal static class OutlineDraw
             return;
         }
         if (!EnsureCamera()) return;
-        int height = ForgeCore.EngineCalls.ScreenHeight();
-        if (height != _screenHeight) { _screenHeight = height; _dirty = true; }
+        PictureSize(_camera!);
         if (_settleFrames > 0) { _dirty = true; if (--_settleFrames == 0) SettleEnded(); }
         WatchCulling();
-        RescanClaims(Time.time);
+        RescanClaims(ForgeCore.Frame.GameTime);
         if (scope == null)
         {
             if (Tracker.SelectedCount > 0) { Tracker.ClearSelection(); _dirty = true; }
@@ -393,7 +395,7 @@ internal static class OutlineDraw
         }
 
         var live = ForgeCore.Enemies.Live;
-        var now = Time.time;
+        var now = ForgeCore.Frame.GameTime;
         if (_tracked.Length < live.Length) Array.Resize(ref _tracked, Math.Max(live.Length, _tracked.Length * 2));
         if (ForgeCore.Enemies.Version != _version) { _version = ForgeCore.Enemies.Version; Reconcile(live); }
         for (int read = 0, seen = 0; read < OutlineRules.RefreshPerFrame && seen < live.Length; seen++)
@@ -414,15 +416,15 @@ internal static class OutlineDraw
             var p = BodyPosition(ref entry);
             Tracker.Set(slot, ForgeCore.Enemies.Generation(slot), p.x, p.y, p.z, state);
         }
-        // An enemy that just woke or appeared: its renderers are read again a few times a second while its animation plays.
+        // An enemy that just woke or appeared: its renderers are looked at again a few times a second while its animation plays, and read
+        // again (and drawn anew) when they switched.
         for (int i = 0, scans = 0; i < Tracker.SelectedCount && scans < CollectsPerFrame; i++)
         {
             ref var entry = ref _tracked[Tracker.SelectedSlot(i)];
             if (entry.Renderers == null || !OutlineRules.WakeScanDue(now, entry.WakeUntil, entry.NextScan)) continue;
             entry.NextScan = now + OutlineRules.WakeScanSeconds;
-            Collect(ref entry);
+            if (Rescan(ref entry)) _dirty = true;
             scans++;
-            _dirty = true;
         }
         var c = ForgeCore.EngineCalls.Position(_cameraTransform!);
         var q = ForgeCore.EngineCalls.Rotation(_cameraTransform!);
@@ -475,9 +477,34 @@ internal static class OutlineDraw
             ref var body = ref _claimed[slot];
             if (body.Renderers == null || now < body.NextScan || (now >= body.WakeUntil && body.Renderers.Length > 0)) continue;
             body.NextScan = now + OutlineRules.WakeScanSeconds;
-            Collect(ref body);
+            if (Rescan(ref body)) _dirty = true;
             scans++;
-            _dirty = true;
+        }
+    }
+
+    /// <summary>A rescan: the renderers under the root are compared with what the last read saw, and read again only when one came, went,
+    /// was switched on or off or turned shadow-only (a wake-up or climb-out swapping its meshes). True when they were read again.</summary>
+    private static bool Rescan(ref Body body)
+    {
+        var all = body.Root.GetComponentsInChildren<Renderer>(false);
+        if (all.Length == body.LayoutCount && Signature(all) == body.Layout) return false;
+        Collect(ref body, all);
+        return true;
+    }
+
+    // The renderers in order, each with whether it is drawn and whether it casts only a shadow.
+    private static long Signature(Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppArrayBase<Renderer> all)
+    {
+        unchecked
+        {
+            var hash = (long)0xcbf29ce484222325;
+            for (int i = 0; i < all.Length; i++)
+            {
+                var renderer = all[i];
+                var state = renderer.Pointer.ToInt64() * 4 + (Models.Drawn(renderer) ? 1 : 0) + (renderer.shadowCastingMode == ShadowCastingMode.ShadowsOnly ? 2 : 0);
+                hash = (hash ^ state) * 0x100000001b3;
+            }
+            return hash;
         }
     }
 
@@ -490,8 +517,15 @@ internal static class OutlineDraw
 
     private static bool Off() => _failed || (Scopes.Current == null && Claims.Count == 0) || !Plugin.Outlines.Value || ForgeUI.HudFocus.Away;
 
-    /// <summary>The HUD is about to go onto this frame: the line goes on first.</summary>
-    internal static void LayOver(IntPtr hud, RenderTexture frame)
+    /// <summary>The game adds its HUD to the frame in its camera's last image effect (ForgeCore <c>Frame.OnHudComposite</c>; under a stand-in, such
+    /// as ForgeFrameGen's, the step still names the camera's own <c>UI_Apply</c> and the frame is the full-size picture shown): the line goes on first.</summary>
+    private static void LayOverStep(UI_Apply hud, RenderTexture frame)
+    {
+        try { LayOver(hud.Pointer, frame); }
+        catch (Exception error) { Plugin.Logger.ErrorOnce("visual-outline-could-not-be-laid-over", "The outline could not be laid over the frame: " + error); }
+    }
+
+    private static void LayOver(IntPtr hud, RenderTexture frame)
     {
         if (!_shown || hud != _hud || ForgeCore.NativeObjects.Gone(_mask)) return;
         var active = RenderTexture.active;
@@ -592,7 +626,8 @@ internal static class OutlineDraw
         var mask = Mask();
         buffer.SetRenderTarget(mask, BuiltinRenderTextureType.CurrentActive);
         buffer.ClearRenderTarget(false, true, Color.clear);
-        float width = OutlineRules.PixelWidth(style?.Width ?? OutlineRules.DefaultWidth, _screenHeight);
+        // In mask pixels: the mask is the camera's picture, which is smaller than the screen while it renders into a smaller target (ForgeFrameGen).
+        float width = OutlineRules.PixelWidth(style?.Width ?? OutlineRules.DefaultWidth, _pictureHeight);
         _lineWidth = width;
 
         // Outlines added to objects: the winner on each object, unless the automatic enemy outline outranks it there.
@@ -674,7 +709,16 @@ internal static class OutlineDraw
     /// <summary>The camera is about to render and an outline was added or removed after this frame's <see cref="Tick"/>: drawn now, so no frame goes without its lines.</summary>
     private static void BeforeRender(Camera camera)
     {
-        if (camera == _camera && _dirty && !Off()) Rebuild(Scopes.Current?.Style);
+        if (camera != _camera || Off()) return;
+        PictureSize(camera); // its target may have changed at this frame's pre-cull (ForgeFrameGen): the mask follows before the camera draws
+        if (_dirty) Rebuild(Scopes.Current?.Style);
+    }
+
+    /// <summary>The mask and the line width follow the height of the camera's picture.</summary>
+    private static void PictureSize(Camera camera)
+    {
+        int height = ForgeCore.EngineCalls.PixelHeight(camera);
+        if (height != _pictureHeight) { _pictureHeight = height; _dirty = true; }
     }
 
     /// <summary>The mask the outlines are drawn into, the size of the camera's picture; made again when that size changes.</summary>
@@ -695,16 +739,24 @@ internal static class OutlineDraw
     /// look's model hung on it is read; particles, lines and sprites are left out) and, for an
     /// enemy, the body cuts the game made: read when it is first outlined (after any model changes made at spawn) and again after a limb
     /// is shot off.</summary>
-    private static void Collect(ref Body body)
+    private static void Collect(ref Body body) => Collect(ref body, body.Root.GetComponentsInChildren<Renderer>(false));
+
+    private static void Collect(ref Body body, Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppArrayBase<Renderer> all)
     {
+        body.Layout = Signature(all);
+        body.LayoutCount = all.Length;
         var meshes = new List<Renderer>();
-        foreach (var renderer in body.Root.GetComponentsInChildren<Renderer>(false))
+        foreach (var renderer in all)
             if ((renderer.TryCast<SkinnedMeshRenderer>() != null || renderer.TryCast<MeshRenderer>() != null) && renderer.shadowCastingMode != ShadowCastingMode.ShadowsOnly && Solid(renderer)) meshes.Add(renderer);
         // The largest first: when a target has more draws than the budget (a player with every part of its gear), what goes is the small parts, not the body.
-        meshes.Sort(static (a, b) => b.bounds.size.sqrMagnitude.CompareTo(a.bounds.size.sqrMagnitude));
+        // Each renderer's bounds are read once, not in every comparison.
+        var sizes = new float[meshes.Count];
+        for (int i = 0; i < sizes.Length; i++) sizes[i] = -meshes[i].bounds.size.sqrMagnitude;
+        var sorted = meshes.ToArray();
+        Array.Sort(sizes, sorted);
         var found = new List<Renderer>();
         // Every submesh of a renderer is drawn: a model in one mesh (a character's face, body, clothes and hair) is all of it, not its first parts.
-        OutlineDrawSet.Collect(meshes, r => !ForgeCore.NativeObjects.Gone(r) && Models.Drawn(r) && r.sharedMaterials.Length > 0, r => r.sharedMaterials.Length, MaxDraws, found);
+        OutlineDrawSet.Collect(sorted, r => !ForgeCore.NativeObjects.Gone(r) && Models.Drawn(r) && r.sharedMaterials.Length > 0, r => r.sharedMaterials.Length, MaxDraws, found);
         var subs = new int[found.Count];
         var objects = new GameObject[found.Count];
         for (int i = 0; i < subs.Length; i++)
@@ -751,17 +803,6 @@ internal static class OutlineDraw
         body.CutMtx = copy;
         body.CutInverts = block.GetVector(CutInvertsId);
         body.CutCount = count;
-    }
-}
-
-/// <summary>The game adds its HUD to the frame in its camera's last image effect. The outline goes onto the frame just before.</summary>
-[HarmonyPatch(typeof(UI_Apply), nameof(UI_Apply.OnRenderImage))]
-internal static class OutlineOverFramePatch
-{
-    private static void Prefix(UI_Apply __instance, RenderTexture src)
-    {
-        try { OutlineDraw.LayOver(__instance.Pointer, src); }
-        catch (Exception error) { Plugin.Logger.ErrorOnce("visual-outline-could-not-be-laid-over", "The outline could not be laid over the frame: " + error); }
     }
 }
 

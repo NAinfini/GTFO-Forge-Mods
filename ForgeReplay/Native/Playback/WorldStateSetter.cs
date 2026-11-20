@@ -45,6 +45,13 @@ internal sealed class WorldStateSetter
     // Whether this class last showed (true) or hid each spawned item: only a change of that is applied, so a pickup the game hid itself
     // (picked up) is left as the game has it.
     private readonly List<bool> _visible = new();
+    // The recorded pickup key of each spawn (0: none), and the keys of the spawns made for a moment after the one shown now.
+    private readonly List<ulong> _spawnKey = new();
+    private readonly HashSet<ulong> _later = new();
+
+    /// <summary>The recorded pickup <paramref name="key"/> is an item spawned after the moment shown now (a jump back before it): it is not in the
+    /// level yet, so it has no state to be put back into; giving it the level's first state would show it again where the level never had it.</summary>
+    internal bool NotSpawnedYet(ulong key) => _later.Contains(key);
 
     internal int Done { get; private set; }
     internal int Refused { get; private set; }
@@ -91,7 +98,7 @@ internal sealed class WorldStateSetter
     {
         _asleep.Clear();
         ForgetLists(); _stationStatus.Clear(); _requeryAt = 0f;
-        _itemByKey.Clear(); _home.Clear(); _kept.Clear(); _matched.Clear(); _spawned.Clear(); _tried.Clear(); _visible.Clear();
+        _itemByKey.Clear(); _home.Clear(); _kept.Clear(); _matched.Clear(); _spawned.Clear(); _tried.Clear(); _visible.Clear(); _spawnKey.Clear(); _later.Clear();
         Done = Refused = 0; _censusReread = false;
         if (_musicHeld && DramaManager.Current != null) DramaManager.Current.enabled = true;
         if (_musicHeld && MusicManager.Current != null) MusicManager.Current.enabled = true;
@@ -475,9 +482,12 @@ internal sealed class WorldStateSetter
     public int Spawns(IReadOnlyList<ItemSpawned> spawns, int count)
     {
         var failed = 0;
+        _later.Clear();
         for (var i = 0; i < Math.Max(count, _spawned.Count); i++)
         {
-            if (i >= _spawned.Count) { _spawned.Add(null); _tried.Add(false); _visible.Add(true); }
+            if (i >= _spawned.Count) { _spawned.Add(null); _tried.Add(false); _visible.Add(true); _spawnKey.Add(0); }
+            if (i < count) _spawnKey[i] = spawns[i].Key;
+            else if (_spawnKey[i] != 0) _later.Add(_spawnKey[i]);
             if (i < count && !_tried[i])
             {
                 // An item the level held at the opening is the replay level's own when that level has the same one there.

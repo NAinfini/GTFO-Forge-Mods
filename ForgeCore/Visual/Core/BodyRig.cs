@@ -185,11 +185,14 @@ public static class HumanRig
     }
 
     /// <summary>The joints <paramref name="links"/> (from <see cref="Links(IReadOnlyList{string?}, IReadOnlyList{Vector3}?)"/>) leave out
-    /// of the copy, by <see cref="ClipRig"/> name: those parts of the model keep their rest pose on the bone above them.</summary>
-    public static string[] Unposed(IReadOnlyList<PoseLink> links)
+    /// of the copy, by <see cref="ClipRig"/> name: those parts of the model keep their rest pose on the bone above them. With
+    /// <paramref name="optional"/> false it leaves out the joints a humanoid body may lack as well (the upper chest and the shoulders):
+    /// many skeletons have none, and the bone above carries their parts and points past them.</summary>
+    public static string[] Unposed(IReadOnlyList<PoseLink> links, bool optional = true)
     {
         var names = new List<string>();
-        for (var j = 0; j < links.Count && j < ClipRig.Count; j++) if (links[j].Model[0] == '\0') names.Add(ClipRig.Names[j]);
+        for (var j = 0; j < links.Count && j < ClipRig.Count; j++)
+            if (links[j].Model[0] == '\0' && (optional || j >= ClipRig.BodyCount || !Optional[j])) names.Add(ClipRig.Names[j]);
         return names.ToArray();
     }
 
@@ -553,7 +556,8 @@ internal static class PoseSolver
         var to = target - root;
         var distance = to.Length();
         var dir = distance > 1e-5f ? to / distance : Vector3.UnitY;
-        var d = Math.Clamp(distance, Math.Abs(upper - lower) + 1e-4f, upper + lower - 1e-4f);
+        var near = Math.Abs(upper - lower) + 1e-4f; // a zero-length bone leaves no room between the two bounds
+        var d = Math.Clamp(distance, near, Math.Max(near, upper + lower - 1e-4f));
         end = root + dir * d;
         var side = bend - dir * Vector3.Dot(bend, dir);
         if (side.LengthSquared() < 1e-10f) side = Vector3.Cross(dir, Math.Abs(dir.Y) < 0.99f ? Vector3.UnitY : Vector3.UnitX);

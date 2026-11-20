@@ -114,6 +114,18 @@ export async function buildImportedScene(model: Pick<ImportedModelPackage, 'name
         const mesh = new Mesh(geometry, materials);
         mesh.name = model.name;
         scene.add(mesh);
+        // Camera-facing parts (FACE_ nodes) stand as authored here: at their pivot, turned by their yaw (mirrored with X, so the turn reverses).
+        for (const [index, part] of (model.descriptor.facing ?? []).entries()) {
+            const own = new BufferGeometry();
+            for (const name of ['position', 'normal', 'uv']) own.setAttribute(name, geometry.getAttribute(name));
+            own.setIndex(geometry.getIndex());
+            for (const submesh of part.submeshes) own.addGroup(submesh.start, submesh.count, submesh.material);
+            const turning = new Mesh(own, materials);
+            turning.name = model.name + ' facing ' + index;
+            turning.position.set(-part.pivot[0], part.pivot[1], part.pivot[2]);
+            turning.rotation.y = -part.yaw;
+            scene.add(turning);
+        }
         return scene;
     }
     // 蒙皮模型：骨架按描述符的静止姿态建（和网格同样 X 取反），网格放在最后；姿态由 imported-skin-pose.ts 按宿主骨驱动，没人驱动时就是绑定姿态。

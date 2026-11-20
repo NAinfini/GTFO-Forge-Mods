@@ -15,13 +15,13 @@ namespace ForgeOrdnance;
 /// It is the only place that names all three: each of the game's moments has one handler here, which runs the parts' steps in order.</summary>
 [BepInPlugin(Id, "Forge Ordnance", Version)]
 [BepInDependency("dev.gtfomodding.gtfo-api", ">=0.6.1")]
-[BepInDependency("NAinfini.ForgeCore", ">=1.0.1")]
+[BepInDependency("NAinfini.ForgeCore", ">=1.0.3")]
 // MTFO marks the game as modded (achievements and public matchmaking off) and provides the CustomPath the definitions live in.
 [BepInDependency("com.dak.MTFO", ">=4.6.3")]
 internal sealed class Plugin : BasePlugin
 {
     internal const string Id = "NAinfini.ForgeOrdnance";
-    internal const string Version = "1.0.2"; // package-version: NAinfini-ForgeOrdnance
+    internal const string Version = "1.0.3"; // package-version: NAinfini-ForgeOrdnance
     private static OrdnanceController? _controller;
     private static OrdnanceHud? _hud;
     /// <summary>The content parts that loaded; the steps of one that did not are left out everywhere.</summary>
@@ -329,7 +329,7 @@ internal sealed class Plugin : BasePlugin
     /// on its own, so a part that throws stops only its own frame.</summary>
     private static void Tick()
     {
-        var now = Time.time;
+        var now = ForgeCore.Frame.GameTime;
         var host = ForgeCore.Session.IsHost;
         try
         {
@@ -366,7 +366,7 @@ internal sealed class Plugin : BasePlugin
     /// <summary>After the game's animation, from ForgeCore's <c>Frame.OnLateUpdate</c>.</summary>
     private static void LateTick()
     {
-        var now = Time.time;
+        var now = ForgeCore.Frame.GameTime;
         try { TurretLooks.LateTick(now); }
         catch (Exception error) { Logger.ErrorOnce("ordnance-late-frame-failed", "the turret looks' frame failed: " + error); }
         if (!_frames) return;

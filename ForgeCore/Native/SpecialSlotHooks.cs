@@ -43,15 +43,19 @@ internal static class SpecialSlotHooks
     }
 
     /// <summary>An ammunition pack counts the own special weapon as needing rounds while it is away and its kept pool is not full (the
-    /// game would only look at the lent gun's pool in the slot).</summary>
-    [HarmonyPatch(typeof(PlayerAmmoStorage), nameof(PlayerAmmoStorage.NeedWeaponAmmo))]
+    /// game would only look at the lent gun's pool in the slot). Patched on <c>PlayerBackpackManager.NeedWeaponAmmo</c>, the body every
+    /// ask reaches (<c>PlayerAgent.NeedWeaponAmmo</c> jumps to it): it inlines <c>PlayerAmmoStorage.NeedWeaponAmmo</c>, which has no
+    /// caller of its own in this build, so a patch there never ran.</summary>
+    [HarmonyPatch(typeof(PlayerBackpackManager), nameof(PlayerBackpackManager.NeedWeaponAmmo))]
     [HarmonyPostfix]
-    private static void NeedPostfix(PlayerAmmoStorage __instance, ref bool __result)
+    private static void NeedPostfix(SNetwork.SNet_Player player, ref bool __result)
     {
         try
         {
-            if (__result || !Redirects(__instance)) return;
-            if (SpecialSlot.Local.Own!.Pool < __instance.SpecialAmmo.AmmoMaxCap) __result = true;
+            if (__result || player == null || !player.IsLocal) return;
+            var storage = PlayerBackpackManager.LocalBackpack?.AmmoStorage;
+            if (storage == null || !Redirects(storage)) return;
+            if (SpecialSlot.Local.Own!.Pool < storage.SpecialAmmo.AmmoMaxCap) __result = true;
         }
         catch (Exception error) { Plugin.Logger.ErrorOnce("core-reading-own-special-weapons-need-ammunition", "Reading the own special weapon's need for ammunition failed: " + error); }
     }

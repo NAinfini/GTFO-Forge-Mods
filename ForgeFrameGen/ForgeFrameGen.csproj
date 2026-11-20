@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>ForgeFrameGen</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DebugType>embedded</DebugType>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+    <!-- tools/build_native.ps1 builds the bridge into this folder of the checkout and puts the pinned NVIDIA and AMD files beside it. -->
+    <ForgeFrameGenNativeOut>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../artifacts/native/ForgeFrameGen/Release'))</ForgeFrameGenNativeOut>
+  </PropertyGroup>
+  <Target Name="RequireGameReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(GTFOBepInExPath)/core/BepInEx.Unity.IL2CPP.dll') or !Exists('$(GTFOBepInExPath)/interop/Modules-ASM.dll')"
+           Text="Set GTFOBepInExPath to a GTFO BepInEx IL2CPP profile with generated interop assemblies." />
+  </Target>
+  <!-- The native bridge is rebuilt (and the pinned NVIDIA and AMD files fetched) whenever its sources or pins are newer than the built DLL. -->
+  <Target Name="BuildNative" BeforeTargets="ResolveReferences" Inputs="native/forge_framegen.cpp;native/present_bridge.cpp;native/frame_generation.cpp;native/frame_generation.h;native/frame_generation_backend.h;native/dlss_frame_generation.cpp;native/fsr_frame_generation.cpp;native/ffx_runtime.cpp;native/ffx_runtime.h;native/screen_pass.cpp;native/screen_pass.h;native/bridge_check.cpp;native/bridge_common.h;native/upscale_params.h;native/fsr_upscale.cpp;native/fsr_upscale.h;native/CMakeLists.txt;dlss-sdk.json;streamline-sdk.json;fidelityfx-sdk.json;tools/build_native.ps1" Outputs="$(ForgeFrameGenNativeOut)/ForgeFrameGen.Native.dll">
+    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)/tools/build_native.ps1&quot;" />
+  </Target>
+  <Target Name="RequireNative" AfterTargets="BuildNative" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ForgeFrameGenNativeOut)/ForgeFrameGen.Native.dll') or !Exists('$(ForgeFrameGenNativeOut)/nvngx_dlss.dll') or !Exists('$(ForgeFrameGenNativeOut)/amd_fidelityfx_upscaler_dx12.dll') or !Exists('$(ForgeFrameGenNativeOut)/amd_fidelityfx_framegeneration_dx12.dll')"
+           Text="The native bridge or the NVIDIA DLSS or AMD FSR files are missing after tools/build_native.ps1; see its output." />
+  </Target>
+  <ItemGroup>
+    <Compile Include="*.cs;Native/**/*.cs" />
+    <!-- Shipped beside the plugin DLL, unchanged: the bridge, NVIDIA's DLSS and Streamline libraries, AMD's FSR libraries and their licences (see Docs/forge-upscale/PLAN.md). -->
+    <None Include="$(ForgeFrameGenNativeOut)/ForgeFrameGen.Native.dll;$(ForgeFrameGenNativeOut)/nvngx_dlss.dll;$(ForgeFrameGenNativeOut)/nvngx_dlssg.dll;$(ForgeFrameGenNativeOut)/NVIDIA-RTX-SDKs-LICENSE.txt;$(ForgeFrameGenNativeOut)/sl.interposer.dll;$(ForgeFrameGenNativeOut)/sl.common.dll;$(ForgeFrameGenNativeOut)/sl.dlss_g.dll;$(ForgeFrameGenNativeOut)/sl.reflex.dll;$(ForgeFrameGenNativeOut)/sl.pcl.dll;$(ForgeFrameGenNativeOut)/NVIDIA-Streamline-LICENSE.txt;$(ForgeFrameGenNativeOut)/NVIDIA-Reflex-LICENSE.txt;$(ForgeFrameGenNativeOut)/amd_fidelityfx_loader_dx12.dll;$(ForgeFrameGenNativeOut)/amd_fidelityfx_upscaler_dx12.dll;$(ForgeFrameGenNativeOut)/amd_fidelityfx_framegeneration_dx12.dll;$(ForgeFrameGenNativeOut)/AMD-FSR-SDK-LICENSE.txt;RiskOfRainUpscaling-LICENSE.txt" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="lang/*.forge" CopyToOutputDirectory="PreserveNewest" />
+    <ProjectReference Include="../ForgeCore/ForgeCore.csproj" Private="false" />
+    <!-- Built alongside; packaged into patchers/ by tools/package_release.py. -->
+    <ProjectReference Include="preloader/ForgeFrameGen.Preloader.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <Reference Include="0Harmony" HintPath="$(GTFOBepInExPath)/core/0Harmony.dll" Private="false" />
+    <Reference Include="BepInEx.Core" HintPath="$(GTFOBepInExPath)/core/BepInEx.Core.dll" Private="false" />
+    <Reference Include="BepInEx.Unity.IL2CPP" HintPath="$(GTFOBepInExPath)/core/BepInEx.Unity.IL2CPP.dll" Private="false" />
+    <Reference Include="GlobalFramework-ASM" HintPath="$(GTFOBepInExPath)/interop/GlobalFramework-ASM.dll" Private="false" />
+    <Reference Include="Il2CppInterop.Runtime" HintPath="$(GTFOBepInExPath)/core/Il2CppInterop.Runtime.dll" Private="false" />
+    <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" Private="false" />
+    <Reference Include="Modules-ASM" HintPath="$(GTFOBepInExPath)/interop/Modules-ASM.dll" Private="false" />
+    <Reference Include="Unity.Postprocessing.Runtime" HintPath="$(GTFOBepInExPath)/interop/Unity.Postprocessing.Runtime.dll" Private="false" />
+    <Reference Include="Utils-ASM" HintPath="$(GTFOBepInExPath)/interop/Utils-ASM.dll" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.CoreModule.dll" Private="false" />
+  </ItemGroup>
+</Project>

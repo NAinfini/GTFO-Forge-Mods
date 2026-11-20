@@ -796,7 +796,7 @@ internal static class PuppetMovementHook
 {
     internal static readonly System.Collections.Generic.HashSet<IntPtr> Held = new();
 
-    private static bool Prefix(PlayerLocomotion __instance) => !Held.Contains(__instance.Pointer);
+    private static bool Prefix(PlayerLocomotion __instance) => Held.Count == 0 || !Held.Contains(__instance.Pointer);
 }
 
 /// <summary>Holds a puppet enemy's own launches off: whoever holds puppets is the host, so the attack states a puppet plays

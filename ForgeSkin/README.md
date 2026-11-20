@@ -14,19 +14,24 @@ live screens (ammo, kills, damage dealt and taken, accuracy, health, infection â
 flashes and sounds played on game events (kill, hit, miss, fire, reload, aim, low ammo, empty, going down, revived, ...;
 several sounds on one event play one at random, and kills can have their own sounds per enemy), and a custom part
 layout. Skins can also hang charms on a cord or chain that sway with gravity and swing as you move (on the gun in your
-own hands), and replace the reticle in a holographic sight (up to three layers, seen when you aim down it).
+own hands), and replace the reticle in a holographic sight (up to three layers, seen when you aim down it). A skin can also swap
+one part, or the whole gun, for an imported model, move where the gun light's beam comes out with the model, and set a sight's lens, reticle and zoom.
 
-Inspect your weapon: press the inspect key (I by default, under Forge mods on the game's key settings page) with any gun in your
-hands to turn it over and look at it. Each kind of gun has its own motion: pistols, revolvers and compact guns turn in
-the hand (a revolver spins twice), rifles, shotguns, machine guns and snipers turn in both hands. Firing, aiming,
-reloading, sprinting, a menu or a hit ends it. Known issue: rifles, shotguns, machine guns and snipers are held badly
-while their right side is shown; a later version fixes it.
+Inspect your weapon: press the inspect key (I by default, under Forge mods on the game's key settings page) once, standing or
+crouching, with any gun in your hands to turn it over and look at it. Each kind of gun has several motions and every press plays
+one at random, never the same one twice in a row: pistols are turned over or tossed up and caught, show their sights or their muzzle, or slap their magazine home; the
+Shelling Arid 5 and S-49 also bring the magazine up to your eyes or pull the slide; revolvers spin on the finger (the Mastaba R66 swings its cylinder
+out, the Bataldo 3RB breaks open); rifles, shotguns, machine guns and snipers are turned in both hands or
+tossed over by the stock; compact guns also show their sights or slap their magazine home. Firing, aiming, reloading, sprinting, a menu or a hit ends it. Known issue: rifles, shotguns,
+machine guns and snipers are held badly while their right side is shown; a later version fixes it.
 
 Character skins replace your whole character with an imported humanoid model. It moves with the game's own animations
 (walking, running, crouching, jumping, holding the gun, going down, being revived), its hair, skirt and ribbons swing as you
 move, and in first person you see the model's own arms; where you can be hit stays the original character's. The lobby
 figure wears it too. The model need not be a whole human: a creature without fingers, with one arm or with unlike sides
-works too. Only its hips need a bone; a part without one keeps its shape and moves with the part above it.
+works too. Only its hips need a bone; a part without one keeps its shape and moves with the part above it. You can also
+give another player a character with the SKINS button on their bar: you see their own pick first, else the character you chose
+for that player's slot, else the original; only you see it, and nothing is sent.
 
 You normally don't install this by hand: skin mods made with the ForgeSkin editor list it as a dependency, so your mod
 manager installs it with them.
@@ -69,8 +74,8 @@ Your skins show on your gear: in your hands, on a sentry or mine you placed, on 
 pickups lying in the level whose item has a skin (they keep it when you pick them up). Teammates who have the same skin mod
 installed see the character, skins, colours and adjustments you picked, and you see theirs; their skin's shot,
 wield and down/revive sounds play at their gun. A teammate's gear whose skin you don't have (or have in another version)
-keeps its original look, and the skin picker says which mod to install. Bots' guns and teammates' mines keep their
-original look.
+keeps its original look, and the skin picker says which mod to install. Bots wear what the host picked for them;
+teammates' mines keep their original look.
 
 In the lobby, the SKINS button opens the skin picker: choose a character and a
 skin for each gear, or the original look (a gear with several skins installed lists them all, each with the preview picture

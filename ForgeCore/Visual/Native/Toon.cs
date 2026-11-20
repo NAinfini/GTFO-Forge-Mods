@@ -23,7 +23,7 @@ public enum ToonLighting
 /// <c>_UseNormalMap</c> 1, <c>_ShadeColor</c>, <c>_ShadeThreshold</c> and <c>_ShadeSoftness</c> or a ramp <c>_ShadeRamp</c> with
 /// <c>_UseShadeRamp</c> 1, <c>_OutlineWidth</c> (pixels at 1080 lines) and <c>_OutlineColor</c>, <c>_RimColor</c>, <c>_RimPower</c>,
 /// <c>_RimStrength</c>, <c>_HighlightColor</c>, <c>_HighlightSize</c>, <c>_HighlightSoftness</c> (forward only); glow through <c>Glow.Write</c>
-/// (the gear shader's <c>_EmissiveColor</c>, <c>_EmissiveMap</c>, <c>_EnableEmissive</c>, so <c>LitMaterial.EmissionPerUnit</c> holds). A
+/// (the gear shader's <c>_EmissiveColor</c>, <c>_EmissiveMap</c>, <c>_EnableEmissive</c>, so <c>ColourSpace.EmissionPerUnit</c> holds). A
 /// first-person copy is made with <c>LitMaterial.FirstPersonCopy</c> as for the gear shader. The caller owns what it gets.
 /// </summary>
 public static class Toon

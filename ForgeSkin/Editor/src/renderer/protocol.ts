@@ -310,6 +310,10 @@ export interface PreviewTransform {
   /** GLB node name. */
   node: string;
   parent: string | null;
+  /** On a node with a model of its own: that model's name (names a node whose own name says nothing), and whether it is skinned
+   * (the game cannot replace a skinned model). */
+  model?: string | null;
+  skinned?: boolean;
 }
 
 export interface VerifyResult {
@@ -341,11 +345,13 @@ export interface WeaponPreview {
   damaged: boolean;
   /** Some game textures are not the game's own (another mod rewrote the game files); they show and bake as rewritten. */
   modified: boolean;
-  /** The gun's hold points it has: the node (a PartTransform key) the game puts each wrist on, shoots from and aims along. */
-  points?: { point: HoldPoint; part: string; path: string }[] | null;
+  /** The gun's hold points it has: the node (a PartTransform key) the game puts each wrist on, shoots from and aims along; and
+   * its flashlight's light, the node the game's light shines from (GearPartFlashlight.m_lightAlign). */
+  points?: { point: GearPoint; part: string; path: string }[] | null;
 }
 
 export type HoldPoint = 'rightHand' | 'leftHand' | 'muzzle' | 'sight';
+export type GearPoint = HoldPoint | 'light';
 
 /** One hand of the game's first-person arms (preview.hands), in the hand bone's frame, Unity space: the hand bone and its 15 finger
  *  joints (thumb, index, middle, ring, little; three each), each with its parent's index and rest pose, and the glove's skin. */
@@ -388,8 +394,8 @@ export interface MeshImport {
   emissive: { color: number[]; intensity: number } | null;
   /** Sizes of the pictures kept, and what was left out. */
   notes: string[];
-  /** The model's gun sockets by hold point (RightHand, LeftHand, muzzle, SightLook nodes; Unity space, its own size). */
-  sockets: Partial<Record<HoldPoint, number[]>>;
+  /** The model's gun sockets by point (RightHand, LeftHand, muzzle, SightLook and light nodes; Unity space, its own size). */
+  sockets: Partial<Record<GearPoint, number[]>>;
 }
 
 /** The whole-gun model's seat (backend GunSwap): in the gear's frame, Unity space. Muzzle and sight are null where the gun's stay. */
@@ -405,7 +411,7 @@ export interface GunSeat {
   shownLength: number;
   lengthMin: number;
   lengthMax: number;
-  sockets: HoldPoint[];
+  sockets: GearPoint[];
 }
 
 /** A skin project on disk (`project.list`). */
@@ -456,6 +462,7 @@ export type SkinsNoteKind =
   | 'sounds'
   | 'playerColors'
   | 'codeEffects'
+  | 'inspect'
   | 'variants';
 export interface SkinsNote {
   kind: SkinsNoteKind;

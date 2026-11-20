@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -41,12 +42,15 @@ internal static class Hud
 
     private static readonly List<Anchor> Anchors = new();
     private static Matrix4x4 _matrix;
-    private static float _nextScan;
+    private static float _nextScan, _nextRendererScan;
     private static HudBox? _weaponList, _vitals;
     private static float _barCentre, _barWidth;
 
     private static float _lastTick;
     private static HudScene _scene;
+
+    /// <summary>Counts the texts and sprites made through the kit: an element collects its renderers again when it changes.</summary>
+    internal static int PiecesAdded;
 
     internal static PUI_Inventory? List => _list;
     internal static float FontSize => _text != null ? _text.fontSize : 0f;
@@ -133,10 +137,10 @@ internal static class Hud
             if (HudFocus.Away) { HideAll(elements); return; }
             var layer = GuiManager.PlayerLayer;
             var list = layer != null ? layer.Inventory : null;
-            if (list == null || list.WasCollected) { HideAll(elements); return; }
+            if (ForgeCore.NativeObjects.Gone(list)) { HideAll(elements); return; }
             if ((_list == null || _list.WasCollected || _list.Pointer != list.Pointer) && !Capture(list, now)) { HideAll(elements); return; }
             var status = layer!.m_playerStatus;
-            if (status != null && status.WasCollected) status = null;
+            if (ForgeCore.NativeObjects.Gone(status)) status = null;
             var any = false;
             for (var i = 0; i < elements.Count; i++)
             {
@@ -146,7 +150,7 @@ internal static class Hud
                 // The build callback may remove this or any registration.
                 if (!element.IsRegistered) continue;
                 element.Prepare(now);
-                any |= element.Visible && !element.Faulted && element.RootObject != null;
+                any |= element.Visible && !element.Faulted && element.RootObject is not null;
             }
             // Nothing to show (for example in the lobby): nothing is measured.
             if (!any) { HideAll(elements); return; }
@@ -182,7 +186,7 @@ internal static class Hud
             {
                 var element = elements[i];
                 // The pointer is the library's own cursor for whichever mod holds it: a mod that has the screen alone still needs it drawn.
-                var live = element.IsRegistered && element.Visible && !element.Faulted && element.RootObject != null && (AloneMod == null || element.Mod == AloneMod || HudPointer.Draws(element));
+                var live = element.IsRegistered && element.Visible && !element.Faulted && element.RootObject is not null && (AloneMod == null || element.Mod == AloneMod || HudPointer.Draws(element));
                 element.Entry.Visible = live;
                 if (!live) continue;
                 element.MeasureDrawn(now);
@@ -194,14 +198,22 @@ internal static class Hud
                 if (!element.IsRegistered) continue;
                 var entry = element.Entry;
                 var root = element.RootObject;
-                var show = root != null && entry.State is LayoutState.Placed or LayoutState.Free;
-                if (root != null && root.activeSelf != show) root.SetActive(show);
+                var show = root is not null && entry.State is LayoutState.Placed or LayoutState.Free;
+                if (root is not null && element.WrittenActive != show)
+                {
+                    if (root.activeSelf != show) root.SetActive(show);
+                    element.WrittenActive = show;
+                }
                 if (!show) continue;
                 element.HalfWidth = HudScreen.HalfWidth;
                 element.HalfHeight = HudScreen.HalfHeight;
                 element.BarWidth = _barWidth;
                 var position = new Vector3(entry.RootX, entry.RootY, 0f);
-                if (root!.transform.localPosition != position) root.transform.localPosition = position;
+                if (element.WrittenPosition != position)
+                {
+                    if (root!.transform.localPosition != position) root.transform.localPosition = position;
+                    element.WrittenPosition = position;
+                }
                 element.Tick(now, dt);
             }
         }
@@ -218,7 +230,7 @@ internal static class Hud
 
     private static bool HealthDrawn(PUI_LocalPlayerStatus status) => Drawn(status.m_health1) || Drawn(status.m_health2);
 
-    private static bool Drawn(SpriteRenderer? sprite) => sprite != null && !sprite.WasCollected && sprite.enabled && sprite.gameObject.activeInHierarchy;
+    private static bool Drawn(SpriteRenderer? sprite) => !ForgeCore.NativeObjects.Gone(sprite) && sprite.enabled && sprite.gameObject.activeInHierarchy;
 
     /// <summary>Measures the game's vitals on the weapon list's plane as the HUD camera shows them: the health bar from its two sprites (its
     /// centre and width), and every renderer of the player status that draws (the bar, the PULSE row and its value, health, infection,
@@ -245,7 +257,7 @@ internal static class Hud
         }
         foreach (var renderer in VitalRenderers)
         {
-            if (renderer == null || renderer.WasCollected || !renderer.enabled || !renderer.gameObject.activeInHierarchy) continue;
+            if (ForgeCore.NativeObjects.Gone(renderer) || !renderer.enabled || !renderer.gameObject.activeInHierarchy) continue;
             float l = float.MaxValue, bo = float.MaxValue, r = float.MinValue, t = float.MinValue;
             if (!HudScreen.Project(renderer.bounds, ref l, ref bo, ref r, ref t)) continue;
             left = Math.Min(left, l); right = Math.Max(right, r); bottom = Math.Min(bottom, bo); top = Math.Max(top, t);
@@ -279,7 +291,8 @@ internal static class Hud
         for (var i = 0; i < elements.Count; i++)
         {
             var root = elements[i].RootObject;
-            if (root != null && root.activeSelf) root.SetActive(false);
+            if (root is not null && root.activeSelf) root.SetActive(false);
+            elements[i].WrittenActive = false;
         }
     }
 
@@ -321,7 +334,7 @@ internal static class Hud
             textScale = Vector3.Scale(textScale, GameHud.HomeScale(under));
         _textScale = textScale;
         Anchors.Clear();
-        _nextScan = 0f;
+        _nextScan = _nextRendererScan = 0f;
         _weaponList = _vitals = null;
         _vitalsFor = IntPtr.Zero;
         _healthDrawn = false;
@@ -354,6 +367,7 @@ internal static class Hud
     internal static TextMeshPro Text(Transform parent)
     {
         var source = _text ?? throw new InvalidOperationException("the HUD has no text to copy");
+        PiecesAdded++;
         var go = Object.Instantiate(source.gameObject, parent);
         go.name = "Text";
         NativeUi.StripLocalization(go);
@@ -405,6 +419,7 @@ internal static class Hud
     /// <paramref name="order"/> added to the sorting order (negative goes behind the texts).</summary>
     internal static SpriteRenderer Sprite(Transform parent, Sprite sprite, int order)
     {
+        PiecesAdded++;
         var go = new GameObject("Sprite") { layer = _layer };
         go.transform.SetParent(parent, false);
         var renderer = go.AddComponent<SpriteRenderer>();
@@ -424,27 +439,31 @@ internal static class Hud
     // ---- measuring the weapon list -------------------------------------------------------------------------
 
     /// <summary>The box of everything the weapon list draws, in the list's own space (its pieces are its children, so the list's sway does
-    /// not move them in it). The list's renderers are collected twice a second.</summary>
+    /// not move them in it). The list's renderers are collected every <see cref="RendererRescan"/> seconds; their boxes twice a second.</summary>
     private static HudBox? Locate(PUI_Inventory list, float now)
     {
-        var count = 0;
-        foreach (var pair in list.m_inventorySlots)
+        if (now >= _nextRendererScan)
         {
-            if (pair.Value == null) continue;
-            foreach (var renderer in pair.Value.GetComponentsInChildren<Renderer>(true))
+            _nextRendererScan = now + RendererRescan;
+            var count = 0;
+            foreach (var pair in list.m_inventorySlots)
             {
-                if (count == Anchors.Count) Anchors.Add(new Anchor { Renderer = renderer });
-                else if (Anchors[count].Renderer.Pointer != renderer.Pointer) Anchors[count] = new Anchor { Renderer = renderer };
-                count++;
+                if (ForgeCore.NativeObjects.Gone(pair.Value)) continue;
+                foreach (var renderer in pair.Value.GetComponentsInChildren<Renderer>(true))
+                {
+                    if (count == Anchors.Count) Anchors.Add(new Anchor { Renderer = renderer });
+                    else if (Anchors[count].Renderer.Pointer != renderer.Pointer) Anchors[count] = new Anchor { Renderer = renderer };
+                    count++;
+                }
             }
+            if (count != Anchors.Count) Anchors.RemoveRange(count, Anchors.Count - count);
         }
-        if (count != Anchors.Count) Anchors.RemoveRange(count, Anchors.Count - count);
         _matrix = list.transform.worldToLocalMatrix;
         float left = float.MaxValue, bottom = float.MaxValue, right = float.MinValue, top = float.MinValue;
         foreach (var anchor in Anchors)
         {
             var renderer = anchor.Renderer;
-            anchor.Visible = renderer != null && !renderer.WasCollected && renderer.enabled && renderer.gameObject.activeInHierarchy;
+            anchor.Visible = !ForgeCore.NativeObjects.Gone(renderer) && renderer.enabled && renderer.gameObject.activeInHierarchy;
             if (!anchor.Visible) continue;
             anchor.Bounds = renderer!.bounds;
             Extend(anchor.Bounds, _matrix, ref left, ref bottom, ref right, ref top);
@@ -462,7 +481,10 @@ internal static class Hud
 /// </summary>
 public sealed class HudElement
 {
-    private const float MeasureEvery = 0.25f;
+    private const float MeasureEvery = 0.25f, CollectEvery = 1f;
+    private Renderer[]? _renderers;
+    private int _piecesSeen;
+    private float _nextCollect;
     private GameObject? _root;
     private PUI_Inventory? _builtFor, _failedFor;
     private float _nextDrawn;
@@ -602,7 +624,7 @@ public sealed class HudElement
     public Transform? Root => RootObject?.transform;
 
     /// <summary>The game's weapon list this element is under, while built.</summary>
-    public PUI_Inventory? WeaponList => RootObject != null ? _builtFor : null;
+    public PUI_Inventory? WeaponList => RootObject is not null ? _builtFor : null;
 
     /// <summary>The font size of the weapon list's item names; scale your texts' <c>fontSize</c> from it.</summary>
     public float FontSize => Hud.FontSize;
@@ -625,7 +647,9 @@ public sealed class HudElement
 
     internal Action<HudElement> BuildCallback { get; }
 
-    internal GameObject? RootObject => _root != null && !_root.WasCollected ? _root : null;
+    // Read several times per element per frame: liveness from the native pointer, not Unity's == (a call into the game per test); callers
+    // test the result with `is null`.
+    internal GameObject? RootObject => ForgeCore.NativeObjects.Gone(_root) ? null : _root;
 
     private Transform Parent(Transform? parent) =>
         parent ?? Root ?? throw new InvalidOperationException("HUD element '" + Id + "' has no HUD yet; add its pieces from its build callback.");
@@ -633,7 +657,7 @@ public sealed class HudElement
     /// <summary>True when this element was built, or failed to build, for <paramref name="list"/>.</summary>
     internal bool BuiltFor(PUI_Inventory list) =>
         (_failedFor != null && _failedFor.Pointer == list.Pointer) ||
-        (RootObject != null && _builtFor != null && _builtFor.Pointer == list.Pointer);
+        (RootObject is not null && _builtFor is not null && _builtFor.Pointer == list.Pointer);
 
     internal void Attach(GameObject root, PUI_Inventory list)
     {
@@ -641,8 +665,11 @@ public sealed class HudElement
         _builtFor = list;
         _failedFor = null;
         Generation++;
+        _renderers = null;
         _nextDrawn = 0f;
         _drawnExact = false;
+        WrittenActive = null;
+        WrittenPosition = null;
         Entry.DrawnWidth = Entry.DrawnHeight = 0f;
     }
 
@@ -657,13 +684,21 @@ public sealed class HudElement
     internal void MeasureDrawn(float now)
     {
         var root = RootObject;
-        if (_drawnExact || root == null || !root.activeSelf || now < _nextDrawn) return;
+        if (_drawnExact || now < _nextDrawn || root is null || !root.activeSelf) return;
         _nextDrawn = now + MeasureEvery;
         float left = float.MaxValue, bottom = float.MaxValue, right = float.MinValue, top = float.MinValue;
         var matrix = Hud.ListSpace;
-        foreach (var renderer in root.GetComponentsInChildren<Renderer>(false))
+        // The renderers under the root are collected again when a piece was added through the kit or after a second (a mod's own
+        // objects), not at every measure: the collection wraps each one.
+        if (_renderers == null || _piecesSeen != Hud.PiecesAdded || now >= _nextCollect)
         {
-            if (!renderer.enabled) continue;
+            _renderers = root.GetComponentsInChildren<Renderer>(true).ToArray(); // inactive too: a pooled piece switched on shows at the next measure
+            _piecesSeen = Hud.PiecesAdded;
+            _nextCollect = now + CollectEvery;
+        }
+        foreach (var renderer in _renderers)
+        {
+            if (ForgeCore.NativeObjects.Gone(renderer) || !renderer.enabled || !renderer.gameObject.activeInHierarchy) continue;
             Hud.Extend(renderer.bounds, matrix, ref left, ref bottom, ref right, ref top);
         }
         if (right < left) { Entry.DrawnWidth = Entry.DrawnHeight = 0f; return; }
@@ -674,6 +709,10 @@ public sealed class HudElement
     }
 
     private bool _drawnExact;
+
+    /// <summary>What the layout pass last wrote to the root (switch and position), so an unchanged frame touches no native object; cleared when the root is replaced.</summary>
+    internal bool? WrittenActive;
+    internal Vector3? WrittenPosition;
 
     /// <summary>A template that knows exactly what it draws this frame (sizes from its root along its region's directions) reports it
     /// before the layout runs, in place of the stepped measure: the layout, and everything stacked or kept clear of it, then follows its
@@ -696,6 +735,7 @@ public sealed class HudElement
             Object.Destroy(_root);
         }
         _root = null;
+        _renderers = null;
         _builtFor = null;
     }
 }

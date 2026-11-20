@@ -1,0 +1,14 @@
+[
+  {
+    "target": "ES_PathMove.Exit",
+    "rva": "0x16E7C00",
+    "sharers": ["ES_PathMove.CommonExit", "ES_PathMove.SyncExit"],
+    "reason": "FarAnimatorThrottle gives a throttled animator back when the enemy leaves PathMove, and all three exit entries should trigger it; only this one patch sits on the folded body."
+  },
+  {
+    "target": "Decay.Initialize",
+    "rva": "0x162FE40",
+    "sharers": ["Decay.Initialize"],
+    "reason": "ForgePerformance keys its decay cleanup by the Decay instance pointer (ExtraCuts.DecayInitialized), which is the same for the SkinnedMeshRenderer and the MeshRenderer overload; the game folds both into one body, so the hook already runs for both and the postfix takes a Decay either way."
+  }
+]

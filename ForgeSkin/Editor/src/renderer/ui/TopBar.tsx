@@ -45,6 +45,19 @@ function Section({ title, info, children }: { title: string; info?: string; chil
   );
 }
 
+/** A folder path on one line, cut in the middle when long (the drive and the last folder stay); the whole path on hover. */
+function PathText({ path }: { path: string }) {
+  const cut = Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/'));
+  return (
+    <Tooltip label={path} multiline w={300} style={{ wordBreak: 'break-all' }}>
+      <Text size="xs" style={{ display: 'flex', minWidth: 0, userSelect: 'text' }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{path.slice(0, cut)}</span>
+        <span style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>{path.slice(cut)}</span>
+      </Text>
+    </Tooltip>
+  );
+}
+
 /** Settings for the whole editor: language, 自动应用, the game folder, the data folder, updates (a profile's own plugin is in its menu). */
 function SettingsMenu() {
   const lang = useLang();
@@ -105,9 +118,7 @@ function SettingsMenu() {
               </Group>
             </Section>
             <Section title={t('dataDir.title')} info={t(`dataDir.info.${edition}`)}>
-              <Text size="xs" truncate="start" title={dataDir} style={{ userSelect: 'text' }}>
-                {dataDir}
-              </Text>
+              <PathText path={dataDir} />
               <Group gap={6} grow>
                 <Tooltip label={t('dataDir.dev')} disabled={edition !== 'dev'} multiline w={240}>
                   <span style={{ display: 'flex' }}>

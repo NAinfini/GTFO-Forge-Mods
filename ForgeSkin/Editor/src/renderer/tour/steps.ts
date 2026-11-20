@@ -109,12 +109,7 @@ const BASICS: TourStep[] = [
     warn: profileWarn,
   },
   {
-    id: 'weapon',
-    targets: [{ css: '.gallery' }, { css: '[data-tour=new]' }, WORKS],
-    ready: loaded,
-    done: (s, start) => loaded(s) && s.weaponId !== start.weaponId,
-  },
-  {
+    // One click in the gear list picks the gear and makes the new work, so this is one step.
     id: 'newSkin',
     targets: [{ css: '.gallery' }, { css: '[data-tour=new]' }, WORKS],
     done: fresh,

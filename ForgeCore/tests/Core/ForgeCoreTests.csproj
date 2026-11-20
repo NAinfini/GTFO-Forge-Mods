@@ -25,6 +25,8 @@
     <Compile Include="../../Net/*.cs" Link="Net/%(Filename)%(Extension)" />
     <Compile Include="../../Visual/Core/JointClip*.cs;../../Visual/Core/ProceduralCatalog.cs;../../Visual/Core/ChainPhysics.cs;../../Visual/Core/LookRouter.cs" Link="Visual/%(Filename)%(Extension)" />
     <Compile Include="../../UI/Core/Registry.cs;../../UI/Core/HudLayout.cs" Link="UI/%(Filename)%(Extension)" />
+    <Compile Include="../../Native/SharedNativeBodies.cs" Link="Native/SharedNativeBodies.cs" />
+    <None Include="../../shared-native-bodies.json" Link="shared-native-bodies.json" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="*.cs" />
     <None Include="../fixtures/*.glb" Link="fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="../../../ForgeCore/Once/ForgeCore.Once.csproj" />

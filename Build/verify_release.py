@@ -1,21 +1,30 @@
 """Prove a set of Forge Thunderstore zips against the Release build and, optionally, against an installed profile.
 
-    python Mods/Build/verify_release.py --packages <zip folder> --artifacts-path <dotnet artifacts> [--installed <BepInEx/plugins>]
+    python Mods/Build/verify_release.py --packages <zip folder> --artifacts-path <dotnet artifacts> [--installed <BepInEx/plugins>] [--store-check]
 
 Fails (exit 1) when
 - a zip entry would not install where the plugin reads it: r2modman flattens every folder not named like an install route, so only
   manifest.json, icon.png, README.md and CHANGELOG.md sit at the zip root and every other file of package <Name> under plugins/<Name>/
-  (package_common.zip_entry, checked by simulating the manager's install, package_common.manager_install);
+  (package_common.zip_entry, checked by simulating the manager's install, package_common.manager_install). The one other place is
+  patchers/ at the zip root, for a BepInEx preloader patcher: the manager installs it in BepInEx/patchers/<Team>-<Name>/, where
+  BepInEx loads patchers from;
 - a lang/ folder lacks en.forge or zh.forge, or the two hold different keys (the plugin would show keys instead of text);
-- a dll in a zip is not byte-identical to the Release build output (artifacts/bin/<project>/release/<dll>);
+- a dll in a zip (managed or native, a patcher included) is not byte-identical to the Release build output
+  (artifacts/bin/<project>/release/<dll>);
 - a package's main dll version differs from its manifest version, or a NAinfini dependency is missing from the set or
   asks for another version than the set holds;
-- a player zip holds a file named .txt, .json, .yml, .yaml or .ini (r2modman lists those as config files; Forge's own data is .forge and .cfg stays allowed; Thunderstore's manifest.json is the one exception);
+- a player zip holds a file named .txt, .json, .yml, .yaml or .ini (r2modman lists those as config files; Forge's own data is .forge and
+  .cfg stays allowed). Two exceptions: Thunderstore's manifest.json, and a third party's licence text shipped under the name its owner
+  gives it, <something>LICENSE.txt (NVIDIA's SDK licences): those do show in r2modman's config list;
 - a zip lacks LICENSE (the MIT text with a copyright line) or NOTICE (copyright line and a third-party section), or holds a file named like
   an original game asset (the release carries 0 of them);
-- a type or member that one dll references in another dll of the set does not exist there (check-assembly-refs.ps1);
+- a type or member that one managed dll references in another dll of the set does not exist there (check-assembly-refs.ps1; a
+  native library such as ForgeFrameGen.Native.dll has no such references and is named in the output as not checked);
 - with --installed: any file of a zip is missing or different where a mod manager installs it (plugins/NAinfini-<name>/), or the folder
-  holds a dll no zip owns.
+  holds a dll no zip owns;
+- with --store-check (off by default, needs the network, read-only: Thunderstore's public package API, no package file is downloaded):
+  a manifest dependency (third-party ones included) is neither on the store nor a package of this set, or a package's own version
+  number already exists on the store. Dependencies on a package of this set are listed as "upload first".
 """
 
 from __future__ import annotations
@@ -29,6 +38,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 import zipfile
 import zlib
 
@@ -86,23 +97,28 @@ def audiences() -> dict[str, str]:
 
 
 def config_extension_problems(name: str, files: dict[str, bytes]) -> list[str]:
+    """A third party's licence text keeps the name its owner gives it (NVIDIA-RTX-SDKs-LICENSE.txt), at the cost of a line in
+    r2modman's config list; every other file with such an extension is the package's own and is reported."""
     return [name + ": " + entry + " would be listed by r2modman as a config file; a player package's own files are .forge" for entry in files
-            if entry != "manifest.json" and entry.lower().endswith(CONFIG_LIST_EXTENSIONS)]
+            if entry != "manifest.json" and not entry.endswith("LICENSE.txt") and entry.lower().endswith(CONFIG_LIST_EXTENSIONS)]
 
 
 def install_problems(name: str, entries) -> list[str]:
-    """Each entry where a mod manager installs it (manager_install) must be where the plugin reads it: the root files in
-    plugins/NAinfini-<name>/, every other file at its path beside the DLL in plugins/NAinfini-<name>/<name>/ (the same path a manual
-    unzip into BepInEx gives under plugins/<name>/). An entry the manager would flatten or send elsewhere, or two entries landing on one
-    file, is reported."""
+    """Each entry where a mod manager installs it (manager_install) must be where it is read: the root files in
+    plugins/NAinfini-<name>/, every other file of the plugin at its path beside the DLL in plugins/NAinfini-<name>/<name>/ (the same
+    path a manual unzip into BepInEx gives under plugins/<name>/), and a preloader patcher (patchers/ at the zip root) in
+    patchers/NAinfini-<name>/, which BepInEx searches. An entry the manager would flatten or send elsewhere, or two entries landing
+    on one file, is reported."""
     package = "NAinfini-" + name
     problems, landed = [], {}
     for entry in sorted(entries):
         installed = manager_install(package, entry)
-        if entry not in ROOT_FILES and not entry.startswith("plugins/" + name + "/"):
+        patcher = entry.startswith("patchers/")
+        if entry not in ROOT_FILES and not patcher and not entry.startswith("plugins/" + name + "/"):
             problems.append(name + ": " + entry + " is outside plugins/" + name + "/ and a mod manager installs it as " + installed + "; only "
                             + ", ".join(ROOT_FILES) + " stay at the zip root")
-        elif installed != "plugins/" + package + "/" + (entry if entry in ROOT_FILES else entry[len("plugins/"):]):
+        elif installed != (("patchers/" + package + "/" + entry[len("patchers/"):]) if patcher
+                           else "plugins/" + package + "/" + (entry if entry in ROOT_FILES else entry[len("plugins/"):])):
             problems.append(name + ": " + entry + " is installed by a mod manager as " + installed)
         if installed.lower() in landed:
             problems.append(name + ": " + entry + " and " + landed[installed.lower()] + " both install as " + installed)
@@ -177,7 +193,8 @@ def verify(packages_dir: Path, artifacts: Path, installed: Path | None) -> list[
         for entry, data in files.items():
             if not entry.endswith(".dll"):
                 continue
-            candidates = build_outputs(artifacts, entry)
+            # A patcher's project builds it into its own output folder, without the patchers/ of the zip.
+            candidates = build_outputs(artifacts, entry[len("patchers/"):] if entry.startswith("patchers/") else entry)
             if not candidates:
                 problems.append(name + ": " + entry + " has no build output under " + str(artifacts / "bin"))
             for built in candidates:
@@ -220,7 +237,7 @@ def verify(packages_dir: Path, artifacts: Path, installed: Path | None) -> list[
                     manifest_version = str(packages[assembly][2]["version_number"])
                     if version != manifest_version + ".0":
                         problems.append(assembly + ": assembly version " + version + " differs from manifest " + manifest_version)
-            elif line.startswith("assembly refs ok"):
+            elif line.startswith(("assembly refs ok", "NATIVE ")):
                 print(line)
     finally:
         shutil.rmtree(temporary, ignore_errors=True)
@@ -237,7 +254,8 @@ def verify(packages_dir: Path, artifacts: Path, installed: Path | None) -> list[
                 target = installed.parent / placed[entry]
                 if not target.is_file() or sha256(target.read_bytes()) != sha256(data):
                     problems.append(name + ": installed " + placed[entry] + " is missing or differs from the zip")
-            owned = {placed[entry][len("plugins/" + folder.name + "/"):] for entry in files if entry.endswith(".dll")}
+            owned = {placed[entry][len("plugins/" + folder.name + "/"):] for entry in files
+                     if entry.endswith(".dll") and placed[entry].startswith("plugins/" + folder.name + "/")}
             for stray in folder.rglob("*.dll"):
                 if stray.relative_to(folder).as_posix() not in owned:
                     problems.append(name + ": installed dll " + stray.relative_to(folder).as_posix() + " belongs to no zip")
@@ -257,14 +275,49 @@ def verify(packages_dir: Path, artifacts: Path, installed: Path | None) -> list[
     return problems
 
 
+STORE_API = "https://thunderstore.io/api/experimental/package/"
+
+
+def on_store(namespace: str, name: str, version: str | None = None) -> bool:
+    url = STORE_API + namespace + "/" + name + "/" + (version + "/" if version else "")
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "forge-release-check"}), timeout=30):
+            return True
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            return False
+        raise
+
+
+def store_problems(packages: dict[str, tuple[Path, dict[str, bytes], dict[str, object]]]) -> list[str]:
+    problems: list[str] = []
+    for name, (_, _, manifest) in packages.items():
+        version = str(manifest["version_number"])
+        if on_store("NAinfini", name, version):
+            problems.append(name + ": version " + version + " already exists on the store")
+        for dependency in manifest.get("dependencies", []):
+            full, _, wanted = str(dependency).rpartition("-")
+            namespace, _, package = full.partition("-")
+            if namespace == "NAinfini" and package in packages:
+                print("store-check: " + name + " -> " + dependency + ": in this set, upload first")
+            elif not on_store(namespace, package, wanted):
+                problems.append(name + ": dependency " + dependency + " is not on the store and not in this set")
+            else:
+                print("store-check: " + name + " -> " + dependency + ": on the store")
+    return problems
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--packages", type=Path, required=True)
     parser.add_argument("--artifacts-path", type=Path, required=True)
     parser.add_argument("--installed", type=Path)
+    parser.add_argument("--store-check", action="store_true", help="also read Thunderstore's public API (network, read-only)")
     args = parser.parse_args()
     try:
         problems = verify(args.packages.resolve(), args.artifacts_path.resolve(), args.installed.resolve() if args.installed else None)
+        if args.store_check:
+            problems += store_problems(read_packages(args.packages.resolve()))
     except (OSError, ValueError, KeyError) as error:
         print("verify_release: " + str(error), file=sys.stderr)
         return 2

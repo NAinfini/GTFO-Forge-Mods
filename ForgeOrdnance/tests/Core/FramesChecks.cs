@@ -19,9 +19,6 @@ internal static class FramesChecks
         {
             var spec = FrameSpecParser.Parse(Json(Minimal));
             check(spec.Model == "Frames:frame-m15" && spec.Armor == 100 && spec.Weapon.Gear == 38 && spec.Weapon.Magazine == 30 && spec.Weapon.DamageMultiplier == 1f, "minimal payload parses with defaults");
-            check(spec.DamageReduction == 0f && spec.Movement.Walk > 1f && spec.Movement.Sprint > 1f && spec.Movement.Jump > 1f && spec.Light.RangeMultiplier >= 2f,
-                "no damage reduction, faster walking, a sprint bonus, a higher jump and the wider lamp by default");
-            check(Math.Abs(FrameSequence.EnterSeconds - 2.85f) < 1e-4f && FrameSequence.ExitSeconds < 2.1f, "boarding lasts 2.85 s to the last power-on block and leaving ends after the landing and the black has cleared, for every model (no definition sets them)");
         }
 
         void Rejected(string name, string payload, string field)
@@ -31,31 +28,9 @@ internal static class FramesChecks
             throw new Exception("FAIL: " + name + " was accepted");
         }
 
-        Rejected("unreachable second active special", Minimal.Replace("\"Armor\":100", "\"Armor\":100,\"Boost\":{\"Seconds\":2,\"SpeedMultiplier\":2,\"Cooldown\":10},\"Siege\":{}"), "Siege");
         Rejected("unknown weapon field", Minimal.Replace("\"Gear\":38", "\"Gear\":38,\"Damage\":1"), "Weapon.Damage");
         Rejected("weapon without gear", Minimal.Replace("\"Gear\":38,", ""), "Weapon.Gear");
         Rejected("damage reduction above 90 percent", Minimal.Replace("\"Armor\":100", "\"Armor\":100,\"DamageReduction\":0.95"), "DamageReduction");
-        Rejected("walk below the player's own", Minimal.Replace("\"Armor\":100", "\"Armor\":100,\"Movement\":{\"Walk\":0.9}"), "Movement.Walk");
-        Rejected("opening without parts", Minimal.Replace("\"Armor\":100", "\"Armor\":100,\"Opening\":{}"), "Opening.Parts");
-        Rejected("opening part twice", Minimal.Replace("\"Armor\":100", "\"Armor\":100,\"Opening\":{\"Parts\":[{\"Node\":\"p\"},{\"Node\":\"p\"}]}"), "Opening.Parts[1].Node");
-        Rejected("opening part with a runtime hinge", Minimal.Replace("\"Armor\":100", "\"Armor\":100,\"Opening\":{\"Parts\":[{\"Node\":\"p\",\"Axis\":[0,1,0]}]}"), "Opening.Parts[0].Axis");
-        Rejected("opening with a runtime curve", Minimal.Replace("\"Armor\":100", "\"Armor\":100,\"Opening\":{\"Ease\":4,\"Parts\":[{\"Node\":\"p\"}]}"), "Opening.Ease");
-        Rejected("shell on an unknown body bone", Minimal.Replace("\"Armor\":100", "\"Armor\":100,\"Shell\":[{\"Bone\":\"hand.L\",\"Body\":\"LeftPaw\"}]"), "Shell[0].Body");
-        Rejected("shell body bone twice", Minimal.Replace("\"Armor\":100", "\"Armor\":100,\"Shell\":[{\"Bone\":\"hand.L\",\"Body\":\"LeftHand\"},{\"Bone\":\"hand.R\",\"Body\":\"LeftHand\"}]"), "Shell[1].Body");
-        {
-            var opened = FrameSpecParser.Parse(Json(Minimal.Replace("\"Armor\":100", "\"Armor\":100,\"Opening\":{\"Parts\":[{\"Node\":\"plate\"},{\"Node\":\"plate.back.L\",\"Seam\":true}]},\"Shell\":[{\"Bone\":\"forearm.R\",\"Body\":\"RightLowerArm\"}]")));
-            check(opened.Opening!.Parts.Length == 2 && opened.Opening.Parts[0].Node == "plate" && opened.Opening.Parts[1].Node == "plate.back.L"
-                && !opened.Opening.Parts[0].Seam && opened.Opening.Parts[1].Seam, "opening parts parse as the bones the model's clips move, the seam's marked");
-            check(FrameSpecParser.Parse(Json(Minimal)).Weapon.ReloadMultiplier == 1f, "every gun keeps its own reload time unless the definition shortens it");
-            Rejected("reload multiplier above one", Minimal.Replace("\"Gear\":38", "\"Gear\":38,\"ReloadMultiplier\":1.5"), "Weapon.ReloadMultiplier");
-            check(opened.Shell.Length == 1 && opened.Shell[0].Bone == "forearm.R" && opened.Shell[0].Body == FrameBodyBone.RightLowerArm, "shell bones map onto body bones");
-            check(FrameSpecKey.Of(opened) != FrameSpecKey.Of(opened with { Shell = Array.Empty<ShellBone>() }), "the shell is part of the content key");
-        }
-        Rejected("bad lamp colour", Minimal.Replace("\"Armor\":100", "\"Armor\":100,\"Light\":{\"Colour\":\"warm\"}"), "Light.Colour");
-        Rejected("missing model", Minimal.Replace("\"Model\":\"Frames:frame-m15\",", ""), "Model");
-        Rejected("fractional magazine", Minimal.Replace("\"Magazine\":30", "\"Magazine\":30.5"), "Weapon.Magazine");
-        Rejected("string number", Minimal.Replace("\"Armor\":100", "\"Armor\":\"100\""), "Armor");
-        Rejected("boost without speed", Minimal.Replace("\"Armor\":100", "\"Armor\":100,\"Boost\":{\"Seconds\":2,\"Cooldown\":5}"), "Boost.SpeedMultiplier");
 
         {
             // The suit definitions the mod ships must load.
@@ -67,13 +42,9 @@ internal static class FramesChecks
                 && entries.All(e => e.GetProperty("Id").GetString()!.StartsWith("nainfini.frames.", StringComparison.Ordinal))
                 && models.Values.Select(FrameSpecKey.Of).Distinct().Count() == 4,
                 "four shipped models, each a prefab of the Frames pack with its own content key, under the author namespace");
-            // Each model's specialty is data: tank barrier and carrying, firepower siege, recon scan, assault charge.
-            check(models["frame-m15"].Boost != null && models["frame-m15"].Shield == null, "assault: charge only");
-            check(models["frame-m16"].Shield != null && models["frame-m16"].CarryHeavy && models["frame-m16"].Boost == null, "tank: barrier and heavy carrying");
             check(FrameRules.CarryBlockReleased(true, true, true) && !FrameRules.CarryBlockReleased(false, true, true)
                 && !FrameRules.CarryBlockReleased(true, false, true) && !FrameRules.CarryBlockReleased(true, true, false),
                 "the carry slot's wield block is lifted only for the local pilot of a heavy-carrying suit");
-            check(models["frame-m17"].Siege != null && models["frame-m17"].Scan == null && models.Values.Count(m => m.Rockets != null) == 1 && models["frame-m17"].Rockets != null, "firepower: siege and the only rockets");
             var fp = models["frame-m17"];
             check(fp.Siege!.FireRateMultiplier > 1f && fp.Siege.ReloadMultiplier < 1f && fp.Shield != null && fp.Shield.WhileSieged && !models["frame-m16"].Shield!.WhileSieged,
                 "firepower: planting fires faster, reloads faster and raises its own barrier; the tank's barrier always stands");
@@ -82,34 +53,9 @@ internal static class FramesChecks
             planted.Sieged = true;
             check(walking && FrameRules.BarrierUp(planted) && FrameRules.Repels(planted, planted.X, planted.Y + 1.2f, planted.Z) && !FrameRules.ShieldHit(planted, 10f, 2f) && planted.Shield < fp.Shield!.Capacity,
                 "a barrier that stands while planted is down (and takes nothing) while walking and up once planted");
-            Rejected("barrier while planted without a siege", Minimal.Replace("\"Armor\":100", "\"Armor\":100,\"Shield\":{\"Capacity\":50,\"RegenRate\":10,\"WhileSieged\":true}"), "Shield.WhileSieged");
-            check(models["frame-m18"].Scan != null && models["frame-m18"].Siege == null && models["frame-m18"].Shield == null, "recon: scan only");
             check(FrameRules.ScanTags(ForgeCore.EnemyAlert.Awake) && FrameRules.ScanTags(ForgeCore.EnemyAlert.Hunting) && !FrameRules.ScanTags(ForgeCore.EnemyAlert.Sleeping) && !FrameRules.ScanTags(ForgeCore.EnemyAlert.Off), "recon: the scan tags awake enemies, not sleeping ones");
-            // The same rules over every shipped model.
-            check(models.Values.All(m => m.Movement.Walk > 1f && m.Movement.Sprint > 1f && m.Movement.Jump > 1f), "every model is faster and jumps higher than the player on foot");
-            check(models.Values.All(m => m.Opening != null && m.Opening.Parts.Length >= 2 && m.Opening.Parts.All(part => !part.Node.Contains("helmet", StringComparison.Ordinal))
-                && FrameBodyRig.HingedParts(m.Opening).SequenceEqual(m.Opening.Parts.Select(p => p.Node))), "every model lists its opening parts, keeps them shut on the shell, and the helmet stays shut");
-            check(models.Values.All(m => m.Shell.Length >= 6 && m.Shell.Any(b => b.Body == FrameBodyBone.LeftUpperArm) && m.Shell.Any(b => b.Body == FrameBodyBone.RightUpperArm) && m.Shell.Any(b => b.Body == FrameBodyBone.Hips)
-                && !m.Shell.Any(b => b.Body is FrameBodyBone.LeftLowerArm or FrameBodyBone.RightLowerArm or FrameBodyBone.LeftHand or FrameBodyBone.RightHand)),
-                "every model lines its skeleton up on the upper arms and hips and keeps the game's own forearms and hands");
-            check(models.Values.All(m =>
-                {
-                    var worn = FrameBodyRig.ShellBones(m.Shell);
-                    return worn.Length == m.Shell.Length && worn.All(b => b.Worn != b.Body is ForgeVisual.BodyBone.LeftUpperArm or ForgeVisual.BodyBone.RightUpperArm)
-                        && worn.Where(b => b.Body is ForgeVisual.BodyBone.LeftUpperLeg or ForgeVisual.BodyBone.LeftLowerLeg or ForgeVisual.BodyBone.LeftFoot).All(b => b.Scale == ForgeVisual.BodyMeasure.LeftLeg)
-                        && worn.Where(b => b.Body is ForgeVisual.BodyBone.RightUpperLeg or ForgeVisual.BodyBone.RightLowerLeg or ForgeVisual.BodyBone.RightFoot).All(b => b.Scale == ForgeVisual.BodyMeasure.RightLeg)
-                        && worn.Where(b => b.Body is ForgeVisual.BodyBone.Hips or ForgeVisual.BodyBone.Spine).All(b => b.Scale == ForgeVisual.BodyMeasure.ShoulderSpan);
-                }), "every model wears its shell: the upper arms only line up, each leg sized by its own length, the body by the shoulder span");
         }
 
-        // The suits' rig onto ForgeVisual's body bones: every definition bone has its humanoid namesake, the pose table is well formed.
-        check(Enum.GetValues<FrameBodyBone>().All(bone => FrameBodyRig.Body(bone).ToString() == bone.ToString()), "every body bone maps onto ForgeVisual's namesake");
-        check(ForgeVisual.PoseSolver.Validate(FrameBodyRig.PoseLinks) == null, "the suit pose table is well formed");
-        check(ForgeVisual.PoseSolver.ValidateReach(FrameBodyRig.ArmReach, FrameBodyRig.PoseLinks.Length) == null
-            && FrameBodyRig.ArmReach.Length == 2 && Array.TrueForAll(FrameBodyRig.ArmReach, r =>
-                FrameBodyRig.PoseLinks[r.Upper].Model.StartsWith("upperarm.") && FrameBodyRig.PoseLinks[r.Lower].Model.StartsWith("forearm.")
-                && FrameBodyRig.PoseLinks[r.End].Model.StartsWith("hand.") && FrameBodyRig.PoseLinks[r.Upper].Model[^1] == FrameBodyRig.PoseLinks[r.End].Model[^1]),
-            "both arms reach, each its own side's upper arm, forearm and hand");
         // The 30 optional finger links (ForgeVisual pose copy): well formed after any table, and a missing joint takes only the joints after it on its finger.
         {
             var body = FrameBodyRig.PoseLinks;

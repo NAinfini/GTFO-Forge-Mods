@@ -2,6 +2,7 @@ import { ActionIcon, Badge, Checkbox, CloseButton, ScrollArea, Select, TextInput
 import {
   IconArrowBackUp,
   IconBox,
+  IconBulb,
   IconChevronRight,
   IconCopy,
   IconCube,
@@ -36,7 +37,7 @@ import { hiddenMeshes, partTarget, useSceneVersion } from '../viewport/refs';
 import { focusSelection } from '../viewport/Viewport';
 import { HOLD_COLOR } from '../viewport/HoldPointMarks';
 import { localName, partLabel, t } from '../i18n';
-import { pieceChanged, pieceLabel } from '../pieces';
+import { lightPoint, pieceChanged, pieceLabel } from '../pieces';
 
 /** A row's hover: the pointer over it shows the thing in the 3D view, and the pointer over the thing in the 3D view marks
  * the row (store `hover`). */
@@ -296,13 +297,15 @@ function PartTree({ query }: { query: string }) {
           .filter((e): e is CodeEffect => !!e && (e.material ? p.materials.includes(e.material) : attachments.some((a) => a.id === e.attachment && a.part === p.id)))
           .filter(show((e) => e.name));
         if (!partHit && !liveries.length && !dynamic.length && !mounted.length && !fx.length) return null;
-        // The original pieces listed are those the author changed (so they can be found and undone) and the one selected
-        // in the 3D view; the others are picked there or chosen as where an attachment hangs.
+        // The original pieces listed are those the author changed (so they can be found and undone), the one selected in the
+        // 3D view and the flashlight's light (a point, never picked there); the others are picked there or chosen as where an
+        // attachment hangs.
         const s = selection;
+        const light = lightPoint(p.id)?.path;
         const pieces = subs
           .map((x) => x.path)
-          .filter((path) => pieceChanged(doc, p.id, path) || (s?.kind === 'part' && s.id === p.id && s.sub === path))
-          .filter((path) => partHit || hit(pieceLabel(path)) || hit(path));
+          .filter((path) => path === light || pieceChanged(doc, p.id, path) || (s?.kind === 'part' && s.id === p.id && s.sub === path))
+          .filter((path) => partHit || hit(pieceLabel(p.id, path)) || hit(path));
         // Collapsing a part hides everything under it; what it holds stays counted on its row.
         const kids = liveries.length + dynamic.length + fx.length + mounted.length + pieces.length;
         const inside =
@@ -410,9 +413,9 @@ function PartTree({ query }: { query: string }) {
                   aria-selected={s?.kind === 'part' && s.id === p.id && s.sub === path}
                   onClick={() => select({ kind: 'part', id: p.id, sub: path })}
                 >
-                  <IconCube size={13} className="kind-icon" />
+                  {path === light ? <IconBulb size={13} className="kind-icon" style={{ color: HOLD_COLOR.light }} /> : <IconCube size={13} className="kind-icon" />}
                   <span className="label" title={path}>
-                    {pieceLabel(path)}
+                    {pieceLabel(p.id, path)}
                   </span>
                   <span className="row-actions">
                     {pieceChanged(doc, p.id, path) && (
@@ -446,7 +449,7 @@ function HoldPoints({ query }: { query: string }) {
   const selection = useStore((s) => s.selection);
   const [open, setOpen] = useState(true);
   const q = query.trim().toLowerCase();
-  const points = HOLD_ORDER.flatMap((point) => listed.filter((p) => p.point === point)).filter(
+  const points = HOLD_ORDER.flatMap((point) => listed.filter((p) => p.point === point).map((p) => ({ ...p, point }))).filter(
     (p) => !q || t('leftRail.holdTitle').toLowerCase().includes(q) || t(`leftRail.hold.${p.point}`).toLowerCase().includes(q),
   );
   if (!points.length) return null;

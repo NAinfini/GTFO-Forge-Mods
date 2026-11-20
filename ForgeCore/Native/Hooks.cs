@@ -18,7 +18,8 @@ public sealed record HookPart(HarmonyMethod? Prefix = null, HarmonyMethod? Postf
 /// this is how one package owns a method. Every owned method has exactly one owner: a second owner is refused when it declares
 /// (native-hook-writer-conflict), and once BepInEx has loaded every plugin ForgeCore checks each owned method's recorded patches and
 /// logs one error per method another Forge package also patches. An observer (<see cref="Observe"/>) only reads, so several may
-/// watch a method beside its owner. A native entry whose first bytes the detour backend cannot relocate is refused (<see cref="HookPrologue"/>);
+/// watch a method beside its owner. A native entry whose first bytes the detour backend cannot relocate is refused (<see cref="HookPrologue"/>),
+/// and so is one whose native body other methods share unless a Forge package registers that body (<see cref="SharedNativeBodies"/>);
 /// a target whose by-reference parameters the Il2CppInterop bridge carries wrongly is repaired before it is patched
 /// (<see cref="HookBridge"/>) or refused. Main thread only.</summary>
 // patch-targets: run time (each target is registered in HookOwners and checked by ForgeCore at startup, see Hooks.CheckAll)
@@ -122,15 +123,21 @@ public static class Hooks
         if (target.GetPatchInfo() is { } info)
             foreach (var patch in info.prefixes.Concat(info.postfixes).Concat(info.finalizers).Concat(info.transpilers).Concat(info.ilmanipulators).ToArray())
                 info.RemovePatch(patch.PatchMethod);
-        Plugin.Logger.Error("native-hook-prologue-refused", "package=" + package + " target=" + Name(target) + " reason=" + verdict);
+        // A shared body has written its own line when it was read.
+        if (verdict != SharedNativeBodies.Reason)
+            Plugin.Logger.Error("native-hook-prologue-refused", "package=" + package + " target=" + Name(target) + " reason=" + verdict);
         throw new NotSupportedException(verdict + " target=" + Name(target));
     }
 
+    /// <summary>The Forge assembly that asked for the patch, or null. This class's own frames are skipped: another mod's patch
+    /// reaches <see cref="Read"/> through <see cref="Resolve"/>, whose frame is ForgeCore's but whose caller is not.</summary>
     private static string? FromForge()
     {
-        foreach (var frame in new System.Diagnostics.StackTrace(2, false).GetFrames())
+        foreach (var frame in new System.Diagnostics.StackTrace(1, false).GetFrames())
         {
-            var name = frame.GetMethod()?.DeclaringType?.Assembly.GetName().Name;
+            var type = frame.GetMethod()?.DeclaringType;
+            if (type == typeof(Hooks) || type?.DeclaringType == typeof(Hooks)) continue;
+            var name = type?.Assembly.GetName().Name;
             if (name != null && name.StartsWith("Forge", StringComparison.Ordinal)) return name;
         }
         return null;
@@ -146,7 +153,10 @@ public static class Hooks
         {
             var bytes = new byte[HookPrologue.SnapshotLength];
             Marshal.Copy(entry, bytes, 0, bytes.Length);
-            verdict = HookPrologue.Rejection(bytes);
+            verdict = HookPrologue.Rejection(bytes) ?? SharedNativeBodies.Refusal(target, entry);
+            if (verdict == SharedNativeBodies.Reason && FromForge() is { } package)
+                Plugin.Logger.Error(SharedNativeBodies.RefusedCode, "package=" + package + " target=" + Name(target)
+                    + " sharers=" + string.Join(",", SharedNativeBodies.Sharers(entry)));
         }
         Entries.Add(target, verdict);
         return verdict;

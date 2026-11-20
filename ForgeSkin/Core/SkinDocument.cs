@@ -425,17 +425,15 @@ public sealed class LiveryLayer
 
 public sealed class MaterialParams
 {
-    // The game's gear shaders have a large emission gain: an _EmissiveColor of 0.01 shows a linear colour of 1 as itself
-    // (measured in game). A skin's glows (EmissiveColor x EmissiveIntensity here, attachment flashes, unlit pictures) are
-    // in "as itself" units, as the editor previews them, and reach the game's _EmissiveColor times this.
-    public const float EmissionUnit = 0.01f;
+    // A skin's glows (EmissiveColor x EmissiveIntensity here, attachment flashes, unlit pictures, screens) are in "as itself"
+    // units, as the editor previews them, and reach the game's _EmissiveColor times ForgeVisual.ColourSpace.EmissionPerUnit.
 
     // A game _EmissiveColor (RGB, the game's units; `hdr`: the property is [HDR]) as a skin's glow, so
-    // ForgeVisual.ColourSpace.Glow(EmissiveColor, EmissiveIntensity x EmissionUnit, hdr) gives it back.
+    // ForgeVisual.ColourSpace.Glow(EmissiveColor, EmissiveIntensity x EmissionPerUnit, hdr) gives it back.
     public static (float[] Color, float Intensity) GlowFromGame(float r, float g, float b, bool hdr)
     {
         var (colour, gain) = ForgeVisual.ColourSpace.FromGlow(r, g, b, hdr);
-        return (colour, gain / EmissionUnit);
+        return (colour, gain / ForgeVisual.ColourSpace.EmissionPerUnit);
     }
 
     public bool? EmissiveEnabled { get; set; }

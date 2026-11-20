@@ -396,14 +396,27 @@ internal static class FrameWorld
     /// (<see cref="FrameRules.Shelters"/>: the target inside the dome, where the attack came from outside it), or null.</summary>
     internal static FrameUnit? ShelterFor(Vector3 target, Vector3 s)
     {
+        RaisedDomes(Scratch);
+        return ShelterIn(Scratch, target, s);
+    }
+
+    private static readonly List<(FrameUnit Unit, Vector3 Centre)> Scratch = new();
+
+    /// <summary>Every raised dome and where it stands now (its pilot's place), resolved once, for a caller that asks <see cref="ShelterIn"/> many times in a frame.</summary>
+    internal static void RaisedDomes(List<(FrameUnit Unit, Vector3 Centre)> into)
+    {
+        into.Clear();
         for (var i = 0; i < Units.Count; i++)
+            if (DomePilot(Units[i]) is { } pilot) into.Add((Units[i], pilot.Position));
+    }
+
+    /// <summary>Numbers only: <see cref="ShelterFor(Vector3, Vector3)"/> against domes already resolved by <see cref="RaisedDomes"/>.</summary>
+    internal static FrameUnit? ShelterIn(List<(FrameUnit Unit, Vector3 Centre)> domes, Vector3 target, Vector3 s)
+    {
+        for (var i = 0; i < domes.Count; i++)
         {
-            var unit = Units[i];
-            var r = unit.Record;
-            var pilot = DomePilot(unit);
-            if (pilot == null) continue;
-            var p = pilot.Position;
-            if (FrameRules.Shelters(r, p.x, p.y, p.z, target.x, target.y, target.z, s.x, s.y, s.z)) return unit;
+            var (unit, p) = domes[i];
+            if (FrameRules.Shelters(unit.Record, p.x, p.y, p.z, target.x, target.y, target.z, s.x, s.y, s.z)) return unit;
         }
         return null;
     }

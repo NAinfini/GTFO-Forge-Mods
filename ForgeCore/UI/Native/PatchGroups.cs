@@ -28,9 +28,10 @@ internal static class PatchGroups
         switch (group)
         {
             case PatchGroup.Objectives: GameObjectives.Subscribe(); UIKit.ObjectivesReading.ReadInFull(); break;
-            case PatchGroup.Inventory: UIKit.InventoryReading.ReadInFull(); Ensure(PatchGroup.SlotNames); break;
-            case PatchGroup.GearNames: Ensure(PatchGroup.SlotNames); break;
+            case PatchGroup.Inventory: UIKit.InventoryReading.ReadInFull(); Ensure(PatchGroup.ListCalls); break;
+            case PatchGroup.GearNames: Ensure(PatchGroup.ListCalls); break;
             case PatchGroup.Intel: GameWardenIntel.Subscribe(); break;
+            case PatchGroup.GearIcons: GearIcons.FollowBuilds(); break;
         }
     }
 }

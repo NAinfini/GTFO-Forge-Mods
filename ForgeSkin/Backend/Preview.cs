@@ -11,14 +11,17 @@ namespace ForgeSkin.Backend;
 // A transform of a part (its root and every sub-transform, not descending into other parts mounted on it): Unity
 // name, child path from the part root as Transform.Find takes it (null for the root, as PartTransform.Path), the GLB node
 // that is it, its parent's GLB node, vanilla local pose in Unity space (rotation as quaternion x, y, z, w) and the
-// renderer nodes at or under it.
-public sealed record PreviewTransform(string Name, string? Path, string Node, string? Parent, float[] Position, float[] Rotation, float[] Scale, List<string> Meshes);
+// renderer nodes at or under it. A renderer node also has its model's name (the mesh asset's, for naming a node whose own name
+// says nothing) and whether that model is skinned (a part layout cannot replace it).
+public sealed record PreviewTransform(string Name, string? Path, string Node, string? Parent, float[] Position, float[] Rotation, float[] Scale, List<string> Meshes,
+    string? Model = null, bool Skinned = false);
 public sealed record PreviewPart(string Id, List<string> Nodes, List<PreviewTransform> Transforms, PreviewAmmo? Ammo);
 // How an ammo part is shown (Catalog.AmmoLayout): the GLB node moved by a world offset (Unity space) and the nodes hidden.
 public sealed record PreviewAmmo(string Node, float[] Offset, List<string> Hidden);
 // Damaged: some game textures could not be read (a game file rewritten outside the game). Modified: some are not the game's
 // own (another mod rewrote the game files; GameAssets.IsVanilla). Neither kind of preview is cached.
-// Points: the gear's hold points it has (Assembly.Points), each the part and path of its node (a PartTransform key).
+// Points: the gear's hold points it has (Assembly.Points) and its flashlight's light ("light", Unity.LightPoint), each the part
+// and path of its node (a PartTransform key).
 public sealed record PreviewResult(string Glb, List<PreviewPart> Parts, Dictionary<string, Dictionary<TextureChannel, string>> Textures,
     Dictionary<string, PreviewMaterial> Params, bool Damaged = false, bool Modified = false, List<PreviewPoint>? Points = null);
 public sealed record PreviewPoint(string Point, string Part, string Path);
@@ -174,8 +177,13 @@ public static class Preview
 
         var transforms = new Dictionary<string, List<PreviewTransform>>();
         var points = new List<PreviewPoint>();
+        var listed = new HashSet<(string, string?)>();
+        var unreachable = new List<string>();
         foreach (var (part, path, n) in Assembly.PartNodes(root, activeOnly: true))
         {
+            // A node named like an earlier sibling has that one's path, and the plugin finds the first node by a path
+            // (Transform.Find): it cannot be addressed on its own, and the editor keys transforms by (part, path).
+            if (!listed.Add((part, path))) { unreachable.Add($"{part}/{path}"); continue; }
             // A point that is its part's own root is left out: moving it would move the whole part.
             if (n.Point != null && path != null) points.Add(new PreviewPoint(n.Point, part, path));
             else if (n.Point != null) Log.Write($"preview {id}: the {n.Point} point is the root of {part}; it cannot be moved on its own");
@@ -184,13 +192,16 @@ public static class Preview
             Collect(n);
             (transforms.TryGetValue(part, out var list) ? list : transforms[part] = new()).Add(new PreviewTransform(n.Name, path, nodeName[n],
                 path == null ? null : nodeName[n.Parent!],
-                [n.Position.X, n.Position.Y, n.Position.Z], [n.Rotation.X, n.Rotation.Y, n.Rotation.Z, n.Rotation.W], [n.Scale.X, n.Scale.Y, n.Scale.Z], under));
+                [n.Position.X, n.Position.Y, n.Position.Z], [n.Rotation.X, n.Rotation.Y, n.Rotation.Z, n.Rotation.W], [n.Scale.X, n.Scale.Y, n.Scale.Z], under,
+                partOf.ContainsKey(n) ? n.Mesh?.Name : null, partOf.ContainsKey(n) && n.Skinned));
         }
+        if (unreachable.Count > 0)
+            Log.Write($"preview {id}: {unreachable.Count} nodes share their path with an earlier sibling and are left out of the layout (only the first of a path can be moved), e.g. {string.Join(", ", unreachable.Take(3))}");
         var ammo = Catalog.AmmoLayout(root, n => meshes[(n.Mesh!.File.path, n.Mesh.PathId)].Data).ToDictionary(a => a.Part,
             a => new PreviewAmmo(nodeName[a.Shown], [a.Offset.X, a.Offset.Y, a.Offset.Z], a.Hidden.Select(h => nodeName[h]).ToList()));
         var order = Assembly.Slots.Select(s => s.Id).Concat(["ammo_speedloader", "ammo_bullet", "ammo_shell"]).ToList();
         var result = new PreviewResult(glbPath, parts.Keys.Union(transforms.Keys).OrderBy(p => order.IndexOf(p) is var i && i < 0 ? 99 : i)
-            .Select(p => new PreviewPart(p, parts.GetValueOrDefault(p) ?? new(), transforms.GetValueOrDefault(p) ?? new(), ammo.GetValueOrDefault(p))).ToList(), textures, parameters, damaged, modified, points.OrderBy(p => Array.FindIndex(Assembly.Points, x => x.Point == p.Point)).ToList());
+            .Select(p => new PreviewPart(p, parts.GetValueOrDefault(p) ?? new(), transforms.GetValueOrDefault(p) ?? new(), ammo.GetValueOrDefault(p))).ToList(), textures, parameters, damaged, modified, points.OrderBy(p => Array.FindIndex(Assembly.Points, x => x.Point == p.Point) is var i && i < 0 ? 99 : i).ToList());
         // Stored relative to the cache folder, so a moved data dir (portable GTFO_UserData) keeps its cache. A damaged or
         // modified one is rebuilt next time, so restored game files (Steam's file check keeps the build id) show again.
         if (!damaged && !modified) AtomicFile.WriteText(cached, JsonSerializer.Serialize(MapPaths(result, p => Path.GetRelativePath(dir, p)), Program.Json));

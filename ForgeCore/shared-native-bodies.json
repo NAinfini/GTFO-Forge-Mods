@@ -1,0 +1,14 @@
+[
+  {
+    "target": "BWA_Semi.OnFireShotEmptyClip",
+    "rva": "0x145B540",
+    "sharers": ["BWA_Burst.OnFireShotEmptyClip"],
+    "reason": "GameHooks.SemiDryFired is meant for both archetypes: the body plays the empty-clip sound for BWA_Semi, BWA_SemiBurst (inherits it) and BWA_Burst alike, and nothing else runs it. ForgeCore's audio part and ForgeEngine's Weapon domain subscribe to it; a separate BWA_Burst patch would be a second hook on the same code."
+  },
+  {
+    "target": "Dam_PlayerDamageBase.ReceiveParasiteDamage",
+    "rva": "0x1617930",
+    "sharers": ["Dam_PlayerDamageBase.ReceiveNoAirDamage"],
+    "reason": "Same class, same body: both decode the mini damage packet and apply it. ForgeEngine's Player domain marks the damage kind as dot without an attack kind, which is the right kind for both parasite and no-air damage; the contract has no separate suffocation kind, and both packet receivers run this one body, so no other entry tells them apart."
+  }
+]

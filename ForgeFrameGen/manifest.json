@@ -1,0 +1,10 @@
+{
+  "name": "ForgeFrameGen",
+  "version_number": "1.0.0",
+  "website_url": "https://github.com/NAinfini/GTFO-Forge-Mods",
+  "description": "DLSS / FSR upscaling and frame generation for GTFO: DLSS on RTX cards, FSR 4 or 3.1 on others; experimental DLSS Frame Generation with Reflex (RTX 40/50) and AMD FSR Frame Generation. Unofficial; not an NVIDIA or AMD product.",
+  "dependencies": [
+    "BepInEx-BepInExPack_GTFO-3.2.4",
+    "NAinfini-ForgeCore-1.0.3"
+  ]
+}

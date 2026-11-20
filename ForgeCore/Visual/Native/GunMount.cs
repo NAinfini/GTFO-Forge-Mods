@@ -80,6 +80,7 @@ public sealed class GunMount
     private static readonly Dictionary<IntPtr, GunMount> ByHolder = new();
     private static bool _hooked;
     private static IntPtr _heldItem;
+    private static IntPtr _inHands;
     private static GunMount? _held;
     // The key of the rule's hold among the settings copies (HeldSettings): every mount on one block shares its copy per sight zoom.
     private const string HoldKey = "ForgeVisual.GunMount";
@@ -87,6 +88,12 @@ public sealed class GunMount
 
     /// <summary>The rule every gun model is held by (<c>Data/gun-hold.json</c>, embedded in ForgeVisual).</summary>
     public static GunHoldRules Rules => _rules ??= ReadRules();
+
+    /// <summary>The item in the local first-person hands as the holder's last step found it: the pointer of the <c>ItemEquippable</c> its
+    /// <c>LateUpdate</c> wielded, zero with empty hands. The mounts read it from the game every frame to find the gun in the hands; a package
+    /// that only asks whether an item is still the one in the hands compares pointers here and does not read the holder again. The first
+    /// read installs the holder's hook when no mount has yet, so it is zero until the holder has stepped once after it. Main thread.</summary>
+    public static IntPtr HeldItem { get { Hook(); return _inHands; } }
 
     private static GunHoldRules ReadRules()
     {
@@ -469,7 +476,7 @@ public sealed class GunMount
         if (_reachRead) return;
         var arms = holder.FPSArms;
         if (arms == null || holder.m_currentState != FPItemStateName.Hip || holder.ItemAimTrigger) { _hipSince = -1f; return; }
-        var now = Time.time;
+        var now = ForgeCore.Frame.GameTime;
         if (_hipSince < 0f) _hipSince = now;
         if (now - _hipSince < HipSettleSeconds) return;
         var rules = Rules;
@@ -676,7 +683,8 @@ public sealed class GunMount
         try
         {
             var item = holder.WieldedItem;
-            if (item == null) { Drop(); _heldItem = IntPtr.Zero; return; }
+            if (item == null) { Drop(); _heldItem = _inHands = IntPtr.Zero; return; }
+            _inHands = item.Pointer;
             GunPartMount.Of(item.GearPartHolder)?.Step();
             if (item.Pointer != _heldItem)
             {

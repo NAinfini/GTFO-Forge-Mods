@@ -202,7 +202,7 @@
       "pluginGuid": "NAinfini.ForgeEmote",
       "providerId": null,
       "providerIds": [],
-      "version": "1.0.2",
+      "version": "1.0.3",
       "audience": "player",
         "packager": "tools/package_release.py",
       "dependencies": [
@@ -238,11 +238,32 @@
       }
     },
     {
+      "packageName": "NAinfini-ForgeFrameGen",
+      "pluginGuid": "NAinfini.ForgeFrameGen",
+      "providerId": null,
+      "providerIds": [],
+      "version": "1.0.0",
+      "audience": "player",
+      "packager": "tools/package_release.py",
+      "dependencies": [
+        "BepInEx-BepInExPack_GTFO-3.2.4",
+        "NAinfini-ForgeCore-1.0.3"
+      ],
+      "identity": {
+        "csprojs": [
+          "ForgeFrameGen/ForgeFrameGen.csproj",
+          "ForgeFrameGen/preloader/ForgeFrameGen.Preloader.csproj"
+        ],
+        "plugin": "ForgeFrameGen/Plugin.cs",
+        "module": null
+      }
+    },
+    {
       "packageName": "NAinfini-ForgeOrdnance",
       "pluginGuid": "NAinfini.ForgeOrdnance",
       "providerId": null,
       "providerIds": [],
-      "version": "1.0.2",
+      "version": "1.0.3",
       "audience": "player",
       "packager": "tools/package_release.py",
       "dependencies": [
@@ -264,7 +285,7 @@
       "pluginGuid": "NAinfini.ForgePerformance",
       "providerId": null,
       "providerIds": [],
-      "version": "1.0.1",
+      "version": "1.0.2",
       "audience": "player",
       "packager": "tools/package_release.py",
       "dependencies": [
@@ -284,7 +305,7 @@
       "pluginGuid": "NAinfini.ForgeReplay",
       "providerId": null,
       "providerIds": [],
-      "version": "1.0.1",
+      "version": "1.0.2",
       "audience": "player",
         "packager": "tools/package_release.py",
       "dependencies": [
@@ -305,7 +326,7 @@
       "pluginGuid": "NAinfini.ForgeWeaponEnergyLab",
       "providerId": null,
       "providerIds": [],
-      "version": "1.0.2",
+      "version": "1.0.3",
       "audience": "player",
       "packager": "tools/package_release.py",
       "dependencies": [

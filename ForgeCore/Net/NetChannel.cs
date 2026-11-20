@@ -156,14 +156,16 @@ public sealed class NetChannel
 
     /// <summary>True while at least one player in the session runs a matching copy of this mod: nobody reads what is sent otherwise,
     /// so a mod that builds its messages ahead of sending them skips the work.</summary>
-    public bool AnyPeer
+    public bool AnyPeer => _anyPeer;
+
+    // Kept by every change of a verdict or of the member list (Judge, AskAgain, Forget, EndSession), so a reader on a hot path reads a flag.
+    private bool _anyPeer;
+
+    private void RefreshAnyPeer()
     {
-        get
-        {
-            foreach (var player in _peers.Keys)
-                if (Compatible(player)) return true;
-            return false;
-        }
+        _anyPeer = false;
+        foreach (var player in _peers.Keys)
+            if (Compatible(player)) { _anyPeer = true; return; }
     }
 
     /// <summary>True when this peer is a client and <paramref name="sender"/> is the host: the check a handler of a host-to-client message
@@ -196,6 +198,7 @@ public sealed class NetChannel
             peer.There = null;
             peer.ThereDetail = null;
         }
+        RefreshAnyPeer();
         _node.GreetAgain();
     }
 
@@ -219,6 +222,7 @@ public sealed class NetChannel
         {
             if (peer.State == PeerState.Compatible) ForgetState(sender);
             peer.State = PeerState.Unknown;
+            RefreshAnyPeer();
             // The sender restarted what it holds: the verdict remembered is void, so the next judgement sends the format list again.
             if (held) { peer.RefusedFormat = peer.RefusedContent = 0; peer.Reported = false; peer.There = null; peer.ThereDetail = null; }
             return;
@@ -229,12 +233,14 @@ public sealed class NetChannel
         {
             if (peer.State == PeerState.Compatible && !greeting) return;
             peer.State = PeerState.Compatible;
+            RefreshAnyPeer();
             foreach (var part in _parts) part.Sync(sender);
             Raise(PeerSynced, sender);
             return;
         }
         if (peer.State == PeerState.Compatible) ForgetState(sender);
         peer.State = PeerState.Refused;
+        RefreshAnyPeer();
         if (peer.RefusedFormat == format && peer.RefusedContent == content) return;
         peer.RefusedFormat = format;
         peer.RefusedContent = content;
@@ -285,6 +291,7 @@ public sealed class NetChannel
     internal void EndSession()
     {
         _peers.Clear();
+        _anyPeer = false;
         _ready = false;
         foreach (var route in _routes) { route.Last?.Clear(); route.Partial?.Clear(); route.Queued = 0; }
         foreach (var part in _parts) part.EndSession();
@@ -294,7 +301,9 @@ public sealed class NetChannel
     internal void Forget(ulong player, bool left)
     {
         ForgetState(player);
-        if (left) _peers.Remove(player);
+        if (!left) return;
+        _peers.Remove(player);
+        RefreshAnyPeer();
     }
 
     private void ForgetState(ulong player)

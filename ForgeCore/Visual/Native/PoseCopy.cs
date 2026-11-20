@@ -16,9 +16,10 @@ public sealed class PoseTarget
     private readonly Vector3[] _restPosition;
     private readonly Quaternion[] _restRotation;
 
-    private PoseTarget(Transform root, IReadOnlyList<PoseLink> links, IReadOnlyList<PoseReach> reach, Transform[] bones, bool[] skipped, NQuaternion[] unframe, NVector3[] restAt, float headHeight)
+    private PoseTarget(Transform root, SkinnedMeshRenderer skin, IReadOnlyList<PoseLink> links, IReadOnlyList<PoseReach> reach, Transform[] bones, bool[] skipped, NQuaternion[] unframe, NVector3[] restAt, float headHeight)
     {
         Root = root;
+        Skin = skin;
         Reach = reach;
         RestAt = restAt;
         RootRest = restAt[0];
@@ -37,6 +38,9 @@ public sealed class PoseTarget
 
     /// <summary>The model's root (its size and turn are the copy's frame).</summary>
     public Transform Root { get; }
+
+    /// <summary>The skinned renderer the model was read from: whether it is drawn decides whether a copy that follows an enemy's body runs.</summary>
+    internal SkinnedMeshRenderer Skin { get; }
 
     /// <summary>The height of the head bone at rest in the root's own units (the model standing on the root's floor); 0 without a head link.
     /// A caller fits a model to a body by the ratio of the body's head height to this.</summary>
@@ -106,7 +110,7 @@ public sealed class PoseTarget
         if (missing.Length > 0) { Error(label, "the model lacks the bones " + missing); return null; }
         var head = 0f;
         for (var i = 0; i < links.Count; i++) if (links[i].Body == BodyBone.Head) head = position[i].Y;
-        return new PoseTarget(root, links, reach ?? Array.Empty<PoseReach>(), found, PoseSolver.Skipped(links, absent), PoseSolver.Unframe(links, position, rotation), position, head);
+        return new PoseTarget(root, skin, links, reach ?? Array.Empty<PoseReach>(), found, PoseSolver.Skipped(links, absent), PoseSolver.Unframe(links, position, rotation), position, head);
     }
 
     internal static void Error(string label, string why)
@@ -121,7 +125,9 @@ public sealed class PoseTarget
 /// the body's does at the limb's own proportions (turns alone put a limb of other proportions elsewhere). A player's body carries what it
 /// holds in its hand socket to the model's hand, and the other hand grips it where the body's does, as much as the body's IK holds it
 /// there; the socket is back where the game keeps it before the game's next frame. While bound the body's animator always animates
-/// (a body hidden inside a model would otherwise stop); <see cref="Release"/> hands it back as it was. Applying looks nothing up and
+/// (a body hidden inside a model would otherwise stop); <see cref="Release"/> hands it back as it was. A copy from bones the caller found
+/// (an enemy's) that follows (<see cref="Follow"/>) animates the body and copies its pose only while the model's own renderer is drawn or
+/// in view; otherwise the animator culls as the game set it and the model keeps its last pose. Applying looks nothing up and
 /// allocates nothing.
 /// </summary>
 public sealed class PoseCopy
@@ -130,7 +136,6 @@ public sealed class PoseCopy
     private readonly AnimatorCullingMode _culling;
     private readonly Transform _body;
     private readonly Transform[] _source;
-    private readonly Quaternion[] _correction;
     private readonly PoseTarget _target;
     private readonly NVector3 _rootRest;
     private readonly float _ratio;
@@ -151,8 +156,18 @@ public sealed class PoseCopy
     private float _nextHeld;
     private const float HeldCheck = 0.25f;
 
-    private PoseCopy(Transform body, Animator? animator, PoseTarget target, Transform[] source, int[] active, Quaternion[] correction, NVector3 rootRest, float ratio, float scale, PoseReach[] reach, float[] limb)
+    // The native objects read and turned every frame, read once (each held by the wrapper beside it): the per-link turns go through the
+    // engine's own calls (EngineCalls) with managed maths, and liveness is read in place.
+    private readonly IntPtr _animatorAt, _bodyAt, _rootAt;
+    private readonly IntPtr[] _sourceAt, _boneAt;
+    private readonly NQuaternion[] _correctionN;
+    // An enemy's copy runs by sight (Wake): _shown is whether the model was drawn or in view at this frame's check.
+    private readonly bool _bySight;
+    private bool _shown = true;
+
+    private PoseCopy(Transform body, Animator? animator, PoseTarget target, Transform[] source, int[] active, Quaternion[] correction, NVector3 rootRest, float ratio, float scale, PoseReach[] reach, float[] limb, bool bySight)
     {
+        _bySight = bySight && animator != null;
         _limb = limb;
         _active = active;
         _turned = new Quaternion[source.Length];
@@ -160,7 +175,18 @@ public sealed class PoseCopy
         _body = body;
         _target = target;
         _source = source;
-        _correction = correction;
+        _animatorAt = animator is null ? IntPtr.Zero : animator.Pointer;
+        _bodyAt = body.Pointer;
+        _rootAt = target.Root.Pointer;
+        _sourceAt = new IntPtr[source.Length];
+        _boneAt = new IntPtr[source.Length];
+        _correctionN = new NQuaternion[source.Length];
+        foreach (var i in active)
+        {
+            _sourceAt[i] = source[i].Pointer;
+            _boneAt[i] = target.Bones[i].Pointer;
+            _correctionN[i] = BodyConvert.N(correction[i]);
+        }
         _rootRest = rootRest;
         _ratio = ratio;
         _reach = reach;
@@ -210,7 +236,7 @@ public sealed class PoseCopy
         if (missing.Length > 0) { PoseTarget.Error(label, "the body lacks the bones (or their bind poses) " + missing); return null; }
         for (var i = 0; i < links.Count; i++)
             if (links[i].TowardBody is { } t && Resolve(animator, rest, t, links[i].TowardBodyAlt, out _, out var m)) toward[i] = BodyConvert.N(m.GetColumn(3));
-        var copy = Create(body, animator, target, source, pose, toward, PoseSolver.Skipped(links, absent), reach, label);
+        var copy = Create(body, animator, target, source, pose, toward, PoseSolver.Skipped(links, absent), reach, label, false);
         copy?.FindHeld(animator, label);
         return copy;
     }
@@ -270,12 +296,13 @@ public sealed class PoseCopy
             source[i] = bones[i];
             pose[i] = rest[i];
         }
-        return Create(body, animator, target, source, pose, new NVector3?[links.Count], PoseSolver.Skipped(links, absent), Array.Empty<PoseReach>(), label);
+        return Create(body, animator, target, source, pose, new NVector3?[links.Count], PoseSolver.Skipped(links, absent), Array.Empty<PoseReach>(), label, true);
     }
 
-    private static PoseCopy? Create(Transform body, Animator? animator, PoseTarget target, Transform[] source, Matrix4x4[] pose, NVector3?[] toward, bool[] skip, IReadOnlyList<PoseReach> reach, string label)
+    private static PoseCopy? Create(Transform body, Animator? animator, PoseTarget target, Transform[] source, Matrix4x4[] pose, NVector3?[] toward, bool[] skip, IReadOnlyList<PoseReach> reach, string label, bool bySight)
     {
         var links = target.Links;
+        if (!ForgeCore.EngineCalls.Prepare(out var missing)) { PoseTarget.Error(label, "an engine call is missing (" + missing + ")"); return null; }
         var position = new NVector3[links.Count];
         var rotation = new NQuaternion[links.Count];
         var active = new List<int>(links.Count);
@@ -311,7 +338,7 @@ public sealed class PoseCopy
             var r = reaches[i] = reachable[i];
             limb[i] = PoseSolver.LimbScale(at[r.Upper], at[r.Lower], at[r.End], position[r.Upper], position[r.Lower], position[r.End], ratio) * world;
         }
-        return new PoseCopy(body, animator, target, source, active.ToArray(), correction, position[0], ratio, scale, reaches, limb);
+        return new PoseCopy(body, animator, target, source, active.ToArray(), correction, position[0], ratio, scale, reaches, limb, bySight);
     }
 
     /// <summary>The body bone <paramref name="first"/> (else <paramref name="second"/>) and its rest in the body's frame.</summary>
@@ -334,22 +361,36 @@ public sealed class PoseCopy
     public bool Apply()
     {
         var root = _target.Root;
-        if (_animator != null && ForgeCore.NativeObjects.Gone(_animator) || ForgeCore.NativeObjects.Gone(_body) || ForgeCore.NativeObjects.Gone(root)) return false;
-        var turn = root.rotation * Quaternion.Inverse(_body.rotation);
+        if (_animator is not null && ForgeCore.NativeObjects.GoneAt(_animatorAt) || ForgeCore.NativeObjects.GoneAt(_bodyAt) || ForgeCore.NativeObjects.GoneAt(_rootAt)) return false;
+        if (!_shown)
+        {
+            if (_target.Reported != this && ForgeCore.Recording.Watched) Report();
+            return true;
+        }
+        var turnN = BodyConvert.N(ForgeCore.EngineCalls.Rotation(_rootAt)) * NQuaternion.Inverse(BodyConvert.N(ForgeCore.EngineCalls.Rotation(_bodyAt)));
+        var turn = BodyConvert.U(turnN);
         Turn = turn;
         var bones = _target.Bones;
         var hips = BodyConvert.N(_body.InverseTransformPoint(_source[0].position));
         bones[0].position = root.TransformPoint(BodyConvert.U(PoseSolver.Root(_target.RootRest, hips, _rootRest, _ratio)));
-        for (var k = 0; k < _active.Length; k++) { var i = _active[k]; bones[i].rotation = _turned[i] = turn * _source[i].rotation * _correction[i]; }
+        for (var k = 0; k < _active.Length; k++)
+        {
+            var i = _active[k];
+            IntPtr from = _sourceAt[i], to = _boneAt[i];
+            // The engine's own call raises in native code on a destroyed bone: a bone gone stops the copy as the wrapper's throw did.
+            if (ForgeCore.NativeObjects.GoneAt(from) || ForgeCore.NativeObjects.GoneAt(to)) return false;
+            var turned = _turned[i] = BodyConvert.U(turnN * BodyConvert.N(ForgeCore.EngineCalls.Rotation(from)) * _correctionN[i]);
+            ForgeCore.EngineCalls.SetRotation(to, turned);
+        }
         // The holding hand first: the item goes with it, and the other hand reaches the item there.
         var carried = false;
         Vector3 hand = default, bodyHand = default;
         if (_holding >= 0 && !ForgeCore.NativeObjects.Gone(_socket))
         {
             var end = _reach[_holding].End;
-            Reach(_holding, turn, bones, default, 0f);
-            hand = bones[end].position;
-            bodyHand = _source[end].position;
+            Reach(_holding, turnN, default, 0f);
+            hand = ForgeCore.EngineCalls.Position(_boneAt[end]);
+            bodyHand = ForgeCore.EngineCalls.Position(_sourceAt[end]);
             Carry(hand, bodyHand, turn);
             carried = true;
         }
@@ -358,8 +399,8 @@ public sealed class PoseCopy
             if (i == _holding && carried) continue;
             // On the item as the body's hand is (seen from the holding hand: the item keeps its size), as far as the body's IK puts it there.
             if (i == _other && carried && _otherSolver != null)
-                Reach(i, turn, bones, hand + turn * (_source[_reach[i].End].position - bodyHand), Mathf.Clamp01(_otherSolver.GetIKPositionWeight()));
-            else Reach(i, turn, bones, default, 0f);
+                Reach(i, turnN, BodyConvert.N(hand) + NVector3.Transform(BodyConvert.Position(_sourceAt[_reach[i].End]) - BodyConvert.N(bodyHand), turnN), Math.Clamp(_otherSolver.GetIKPositionWeight(), 0f, 1f));
+            else Reach(i, turnN, default, 0f);
         }
         PlaceHeld();
         if (_target.Reported != this && ForgeCore.Recording.Watched) Report();
@@ -393,17 +434,16 @@ public sealed class PoseCopy
     }
 
     /// <summary>Limb <paramref name="i"/> bent (in the body limb's bend plane) so its end joint sits where the body's is seen from the
-    /// limb's upper joint, at the limb's proportions (<see cref="PoseReach"/>), moved toward <paramref name="grip"/> by <paramref name="weight"/>.</summary>
-    private void Reach(int i, Quaternion turn, Transform[] bones, Vector3 grip, float weight)
+    /// limb's upper joint, at the limb's proportions (<see cref="PoseReach"/>), moved toward <paramref name="grip"/> by <paramref name="weight"/>.
+    /// Its bones are linked bones Apply has just found alive this frame.</summary>
+    private void Reach(int i, NQuaternion turn, NVector3 grip, float weight)
     {
         var r = _reach[i];
-        Transform upper = bones[r.Upper], lower = bones[r.Lower], end = bones[r.End];
-        var bodyUpper = _source[r.Upper].position;
-        var target = upper.position + turn * (_source[r.End].position - bodyUpper) * _limb[i];
-        if (weight > 0f) target = Vector3.Lerp(target, grip, weight);
-        var keep = _turned[r.End];
-        LimbReach.Bend(upper, lower, end, target, turn * (_source[r.Lower].position - bodyUpper));
-        end.rotation = keep;
+        var bodyUpper = BodyConvert.Position(_sourceAt[r.Upper]);
+        var target = BodyConvert.Position(_boneAt[r.Upper]) + NVector3.Transform(BodyConvert.Position(_sourceAt[r.End]) - bodyUpper, turn) * _limb[i];
+        if (weight > 0f) target = NVector3.Lerp(target, grip, weight);
+        LimbReach.Bend(_boneAt[r.Upper], _boneAt[r.Lower], _boneAt[r.End], target, NVector3.Transform(BodyConvert.Position(_sourceAt[r.Lower]) - bodyUpper, turn));
+        ForgeCore.EngineCalls.SetRotation(_boneAt[r.End], _turned[r.End]);
     }
 
     // The held item moved with the model's hand: the socket keeps its place and turn against the hand as on the body. Where the game keeps
@@ -515,6 +555,44 @@ public sealed class PoseCopy
         if (i >= 0) ApplyFollowing(i);
     }
 
+    /// <summary>LateUpdate, before the joint clips: each following copy onto an enemy's body runs while its model's renderer was drawn last
+    /// frame (by any camera, its shadow too) or stands in the eye's view now (padded, so it is already posed as it comes on screen). Out of
+    /// both the body's animator culls as the game set it (its own renderers are hidden, so it stops) and the copy is not applied. Back in, the
+    /// animator always animates again and is evaluated at once, so the first frame on screen shows the body's pose of now, not the last one.</summary>
+    internal static void WakeAll()
+    {
+        for (var i = 0; i < Following.Count; i++)
+            if (Following[i]._bySight) Following[i].Wake();
+    }
+
+    private void Wake()
+    {
+        var skin = _target.Skin;
+        // Gone: Apply stops the copy (the model's root is the renderer's).
+        if (ForgeCore.NativeObjects.Gone(skin) || ForgeCore.NativeObjects.GoneAt(_animatorAt)) return;
+        var shown = skin.isVisible || InView(skin);
+        if (shown == _shown) return;
+        _shown = shown;
+        var animator = _animator!;
+        if (!shown) { animator.cullingMode = _culling; return; }
+        animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+        if (animator.isActiveAndEnabled) animator.Update(0f);
+    }
+
+    private static bool InView(Renderer skin)
+    {
+        if (!Scene.HasEye) return false;
+        if (!ForgeCore.EngineCalls.Bounds(skin, out var c, out var e))
+        {
+            var bounds = skin.bounds; // the engine lacks the direct call: the wrapper's read
+            c = bounds.center;
+            e = bounds.extents;
+        }
+        Vector3 eye = Scene.Eye, forward = Scene.EyeForward;
+        var radius = (float)Math.Sqrt(e.x * e.x + e.y * e.y + e.z * e.z);
+        return !CullMath.Hidden(false, c.x - eye.x, c.y - eye.y, c.z - eye.z, radius, 0f, forward.x, forward.y, forward.z, Scene.TanCone);
+    }
+
     /// <summary>Every following copy applied (LateUpdate, after the joint clips) unless its body's IK solves this frame (then applied when
     /// it has solved); a copy whose body or model is gone stops following.</summary>
     internal static void TickAll()
@@ -558,6 +636,10 @@ public sealed class PoseCopy
                     solver.OnPostUpdate = Il2CppSystem.Delegate.Remove(after, _solved)?.Cast<IKSolver.UpdateDelegate>();
         _solvers = Array.Empty<IK>();
         _solved = null;
+        // Not following, the copy is as bound: the body always animates and Apply copies.
+        if (_shown) return;
+        _shown = true;
+        if (!ForgeCore.NativeObjects.GoneAt(_animatorAt)) _animator!.cullingMode = AnimatorCullingMode.AlwaysAnimate;
     }
 
     /// <summary>The copy stops following and the body's animator is back as it was (nothing to give back once the game has destroyed it, as a
@@ -582,12 +664,21 @@ public static class LimbReach
     /// (or as near as the bones reach), the middle joint bending toward <paramref name="bend"/>. The end joint's own rotation turns with its parents.</summary>
     public static void Bend(Transform upper, Transform lower, Transform end, Vector3 target, Vector3 bend)
     {
-        Vector3 a = upper.position, b = lower.position, c = end.position;
-        var elbow = BodyConvert.U(PoseSolver.Elbow(BodyConvert.N(a), BodyConvert.N(target), Vector3.Distance(a, b), Vector3.Distance(b, c), BodyConvert.N(bend), out var reached));
-        var swing = Quaternion.FromToRotation(b - a, elbow - a);
-        upper.rotation = swing * upper.rotation;
+        if (ForgeCore.NativeObjects.Gone(upper) || ForgeCore.NativeObjects.Gone(lower) || ForgeCore.NativeObjects.Gone(end)) throw new ArgumentException("a limb bone is destroyed");
+        if (!ForgeCore.EngineCalls.Prepare(out var why)) throw new InvalidOperationException("an engine call is missing (" + why + ")");
+        Bend(upper.Pointer, lower.Pointer, end.Pointer, BodyConvert.N(target), BodyConvert.N(bend));
+    }
+
+    /// <summary><see cref="Bend(Transform, Transform, Transform, Vector3, Vector3)"/> on bones the caller holds and found alive, by pointer, in
+    /// managed maths through the engine's own calls (the per-frame path of the pose copy).</summary>
+    internal static void Bend(IntPtr upper, IntPtr lower, IntPtr end, NVector3 target, NVector3 bend)
+    {
+        NVector3 a = BodyConvert.Position(upper), b = BodyConvert.Position(lower), c = BodyConvert.Position(end);
+        var elbow = PoseSolver.Elbow(a, target, NVector3.Distance(a, b), NVector3.Distance(b, c), bend, out var reached);
+        var swing = BodyMath.FromTo(b - a, elbow - a);
+        ForgeCore.EngineCalls.SetRotation(upper, BodyConvert.U(swing * BodyConvert.N(ForgeCore.EngineCalls.Rotation(upper))));
         // Turned about the upper joint at its own length, the middle joint is on the elbow and the end turned with it.
-        c = a + swing * (c - a);
-        lower.rotation = Quaternion.FromToRotation(c - elbow, BodyConvert.U(reached) - elbow) * lower.rotation;
+        c = a + NVector3.Transform(c - a, swing);
+        ForgeCore.EngineCalls.SetRotation(lower, BodyConvert.U(BodyMath.FromTo(c - elbow, reached - elbow) * BodyConvert.N(ForgeCore.EngineCalls.Rotation(lower))));
     }
 }

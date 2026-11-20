@@ -71,7 +71,7 @@ internal static class Modules
 
     internal static readonly (string Module, Target[] Targets)[] Patched =
     {
-        (SpecialSlot, new[] { new Target("Player.PlayerAmmoStorage", "PickupAmmo"), new Target("Player.PlayerAmmoStorage", "NeedWeaponAmmo") }),
+        (SpecialSlot, new[] { new Target("Player.PlayerAmmoStorage", "PickupAmmo"), new Target("Player.PlayerBackpackManager", "NeedWeaponAmmo") }),
         (GearReload, new[] { new Target("Gear.BulletWeapon", "get_ReloadTime") }),
         (GearOffers, new[] { new Target("Gear.GearManager", "GetAllGearForSlot"), new Target("Player.PlayerBackpackManager", "EquipLocalGear") }),
         (GearParts, new[] { new Target("Gear.GearPartSpawner+_SpawnAllParts_d__15", "MoveNext") }),

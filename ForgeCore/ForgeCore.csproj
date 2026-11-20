@@ -81,6 +81,8 @@
     <EmbeddedResource Include="$(ForgeModsRoot)ForgeCore/Assets/Sights/*.t*.png" LogicalName="ForgeVisual.Sights.%(Filename)%(Extension)" />
     <!-- The shader bundles the screen effects, the power-on panel, the effect shaders and the trigger zones load (built by the tools/*shaders* scripts, tracked). -->
     <EmbeddedResource Include="Assets/Shaders/*.shaderbundle" LogicalName="ForgeCore.Shaders.%(Filename)%(Extension)" />
+    <!-- The shared native bodies a Forge patch target may sit on (Native/SharedNativeBodies.cs); Tools/Forge/check-patch-bodies.py reads the same file. -->
+    <EmbeddedResource Include="shared-native-bodies.json" LogicalName="shared-native-bodies.json" />
   </ItemGroup>
   <Target Name="RequireVfxBundle" BeforeTargets="BeforeBuild">
     <Error Condition="!Exists('$(ForgeModsRoot)ForgeCore/Assets/Sights/red-dot-1x.forgemesh') or !Exists('$(ForgeModsRoot)ForgeCore/Assets/Sights/holo-1x.forgemesh') or !Exists('$(ForgeModsRoot)ForgeCore/Assets/Sights/scope-2x.forgemesh') or !Exists('$(ForgeModsRoot)ForgeCore/Assets/Sights/red-dot-1x.t1.png') or !Exists('$(ForgeModsRoot)ForgeCore/Assets/Sights/holo-1x.t1.png') or !Exists('$(ForgeModsRoot)ForgeCore/Assets/Sights/scope-2x.t1.png')"

@@ -249,9 +249,18 @@ internal static class MenuControlLook
         var pad = h * 0.22f;
         var size = h * 0.26f;
         c.Text(pick.Label, left + pad, top - h * 0.32f, size, focus ? MenuLook.Line : MenuLook.Text, HudAlign.Left, right - left - 2f * pad);
-        float x0 = left + pad, x1 = right - pad, y0 = bottom + h * 0.1f, ph = h * 0.36f, gap = h * 0.06f;
+        float x0 = left + pad, x1 = right - pad;
+        Plates(c, Rect.MinMaxRect(x0, bottom + h * 0.1f, x1, bottom + h * 0.46f), pick, focus, size * 0.9f);
+        return Rect.MinMaxRect(x0, bottom, x1, top);
+    }
+
+    /// <summary>A pick's options alone, as a row of equal plates filling <paramref name="r"/> (the plates of <see cref="Pick"/>, for a pick
+    /// set inline in a row of its own), names <paramref name="size"/> tall. Returns <paramref name="r"/>.</summary>
+    internal static Rect Plates(MenuCanvas c, Rect r, UIPick pick, bool focus, float size)
+    {
+        float x0 = r.XMin(), y0 = r.YMin(), ph = r.Height(), gap = ph / 6f;
         var count = pick.Count;
-        var each = (x1 - x0 - gap * (count - 1)) / count;
+        var each = (r.Width() - gap * (count - 1)) / count;
         var chosen = pick.Value;
         var choice = pick as UIChoice;
         var swatches = pick as UISwatches;
@@ -268,8 +277,8 @@ internal static class MenuControlLook
             }
             c.Plate(plate, ph * 0.2f, on ? MenuLook.Faded(MenuLook.Amber, focus ? 0.9f : 0.7f) : MenuLook.Bay);
             c.Frame(plate, ph * 0.2f, on ? MenuLook.Amber : MenuLook.LineDim);
-            c.Text(choice!.Options[i], x0 + i * (each + gap) + each / 2f, y0 + ph / 2f, size * 0.9f, on ? MenuLook.Ink : MenuLook.Body, HudAlign.Centre, each - 6f);
+            c.Text(choice!.Options[i], x0 + i * (each + gap) + each / 2f, y0 + ph / 2f, size, on ? MenuLook.Ink : MenuLook.Body, HudAlign.Centre, each - 6f);
         }
-        return Rect.MinMaxRect(x0, bottom, x1, top);
+        return r;
     }
 }

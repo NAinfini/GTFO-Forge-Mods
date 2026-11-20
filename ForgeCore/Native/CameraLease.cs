@@ -100,7 +100,7 @@ public sealed class CameraLease : IDisposable
             _orbitOut = 0f;
             _orbitFromRotation = camera.transform.rotation;
         }
-        _orbitOut = OrbitMath.Blend(_orbitOut, !leaving, Time.deltaTime, blendSeconds);
+        _orbitOut = OrbitMath.Blend(_orbitOut, !leaving, Frame.DeltaTime, blendSeconds);
         var turn = Quaternion.Euler(pitch, yaw, 0f);
         var back = turn * new Vector3(shoulder, 0f, -distance);
         var length = Vec.Length(back);

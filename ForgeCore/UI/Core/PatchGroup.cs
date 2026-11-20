@@ -11,15 +11,15 @@ internal enum PatchGroup : byte
     MenuBar,
     MenuScreen,
     Picker,
-    /// <summary>Rows added to the game's settings pages (key actions, audio sliders).</summary>
+    /// <summary>Rows added to the game's settings pages (key actions, audio sliders, mods' settings rows).</summary>
     Settings,
     GearNames,
-    /// <summary>The weapon list row's two name calls, which <see cref="Inventory"/> and <see cref="GearNames"/> share; on with either.</summary>
-    SlotNames,
     GearIcons,
     /// <summary>A claim hiding a game HUD part.</summary>
     HudHides,
-    WeaponListHidden,
+    /// <summary>The weapon list's four list calls, which the hidden-item hold, <see cref="Inventory"/> and <see cref="GearNames"/> share;
+    /// on with any of them.</summary>
+    ListCalls,
     /// <summary>The local player's enemy hits (health bars and hit feedback).</summary>
     LocalHits,
     // The game readouts: used from the first read of the matching UIKit property.

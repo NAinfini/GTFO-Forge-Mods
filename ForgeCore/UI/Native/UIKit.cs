@@ -206,6 +206,29 @@ public sealed partial class UIKitMod
     }
 
     /// <summary>
+    /// Adds <paramref name="rows"/> to <paramref name="block"/> of the game's own settings, after the game's rows, in the order given:
+    /// copies of the game's own rows that the game's own row code runs for (see <see cref="SettingsRow"/>). A value the player sets is
+    /// written through the row at once, never into the game's settings; the game's save, apply and reset leave it alone. Call it in your
+    /// plugin's Load: the game builds its settings once, early; rows added after that are refused (false, logged). Texts are keys of
+    /// your language files or plain strings.
+    /// </summary>
+    /// <param name="name">Unique and stable inside your mod, for example <c>Dlss</c>.</param>
+    /// <param name="block">The window of the game's settings the rows go into.</param>
+    /// <param name="rows">At least one; <see cref="SettingsChoice"/> and <see cref="SettingsToggle"/>.</param>
+    /// <param name="onReset">Runs when the player resets the page (the game's RESET TO DEFAULT): put your values back to their defaults
+    /// here; the rows show them afterwards.</param>
+    /// <example><c>ui.AddSettings("Dlss", SettingsBlock.AdvancedGraphics, new SettingsRow[] { new SettingsToggle(UIText.Key("on.title"), () =&gt; On.Value, v =&gt; On.Value = v) });</c></example>
+    public bool AddSettings(string name, SettingsBlock block, IReadOnlyList<SettingsRow> rows, Action? onReset = null)
+    {
+        var id = Full(name, "settings rows");
+        return id != null && SettingsPages.AddRows(this, id, block, rows, onReset);
+    }
+
+    /// <summary>One line per row of <see cref="AddSettings"/> as the game laid it out, for a development readback: whether the row
+    /// exists, is active and shown, its extent down the window's content and the part of the content the window shows.</summary>
+    public string SettingsReadback(string name) => SettingsPages.Readback(ModIds.Join(Id, name));
+
+    /// <summary>
     /// Adds an element to the in-level HUD in <paramref name="slot"/>'s region. ForgeUI places the elements of every mod: a region
     /// stacks its elements by priority with a gap, keeps them clear of each other and of the game's weapon list and vitals, and
     /// collapses (and logs) the lowest priority ones when it is full. <paramref name="build"/> runs each time the game creates its HUD

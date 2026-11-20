@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.0.2
+
+- 敌人成群时的定时检查（每 0.25 秒一次）更省：玩家是否存在每次只查一次，不再每个敌人查一遍；敌人有没有动画组件在登记时记下。各开关的作用和默认值不变。
+
+敌人成群时的开关，各自独立；括号里是默认值和作用在哪台机器：
+
+- `SetupRendererLookup`（开，每台机器）：不影响观感和玩法。敌人 `Setup` 时本模组改查自己的尸体记录，不再把渲染器遍历两遍。游戏内实测本模组自己的 `Setup` 前缀每次从约 0.038 ms 降到约 0.001 ms。
+- `SpawnFrameDefer`（开，每台机器）：不影响观感和玩法。刚刷出敌人的那一帧，本模组自己的定时工作推到下一帧，不会连推两帧。
+- `FarSkinQuality` / `FarSkinDistance`（开，20 米，每台机器）：影响观感。远处敌人的网格只用两根骨骼混合，不写运动矢量；远处关节变粗，开 TAA 时可能轻微拖影。
+- `FarAnimatorThrottle` / `FarAnimatorDistance` / `FarAnimatorInterval`（开，25 米，3 帧，每台机器）：影响玩法。远处正在走路的敌人每几帧才算一次动画，动作发顿，跟着骨骼的受击盒最多滞后两帧；走路以外的状态和开了根运动的不降。
+- 修复 `FarAnimatorThrottle`：被降频的敌人关掉动画组件时不再丢掉动画状态（之前会滑着走、没有跑动和攻击动作），恢复时还原组件原来的设置。
+- `ClientHiddenSyncThrottle` / `HiddenSyncDistance` / `HiddenSyncInterval`（关，30 米，4 帧，只客户端）：影响玩法。看不见且较远的敌人每几帧才从主机同步一次位置，碰撞体随之滞后，隔墙射击或爆炸的判定可能不同；主机不受影响。
+- `UpdateBudgets` 和六个 `Budget…` 数值（关，只主机）：数值默认就是原版（游戏内读回 `5,2,1 / 10,4,1 / 12,3,1 / 20,10,5 / 5,2,1 / 1`），不改数值打开也不变；改了会影响玩法：敌人思考、侦测、移动的节奏变了。
+- `AvoidanceQuality` / `AvoidanceType`（关，1，只主机）：原版就是低质量避让（游戏内读回 1），只有 0（不避让）更省；改成 0 会影响玩法：敌人互相穿插、堵门方式变了。打开或改值时，已经在走的敌人当场换成新值，不再等它下次开导航。
+- `PathfindingIterations` / `PathfindingIterationsPerFrame`（关，100，只主机）：100 是原版值；调低会影响玩法：寻路摊到更多帧，敌人起步可能变慢。
+- `HitReactKeepsAgent`（关，只主机）：影响玩法。敌人受击硬直时只停导航、不关再开，硬直结束的位置修正与原版不同，落点可能略有偏差。
+- 开关关着时用原版的值和代码，不碰游戏。
+- 新增开发用探针 `Probe` / `ProbeSeconds`（关，1 秒）：每个窗口写一行帧时间、主线程与渲染线程 CPU、敌人刷出、唤醒、导航开关、阴影重绘、逐敌人更新与射手弹体的次数和耗时，写到 `BepInEx/PerformanceLogs/ForgePerformance_*.log`；同时装上全部开关的钩子，可在一局里来回切换对比。探针还给游戏状态更新、敌人更新管理器各组的逐敌人更新、敌人移动、触手、FinalIK、玩家与敌人碰撞、相机、阴影图集、帧率限制器、音频等脚本更新计时，把主线程的脚本阶段拆开；每行带 `utc`，可与 ForgeDevelopment 的每秒行对齐。控制台可用 `Value` 改避让类型和寻路迭代数。每行带 `foreground_frames`（游戏窗口有焦点的帧数），每个标记带 `runInBackground`、垂直同步、目标帧率与当前焦点；控制台 `Limits` 读这些值，`Foreground` / `Background` 请求切换焦点（Windows 可能拒绝，结果写在返回里）。用 `tools/analyze_probe.py` 汇总（标签写成 `<项>-A-<n>` / `<项>-B-<n>` 时按段中位数做 A/B 对比，可并入 ForgeDevelopment 的阶段耗时），`tools/crowd-probe.test`、`tools/crowd-ab.test` 与前后台对照 `tools/crowd-focus.test` 是驱动脚本。
+- 每个补丁写入前都先核对目标函数开头的字节（`Crowd/EntryAdmission.cs`），不只是探针和敌群补丁：减负补丁、风补丁同样先查。规则按游戏文件里的原始字节判断，所以入口已被 Harmony 改过（例如 ForgeCore 先装了 `EnemyAgent.Setup`）也能判；规则补上了转发桩的尾跳转。被拒的目标记一行 `type=perf_native_hook`，带诊断码 `native-hook-prologue-refused`。减负补丁和风补丁各自整组生效：有一个入口被拒，这一组全部不装并报错。
+- `TentacleLimitErrorFold`：每关第一条触手上限报错当场写一行（`state=first`），关卡结束再写总数（`state=level-total`）。进程被杀或崩溃时也留有记录。
+- 探针不再给 `EnemyAllocator.SpawnEnemy` 计时（那是 ForgeEngine 的方法）；刷怪看 `EnemySpawned` 和 `OwnSetupPrefix`。
+- 敌人 `Setup` 时不再无条件查 `EnemyTransformSync` 组件，只在 `ClientHiddenSyncThrottle` 或探针开着时查。不影响观感和玩法。
+- 探针清理旧日志失败时记一行（`perf.probe-log-prune-failed`），不再静默跳过。
+- `SummaryLog` 打开时，每次游戏状态变化写一行 `type=performance_state`（关卡、UTC 和性能计数器时间），帧采集工具录下的数据可以按关卡切开；`tools/analyze_play.py` 读它和 PresentMon 的表，按关卡给出平均帧率、1% low 和帧时间分位。
+- 探针加原生部分（`tools/NativeProbe`，放在插件旁才加载，`Probe` 关着时不碰）：主线程与渲染线程的栈采样、按相机阶段切分的 GPU 时间线、着色器创建计时、33 ms 以上的帧逐条记录；`tools/analyze_samples.py` 把采样归到函数和各个模组，`tools/analyze_gpu_timeline.py` 汇总 GPU 分段。
+- 探针读回 `Lag` 多给三组数：手动推进动画的次数、动画时间前进的次数、骨骼姿势变化的次数（以及只算画面内敌人的同样三项）；新增 `Animators`：存活数、被降频数、最近的被降频敌人距离、动画被关而不在降频名单里的数量。
+- 远处动画降频改挂 `ES_PathMove.Exit`，不再和 ForgeEngine 同挂 `EnemyLocomotion.ChangeState`。
+- 装饰阴影一次要移除的项超过 4096 个时，多出的留在原处并记一行 `perf.decoration-removal-limit`，不再抛异常。
+
 ## 1.0.1
 
 - 启动时游戏文件的哈希跨启动缓存在 `BepInEx/cache/ForgePerformance/file-sha256.txt`，文件变了才重算。

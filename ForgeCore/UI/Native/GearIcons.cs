@@ -41,7 +41,6 @@ public static class GearIcons
     public static void Supply(uint category, GearIconModel model)
     {
         if (model == null) throw new ArgumentNullException(nameof(model));
-        PatchGroups.Ensure(PatchGroup.GearIcons);
         if (Supplied.TryGetValue(category, out var existing))
         {
             if (existing != model) Plugin.Error("ui-gear-icons-category-not-supplied-another", "Gear icons of category " + category + " not supplied: another provider already supplies them.");
@@ -86,7 +85,6 @@ public static class GearIcons
     public static void Unframed(GameObject root)
     {
         if (root == null) throw new ArgumentNullException(nameof(root));
-        PatchGroups.Ensure(PatchGroup.GearIcons);
         Decorations.RemoveAll(d => d == null);
         Decorations.Add(root);
     }
@@ -114,6 +112,98 @@ public static class GearIcons
             else (result, framed) = (renderer.bounds, true);
         }
         if (framed) bounds = result;
+    }
+
+    private static IntPtr _hiddenGear;
+
+    /// <summary>The renderer builds the gear it draws at the world origin, on the gear's own view layer, and keeps it there until the job is
+    /// cleaned up; it draws it through its own command buffer, which reads no layer. <paramref name="gear"/> and everything under it go on
+    /// a layer no camera draws: the icon is drawn the same and no camera in the lobby or a level shows the gear. Asked every frame of a job;
+    /// only a gear not hidden yet is worked on (<see cref="HideNew"/>), once. The gun the game built for the job is no longer followed.</summary>
+    internal static void Hide(GameObject? gear)
+    {
+        if (gear == null || gear.Pointer == _hiddenGear) return;
+        _hiddenGear = gear.Pointer;
+        _built = null;
+        _builtHolder = IntPtr.Zero;
+        HideNew(gear);
+    }
+
+    /// <summary>True while the game's load of a job it builds itself runs (<c>GearIconRendering.LoadGearForIconJob</c>, whose
+    /// <c>GearBuilder.AssembleGearAsync</c> spawns the gun's item at the world origin before it returns).</summary>
+    internal static bool Building;
+    // The gun the game is building for the current icon job, from its item spawn until the job holds it (Hide), and its part holder.
+    private static ItemEquippable? _built;
+    private static IntPtr _builtHolder;
+
+    /// <summary>Follows the guns the game builds for its icons from their first frame: the item is spawned inside the job's load, and its
+    /// parts come one per frame after it (<c>GearPartSpawner.SpawnAllParts</c>), each on the part's own layer, for a dozen frames before
+    /// the job holds the gun. Started with the icon hooks.</summary>
+    internal static void FollowBuilds()
+    {
+        ForgeCore.GameHooks.ItemSpawned.After(Spawned);
+        ForgeCore.Patches.Ensure(ForgeCore.Modules.GearParts, typeof(ForgeCore.GearPartsStartedHook));
+    }
+
+    // The item the job's load spawned is the gun: hidden at once, before its first part.
+    private static void Spawned(ForgeCore.ItemSpawn spawn, bool ran)
+    {
+        if (!Building || spawn.Item == null) return;
+        Building = false;
+        _built = spawn.Item.TryCast<ItemEquippable>();
+        _builtHolder = IntPtr.Zero;
+        if (_built == null)
+        {
+            Plugin.Error("ui-gear-icon-build-not-gear", "The item the game spawned for a weapon picture is no gear; it is not followed and its parts stay visible at the world origin while they are built.");
+            return;
+        }
+        HideNew(_built.gameObject);
+    }
+
+    /// <summary>The game's part spawner of <paramref name="spawner"/> took a step (a part spawned, or, at its last step, the gun finished
+    /// and handed to the job): when it builds the icon job's gun, the gun with every part under it is hidden again before any camera
+    /// draws this frame.</summary>
+    internal static void PartsStepped(GearPartSpawner spawner)
+    {
+        var built = BuiltHolder();
+        if (built != IntPtr.Zero && spawner.m_holder?.Pointer == built) HideNew(_built!.gameObject);
+    }
+
+    /// <summary>True while <paramref name="holder"/> is the part holder of the gun the game's icon renderer is building, from the gun's
+    /// spawn until the renderer draws it: that exact gun, never another gun of the same checksum built meanwhile.</summary>
+    public static bool IsBuilding(GearPartHolder holder)
+    {
+        if (holder == null) return false;
+        var built = BuiltHolder();
+        return built != IntPtr.Zero && holder.Pointer == built;
+    }
+
+    // The part holder of the gun being built for the current icon job, or zero; read from the gun once it has one.
+    private static IntPtr BuiltHolder()
+    {
+        if (_built == null) return IntPtr.Zero;
+        if (_builtHolder != IntPtr.Zero) return _builtHolder;
+        var holder = _built.GearPartHolder;
+        if (holder == null)
+        {
+            Plugin.Error("ui-gear-icon-build-no-holder", "The gun the game builds for a weapon picture has no part holder; its parts are not followed and stay visible at the world origin until the picture is drawn.");
+            _built = null;
+            return IntPtr.Zero;
+        }
+        return _builtHolder = holder.Pointer;
+    }
+
+    /// <summary>Chooses the layer for this gear and puts the gear with every part under it there: once per icon gear the job holds, and
+    /// at each step of the gun's build, whose parts spawn on their own layers.</summary>
+    private static void HideNew(GameObject gear)
+    {
+        var layer = ForgeCore.SpareLayers.Unseen();
+        if (layer < 0)
+        {
+            Plugin.Error("ui-gear-icon-no-spare-layer", "No layer is left that no camera draws; the gun the game builds for each weapon picture stays visible at the world origin while it is drawn.");
+            return;
+        }
+        foreach (var part in gear.GetComponentsInChildren<Transform>(true)) part.gameObject.layer = layer;
     }
 
     // The game's own icon cache, at the path the game gives (under its persistent data folder): TryGetGearIconSprite reads the file when
@@ -168,6 +258,8 @@ public static class GearIcons
                 Plugin.Error("ui-gear-icon-category-empty", "Gear icon of category " + waiting.Category + " is empty: " + failure);
                 model = new GameObject("Gear icon (no model)");
             }
+            // Hidden as it becomes the job's gear, before any camera of this frame draws it.
+            Hide(model);
             IconJobLoad.Complete(waiting.Job, model!);
             Jobs.RemoveAt(i);
         }

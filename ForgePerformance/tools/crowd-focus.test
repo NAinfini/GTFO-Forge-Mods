@@ -1,0 +1,76 @@
+# ForgePerformance focus check: is the pinned ~78 ms frame a background-window throttle or real present cost?
+# Samples alternate foreground (F) and background (G) in 16-second windows, empty room first, then 40 awake Strikers.
+# Each window line carries foreground_frames (frames the game window had focus); each mark carries the frame limits.
+# Windows refuses the focus request unless the game may take the foreground, so check foreground_frames, not the label.
+# Background hands focus to the desktop shell without minimizing.
+# Read with tools/analyze_probe.py <log> --forgedev <ForgeDevelopment log>. PLACE: an open room of V1 A1.
+god on
+clear enemies
+teleport 35.5 0.06 50.5
+look 35.5 0.6 60
+call static:ForgePerformance.Crowd.PerformanceControl Read as=focus
+call static:ForgePerformance.Crowd.PerformanceControl Limits
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+wait 1s
+call static:ForgePerformance.Crowd.PerformanceControl Limits
+call static:ForgePerformance.Crowd.PerformanceControl Mark "focus-empty-F-1"
+wait 16s
+call static:ForgePerformance.Crowd.PerformanceControl Background
+wait 1s
+call static:ForgePerformance.Crowd.PerformanceControl Limits
+call static:ForgePerformance.Crowd.PerformanceControl Mark "focus-empty-G-2"
+wait 16s
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+wait 1s
+call static:ForgePerformance.Crowd.PerformanceControl Limits
+call static:ForgePerformance.Crowd.PerformanceControl Mark "focus-empty-F-3"
+wait 16s
+call static:ForgePerformance.Crowd.PerformanceControl Background
+wait 1s
+call static:ForgePerformance.Crowd.PerformanceControl Limits
+call static:ForgePerformance.Crowd.PerformanceControl Mark "focus-empty-G-4"
+wait 16s
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+wait 1s
+call static:ForgePerformance.Crowd.PerformanceControl Limits
+call static:ForgePerformance.Crowd.PerformanceControl Mark "focus-empty-F-5"
+wait 16s
+spawn Striker 4 at=front:3
+spawn Striker 4 at=front:5
+spawn Striker 4 at=front:7
+spawn Striker 4 at=front:9
+spawn Striker 4 at=front:11
+spawn Striker 4 at=front:13
+spawn Striker 4 at=front:15
+spawn Striker 4 at=front:17
+spawn Striker 4 at=front:19
+spawn Striker 4 at=front:21
+wait 5s
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+wait 1s
+call static:ForgePerformance.Crowd.PerformanceControl Limits
+call static:ForgePerformance.Crowd.PerformanceControl Mark "focus-awake-F-1"
+wait 16s
+call static:ForgePerformance.Crowd.PerformanceControl Background
+wait 1s
+call static:ForgePerformance.Crowd.PerformanceControl Limits
+call static:ForgePerformance.Crowd.PerformanceControl Mark "focus-awake-G-2"
+wait 16s
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+wait 1s
+call static:ForgePerformance.Crowd.PerformanceControl Limits
+call static:ForgePerformance.Crowd.PerformanceControl Mark "focus-awake-F-3"
+wait 16s
+call static:ForgePerformance.Crowd.PerformanceControl Background
+wait 1s
+call static:ForgePerformance.Crowd.PerformanceControl Limits
+call static:ForgePerformance.Crowd.PerformanceControl Mark "focus-awake-G-4"
+wait 16s
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+wait 1s
+call static:ForgePerformance.Crowd.PerformanceControl Limits
+call static:ForgePerformance.Crowd.PerformanceControl Mark "focus-awake-F-5"
+wait 16s
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+call static:ForgePerformance.Crowd.PerformanceControl Mark "focus-end"
+clear enemies

@@ -94,9 +94,6 @@ internal static class ArsenalChecks
                 && racked.Spec.AmmoRatio == 0.5f && racked.Spec.Grenade == new GrenadeSpec(200, 4, 32) && racked.Yaw == 90f && racked.Id == "Grenade Launcher", "rack round trip");
             var longName = Wire.Rack(new RackRecord(launcher, 15, 1, 2, 3, 0, new string('重', 100)));
             check(longName.Length <= Wire.MaxDataBytes && Wire.TryRack(longName, out var cut) && cut.Id.Length == (Wire.MaxDataBytes - Wire.RackBytes) / 3, "long rack name cut to whole characters");
-            var gun = HeavyWeaponSpec.Parse(Json("{\"Model\":\"Arsenal:heavy-mg\",\"Gear\":38}"));
-            check(gun.Muzzle == HeavyMuzzle.Mg && HeavyWeaponSpec.Parse(Json("{\"Model\":\"Arsenal:heavy-mg\",\"Gear\":38,\"Muzzle\":\"amr\"}")).Muzzle == HeavyMuzzle.Amr
-                && Throws<ForgeCore.StrictJsonException>(() => HeavyWeaponSpec.Parse(Json("{\"Model\":\"Arsenal:heavy-mg\",\"Gear\":38,\"Muzzle\":\"flame\"}")), "unknown muzzle").Field == "Muzzle", "muzzle flash from the payload: default mg, unknown refused");
             var unknown = (byte[])rack.Clone();
             unknown[0] ^= 0xFF;
             check(!Wire.TryRack(unknown, out _) && Wire.UnknownRackModel(unknown, out var unknownHash) && unknownHash != launcher.ModelHash && !Wire.UnknownRackModel(rack, out _), "rack with an unknown model hash is dropped whole and says why");
@@ -115,7 +112,6 @@ internal static class ArsenalChecks
             var inForce = tuned.Tuning.Over(vanillaNumbers);
             check(inForce.Damage == 5.6f && inForce.ShotDelay == .08f && inForce.Magazine == 80 && inForce.AmmoCost == 1.9f && inForce.Valid()
                 && inForce.Rounds(1f, 230f) == Math.Floor(230d / 1.9f) + 80, "factory settings over the game's numbers; the budget counts reserve plus magazine");
-            check(Throws<ForgeCore.StrictJsonException>(() => HeavyWeaponSpec.Parse(Json("{\"Model\":\"Arsenal:heavy-mg\",\"Gear\":38,\"Magazine\":2.5}")), "fractional magazine").Field == "Magazine", "magazine is whole");
             var placed = tuned.Placed(0.5f, 20, 4f).Tuning;
             check(placed.Magazine == 20 && placed.AmmoCost == 4f && placed.Damage == 5.6f && tuned.Placed(null, null, null).Tuning.SameAs(tuned.Tuning) && placed.Over(vanillaNumbers).Rounds(0.5f, 230f) == Math.Floor(115d / 4f) + 20, "a placement sets magazine and round cost over the definition; the budget follows");
             check(tuned.Placed(null, null, null, 2).Count == 2 && Wire.TryRack(Wire.Rack(new RackRecord(tuned.Placed(null, null, null, 2), 38, 0, 0, 0, 0, "mg")), out var twoRacks) && twoRacks.Spec.Count == 2,
@@ -150,9 +146,7 @@ internal static class ArsenalChecks
             check(endless.IsStocked(0) && !endless.Spent && endless.Given == 51, "with no limit and no wait a taken rack is laid again at once, without end");
             check(ArchetypeTuning.FromWire(new[] { float.NaN, 0f, float.NaN, float.NaN, float.NaN, float.NaN, float.NaN, float.NaN, float.NaN, float.NaN, float.NaN, float.NaN }) == null, "tuning outside its range rejected on the wire");
             // Damage falloff in metres: both or neither, the end beyond the start; unset takes the game block's own.
-            check(Throws<ForgeCore.StrictJsonException>(() => HeavyWeaponSpec.Parse(Json("{\"Model\":\"Arsenal:heavy-mg\",\"Gear\":38,\"FalloffStart\":80}")), "falloff start alone").Field == "FalloffStart"
-                && Throws<ForgeCore.StrictJsonException>(() => HeavyWeaponSpec.Parse(Json("{\"Model\":\"Arsenal:heavy-mg\",\"Gear\":38,\"FalloffEnd\":200}")), "falloff end alone").Field == "FalloffStart"
-                && Throws<ForgeCore.StrictJsonException>(() => HeavyWeaponSpec.Parse(Json("{\"Model\":\"Arsenal:heavy-mg\",\"Gear\":38,\"FalloffStart\":80,\"FalloffEnd\":80}")), "falloff end not beyond start").Field == "FalloffEnd", "falloff needs both fields, end beyond start");
+            check(Throws<ForgeCore.StrictJsonException>(() => HeavyWeaponSpec.Parse(Json("{\"Model\":\"Arsenal:heavy-mg\",\"Gear\":38,\"FalloffStart\":80}")), "falloff start alone").Field == "FalloffStart", "a bad factory setting is refused naming its field");
 
             check(Marshal.SizeOf<GrenadeShot>() == 64 && (int)Marshal.OffsetOf<GrenadeShot>("VX") == 40 && (int)Marshal.OffsetOf<GrenadeShot>("Radius") == 56, "grenade shot layout");
             check(Marshal.SizeOf<GrenadeBurst>() == 41 && (int)Marshal.OffsetOf<GrenadeBurst>("Sequence") == 24

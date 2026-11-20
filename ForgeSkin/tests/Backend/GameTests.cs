@@ -312,8 +312,9 @@ public class GameTests
         Assert.Equal(["auto_pistol", "machine_pistol", "sledgehammer"], back["skins"]!.AsArray().Select(s => (string)s!["weapon"]!).Order());
     }
 
-    // Resource integrity of previews: every opaque or cutout material of every catalog item has a readable albedo PNG, and
-    // every material says how the game draws it.
+    // Resource integrity of previews: every opaque or cutout material of every catalog item has a readable albedo PNG, every
+    // material says how the game draws it, and no part lists one path twice (the editor keys transforms and its mount list
+    // by part and path; the SBS III and the PDW have sibling nodes of one name).
     [GameFact]
     public void EveryPreviewMaterialHasAlbedo()
     {
@@ -322,6 +323,9 @@ public class GameTests
         {
             var id = (string)item!["id"]!;
             var preview = Call("preview.weapon", new { id });
+            foreach (var part in preview["parts"]!.AsArray())
+                foreach (var twice in part!["transforms"]!.AsArray().GroupBy(t => (string?)t!["path"]).Where(g => g.Count() > 1))
+                    missing.Add($"{id}/{part["id"]}: path {twice.Key ?? "."} listed {twice.Count()} times");
             var textures = preview["textures"]!.AsObject();
             foreach (var material in item["parts"]!.AsArray().SelectMany(p => p!["materials"]!.AsArray()).Select(m => (string)m!).Distinct())
             {

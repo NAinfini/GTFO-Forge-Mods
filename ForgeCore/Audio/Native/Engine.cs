@@ -552,16 +552,17 @@ internal static class Engine
             Eligible[i] = p != null && p.Spatial && p.Cue.Definition.Environment && p.Audibility > 0 && GameContext.HasListener;
         }
         int next;
-        while ((next = Occlusion.Next(Time.frameCount, now, Eligible)) >= 0)
+        while ((next = Occlusion.Next(ForgeCore.Frame.Count, now, Eligible)) >= 0)
         {
             var p = Voices[next]!.Owner!;
             p.OcclusionTarget = GameContext.Occluded(p.Position, p.Emitter.Target) ? .35f : 1;
         }
         UpdateDucking();
+        var dt = Math.Clamp(ForgeCore.Frame.UnscaledDeltaTime, 0, .1f);
         for (var i = 0; i < Voices.Length; i++)
         {
             var voice = Voices[i]; if (voice?.Owner == null) continue;
-            Apply(voice.Owner, voice, Math.Clamp(Time.unscaledDeltaTime, 0, .1f));
+            Apply(voice.Owner, voice, dt);
         }
         DispatchEnded();
     }

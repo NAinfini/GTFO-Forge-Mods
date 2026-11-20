@@ -138,7 +138,9 @@ internal static class LobbyStrips
         }
         foreach (var pointer in Gone) Rows.Remove(pointer);
         var page = CM_PageLoadout.Current;
-        if (page == null || page.WasCollected) return;
+        // The loadout page is shut in a level (SetPageActive turns its object off with the flag): its bars draw nothing then, and every
+        // row is synced again when it opens.
+        if (ForgeCore.NativeObjects.Gone(page) || !page.m_isActive) return;
         var bars = page.m_playerLobbyBars;
         if (bars == null) return;
         for (var i = 0; i < bars.Length; i++)

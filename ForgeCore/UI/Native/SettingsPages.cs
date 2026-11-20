@@ -11,6 +11,31 @@ namespace ForgeUI;
 /// ForgeUI's language files (shown in the current language), <see cref="Get"/> and <see cref="Set"/> read and write its value, 0 to 1.</summary>
 public sealed record SettingsSlider(string Id, string TextKey, Func<float> Get, Action<float> Set);
 
+/// <summary>A block of the game's own settings that <see cref="UIKitMod.AddSettings"/> adds rows to: one window of a settings page.</summary>
+public enum SettingsBlock
+{
+    /// <summary>The video page's ADVANCED GRAPHICS window, the last of its three windows.</summary>
+    AdvancedGraphics,
+}
+
+/// <summary>A row added to a block of the game's settings (<see cref="UIKitMod.AddSettings"/>): <see cref="SettingsChoice"/> or
+/// <see cref="SettingsToggle"/>, a name and a control like the game's own rows. The game's own row code runs for it, so it looks,
+/// hovers, sounds and scrolls like the game's. Every value, <c>Enabled</c> and <c>Hint</c> is read again twice a second while the
+/// page shows, so a change made elsewhere shows there. <c>Hint</c> (optional) answers a short text the game shows in its own tooltip
+/// while the cursor is on the row, or null for none: what the setting does, or why it cannot be used now. The list holds no text
+/// rows; put what a player must know into the option names.</summary>
+public abstract record SettingsRow;
+
+/// <summary>The game's dropdown row: <see cref="Title"/>, and a popup of <see cref="Options"/>; a value is an option's index.
+/// <see cref="Set"/> runs when the player picks one. While <see cref="Enabled"/> (optional) answers false the dropdown has the game's
+/// disabled look and does not open.</summary>
+public sealed record SettingsChoice(UIText Title, IReadOnlyList<UIText> Options, Func<int> Get, Action<int> Set, Func<bool>? Enabled = null,
+    Func<UIText?>? Hint = null) : SettingsRow;
+
+/// <summary>The game's on/off row: <see cref="Title"/>, and the game's own On and Off. <see cref="Set"/> runs on every press. While
+/// <see cref="Enabled"/> (optional) answers false the row is dimmed and a press changes nothing.</summary>
+public sealed record SettingsToggle(UIText Title, Func<bool> Get, Action<bool> Set, Func<bool>? Enabled = null, Func<UIText?>? Hint = null) : SettingsRow;
+
 /// <summary>Which game method builds a settings page: the key pages by <c>CreateKeyMappingSubMenu</c>, every other page by <c>CreateSubmenu</c>.</summary>
 internal enum PageBuilder { KeyMapping, Submenu }
 
@@ -23,6 +48,9 @@ internal abstract class PageRows
     internal abstract string Owner { get; }
     internal readonly List<CM_SettingsItem> Items = new();
 
+    /// <summary>Whether the rows go into this window of the page: a page built by several <c>CreateSubmenu</c> calls (the video page's
+    /// three windows) has one list of the game's settings per window, <paramref name="list"/> (zero for a key page).</summary>
+    internal virtual bool Takes(CM_PageSettings? settings, IntPtr list) => true;
     /// <summary>The game is about to lay out the page: drop the rows of an earlier build, copy new ones with <see cref="SettingsPages.CopyRows"/>.</summary>
     internal abstract void Append(CM_ScrollWindow window, Il2CppSystem.Collections.Generic.List<iScrollWindowContent> content);
     /// <summary>The game's reset of the page.</summary>
@@ -43,8 +71,44 @@ public static class SettingsPages
 {
     private static readonly List<PageRows> Groups = new() { KeyBindSettings.Group };
     private static readonly HashSet<(PageBuilder, eSettingsSubMenuId)> Built = new();
-    private static eSettingsSubMenuId? _keyMapping, _submenu;
-    private static (PageBuilder Builder, eSettingsSubMenuId Page) _laying;
+    private static eSettingsSubMenuId? _keyMapping;
+    private static (eSettingsSubMenuId Page, CM_PageSettings Settings, IntPtr List)? _submenu;
+    private static (PageBuilder Builder, eSettingsSubMenuId Page, CM_PageSettings? Settings, IntPtr List) _laying;
+
+    /// <summary>Every row a group copied: its title is the group's, so the game's own title refresh of the row never runs for it.</summary>
+    internal static readonly HashSet<IntPtr> Copies = new();
+
+    /// <summary>The rows of <see cref="UIKitMod.AddSettings"/>: false (and a logged error) when the name is taken or the game already
+    /// built the page.</summary>
+    internal static bool AddRows(UIKitMod mod, string id, SettingsBlock block, IReadOnlyList<SettingsRow> rows, Action? onReset)
+    {
+        if (!Enum.IsDefined(typeof(SettingsBlock), block)) throw new ArgumentOutOfRangeException(nameof(block));
+        if (rows == null || rows.Count == 0) throw new ArgumentException("Give at least one row.", nameof(rows));
+        foreach (var row in rows)
+            if (row == null) throw new ArgumentException("A row is null.", nameof(rows));
+        foreach (var group in Groups)
+            if (group is OptionRows existing && existing.Id == id)
+            {
+                Plugin.Error("ui-settings-rows-name-taken", "The settings rows " + id + " are already added; these are not.");
+                return false;
+            }
+        if (Built.Contains((PageBuilder.Submenu, OptionRows.PageOf(block))))
+        {
+            Plugin.Error("ui-settings-rows-were-added-after-game-built", "The settings rows " + id + " were added after the game built its settings and are not listed there; add them in the package's Load.");
+            return false;
+        }
+        PatchGroups.Ensure(PatchGroup.Settings);
+        Groups.Add(new OptionRows(mod, id, block, rows, onReset));
+        return true;
+    }
+
+    /// <summary>The rows of <see cref="UIKitMod.SettingsReadback"/>.</summary>
+    internal static string Readback(string id)
+    {
+        foreach (var group in Groups)
+            if (group is OptionRows rows && rows.Id == id) return rows.Readback();
+        return "no settings rows " + id;
+    }
 
     /// <summary>Adds a heading and one slider row per entry of <paramref name="sliders"/> to the game's audio settings page, after the game's
     /// rows. The rows are copies of the game's sound-effects slider row (<c>Audio_SFXVolume</c>), so they look, drag and scroll like the
@@ -97,6 +161,28 @@ public static class SettingsPages
         finally { Object.Destroy(holder); }
     }
 
+    /// <summary>Takes the <paramref name="rows"/> of an earlier build out of <paramref name="window"/>'s list and destroys them.</summary>
+    internal static void Drop(CM_ScrollWindow? window, List<CM_SettingsItem> rows)
+    {
+        var dropped = new HashSet<IntPtr>();
+        foreach (var row in rows)
+            if (!row.WasCollected) dropped.Add(row.Pointer);
+        if (dropped.Count == 0) return;
+        if (window != null && !window.WasCollected && window.m_contentItems is { } items)
+        {
+            var kept = new Il2CppSystem.Collections.Generic.List<iScrollWindowContent>();
+            for (var i = 0; i < items.Count; i++)
+                if (items[i] != null && !dropped.Contains(items[i].Pointer)) kept.Add(items[i]);
+            if (kept.Count != items.Count) window.m_contentItems = kept;
+        }
+        foreach (var row in rows)
+        {
+            if (row.WasCollected) continue;
+            Copies.Remove(row.Pointer);
+            Object.Destroy(row.gameObject);
+        }
+    }
+
     /// <summary>The game's list after its own layout must hold every row of the group, alive, under the window's content container.</summary>
     private static void CheckLaidOut(PageRows group, CM_ScrollWindow window)
     {
@@ -133,13 +219,15 @@ public static class SettingsPages
         private static void Postfix() => _keyMapping = null;
     }
 
-    /// <summary>Marks the build of every other page (every one is built by the same method with its own id).</summary>
+    /// <summary>Marks the build of every other page (every one is built by the same method with its own id; the video page by three
+    /// calls, one per window, each with its own list of the game's settings).</summary>
     [PatchGroup(PatchGroup.Settings)]
     [HarmonyPatch(typeof(CM_PageSettings), nameof(CM_PageSettings.CreateSubmenu))]
     private static class SubmenuBuild
     {
         [HarmonyPrefix]
-        private static void Prefix(eSettingsSubMenuId subMenuId) => _submenu = subMenuId;
+        private static void Prefix(CM_PageSettings __instance, eSettingsSubMenuId subMenuId, Il2CppSystem.Collections.Generic.List<iSettingsFieldData> settingsData)
+            => _submenu = (subMenuId, __instance, settingsData == null ? IntPtr.Zero : settingsData.Pointer);
 
         [HarmonyPostfix]
         private static void Postfix() => _submenu = null;
@@ -155,16 +243,17 @@ public static class SettingsPages
         {
             __state = false;
             if (contentItems == null) return;
-            if (_keyMapping is { } key) _laying = (PageBuilder.KeyMapping, key);
-            else if (_submenu is { } sub) _laying = (PageBuilder.Submenu, sub);
+            if (_keyMapping is { } key) _laying = (PageBuilder.KeyMapping, key, null, IntPtr.Zero);
+            else if (_submenu is { } sub) _laying = (PageBuilder.Submenu, sub.Page, sub.Settings, sub.List);
             else return;
-            _keyMapping = _submenu = null;
+            _keyMapping = null;
+            _submenu = null;
             __state = true;
             var built = _laying;
-            Built.Add(built);
+            Built.Add((built.Builder, built.Page));
             foreach (var group in Groups)
             {
-                if (group.Builder != built.Builder || group.Page != built.Page) continue;
+                if (!Lays(group, built)) continue;
                 group.Items.Clear();
                 try { group.Append(__instance, contentItems); }
                 catch (Exception error) { Plugin.Error("ui-adding-games-settings-page-failed", "Adding " + group.Owner + " to the game's " + group.Page + " settings page failed: " + error); }
@@ -178,11 +267,23 @@ public static class SettingsPages
             var built = _laying;
             foreach (var group in Groups)
             {
-                if (group.Builder != built.Builder || group.Page != built.Page || group.Items.Count == 0) continue;
+                if (!Lays(group, built) || group.Items.Count == 0) continue;
                 try { CheckLaidOut(group, __instance); }
                 catch (Exception error) { Plugin.Error("ui-checking-games-settings-page-failed", "Checking " + group.Owner + " on the game's " + group.Page + " settings page failed: " + error); }
             }
         }
+
+        private static bool Lays(PageRows group, (PageBuilder Builder, eSettingsSubMenuId Page, CM_PageSettings? Settings, IntPtr List) built)
+            => group.Builder == built.Builder && group.Page == built.Page && group.Takes(built.Settings, built.List);
+    }
+
+    /// <summary>The copied rows keep the titles their group writes.</summary>
+    [PatchGroup(PatchGroup.Settings)]
+    [HarmonyPatch(typeof(CM_SettingsItem), nameof(CM_SettingsItem.UpdateText))]
+    private static class RowSkip
+    {
+        [HarmonyPrefix]
+        private static bool Prefix(CM_SettingsItem __instance) => !Copies.Contains(__instance.Pointer);
     }
 
     /// <summary>The game's reset of a page also resets what the groups on it hold.</summary>

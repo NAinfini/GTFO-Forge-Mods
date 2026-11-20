@@ -1,0 +1,157 @@
+# ForgePerformance enemy-crowd probe: one session, every crowd option switched on and off in turn over the same enemies.
+# Needs the probe on (NAinfini.ForgePerformance.cfg [Performance] Probe = true); each Mark starts a label in
+# BepInEx/PerformanceLogs/ForgePerformance_<utc>.log, read with tools/analyze_probe.py. Start a session, then run:
+#   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package <level package> --level <level> --profile <profile> --perf --work-dir artifacts/work/drivesession/<name>
+#   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name> run Mods/ForgePerformance/tools/crowd-probe.test
+# Rows of four are spawned in front of the player; PLACE below stands the player in an open room of V1 A1 (change it for another level). No stop-on-fail: a row with no floor fails
+# alone and the enemy count in each probe window says how many stood.
+god on
+clear enemies
+teleport 35.5 0.06 50.5
+look 35.5 0.6 60
+player as=start
+call static:ForgePerformance.Crowd.PerformanceControl Read as=vanilla
+
+# baseline: every crowd option off
+call static:ForgePerformance.Crowd.PerformanceControl Set "SetupRendererLookup" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "SpawnFrameDefer" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "FarSkinQuality" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "ClientHiddenSyncThrottle" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "UpdateBudgets" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "AvoidanceQuality" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "HitReactKeepsAgent" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "idle"
+wait 10s
+
+# 40 sleepers, setup lookup and spawn-frame defer off
+teleport 35.5 0.06 50.5
+look 35.5 0.6 60
+call static:ForgePerformance.Crowd.PerformanceControl Mark "spawn-off"
+spawn Striker 4 at=front:3 mode=hibernate
+spawn Striker 4 at=front:5 mode=hibernate
+spawn Striker 4 at=front:7 mode=hibernate
+spawn Striker 4 at=front:9 mode=hibernate
+spawn Striker 4 at=front:11 mode=hibernate
+spawn Striker 4 at=front:13 mode=hibernate
+spawn Striker 4 at=front:15 mode=hibernate
+spawn Striker 4 at=front:17 mode=hibernate
+spawn Striker 4 at=front:19 mode=hibernate
+spawn Striker 4 at=front:21 mode=hibernate
+wait 5s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "sleep-off"
+wait 10s
+
+# wake-up: one loud noise over the sleepers
+call static:ForgePerformance.Crowd.PerformanceControl Mark "wake-off"
+noise 40
+wait 20s
+
+# the awake crowd, each option alone
+call static:ForgePerformance.Crowd.PerformanceControl Mark "crowd-off"
+wait 15s
+call static:ForgePerformance.Crowd.PerformanceControl Set "FarSkinQuality" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "crowd-B3"
+wait 15s
+call static:ForgePerformance.Crowd.PerformanceControl Set "FarSkinQuality" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "crowd-B2"
+wait 15s
+call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "UpdateBudgets" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "crowd-C1"
+wait 15s
+call static:ForgePerformance.Crowd.PerformanceControl Set "UpdateBudgets" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "AvoidanceQuality" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "crowd-C3"
+wait 15s
+call static:ForgePerformance.Crowd.PerformanceControl Set "AvoidanceQuality" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "crowd-C4"
+wait 15s
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "crowd-off-fire"
+wield primary
+ammo fill
+fire 4s
+wait 4s
+call static:ForgePerformance.Crowd.PerformanceControl Set "HitReactKeepsAgent" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "crowd-C6-fire"
+ammo fill
+fire 4s
+wait 4s
+call static:ForgePerformance.Crowd.PerformanceControl Set "HitReactKeepsAgent" false
+
+# the shipped defaults, then everything, then off again to see drift
+call static:ForgePerformance.Crowd.PerformanceControl Set "SetupRendererLookup" true
+call static:ForgePerformance.Crowd.PerformanceControl Set "SpawnFrameDefer" true
+call static:ForgePerformance.Crowd.PerformanceControl Set "FarSkinQuality" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "crowd-defaults"
+wait 15s
+call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" true
+call static:ForgePerformance.Crowd.PerformanceControl Set "UpdateBudgets" true
+call static:ForgePerformance.Crowd.PerformanceControl Set "AvoidanceQuality" true
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" true
+call static:ForgePerformance.Crowd.PerformanceControl Set "HitReactKeepsAgent" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "crowd-all"
+wait 15s
+call static:ForgePerformance.Crowd.PerformanceControl Set "SetupRendererLookup" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "SpawnFrameDefer" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "FarSkinQuality" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "ClientHiddenSyncThrottle" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "UpdateBudgets" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "AvoidanceQuality" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "HitReactKeepsAgent" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "crowd-off-again"
+wait 15s
+clear enemies
+wait 5s
+
+# 40 sleepers again with setup lookup and spawn-frame defer on
+call static:ForgePerformance.Crowd.PerformanceControl Set "SetupRendererLookup" true
+call static:ForgePerformance.Crowd.PerformanceControl Set "SpawnFrameDefer" true
+teleport 35.5 0.06 50.5
+look 35.5 0.6 60
+call static:ForgePerformance.Crowd.PerformanceControl Mark "spawn-on"
+spawn Striker 4 at=front:3 mode=hibernate
+spawn Striker 4 at=front:5 mode=hibernate
+spawn Striker 4 at=front:7 mode=hibernate
+spawn Striker 4 at=front:9 mode=hibernate
+spawn Striker 4 at=front:11 mode=hibernate
+spawn Striker 4 at=front:13 mode=hibernate
+spawn Striker 4 at=front:15 mode=hibernate
+spawn Striker 4 at=front:17 mode=hibernate
+spawn Striker 4 at=front:19 mode=hibernate
+spawn Striker 4 at=front:21 mode=hibernate
+wait 5s
+clear enemies
+wait 5s
+
+# shooter barrage: eight shooters awake, every option off, then the defaults
+call static:ForgePerformance.Crowd.PerformanceControl Set "SetupRendererLookup" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "SpawnFrameDefer" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "FarSkinQuality" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "ClientHiddenSyncThrottle" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "UpdateBudgets" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "AvoidanceQuality" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
+call static:ForgePerformance.Crowd.PerformanceControl Set "HitReactKeepsAgent" false
+teleport 35.5 0.06 50.5
+look 35.5 0.6 60
+call static:ForgePerformance.Crowd.PerformanceControl Mark "shooter-off"
+spawn Shooter 4 at=front:10
+spawn Shooter 4 at=front:14
+wait 20s
+call static:ForgePerformance.Crowd.PerformanceControl Set "SetupRendererLookup" true
+call static:ForgePerformance.Crowd.PerformanceControl Set "SpawnFrameDefer" true
+call static:ForgePerformance.Crowd.PerformanceControl Set "FarSkinQuality" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "shooter-defaults"
+wait 20s
+clear enemies
+call static:ForgePerformance.Crowd.PerformanceControl Mark "end"
+call static:ForgePerformance.Crowd.PerformanceControl Read as=final
+expect log --all !contains "Exception"

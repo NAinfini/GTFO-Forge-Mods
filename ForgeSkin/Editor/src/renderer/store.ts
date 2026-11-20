@@ -376,8 +376,9 @@ interface State {
   // part layout
   setPartTransform(part: string, path: string | null | undefined, fn: (t: PartTransform) => void, coalesceKey?: string): void;
   resetPartTransform(part: string, path: string | null | undefined, row?: 'position' | 'rotation' | 'scale'): void;
-  /** Replaces a node's own model (null puts the game's back); the 3D view shows `glb` in its place. */
-  setPartMesh(part: string, path: string | null | undefined, mesh: { forgeskinmesh: string; glb: string } | null): void;
+  /** Replaces a node's own model (null puts the game's back); the 3D view shows `glb` in its place. `also` changes more in the
+   * same undo step. */
+  setPartMesh(part: string, path: string | null | undefined, mesh: { forgeskinmesh: string; glb: string } | null, also?: (d: SkinDocument) => void): void;
 }
 
 let initialised = false;
@@ -657,6 +658,7 @@ export const useStore = create<State>((set, get) => ({
     const had = !!get().works[weaponId]?.length;
     await get().selectWeapon(weaponId);
     if (had) await get().newSkin(false);
+    else showTab('left', 'parts');
   },
   async refreshInstalled() {
     const s = get();
@@ -699,7 +701,9 @@ export const useStore = create<State>((set, get) => ({
         s.weaponId,
         s.skins.map((k) => k.name),
       );
-    if (openSkin(doc, s.weaponId, ticket)) await persistAutosave();
+    if (!openSkin(doc, s.weaponId, ticket)) return;
+    await persistAutosave();
+    showTab('left', 'parts'); // a new work is made next, on its parts
   },
   async deleteSkin(id, weaponId = get().weaponId ?? '') {
     const s = get();
@@ -1157,7 +1161,7 @@ export const useStore = create<State>((set, get) => ({
       dropEmptyParts(d);
     });
   },
-  setPartMesh(part, path, mesh) {
+  setPartMesh(part, path, mesh, also) {
     get().edit((d) => {
       let t = partTransformOf(d, part, path);
       if (!t) {
@@ -1170,6 +1174,7 @@ export const useStore = create<State>((set, get) => ({
       if (mesh) previews[partMeshKey(part, path)] = mesh.glb;
       else delete previews[partMeshKey(part, path)];
       ed.partMeshPreviews = previews;
+      also?.(d);
       dropEmptyParts(d);
     });
   },

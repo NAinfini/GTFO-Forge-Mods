@@ -33,9 +33,10 @@ internal sealed class WindCapacityProtection : IDisposable
         _current = this;
         try
         {
-            _harmony.CreateClassProcessor(typeof(WindEnable)).Patch();
-            _harmony.CreateClassProcessor(typeof(WindDisable)).Patch();
-            _harmony.CreateClassProcessor(typeof(WindUpdate)).Patch();
+            // Each entry is checked before it is written; the three stand together, so one refused entry installs none.
+            foreach (var patch in new[] { typeof(WindEnable), typeof(WindDisable), typeof(WindUpdate) })
+                if (!ForgePerformance.Crowd.EntryAdmission.PatchClass(_harmony, patch, line => _log.LogError(line), sharersCheckedOffline: true))
+                    throw new InvalidOperationException("WindVolume refuses a native entry it cannot patch: " + patch.Name);
             EventAPI.OnGameStateChanged += OnStateChanged; // GTFO-API's: the game's own delegate added from a mod never fires
         }
         catch { Dispose(); throw; }
@@ -66,8 +67,10 @@ internal sealed class WindCapacityProtection : IDisposable
     internal bool Before(WindVolumeCamera camera, out WindState state)
     {
         state = default;
-        if (_trim != null && !_trim.Prefix(camera, out state.Trim)) return false;
-        return _guard?.Prefix(camera, out state.Capacity) ?? true;
+        var started = ForgePerformance.Crowd.Probe.Begin();
+        var run = (_trim == null || _trim.Prefix(camera, out state.Trim)) && (_guard?.Prefix(camera, out state.Capacity) ?? true);
+        ForgePerformance.Crowd.Probe.End(ForgePerformance.Crowd.ProbePoint.OwnWind, started);
+        return run;
     }
     internal Exception? After(WindState state, Exception? error)
     {

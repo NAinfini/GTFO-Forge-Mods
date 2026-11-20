@@ -1,0 +1,22 @@
+{
+  "repository": "https://github.com/NVIDIA/DLSS",
+  "tag": "v310.9.16",
+  "commit": "9981c6350dc58c0ce21f024fd65e31e851c31689",
+  "files": {
+    "LICENSE.txt": "d4216e39ebef5f9b50a6712ebb37beeb5379862a67733a9999c651f21592aaf0",
+    "include/nvsdk_ngx.h": "dc38e7467cf415379c9d12ae1b6e4a494c453ed92720fb53e92aecb523e7b848",
+    "include/nvsdk_ngx_defs.h": "ea23f33497cd274860d1c25a97644fce807dcb0037c594547203343103fad03e",
+    "include/nvsdk_ngx_params.h": "943bc8cc5cdae03b6303016fbad3183636f2335ae27a2d18776798c3b4efabbc",
+    "include/nvsdk_ngx_loader.h": "abdf5f66a692620538357d29fdf78e3e2a677ee8140b7a638962ecb766585e75",
+    "include/nvsdk_ngx_helpers_cuda.h": "f2851a76107bdf4fbcb7b261f3c35573c312d8ecb4bc18fb02d9e2cec7705042",
+    "include/nvsdk_ngx_helpers.h":"5bcbadfe7478b802cf6d3aca4dc5ddd7d0889b99726e69c63f9e9bd555f44471",
+    "include/nvsdk_ngx_helpers_d3d.h": "ec75224f36ed6580baaf250fa83620405ad81a1d98c2c436654a0c9cf6a6b8ba",
+    "include/nvsdk_ngx_defs_dlssg.h": "c29765ab9e0125f9d724ae9811cc2abe03738d17486ec8eee80d78a1504549e1",
+    "include/nvsdk_ngx_params_dlssg.h": "c24fa5aa68ffa2808c828b75cfa32843f1606f80a145f84055ac450d7e6c74ad",
+    "include/nvsdk_ngx_helpers_dlssg.h": "6881d21419c40c78ec948b326902ece09fc112b0223144d51c4905f3fced7a1f",
+    "include/nvsdk_ngx_helpers_dlssg_d3d.h": "6335ebcb95de39a361e87fe0257d6ce0723e5d8deaa15db3b35afacf2b3f4220",
+    "lib/Windows_x86_64/x64/nvsdk_ngx_s.lib": "7b9a5239c1145af5f645ab472aa066f9ea79db36ac819562312aae69d65f3765",
+    "lib/Windows_x86_64/rel/nvngx_dlss.dll": "d00b5b0ab29c3ca101b70c3a5ecb3a01b7ef33766a3383a28a18623083e6123e",
+    "lib/Windows_x86_64/rel/nvngx_dlssg.dll": "8d59d49b36410dd6b62fef2503a5871d347415bd85d943fa0848563a95dd50c7"
+  }
+}

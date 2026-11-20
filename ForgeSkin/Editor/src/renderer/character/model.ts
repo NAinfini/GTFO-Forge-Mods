@@ -40,6 +40,7 @@ import { friendly } from '../errors';
 import { t } from '../i18n';
 import { call, fileUrl, type Methods, type ProjectEntry, type SkinDocument } from '../protocol';
 import { autosaveRoot, useStore } from '../store';
+import { showTab } from '../ui/InspectorTabs';
 import { motionMatrix, MOTION_SECONDS, PREVIEW_FPS, SETTLE_SECONDS } from '../viewport/motion';
 import { hash, THUMB_EVENT } from '../viewport/thumbnails';
 import type { CharmMotion } from '../viewport/refs';
@@ -261,6 +262,7 @@ export async function importModel(path: string) {
       playing: false,
     });
     toast('ok', t(r.vrm ? 'character.importedVrm' : 'character.imported', { v0: loaded.rows.length, v1: r.springs.length, v2: r.capsules.length }));
+    showTab('left', 'parts'); // the steps go on from the bones
     await checkMatch();
     await saveCharacter();
     void stageIcon();

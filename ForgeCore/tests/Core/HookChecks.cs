@@ -7,7 +7,30 @@ namespace ForgeCore.Tests;
 /// (detection).</summary>
 internal static class HookChecks
 {
-    internal static void Run(Action<bool, string> check) => Owners(check);
+    internal static void Run(Action<bool, string> check)
+    {
+        Owners(check);
+        SharedBodies(check);
+    }
+
+    /// <summary>Detection: a body two method infos point at is found, and a patch target on it is refused unless the registry names
+    /// that exact body and set; the registry ForgeCore ships parses.</summary>
+    private static void SharedBodies(Action<bool, string> check)
+    {
+        IntPtr body = new(0x1000), own = new(0x2000), fire = new(0x10), reload = new(0x20), alone = new(0x30);
+        var shared = SharedNativeBodies.Shared(new[] { (body, fire), (own, alone), (body, reload), (body, fire), (IntPtr.Zero, new IntPtr(0x40)) });
+        check(shared.Count == 1 && shared[body].SequenceEqual(new[] { fire, reload }), "a body two methods share is found once, with both methods; an unshared body is not");
+        var entries = new[] { new SharedNativeBodies.Entry("Gun.Fire", 0x1000, new[] { "Gun.Reload" }) };
+        check(SharedNativeBodies.Decide("Gun.Fire", 0x1000, new[] { "Gun.Fire", "Gun.Reload" }, Array.Empty<SharedNativeBodies.Entry>()) == SharedNativeBodies.Reason,
+            "a patch target on a shared body nobody registered is refused");
+        check(SharedNativeBodies.Decide("Gun.Fire", 0x1000, new[] { "Gun.Reload", "Gun.Fire" }, entries) == null, "the exact registered body and set is admitted");
+        check(SharedNativeBodies.Decide("Gun.Fire", 0x1000, new[] { "Gun.Fire", "Gun.Reload", "Gun.Drop" }, entries) == SharedNativeBodies.Reason
+            && SharedNativeBodies.Decide("Gun.Fire", 0x2000, new[] { "Gun.Fire", "Gun.Reload" }, entries) == SharedNativeBodies.Reason
+            && SharedNativeBodies.Decide("Gun.Reload", 0x1000, new[] { "Gun.Fire", "Gun.Reload" }, entries) == SharedNativeBodies.Reason,
+            "a registered body that gained a sharer, moved, or is patched through another method is refused");
+        using var file = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "shared-native-bodies.json"));
+        check(SharedNativeBodies.Parse(file).Length > 0, "ForgeCore's shared-native-bodies.json parses");
+    }
 
     private static void Target() { }
     private static void Other() { }

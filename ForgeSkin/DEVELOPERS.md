@@ -33,7 +33,7 @@ live screens, animated layers, trigger effects, casing pools and the part layout
 Every gear instance by its owner: a gear built from parts waits (`SkinnedGear` pending list, looked at four times a second for as
 long as it exists) until its item's `Owner` (`PlayerAgent`, then its `SNet_Player`) is known. The local player's gear (first and
 third person) wears their own choices; a teammate's (third person, and the sentry they placed) wears their synced look (below);
-a bot's stays vanilla; an icon or lobby preview, which never gets an owner, is skinned only on the icon and menu paths. The key is
+a bot's the look the host picked for it; an icon or lobby preview, which never gets an owner, is skinned only on the icon and menu paths. The key is
 (owner, gear id): two players with the same gun each show their own skin, colours and changes. Every look goes through
 `SkinnedGear` (apply, revert, wait for the skin to load, release after 30 s unused).
 
@@ -92,8 +92,13 @@ times the author's `height` (`Characters.Fit`: `CharacterRig.Stature` against th
 capsule radii and gravity scale with it), drawn on the layer of the body's first active mesh (the lobby figure keeps inactive spares
 on a layer its camera does not draw), posed by `Models.CopyPose` over `CharacterRig.Links` and `HumanRig.ArmReach` with `Follow`, its spring
 chains bound with `Chains.Bind` at rest (capsules on the mapped joints), and the original person hidden with `Persons.Hide`
-(`Look = true`). The local player wears their own pick, a teammate the character entry of their look (same pack and content, else
-the original person), a bot always the original; who wears what is put right twice a second only after something changed
+(`Look = true`). The local player wears their own pick, a bot the character the host picked for it (`bots`), a teammate the
+character entry of their look (same pack and content, else the original person and `skin-look-missing` or `-mismatch`). Only when
+a teammate's look names no character, or none came (no ForgeSkin, or a look that cannot be read), they wear the character this
+player picked for their lobby slot: the SKINS button on another player's bar (shown with a character pack installed) opens the
+picker on the character alone, its first card 按他自己选的 / THEIR OWN CHOICE clears the pick. The picks are kept per slot in
+`BepInEx/ForgeSkin/others.json` (`{"<slot>": "<skin id>"}`), shown on this machine only and never sent; a replay stand-in keeps
+the shared look. The order is `Look.CharacterSource` (their pick, this player's pick for the slot, the original). Who wears what is put right twice a second only after something changed
 (`Characters.Dirty`). A model that cannot be built or posed leaves the original person and logs `skin-character-failed` once.
 What a model has no bone for is never silent: `skin-character-part-skipped` once per skin names the joints left in their rest pose,
 a model without both upper arms (the game's own first-person arms show) and a height that cannot be measured (no head, or a head
@@ -243,6 +248,26 @@ is one hint in the editor. ForgeSkin does not go through `GunMount`, so nothing 
 The editor keeps the model's sockets and bounds in its own state (`editor.wholeGun`, never packed); `gunSwap.ts` reads the 3D
 view's gear frame for the rule and writes its answer as one undo step.
 
+## Part models and the flashlight's light
+
+A part layout entry's `mesh` replaces that node's own model; the plugin's `PartPose` swaps the mesh of a plain renderer only
+and keeps the node's whole material set, and the editor preview draws the replacement with that same set
+(`viewport/PartMeshes.tsx`). The backend's preview marks each node with a model with its mesh name `model` and `skinned`
+for a `SkinnedMeshRenderer`. `ui/PartModel.tsx` holds the editor side: `modelState` (replaceable, `skinned` or `empty`, the
+last two shown disabled with their reason), `modelPieces` (the pieces with a model under a node, listed when the node has none
+of its own, as part roots usually do), `replacePartModel` and `replaceWholePart` (root `visible: false` plus an attachment on
+the root placed the whole-gun way, through `importMesh`'s `place` callback, one undo step). The 挂件 page's Model section and
+the part row's + menu (`ui/AddMenu.tsx`) call the same functions; `pieces.ts` names a piece by its node name, then its mesh
+name.
+
+The light comes out of the node `GearPartFlashlight.m_lightAlign` names. `Backend/Unity.cs` reads that field when it loads the
+prefab and marks the node `Point = "light"`; when the field names no transform of the prefab it logs once and takes the node
+named `Spot`. The preview lists it with the hold points (`points`, `GearPoint` in `protocol.ts`), so the editor drags it with
+the same marks and saves it as that node's part layout entry; the plugin needs nothing new. `mesh.import` returns a model's
+`light` node in `sockets`; replacing a flashlight piece or the whole flashlight places the light there in the same undo step
+(`gunSwap.ts` `placePoint`), else selects it and says the light stayed. `LightStays` in the Place tab says so for a moved
+lamp body.
+
 ## Charms
 
 An attachment's `charm` hangs its model and screen on a rope generated in code, from the attachment's origin (its -Y the
@@ -309,45 +334,432 @@ packaging. A clip that has not been copied is hidden from the row.
 The inspect key plays a motion from a table: `Core/inspect-motions.json` is embedded in the plugin, and
 `BepInEx/config/ForgeSkin.inspect.json`, when present, is read over it with the same shape. A motion says what to show, not
 where in metres; the plugin solves the rest for the gun in hand when the look starts (`Core/InspectMotion.cs`, `InspectLook`).
+A press the hands are not ready for (`Inspect.NotReady`: the game's item holder busy or in an animation sequence, aim held, the gun
+reloading, a game screen open, or a player motion other than stand, crouch or stand-still) is kept for half a second and retried each
+tick, so one press starts the look as soon as the hands are free; a press that never found them free logs one line, `inspect: the key
+was pressed and no look started: <reason>`, with the first reason and then every state it reads (player motion, holder busy, animation sequence, aimed, aim held, reloading, screen). Crouching is not a reason of its own.
 
-- `gun`: keys `{ "t": seconds, "turn", "tilt", "roll", "at": [x, y], "fill", "spin", "flip", "rise" }`. A key with only `t` is the
+A melee weapon is inspected by the same mechanism (`MeleeWeaponFirstPerson`; a press while it charges, swings or pushes, its state
+other than idle, waits like any other). Its model's length is its own Y where a gun's is its Z, so the plugin turns the measured rig
+(`InspectRig.LengthAsY`, `InspectRig.Turned`) and the look is solved and posed with the length as Z; the turn is taken off again as
+the item is posed. Its motions are written from the
+hold the game has it in (`"from": "hold"`, below) and come from the table by gear id, else from the `fallback` entries with
+`"melee": true` by its length; a table with no melee entry leaves the key without a look and the log says so.
+
+Anything else a player holds plays the table's `default` list (`InspectTable.Default`, `DefaultKind`, `DefaultFeel`): a tool (the
+bio tracker, the C-foam launcher, the mine deployer, a sentry gun), a pack, a consumable, another mod's item. It is decided by what
+the item is (neither a `BulletWeapon` nor a melee weapon, `Inspect.Plain`) and never by a list of items, so a new item needs no
+entry. A gun or melee weapon that can play none of its own motions nor one of its length's plays the default too. Each is logged
+once. The default's motions are from the hold (checked when the table is read), since such an item is held any way; the shipped one
+is `item-look`: the item turned to one side and the other from where the game holds it, both hands staying on it as the game has
+them. Only some item kinds' unwield is hooked, so a look whose item is no longer the one in hand is cut on the next tick
+(`Inspect.Tick`, against ForgeCore's `GunMount.HeldItem`: what the holder's last step had in the hands, which ForgeCore reads every
+frame for its gun models, so the look does not read the holder again).
+
+- `gun`: keys `{ "t": seconds, "turn", "tilt", "roll", "at": [x, y], "fill", "spin", "flip", "rise", "palm" }`. A key with only `t` is the
   game's own pose; the first key (at 0) and the last are. `turn` swings the muzzle to the view's right, `tilt` raises it, `roll`
   turns the gun about its bore with the top going right, all in degrees from the gun held level and pointing ahead (at most 180;
-  not from the game's pose this frame, which is lowered when the game relaxes the gun at idle). `at` is where the centre
-  of the gun's bounds should sit in the view (-1..1 of the half width and height, default the middle; a preference the solve weighs,
-  not a pin), `fill` the share of the half view the shown part stays inside (default 0.95; over 1, up to 2, lets it reach past the view).
+  not from the game's pose this frame, which is lowered when the game relaxes the gun at idle). A motion with `"from": "hold"`
+  beside its `gun` takes them from the hold the game has the item in when the look starts instead, about the view's up, right and
+  forward: for an item whose hold is not a gun's ready pose (every melee weapon, every item of the default look). `palm: true` on a
+  key of such a motion takes the key's angles from that hold with the grip hand's palm turned up instead, the shortest way and at
+  most 75 degrees (`InspectLook.PalmUp`): where an item is tossed from and caught, whichever way the game holds it, so a knife held
+  point down in a reverse grip leaves from the palm's side and not through the back of the hand; the keys after the catch that do
+  not write it turn the item back into the game's hold. A motion from the hold turns a free item (`spin`) about the axis across its
+  length nearest the line of the grip hand's fingers, so it goes end over end in the plane across the fingers and the forearm and
+  does not sweep through them; a gun turns about its side axis. `at` is where the centre
+  of the gun's bounds should sit in the view (-1..1 of the half width and height): a key that writes it is held there within about
+  0.1, giving way only to the frame rules and the grip hand's range; a key without it leans a little toward the middle. `fill` is the
+  share of the half view the shown part stays inside (default 0.95; over 1, up to 2, lets it reach past the view): it sets how far the
+  item camera widens for that key, not how far the gun is held (the grip hand's range sets that).
 - `rise` alone (metres up) lifts the gun in both hands from where the key holds it (the hand is placed for the gun as held, then lifted). The free-gun track: `spin` (degrees about the gun's side axis) and `flip`
   (degrees about the bore) free the gun from the grip hand. `spin` alone is a twirl on the trigger finger: the gun turns about its
-  trigger guard and the hand goes with it (a small circle, the wrist rocking once a turn). With `flip` or `rise` it is a toss: the
-  hand stays where the key's held pose puts it and the gun turns about its bounds centre. Either way the hand takes the gun back
-  without a jump when the track returns to zero or a whole turn. They are interpolated as numbers (up to 1440 degrees), so one key can spin twice; a game's-pose key takes the whole turn
+  trigger guard and the hand goes with it (a small circle, the wrist rocking once a turn); it takes no `flip` and no `rise`.
+  A twirl spins up over 0.08 s, turns at a steady rate that fills the way, slows evenly to a stop over its last half turn, goes 6
+  degrees past and back over 0.1 s (starting and ending at no speed), and the wrist takes the knock (4 degrees, 6 mm).
+  `toss` (metres, up to 0.5) on a key makes the way into it a toss, from a key of the motion's own by whole turns of `spin` and/or
+  `flip`, with no `rise` on either key; `g` (8.5..10.5 m/s², default 9.8, toss keys only) is its gravity. The flight is real: it is
+  T = 2√(2·toss/g) long and the gun leaves the hand T before the key at √(2·g·toss), its centre on one parabola along the world's
+  up (measured in the view as the look starts, `InspectRig.Up`) from where the held pose leaves it at the release to where the held
+  pose takes it at the catch (both fixed for the flight), while it turns at an even rate about its bounds centre. The hand winds up
+  over the 0.3 s before it lets go (sinks 4 cm, cocks the wrist 12 degrees back), throws over the last 0.14 s (the wrist whipping 10
+  forward), follows through for 0.15 s, lifts to meet the gun 0.09 s before it lands, takes it at its speed and sinks with it on a
+  second-order spring (3 Hz, ζ 0.5) for 0.5 s, the wrist pressing the muzzle down from nothing and at no rate as the hand sinks below
+  where it took the gun (x²/(x + 1 cm) of the sink, 150 degrees a metre). The gun turns in the fingers for 0.07 s before it leaves and after it lands, its rate
+  rising from and falling to nothing; the grip hand's fingers open as it leaves and close on it only once it has landed and stopped
+  turning in the hand. For a `flip` the open hand waits 5 cm off the side it holds the gun from (`TossAside`, from 0.15 s after
+  the gun left) and closes on the gun over the 0.07 s it stops turning: at the grip, the gun's underside would go through the wrist
+  on the last of the turn. The wrist's cock and whip take only what keeps the wrist within its limits (`WristKept`), and the hand that
+  throws and catches is turned back to them (`InspectArm.Comfort`). The key must come
+  at least T + 0.3 s after the key before. The item camera keeps its view through the flight: its keys' `fill` decides it, so a
+  toss whose keys have `fill` 2 is seen at the view the game's hold has, the item as large as there and partly out of the view as
+  there (the camera widens only for what would reach past twice the half view). In a motion with a toss the keys
+  place the grip hand within 0.12 m of where the game holds the item (`InspectLook.TossMove`; 0.3 m, `Move`, in every other
+  motion): the item is thrown and caught where it is held, not pushed out ahead first. Either way the hand takes the gun
+  back without a jump at a whole turn. They are interpolated as numbers (up to 1440 degrees), so one key can spin twice; a game's-pose key takes the whole turn
   nearest its neighbour, so a gun spun round is not wound back, and an interrupted look fades the rest of the spin.
+- `hit: true` on a key of the motion's own: the gun is knocked as it arrives there (a slap home, a bump), with the kind's `hit`
+  impulse (see `feel`). `cue` on a gun, hand or part key names a sound beat (see `sounds`).
+- `windup` and `settle` (shares of the way, 0..0.3) on a key of the motion's own the gun does not go through: the way into it first
+  turns back by `windup` over its first fifth while the hand stays where it starts (anticipation; drawing the hand back too could
+  take the gun out of the view), then goes past the key by `settle`, turn and hand, and comes back over its last 30% (overshoot and
+  settle). A key without them keeps the plain smooth step.
 - `through: true` on a key of the motion's own: the gun does not stop there. The span into it only eases in and the span out of
   it only eases out, so two beats read as one motion (a spin that carries the hand on).
-- `hand`: the off hand's keys `{ "t", "on", "along" }`, first and last `grip`. `on` is `grip` (the game's own grip), `away`
-  (lowered out of the view), `under` (its grip slid along the gun; without `along` it stays at its own place), `side` (the gun's left
-  side), `top`, `muzzle` (under the front end) or `mag` (under the magazine node, or along the bottom); `along` is 0 at the back of
-  the bounds and 1 at the front. Between keys the hand moves on a smooth step, following the gun.
+- `hold: "stock"` on a key of the motion's own: the grip hand holds the gun under its stock (`InspectGrip.Stock`: 0.55 of the way from
+  the grip to the back of the bounds, at the grip's height; a gun with no stock behind the grip keeps the grip). Between two keys
+  that hold it at different places the hand goes straight while its place slides along the gun. A key next to the game's pose holds
+  the grip.
+- `hand`: the off hand's keys `{ "t", "on", "along", "node", "face", "at", "offset", "spin", "tips", "clasp", "fingers", "cue", "regrip" }`, first and last `grip`. `on` is `grip` (the game's own grip), `away`
+  (lowered out of the view, the hand hanging straight on its forearm), `under` (turned as the game holds it, its palm's middle 1.5 cm
+  under the meshes over the hand there, whatever gap the game's own hold leaves; without `along` at the hold's own place along the
+  gun), `side` (the gun's left side),
+  `top`, `muzzle` (under the front end, as `under`), `mag` (on the motion's own `@mag` part, which it needs) or `node` (on the motion's
+  part `node`), or `open` (as `under`, but under the gun as it was held and not as it flies: during a toss the hand waits where it
+  held the gun and takes it back at the whole turn); `along` is 0 at the back of the bounds and 1 at the front. A hand on `mag` or
+  `node` lies on a face of that part's mesh box as this gun has it (measured when the look starts): `face` (`left`, `right`, `top`,
+  `bottom`; default `left`) and `at` [u, v], u from the back of the face to its front, v across it (default
+  [0.5, 0.5]; a raked handgun magazine takes u 0.125, its back), turned about the bore until its palm faces it, the palm's middle
+  (6 cm from the wrist toward the fingers) 1.5 cm off that point, then shifted by `offset` [out, across, along] metres (each at most
+  0.1; out is along the face's outward normal, so a negative out presses in). `spin` (degrees, -180..180) turns the hand on the
+  face about the way out of it, to lay it across the part instead of along it (a palm arched over the back of a slide, the fingers
+  down one side and the heel down the other). `tips: true` (on a `node` key only) lays the pads of the index and middle fingers
+  on the point instead of the palm (`InspectLook.Pads`: the middle of their last bones, bent 0.1, a finger's 8 mm off the face), so
+  the palm stays a hand's length back and touches nothing: a finger stroking a cylinder. `clasp: true` (on a `node` key without
+  `tips`) takes the part between the thumb and the fingers with the same search as a magazine's clasp (`InspectLook.ClaspTarget`):
+  on `top` or `bottom` the palm faces the face and the fingers point across the gun; on `left` or `right` the palm faces the gun's
+  side or, the second way, the back of the part. A small part takes a pinch (the thumb and one finger or more) or a hook (two
+  fingers over it, the thumb open beside them); each place is put on the gun at rest and its fingers closed until they meet a mesh,
+  and one whose palm lies in the gun's other meshes, or whose thumb or a finger stays more than 0.4 cm in them, is no place. The
+  places are ranked (a thumb before a hook, then the most fingers on the part) and found once per gun and motion. A hand `under`,
+  `side` or `top` wraps the gun's body the same way (`InspectLook.SupportBox`): the meshes no part moves at its place along the
+  gun whose face the palm lies on (within 3 cm of the section's own), 4.5 cm either way along it, the palm on that face and the
+  fingers round the far side, turned about the palm toward the game's own fingers by one of a few shares (half first); its places
+  are ranked by how far the wrist goes past its limits with the gun held as the game holds it. Each such hold stands alone: one
+  with no place, or whose clasp breaks the solved look, keeps its plain hold, said once a gun and motion (`SupportNote`), and the
+  look is solved again without it; the part's clasp and the other holds are not touched. No clasp may make the off hand's
+  fingers twitch (rule J) more than the plain look does (`InspectLook.Plain`: no clasp, every hand on the gun as its keys say,
+  solved alongside): a support hold whose clasp twitches more over its keys keeps its plain hold, and a look whose clasps twitch
+  more over the whole look plays the plain look, unless the plain look lays a finger more than 0.4 cm deeper in the gun; each
+  said in `SupportNote`. Where the best ranked place leaves the off hand off what it holds, the ranked place that leaves it
+  closest plays. Holding a finger back (`FingerBack`, below) must not leave it deeper in the gun or the hand further from what it
+  holds than a finger stopped sample by sample does (`InspectLook.Snug`, measured at the audit's times): where it would, the
+  look's twin whose fingers close back faster plays, the slowest of 2.5 to 40 of its bend a second (or at once) that lies as
+  shallow and close as that (no shallower than the grip hand's index finger lies anyway), said in `SupportNote`. Where no place
+  holds and keeps the look's rules the look cannot play on that gun (`InspectLook.Unplayable`): the plugin says why once and solves
+  another motion of the gun's pool in its place. The plugin solves every motion an item can play off the main thread once the item is in the hands
+  at rest with no look on (`Inspect.Prepare`), kept by item and motion for the last four items held; a press whose camera, gun
+  bounds and parts, arms and hold (the gun and the off hand in the grip hand's frame, not where they are in the view: the game
+  sways arms and gun together at rest, and a look plays on the gun's live pose) are within 5 mm and 1 degree of that solve plays
+  it at once (`Inspect.Unlike`); a press before that solve is done (or after one of those changed, said once with what changed)
+  plays the plain look, solved on the press, says so once, and the clasped looks are solved again at rest. At rest the item is
+  measured again every 0.5 s and its looks solved again where that changed (a skin's attachment shown a moment after a look ends),
+  so the next press finds them. The gun's bounds take a skinned mesh's own box about its root bone (a world box, square to the
+  world, grows and shrinks in the gun's space as the gun turns), a mesh once left out of them (a rope) stays out, a skin's charm
+  (its rope and pendant, which swing) is left out, and a mesh once counted stays counted while it is switched on and off. A motion with a `clasp`
+  key plays only its look solved ahead: until that is done it is left out of the pick (said once), a press whose solve no longer
+  holds plays another motion, and one solved unplayable leaves the gun's pool when the solve at rest finishes. The log gives
+  the time from rest to every look solved and, per press, from the key to the look. A magazine in the hand (`mag` with no `at`) is held
+  on the magazine's own box (`InspectLook.MagBox`: a magazine that leans in the gun is held along its own down axis, not the
+  gun's), and its `offset` is to the magazine's left, up it and to its front. With no `face` it is held round its body as a bottle
+  is: the palm toward its left face (its normal level and square to the magazine's length), the fingers toward its front and the
+  thumb's side up it, the hand's middle (half way from the index knuckle to the little finger's, `MagHandMiddle`) at its middle;
+  the pad of the closed thumb (`MagThumbPad`, the thumb bent `MagThumbBend` 1) a finger's half thickness off the left face and
+  0.5 cm behind the front edge (`MagThumbBack`), so the knuckles lie past that edge and the fingers, closing until they meet it,
+  curl round the front onto the right face. The nominal hand's thumb lies about 5 cm in from the palm's plane, so the palm stands
+  that far off the face: the thumb and the curled fingers hold it, and R1 and the fingers' touch count the thumb's pad. `spin`
+  turns the hand about the way out of the left face, about the thumb's pad. That pinch is the fallback of the clasp: a
+  magazine by its side is first clasped (`InspectLook.Clasp`, searched once per magazine size): its back narrow face on the palm
+  (the palm's skin at most 1.5 cm off it), the thumb's pad on its right face and the pads of three fingers or more on its left,
+  each pad's skin at most 0.6 cm off its face, nothing sunk into the magazine, the fingers shaped by joint and the thumb's root
+  spread; the magazine keeps its pose and the hand turns round it (`ClaspAnchor`). The back face takes the palm because the
+  magazine then keeps the turn its keys give it and the camera sees the back of the hand and the fingers wrapped over the front;
+  the front face turned the magazine and asked a handgun's wrist past its limit. A `regrip` into or out of the clasp goes as a
+  hand changes its hold (`InspectMotion.RegripOpen`, `RegripClose`): over the first third of the span the fingers open while the
+  hand stays on the magazine (`InspectMotion.Opened`: every joint at rest, the thumb straight and spread as far as it goes, since
+  beside the fingers it would lie across the magazine), in the middle third the hand goes round to the new hold, and over the last
+  third the fingers close on it. On a clasped span the hand lifts toward its back by the least that keeps every finger's middle
+  line within 0.2 cm of the meshes (the open hand on the way; the fingers stopped on the meshes, pressing in at most
+  `ClaspSquash`, in the holds), and the look samples the fingers at 120 a second (`InspectLook.FingerRate`; 30 otherwise). Each
+  finger closes as far as it stays out of the meshes, searched down from its whole shape, and the baked fingers take each joint's
+  median over 0.05 s (`InspectLook.Steady`) except where that would press a finger deeper than the raw sample: a finger stopped
+  on an edge as the hand sways no longer falls open and closes again between samples. From one sample to the next a finger the
+  gun holds back opens at once but closes back toward its shape at most 1.5 of its bend a second (`InspectLook.FingerBack`, under
+  200 degrees a second), as does the hand's hold on the gun (the palm's touch that closes the fingers), and the look takes its
+  fingers over from the game's grip at most 8 times its weight a second (`WeightSpeed`); a clasp's fingers close on what it holds
+  as placed, and on the way into a clasp each joint opens at most `FingerBack` a second, sooner where a mesh opens it ahead. The
+baked tracks are then smoothed over `SmoothFor` (0.05 s) either side (`InspectLook.Smoothed`: each joint first held at its most
+open within twice that, so smoothing never closes a finger into the gun, then two running means), away from a clasp's still hold
+(kept as placed) and its regrips (means only), and taken back to the raw sample wherever the smoothed finger would sit deeper
+in the meshes (`SmoothDeeper`); between the samples the look reads them on a monotone cubic (Steffen), and `InspectFingers`
+bakes its clip at 120 a second (`InspectLook.ClipRate`), so the speed a finger shows has no step at each sample. The
+  solved look is then checked every 1/240 s of every clasped span (`InspectLook.Solve`): no finger more than 0.4 cm into the
+  gun's or the magazine's meshes, the wrist within its limits, on the way between the holds some part of the hand (the palm's
+  skin or a finger's) within 0.6 cm of the magazine on every sample, and in the hold the thumb's pad and three fingers' pads
+  within 0.6 cm of it and the palm within 1.5 cm. Where no place clasps the size, or the solved look fails any of these, the
+  look keeps the pinch and `MagNote` says why, logged once a gun and motion. A magazine still in a long gun is taken by its base
+  (`face` `bottom`) and held so only once it is clear (a `regrip`): round its middle the hand would sit in the gun.
+  With `face` `bottom`, or where the magazine is wider than 4.3 cm (`MagSpan`: sniper and marksman magazines, drums, boxes), the
+  palm takes the base: the fingers point to its front and 30 degrees across (`MagYaw`, the left arm comes from
+  the left), the palm's middle 4 cm behind its front edge (`MagKnuckles`) and the knuckles just past that edge, so the fingers close up its front, and the hand's middle
+  line lies 2 cm in from its left face (`MagThumb`), so the thumb goes up that face; its top, the feed lips and the first round,
+  stays clear. `side` and `top` put the palm's middle 1.5 cm off the
+  left side or top of the gun's body (the meshes no part moves) where it is at `along`, the same way. Where the wrist's limits turn
+  the hand, the palm stays on its place and the wrist moves. It goes with the part, never round the gun, a carried one too (a part
+  with a `symmetry` under a whole turn, a cylinder, takes the hand round only between the keys that hold it: once the hand is on
+  its way off, the part spins on without it, `InspectLook.WithPart`); holding a
+  carried part it keeps the turn the key gives it on the part (the wrist's limits give way there, and the wrist rule reports a
+  carry that asks the wrist more than 5 degrees past them); the way off the part (a regrip too) starts from the hand as the ride left it and comes to its
+  own place over that span, and the way onto it ends in the hand as the ride takes it, so the hand never steps where it takes or
+  lets go of the part. Where the off forearm, or the palm nearer than touching, would sink deeper into the gun than
+  in the game's hold, the hand lifts toward its back by as much (a palm on a face then stands off it by that much more), except
+  where the keys themselves press the palm in. `fingers` [thumb, index, middle, ring, pinky], each 0 (open, as the hand rests) to 1
+  (closed, the thumb across the palm), or any of them by joint as [knuckle, middle, last] (each 0..1 of that joint's range,
+  ForgeCore `FingerBend.ByJoints`; the thumb's entry may add its root's spread and opposition, [root, knuckle, last, spread,
+  oppose]), shapes the off hand at that key (ForgeCore `ClipFingers` on the first-person arms through
+  `Models.BindArms`, masked to the left fingers); a key without one holds the gun's shape (0.5, 0.7, 0.75, 0.8, 0.85) on the gun and
+  rests relaxed (0.2) at `away`; between a key with a shape and a `grip` key the shape fades from or to the game's own grip, so the
+  first and last keys have none. Where the palm and fingertips are more than 2 cm farther from every mesh of the gun than in the game's
+  hold, the shape relaxes toward 0.2, so the hand never grips air (`InspectLook.OffFingers`, baked at 30 a second when the look is
+  solved). Each finger then closes only until it meets a mesh box of the gun (`InspectLook.FingerStop`, along the finger's line from
+  `InspectHand`: a nominal hand's knuckles and bones, bent as ForgeCore `ClipFingers` bends them), so the fingers stop on what the
+  hand holds instead of passing into it; a finger that lies in a box with the hand open takes the bend that leaves it least deep
+  (within how far it may close since the sample before, `FingerBack`).
+  Two kinds of part are met closer than their boxes along the gun's axes: a magazine on its own box (`MagBox`, so a finger stops
+  on a leaning magazine and not on the air beside it) and a part with a `symmetry` under a whole turn, with the parts that follow
+  it, on the cylinder its box turns in (about its axis through its pivot, the radius the least way from the pivot to a side of
+  the box: `InspectLook.Round`), so a fingertip stops on a cylinder's own radius all the way round. A
+  hand `under` the gun with no `fingers` keeps the game's own fingers, the support hold that already lies on this gun. The stop is
+  on the meshes' boxes and a nominal hand: neither the game nor the offline data gives the look a mesh's surface or the arms' finger
+  bones, so a finger stops within about a finger's width of a boxy part and stands off a raked or rounded one. First person only. A place on the gun (`under`, `open`, `side`, `top`, `muzzle`) the off arm cannot
+  reach in the poses the gun takes about that key (a shotgun's pump or a long gun's fore-end turned away from the body) slides back
+  toward the grip a centimetre at a time until it can, on the followed pose, so the look keeps its frame rules on every gun. Between keys the hand moves on a smooth step, following the gun
+  (to or from `away` the wrist turns evenly in the forearm's frame);
+  a way whose straight line passes through the gun's bounds from outside them to outside them (from the grip or from out of view onto the top, a part or the magazine)
+  goes round under the gun on the off-hand side, through a point 6 cm out from its left side and half its half height below its
+  middle, decided once per span.
+  `regrip: true` on a key on a part whose key before holds the same part declares the way into it a change of hold on that part
+  (from under a magazine to its side, say, as a handgun's magazine comes clear of the grip): the palm goes round the part's mesh
+  box, as far off its surface as the two holds stand off it (1.5 cm for a palm on a face; a hold in the fingers has its palm off
+  the part, and the palm leaves late and comes to it early), the hand turning from one hold to the other, and the part goes with
+  its own keys. The
+  way is at most 0.4 s long (`InspectMotion.RegripMost`: moving a magazine from the palm to the fingers is one movement of fingers
+  and wrist, about a quarter to a third of a second; slower reads as the hand sliding over the part); a longer one, one onto
+  another part, or one that keeps the hold (the same face with `at` moved by under a quarter of the face in u and v,
+  `InspectMotion.RegripShift`: the hand's own give in a hold is half a centimetre, and a quarter of the game's magazine faces, 4 to
+  30 cm, is 1 to 7 cm) is refused. Only there may the part move in the hand (frame rule R3).
+- `parts`: the parts of the gun the motion moves, `{ "node", "about", "follow", "optional", "symmetry", "keys": [{ "t", "move", "out", "clear", "turn", "show", "carry", "ease", "bounce", "cue" }] }`.
+  `node` names every node of that name under the gun (a rig some guns carry twice, in two parts, moves as one; names are the ones the
+  editor backend's `preview.weapon` lists), or an array of names, the first present that draws taken (the first name is the part's
+  identity), `@mag` the magazine's mount (the part holder's `m_aMag`, so the magazine part), `@round` a
+  copy of the magazine's first `Cartridge` round the look adds at the shell-eject point `Front_SE` (no gun has a chambered round; it
+  lies as the magazine's round does and is drawn while `show` is at least 0.5). A key's `move` is metres in the gun's space (x right,
+  y up, z toward the muzzle: a slide pulled back is `[0, 0, -0.03]`), `out` metres along the node's own down axis (a magazine out of
+  its well), `turn` degrees (up to 1440) about `about` (`bore`, `side` or `up`, the gun's axes at rest) through the node's origin.
+  `clear` (0..3) takes it out along its down axis by that many of its own lengths (its mesh box along that axis), so a magazine
+  clears its well on every gun. `carry` `{ "at": [x, y], "dist", "roll", "tip" }` holds the part in the view instead, off the gun: its box
+  centre at that point of the view (-1..1 of the half width and height) `dist` metres (0.2..0.6) from the eye, its top toward the
+  eye or `tip` degrees (0..80) up from that line (a part held aslant for a glance, not shown to the eye), its length turned `roll` degrees about the line to the eye or, held by the off hand, by the turn nearest `roll` (in steps of
+  15 degrees) that leaves that hand's wrist most at ease (`InspectLook.CarryRoll`), so the hand shows the part to the eye the way an
+  arm can on every gun; a hand on it goes with it (a part the wrist's limits turned with the hand, let go while still out of the
+  gun, turns back to its keyed turn over the hand's way off it, not at once, and over a regrip goes over to the turn
+  the next ride gives it), and into and out of a carried key the box centre goes on a straight line. A
+  carried key takes no `move`, `out`, `turn`, `show` or `clear`; a carried `@round` is drawn (its `show` is 1 there, so on the way to a key with `show` 0 it hides halfway). A carried part follows no other part. `ease` is `in` (gathering speed and braking into the key: u³(4 − 3u)), `out` (leaving fast from no speed and braking long into the key: 1 − (1 − u)³(1 + 3u)) or `spring` (gathering speed into a stop) for the way into that key (default
+  the smooth step); `spring` bounces back off the key, leaving it at 3 × `bounce` (0..0.3, default 0.08) of the speed it came in at
+  and settling within 0.08 s (the next key comes at least that much later), and knocks the gun with the kind's `hit`; parts that
+  slam home together (within 0.02 s) knock it once. `symmetry` (degrees, default 360) is the part's turn
+  that looks the same (a six-shot cylinder 60): a rest key winds its turn to the nearest multiple, so a cylinder spun round is not
+  wound back. The first and last keys are at rest (only `t`, and a `cue`, `ease` or `bounce`); before the first the part is at rest, and after the last too but for the whole turns its last key is wound to, which it keeps; as the look fades out its weight takes off only the turn past the nearest whole turn of its symmetry, and the plugin puts the node back when the look ends, where the two look the same. A part whose node hangs under another part's node goes with that part (a revolver's cylinder on its crane); `follow` names
+  an earlier part a node not under it goes with too (the rounds of a speed loader with the cylinder). A gun without a part's node, or
+  whose node draws nothing (a skin hid it, a mounted model replaced the gun), does not play the motion and the log says so once per
+  gun and motion; an `optional` part is moved where it is there. The plugin (`Native/Inspect/InspectParts.cs`) measures each node's
+  pose and its parent's, and each part's mesh box (`InspectPartRig.Lo`, `Hi`: the meshes whose nearest part node is that part; an
+  `@mag` with none takes its `Cartridge` boxes; `@round` a 6 mm box) and every drawn mesh's box (`InspectRig.Meshes`) in the gun's
+  space when the look starts and writes the node's local pose each frame before the holder's
+  LateUpdate (`InspectLook.PartDelta`; nothing of the game is read per frame), and puts every node back when the look ends. Parts
+  move in first person only: teammates and replays see the wrist. A carried part is placed against the gun where the last
+  `GunPose` put it, so a caller (the plugin each frame, an offline check each sample) calls `GunPose` for a time before
+  `PartDelta` and `HandPose` for it.
 
-The shipped motions are the wrist roll in two beats and back: the gun's left face, muzzle to the left and level, top rolled a little
-right; then it turns to its right side with the muzzle still up and to the left: pistols, revolvers and compact guns all the way
-over in the wrist (the gun upside down, the back of the grip hand toward the viewer, the elbow swung out), rifles, shotguns, machine
-guns and long guns in both hands a third of a turn the other way (roll -90 from +30), enough to show the right side and top, since
-nobody rolls a machine gun over in one hand; then the game's pose. Only the revolver adds a beat before it goes back: two turns on
-the trigger finger (the grip hand's index finger, on the gun's centre plane), upright, the hand going with it (watched from as near
-as the gun is held: its far end may leave the view as it goes round); the last turn runs straight on into the hand going up until the
-muzzle points up (the key that ends the spin is `through`), and the hand brings it back down. Pistols, revolvers and compact guns drop the off hand out of view; rifles, shotguns,
-machine guns and long guns keep it under the gun throughout and slide it toward the receiver for the right face (`along` 0.45, 0.3
-for machine guns, 0.35 for long guns).
+`feel` (the plugin's table only, one per kind, every kind needs one): `{ "f", "zeta", "carry", "wind", "hit": [degrees, metres], "spin", "slow" }`.
+Every motion's pose is its keyed pose with the item's weight laid over it (`InspectLook.Follow`; one layer for every motion of
+every gun and melee weapon, nothing in it is written per motion or per frame). A spring of f hertz (0.3..10) and zeta damping
+(0.1..1.5) joins the hand and the item, and only the keys' own acceleration drives it (k2 e'' + k1 e' + e = k2 x'' on the offset e
+from the keyed pose x, k1 = 2ζ/2πf, k2 = 1/(2πf)², semi-implicit at 240 Hz): the item hangs back as the hand starts, goes past where
+the hand stops and settles, and at a steady rate is on its keys, so a key is reached when it says. `carry` (0..2, default 1) is how
+much of that shows. Before a turn of at least 45 degrees between two keys the item stops at, the hand draws it back against the
+turn by 4% of it, at most `wind` degrees (0..12, default 5), over the 0.16 s before (`Winds`; not into a toss or a twirl, whose
+hand has its own wind-up). A held pose is never dead still: it sways 0.6 degrees and 1.5 mm at three unrelated rates (`Sway`). The
+offset, the sway with it, is at most about 14 degrees from the keyed turn (softly), does not carry the grip wrist past its limits
+(`WristKept`: all of it while three times as much would still be within 0.9 degrees of them, eased off toward none past that), is
+gone over the last
+0.15 s, and turns about the grip point. A `hit` key, a `spring` part key and a twirl's stop knock it: the muzzle dips `hit` degrees
+and the gun drops `hit` metres at the height of the knock. `spin` (30..3000 degrees a second) is the most a gun in the hand (not
+tossed or twirled) may turn; `slow` (0.5..3, default 1) plays the kind's motions that many times slower (heavy and long guns). The
+frame rules measure the followed pose.
+
+`sounds` (the plugin's table only): `roles` `{ name: { "match": [patterns], "default": event or { kind: event, "*": event }, "zoom": "in" | "out" } }`
+and `cues` `{ name: [role or { "role", "after" }] }`. A cue plays its roles, `after` seconds (0..0.3) late. A role finds the game's own
+Wwise event for the gun in hand (`Native/Inspect/InspectSounds.cs`): the first `match` pattern (lower case, `*` at its start or end)
+that names a sound item of the gun's own reload sequence (its front part's, else its stock part's) or of either part's fire
+sequence, by trigger time; else its kind's `default`, else `*`'s; `zoom` takes the gun's own aim sound. The local player hears the
+event in their head (ForgeCore `AudioKit.PlayGameEvent`); a teammate's gun plays its `_3rd` form following the gun object; an event
+with no `_3rd` form is 3D only and follows the gun for both. A role with no event is logged once per gear, motion and role and the
+beat plays nothing. Every cue a motion names must be in `cues`, and every role a cue names in `roles`. The plugin adds three cues
+itself: `toss` when a tossed gun leaves the hand, `catch` when it lands and `twirl-catch` when a twirl stops (`InspectLook.Cues`, in
+real seconds). Each beat plays once, on the frame its time is crossed, and none after the look was stopped. Nothing goes over the
+network: each machine rebuilds a teammate's beats from the motion number and start time it already gets, and a teammate seen late
+skips the beats already gone.
+
+The frame rules added to those below (`InspectLook.Rules`, on the followed pose, every 30th of a second; R1, R3 and R6, which
+measure where the arms are and need no even frames, also at every hand and part key's own time, so a pose that breaks only on a
+key's frame is caught; the offline audit samples the same times):
+R5, each pose shown (a key the gun does not go through, with the keys after it within 10 degrees of turn, 0.1 of the view and 2 cm
+of rise) holds still (under 25 degrees and 6 cm a second) for 0.4 s,
+from 0.3 s before its first key to the key after its last;
+R1, where both keys of the off hand's span put it on the gun (its body, or one part), the nearer of its palm and fingertips is at
+most 2 cm from what it touches (`InspectLook.ContactOf`, `ContactGap`: absolute, the game's own hold is not taken off; between
+two `tips` keys it is the pads of the index and middle fingers that are measured, not the palm; the offline audit calls the
+same); R3, a part out of its place that the off hand holds moves at most 0.5 cm in the hand (its box centre in the
+hand's frame, from where the hold began; `SlipMost`) except over a declared `regrip`, after which the hold begins again; R6, where the item camera sees it (a point of the arm out of the view does not count), the grip arm (forearm a 3.5 cm capsule, palm a
+4.5 cm ball) sinks into a mesh box of the gun at most 1.5 cm deeper than the whole arm does in the game's hold, and so does the off
+forearm, with the off palm at most 1.5 cm nearer than touching (1.5 cm off); the off arm's baseline is the deeper of the game's hold and the key's own place without its `offset` (a hand on a part's face already presses its wrist into the gun's box), and the look lifts the off hand toward its back, rechecking the wrist, up to eight rounds, then keeps only the least share of that lift that still meets R6 (so a palm on a face
+stands off it no farther than R6 needs, which R1 also measures); R7, in the middle of the view (30% of its half width and height, 20 by 20 rays) the arms cover at most 30% while the gun holds still and the off hand is idle (neither on the gun nor moving; `InspectLook.Idle`), and may hide it otherwise (a hand touching the gun, working a part or on its way); a carried part covers at most 40% of the middle with its centre at least 0.3 m from the eye (the gun itself is not counted: it is framed in the middle; any input puts it back within 0.15 s);
+speed, a gun in the hand turns at most its kind's `spin`;
+W, the wrist, measured from the game's own hold (the first-person arm's bones lie 59 to 103 degrees off an anatomical zero, and that
+hold is what the player sees as a relaxed wrist): where the item camera sees the hand, it flexes at most 65 degrees toward the palm,
+extends at most 65, bends at most 70 toward the thumb and 58 toward the little finger, and the forearm turns at most 80, each give or
+take 2 (`InspectArm.Joint`, `InspectLook.WristBreaks`, `WristPast`); and the hand's line (the wrist to the knuckles) lies at
+most 90 degrees off the forearm's, whichever way it bends, or as far as the game's own hold has it where that is more, give or
+take the same 2 (`InspectArm.Fold`, `WristFold`): the joint's angles are counted from a hold that is itself folded on some guns,
+so a hand at their limits can hang off its forearm past a right angle, which they do not see (a hand brought down over the top
+of the gun onto a charging handle did). The look keeps both wrists inside them itself, for every
+motion: `InspectArm.Comfort` turns a hand back to them (the four bends as an ellipse, and the twist) and `InspectArm.Past` is how
+far a pose asks past them; the solve places the grip hand and swings its elbow so the forearm carries the gun where the wrist alone
+would pass them, the off elbow swings the same way, and the follow, the sway and a toss's wrist take only what stays within them
+(`WristKept`). Flexion, extension and the forearm's turn are within the active
+range of a healthy wrist (Greene and Heckman, The Clinical Measurement of Joint Motion, AAOS 1994: 80, 70, 80) and a little past what
+daily tasks use (Ryu et al., J Hand Surg 16A:409-419, 1991: 54 to 60); deviation is not held to the AAOS's 20 and 30, because the
+off hand moved from under the gun to its flank turns about the palm's normal by about 60 degrees from the game's hold, and the two
+motions the owner holds good (`pistol`, `revolver`) reach 64 radial and 53 ulnar, so the limits are theirs plus 5.
+No gun key asks the grip wrist more than 5 degrees past those limits (`KeyBack`, measured from the solve; the pose is not changed by
+it), the off hand is turned no more than 30 degrees off the turn its hold asks (`OffBack`, a judgement, not a measured human bound:
+past it the hand visibly lets go of the shape it holds; the two good motions turn it 0), and neither forearm, wound on from the first
+frame, turns more than 5 past 80;
+I, inertia, on the followed pose and every part the motion moves, at 60 a second (`InspectLook.Inertia`): the gun's angular velocity
+changes by at most 2600 degrees a second per second and its centre's by 10 m a second per second, those changes change by at most
+67000 degrees and 430 m a second cubed (the jerk: a move that starts or stops in one frame spikes there however slow), and neither
+turns back within a frame while faster than 30 degrees or 0.1 m a second; these are 1.5 times the most the left and right look of
+each kind and the revolver's twirl reached outside a knock under the first follow (1724, 6.8, 44535, 287), and what the present
+follow and motions exceed is reported as it is. A part moves at most 15 m a second per second, 750 m a
+second cubed and 23000 degrees a second per second, from minimum-jerk reaching (Flash and Hogan, J Neurosci 5:1688-1703, 1985: 10 cm
+in 0.2 s, a quarter turn in 0.15 s). A knock (a `hit` key, a `spring` part key, a twirl stopping or caught into the next move, a toss caught) is let through for
+0.2 s after it, and a gun free of the hand moves by its own physics. A turn of at least 45 degrees between two keys draws back before
+it or goes past its end and settles by at least 0.5% of the turn;
+F, the fingers. The grip hand's thumb and three fingers round the grip (`InspectLook.FingersBreak`): the look has no surface of
+the gun to stop a finger on at the grip (a grip sits inside its frame's box), so the one pose of theirs known to lie on the gun is
+the game's own grip; reported are a look that moves them on a hand holding the gun still (more than 5% off the game's grip outside
+0.1 s before and 0.35 s after a twirl or a toss), a shape of the look's own that closes them (mean bend over 0.45) and fingers
+less than 0.6 open while a tossed gun turns into the hand. The grip hand's index finger, which the look lays along the gun's side
+(once a look): its middle line more than 0.4 cm inside a mesh, at the worst sample it lies wholly along the side with the gun in
+the hand, the boxes counted from the depth its knuckle has in them in the game's hold; and its skin more than 2 cm (`TouchGap`)
+off every mesh where it was laid. The off hand (`InspectLook.OffFingerSunk`): a finger whose middle line lies more than 0.4 cm inside a mesh box
+with the fingers as stopped, where the hand is wholly on its keyed shape (on the game's grip, on the way from or to it and `under`
+the gun its fingers are the game's, which the look does not know);
+P, an item free of the hand (tossed, twirled): it passes more than 1.5 cm deeper into the grip hand or forearm than the held item
+lies (R6's capsule and ball), or it leaves or lands where the palm faces more than 30 degrees down (`InspectLook.ThroughBack`,
+`BackDown`: it would go up through the back of the hand and be caught on it);
+J, jerking fingers: a joint of either hand, as the game shows it (the finger clip as `InspectFingers` plays it, times the share the
+look takes), whose speed changes by more than 150 degrees a second from one 60 a second frame to the next (`InspectLook.Jerks`,
+`JerkSpeed`), from two frames before the look to two after it (the hand-over from and back to the game's fingers counts): a step, a plateau that starts or stops at once, a twitch; once per hand and joint with the count. The same static
+`InspectLook.Jerks(track, times)` counts a joint read back in game frame by frame (ForgeDevelopment `FingerPoseCapture.Record`);
+whether a clasp is calmer than the plain hold is still weighed by turns one way and straight back from one finger sample to the
+next, both ways faster than 200 degrees a second;
+S, still fingers: no joint of either hand (the index finger's lift off the trigger not counted) turns through more than 15 degrees
+over the look (`InspectLook.StillFingers`);
+T, a toss turns the item as its keys ask (the flip and spin the toss key adds to the key before it: one turn of a gun, two of a
+knife): summed frame to frame at 240 a second from the throw's lead to the catch's settle, more than 60 degrees off that is reported, and so is every pair of neighbouring frames whose turns lie the long way apart
+(`InspectLook.Tosses`); R1 is also listed at every sample.
+`InspectLook.Audit` lists every W, I, F, R6, P, J, S, T and R1 finding of a look, R6 at every sample an arm sinks past the game's hold (the
+frame rules stop at the first); the offline audit counts those.
+Each fault names its rule (`R1:`, `R3:`, `R5:`, `R6:`, `R7:`, `speed:`, `W:`, `I:`, `F:`, `P:`, `J:`, `S:`, `T:`). A fault is a finding, never a reason not to
+play: the format test reports the shipped table's findings, the game logs each once per gun and motion as a warning and plays the
+look, and the owner decides from the look itself whether a motion stays. The rules only measure; none of them changes a pose.
+
+The shipped motions. Every gun's pool (its kind in `kinds`, single guns in `gear`) has three common motions and up to two of its
+own; a gun without the part a motion moves does not get that motion (logged once per gun and motion).
+
+1. The look (`pistol`, `revolver`, `compact`, `rifle`, `shotgun`, `heavy`, `long`), the wrist roll in two beats and back: the gun's
+   left face, muzzle to the left and level, top rolled a little right; then its right side with the muzzle still up and to the
+   left: pistols, revolvers and compact guns all the way over in the wrist (the gun upside down, the back of the grip hand toward
+   the viewer, the elbow swung out), rifles, shotguns, machine guns and long guns in both hands under a third of a turn the other way
+   (roll -78 from +30, where the grip wrist ends its range and the forearm and elbow have carried the rest), enough to show the
+   right side and top, since nobody rolls a machine gun over in one hand; then the game's
+   pose. The revolver's goes on as one motion: two turns on the trigger finger (the grip hand's index finger, on the gun's centre
+   plane), upright, the hand going with it (watched from as near as the gun is held: its far end may leave the view as it goes
+   round); the last turn runs straight on into the hand going up until the muzzle points up (the key that ends the spin is
+   `through`), and the hand brings it back down. Handguns and compact guns drop the off hand out of view; the others keep it under
+   the gun and slide it toward the receiver for the right face (`along` 0.45, 0.3 for machine guns, 0.35 for long guns).
+2. The magazine check (`handgun-mag`, `rifle-mag` for rifles, compact guns, shotguns and long guns, `heavy-mag`): the off hand takes
+   the magazine by its side low down (a `mag` key with no `face`, `spin` 15; the fingers stopped on the magazine's own box),
+   draws it out by 1.1 of its own height, lifts it a little out from there, to where the hand has it (low on the left of the view,
+   0.47 to 0.50 m from the eye), aslant, its top 50 degrees up from straight at the eye (`carry` with `tip`, the hand riding it,
+   its roll picked for the wrist), holds it 0.6 s for a glance, seats it with a push (`spring`, `hit`) and slides back off it
+   (`offset` [0.012, 0, -0.03]). A handgun's is inside the grip: it comes out onto the palm (`face: bottom`), the hand takes it by
+   its side as it comes clear (`regrip`) and by its base again to seat it. A magazine wider than 4.3 cm is held by its base
+   throughout: the keys are the same, and which hold a key with no `face` gives follows the magazine's width. Revolvers do it
+   in one hand (`revolver-check` on the R-66, `break-check` on the 3RB): a flick of the wrist (a `through` wind-up into a `hit`
+   key) throws the cylinder out on its crane, 80 degrees about the bore, or breaks the frame open, 40 about the side; the cylinder
+   runs on a third of a turn; a flick back shuts it.
+3. The toss (`handgun-toss`: one turn end over end, 0.16 m up; `longgun-toss`: one turn about the bore, 0.12 m, the off hand out of
+   the way and back under the gun once it is caught). Thrown, turned and caught where the gun is held (`TossMove`). A long gun's
+   is seen at the view the game's hold has (`fill` 2), so the gun stays as large as it is held and about half to four fifths of
+   its length is in the view; a handgun's widens the item camera a little (`fill` 0.6, to 36..47 degrees from the game's 33..36)
+   to keep the flight in the view.
+
+Of a kind's own: `slide-rack` (large pistols: the gun turned 25 degrees left and rolled 55 so the top of the slide and the port
+face the eye; the off hand arches over the back of the slide from above, the fingers down one side and the heel of the palm down
+the other (`face: top`, `spin: 90`), clear of the muzzle, draws the slide back 2.6 cm on the round in the chamber, lets it go and
+leaves before it slams home), `revolver-swing` and `revolver-break` (the flick, then the off hand comes up from outside the
+cylinder with the pads of its index and middle fingers on its outer surface (`tips`, the palm clear of the frame and of the
+chamber face), strokes it 24 degrees round over 0.07 s riding its surface and lifts off; the cylinder runs on from about the
+stroke's top speed, some 600 degrees a second, slowing through the rest of one turn, and is pressed shut. The part eases all end
+at rest except `spring`, which is a knock, so between the stroke and the run the cylinder's rate dips by about a fifth for two
+frames), `rifle-charge` (rifles, compact guns, long guns and shotguns that have a charging
+handle) and `heavy-charge` (the handle is on the left side of these guns: the gun is turned only a little, the off forearm comes
+up from below or below and beside it, the off hand goes from under the gun to the handle and takes it between the thumb and the
+fingers (`face: left`, `clasp`), draws it back along the bolt's axis, lets go at the back and the handle springs home past its
+rest and settles; no hand comes down onto it over the top of the gun; a gun whose handle no clasp takes does not play it),
+`shotgun-pump`.
+
+Melee weapons (`"from": "hold"`; the off hand lets go and is out of the view) have three each: `knife-look` (one flat, then the
+other), `knife-twirl` (a 7 cm hop, one turn end over end), `knife-toss` (two turns end over end, 0.14 m);
+`bat-look`, `bat-twirl` (0.1 m, one turn), `bat-toss` (0.25 m, one turn); `hammer-look`, `hammer-spin` (a 0.1 m hop turning twice
+about the handle), `hammer-toss` (one turn about the handle, 0.12 m); `spear-look`, `spear-thrust` (levelled, drawn back and
+thrust, a `hit`), `spear-toss` (one turn about the shaft, 0.15 m). Every hop and toss is thrown from and caught in the palm turned
+up (`palm`), whichever way the game holds the weapon, and the weapon is turned back into the game's hold after the catch. The
+hammer and the spear are thrown at the view the game's hold has (`fill` 1.2 and 0.8), as low as keeps in the air what the view
+showed before the throw: about half the hammer's length, its head, the handle's end behind the hand out of the view as in the
+game's hold; the knife and the bat widen the item camera a little (`fill` 0.6, to at most 49 degrees). Those views are the
+forward hold's, which the offline rigs assume; in a reverse hold the same keys widen the camera (the hammer's to 66 degrees).
+
+Everything else held plays `item-look` (the `item` kind, the table's `default`).
+
+The off hand's rule is the owner's, and the format test holds the shipped table to it: the off hand holds the gun up from under it
+(`under`), is out of the view (`away`), or works the part the motion is about (`mag`, `node`: the magazine, the slide, the cylinder,
+the charging handle, the pump); it never takes the grip or the trigger, and on a melee weapon it only supports or stays away. The
+format still takes every hold, for skin packs and override files.
 
 How a key is solved: the gun's bounds are every drawn mesh under it (parts, attachments, a skin's models), in the gun's own space,
 except a mesh whose box alone makes the bounds more than twice as wide or tall as all the other meshes together (a sling or rope
 with a placeholder box, such as the Köning's `rope`); that mesh is logged once. The gun's body cannot be left out by this rule, since
 its other parts span about as much. The shown part is the box ahead of and above the grip hand (receiver to muzzle); the stock behind
 it and the grip and magazine below it may leave the view. The grip hand (the right hand) and its elbow are placed by a sweep (coarse,
-then fine round the best) of places within 0.3 m of where the game holds it and its arm's reach, and of elbow swivels from 20
+then fine round the best) of places within 0.3 m (0.12 m in a motion with a toss) of where the game holds it and its arm's reach, and of elbow swivels from 20
 degrees tucked in to 90 swung out (the game's two-bone IK bends toward a goal the look moves for the whole look). A place where the
-wrist would have to turn about the forearm more than 80 degrees or bend more than 75 from its rest pose is ruled out; among the
+wrist would pass its limits by more than 2 degrees to hold the key's turn (`InspectArm.Comfort`: rule W's four bends as an ellipse
+and the 80-degree twist) loses to every place where it would not, so the arm and elbow carry the gun before the wrist bends
+further; where no place is within them the gun is held back to them and rule W reports the key (`KeyHeldBack`). Among the
 rest, the frame rules come first (below, a margin of 0.1 inside them), then the narrowest item camera view the shown part needs
 (three times as much past the game's view), the hand's distance from where the game holds it, the swivel, the centre's distance
 from `at`, and each place the off hand touches about that key being out of its arm's reach. A key's view is never narrower than the
@@ -364,32 +776,71 @@ half width right of the middle and not above it, in the game's view, or as far a
 fit. Between two keys of the motion the grip point moves on a straight line, so the hand stays in that place while the gun turns
 over in it, and the gun turns with the grip hand's wrist, which goes between the keys' wrist turns the short way in its forearm's
 frame (`InspectArm.Wrist`; the short way in view space wound a compact gun's forearm a whole turn round while the arm swung). To and from the game's pose the back of the gun moves on a straight line (so the stock leaves the eye without swinging
-nearer); every way is bowed off it forward, down or out by the least bow that keeps the rules below.
+nearer); every way is bowed off it forward, down or out by the least bow that keeps the rules below, except the way into a toss (the gun flies there, and a bowed hand would turn it with its forearm about a leaning axis).
 
 What no frame may do: leave more than half of the gun's length out of the view, or bring the shown part nearer than 0.12 m (or than
 the game's own hold has it); frames on the way from and to the game's pose are held to the poorer of the game's pose and these, give
-or take 0.05 of a share and 0.02 m. Nor may a joint jump or wind: from one frame to the next no hand's twist about its forearm or
+or take 0.1 of a share (the follow carries the gun a little past the game's pose as it settles there) and 0.02 m. Nor may a joint jump or wind: from one frame to the next no hand's twist about its forearm or
 its wrist's bend, and not the grip elbow's swivel, moves more than 15 degrees (an off hand dropping out of view bends about 10 a frame;
 a wrist limit flipping across its half turn, as an off hand under a rifle rolled over does, jumps 160), and neither forearm's twist,
-wound on from the first frame, goes more than 5 degrees past the wrist's 80-degree limit. Every frame is sampled at 60 a second, with
-both hands' reach; a look that breaks one anywhere
-in these hands is not played and is logged once as `skin-inspect-unframed` with the time and the rule. The shipped table passes on
-all 70 pairs of hands measured in game (hip and relaxed), so this is the last word on a faulty override file. The press only
+wound on from the first frame, goes more than 5 degrees past the wrist's 80-degree limit, nor is the off hand turned off its hold past
+rule W's 30 degrees. The off hand is turned within `InspectArm.Comfort` (rule W's four bends and the 80-degree twist off its rest,
+then stops) about the wrist with the palm left in place; the grip hand's place is held to the same by the sweep. Every frame is sampled at 60 a second, with
+both hands' reach; what a look breaks anywhere in these hands is logged once per gun and motion as a warning with the time and the
+rule, and the look plays. Only a technical failure (a part the motion names missing on the gun) leaves a motion out, logged. The press only
 measures (the log line gives its milliseconds); the solve (10 to 75 ms, the revolver's spin the most) runs on a worker thread on
 that copy of the measures, and the look starts on the first tick after it is done if the same gun is still in the hands. The off hand's places are points of the gun's bounds (the `side` and `top` hands are its
 grip hand turned about the bore), so one motion fits every gun of a kind, and its wrist is kept within the same limits. One-handed
-guns use the same roles: the right hand holds the grip, the left hand, which supports it in the game's pose, is the one that lets go.
-Fingers are not posed: the grip hand stays closed while the gun is free. A finger pose would use ForgeCore's joint player on the
-first-person body's animator with the finger masks (`Models.BindJoints`, `JointMask.RightFingers` and `LeftFingers`); it is not
-built.
+guns use the same roles: the right hand holds the grip, the left hand, which supports it in the game's pose, is the one that lets go. Where the off wrist would pass its limits its elbow swings the forearm round instead (`InspectLook.OffSwivel`, solved a frame at a time, reached ahead and at most 8 degrees a 60th; `OffElbow`/`OffElbowAt` give the elbow, and the plugin bends the off arm's IK toward it). A carried part turns about the palm by what the wrist can follow, not past it; a hand riding a part keeps the hold it had at that span's start; keys of one pose (same turn, no toss or spin) share one set of off hand contacts with no bow between them; the off fingers open as soon as they leave the grip and touch nothing, and close near a contact. `under` and `muzzle` find the gun's underside from the meshes over the hand (within 2 cm across it), so a spent shell hanging beside the gun does not pull the hand down.
+The fingers (`Native/Inspect/InspectFingers.cs`) play three clips per look, baked from it: the off hand's shapes
+(`InspectLook.OffFingers`), the grip hand's index finger (`InspectLook.IndexFinger`) and the grip hand's other fingers
+(`InspectLook.GripFingersBaked`), each masked to those fingers on the first-person arms and weighed each frame by how far the look
+takes them times the look's own weight. The grip hand's fingers are not in the table; every motion gets the same
+(`InspectLook.GripFingers`). The thumb and the three fingers round the grip keep the game's own grip while the hand holds the
+weapon, the one pose of theirs known to lie on this gun; on a twirl they open to let the gun round and close over the end of the
+spin; round a toss all five open as the gun leaves and close once it has landed and stopped turning in the hand. The index finger
+comes off the trigger for the look, over the first 0.25 s, and lies along the side of the gun until the last 0.25 s; for a twirl
+it is back in the guard 0.2 s before the spin starts and until 0.2 s after it ends (the gun turns on it), and a motion from the
+hold (melee weapons, the default look) keeps the game's. Where it lies is solved once a look (`InspectLook.IndexBend`, in the
+game's hold): the bend at which its line from knuckle to tip is parallel to the gun's side, then from 6 degrees at the knuckle
+more open than that (`IndexGive`) it closes until its skin meets a mesh that no part of the motion moves (a cylinder that swings
+out or a frame that breaks open leaves it on the frame behind), at most 6 degrees past flat, the boxes counted from the depth
+its knuckle has in them in the hold (a nominal hand's knuckle lies in the grip's box). On a gun wider than its grip the knuckle
+bends back, up to 24 degrees (`InspectHand.Lift`), which ForgeCore's `FingerBend` (0..1) does not say: `InspectHand.Lifted` gives
+those three joints' turns, the knuckle's whole-bend turn scaled back. A hand that does not hold the gun from its side, a finger
+left more than 0.4 cm inside a mesh or more than 2 cm off them all is `InspectLook.IndexFault`, logged once a gun and motion; the
+finger is a nominal hand's against mesh boxes, so on the real hand it can stand a little off the gun or press into it.
 
-`gear` maps an offline gear id to its motions (repeated presses take the next); `fallback` picks motions for any other gun by its
-measured length in metres (`upTo`, the last entry without it). A later file replaces motions by name and gun entries by id; its
-`fallback`, when given, replaces the whole list. A faulty file is not used at all and logged once as `skin-inspect-failed`. Each
-look writes one line to `forgeskin.log`: the gun, its motion, its bounds, the item camera, each key's item view in degrees and each
-key's elbow swivel. Teammates see a motion by its name's FNV-1a 32 hash, so a motion only one player's table has is not shown on
-that body; on their screens (and in a replay) the right wrist turns with the motion's roll and turn and the off hand stays on the
-gun; the free-gun track (spin, flip, toss) is first-person only.
+`kinds` names lists of motions (`pistol`, `highcal`, `revolver`, `compact`, `rifle`, `shotgun`, `heavy`, `long`, and for melee
+weapons `knife`, `bat`, `hammer`, `spear`, and `item` for everything else); `gear` maps an offline gear id to its pool, motion ids and `@kind`s (each motion
+once); `fallback` picks the pool for any other gun by its measured length in metres (`upTo`, the last entry without it), and its
+entries with `"melee": true` do the same for melee weapons (a list of their own, its last entry without `upTo`). Each press plays a motion of the gun's pool at random, never the one
+that gun played last while the pool has another (`InspectTable.Pick`); motions the gun cannot play (a part missing or hidden) are
+left out first, and a gun that can play none of its own takes the fallback pool for its length, then the default. `default` lists
+the motions and `@kind`s of anything held that has none of its own (above), each from the hold; its first `@kind` names the kind
+whose `feel` and sounds it plays with. A later file replaces motions and
+kinds by name and gun entries by id; its `fallback` and its `default`, when given, replace the whole list. So a skin author can give a gun of their
+own motions that move their model's named nodes. A faulty file is not used at all and logged once as `skin-inspect-failed`.
+
+A skin pack can carry its own motions: `inspect.json` at the root of the `.forgeskin` zip, beside `manifest.json` (the editor's build
+copies an `inspect.json` that sits beside the project file). It has the table's shape without `fallback` and `default`: `motions`, `kinds` and
+`gear`, whose lists name only the pack's own motions and kinds. It adds and never replaces: while a gun shows the skin (its own skin or
+a global one), the pack's `gear` list for that gun's offline gear id and its `kinds` of the names the gun's list in the table uses
+(`"rifle": [...]` joins every gun whose list has `@rifle`, the fallback's included) come after the gun's own motions in its pool
+(`InspectTable.For` with the packs' tables). Its motions are named `<skin id>/<motion id>`, so they never take the place of the
+plugin's or another pack's, and teammates with the same pack see them by that name's number. `SkinPack.Open` reads and checks it with
+the same rules as the table; one that cannot be read, names a motion or kind it lacks, has a `fallback` or a `default`, or sits in a character
+skin rejects the pack as `bad-inspect` (the picker lists it as damaged, the log has the rule). A kind the plugin's table does not have
+is logged once when the pack is read, since no gun would play it. Exporting to the Skins format leaves the motions out and says so.
+
+Each
+look writes one line to `forgeskin.log`: the gun, its kind, its motion, its length in seconds and its number of sounds, its bounds,
+the item camera, each key's item view in degrees and each key's elbow swivel. Teammates see a motion by its name's FNV-1a 32 hash, so a motion only one player's table has is not shown on
+that body; on their screens (and in a replay) the right wrist turns with the motion's roll and turn at the pace of the gun's kind
+(`slow`; each motion's third-person clip is made at every pace the table's kinds use, named `<id>@<slow>`) and the off hand stays
+on the gun, and the gun plays the motion's sounds. The follow, the hand on the gun's parts, a toss and a twirl are solved for
+first-person arms and the gun pose of a body is the game's: they are not sent, as a teammate's third-person body shows the wrist
+only and the motion number and start time already rebuild the rest each machine needs.
 
 ## Other packages on the same gun
 
@@ -475,7 +926,7 @@ A pack the reader refuses is not loaded and logs `skin-pack-rejected` with the r
 A MetallicSmoothness texture is in the game gear shader's layout (`Cell/Player/CustomGearShader`, as the game's own gear
 textures): metallic in R, smoothness in G. A material's or attachment's glow (`EmissiveColor` x `EmissiveIntensity`, effect
 flashes, unlit pictures) is in "as itself" units, as the editor previews it; it reaches the game's `_EmissiveColor` times
-`MaterialParams.EmissionUnit` (0.01, the gear shaders' measured emission gain) for white; its colour is sRGB like every skin
+ForgeCore `ColourSpace.EmissionPerUnit` (0.01, the gear shaders' measured emission gain, the one glow unit) for white; its colour is sRGB like every skin
 colour, and ForgeCore `ColourSpace.Glow` (`Glow.Value` in game) works out the value so the shader gets the picked hue whether the property is `[HDR]` (set as it
 is) or a plain colour (Unity converts it from sRGB). With no `EmissiveColor` the intensity scales the game material's own glow colour.
 

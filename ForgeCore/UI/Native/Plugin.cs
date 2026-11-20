@@ -75,7 +75,9 @@ internal static class Plugin
         Strength("Glow", 1f, "Multiplies the soft glow round HUD pieces mods draw, 0 to 2; 0 turns it off.", v => Glow = v, 2f);
         Watch("Screen", "Fringe", true, "Draws a faint 1 px red and blue colour fringe on HUD pieces mods draw, like a display seen through a visor. Turn it off for clean edges.", v => Fringe = v);
         Strength("HitFlashSeconds", 0.3f, "How long a full hit-direction flash lasts, 0.1 to 2 seconds.", v => HitFlashSeconds = Math.Max(0.1f, v), 2f);
-        // No game method is patched here: each feature puts its own hooks on the first time it is used (PatchGroups).
+        // Each feature puts its own hooks on the first time it is used (PatchGroups), except the gear icon hooks: the game draws every
+        // gun's icon from startup, building each gun at the world origin, and that gun is hidden whether or not a mod uses GearIcons.
+        PatchGroups.Ensure(PatchGroup.GearIcons);
         // The confirmation keys are listed under Controls from the start, so they can be rebound before the first question.
         ConfirmDialogs.RegisterKeys();
     }

@@ -73,6 +73,16 @@ public readonly struct JointTrack
         _player!.SeekSlot(_slot, elapsed);
         return true;
     }
+
+    /// <summary>Sets how far the masked bones go from the game's pose to the clip's, 0 to 1, from this frame on (a hand shape that comes and
+    /// goes within one clip); false once it has ended. A recording keeps the weight the track started with.</summary>
+    public bool Weigh(float weight)
+    {
+        if (!(weight is >= 0f and <= 1f)) throw new ArgumentOutOfRangeException(nameof(weight), "A track's weight is from 0 to 1.");
+        if (!Playing) return false;
+        _player!.WeighSlot(_slot, weight);
+        return true;
+    }
 }
 
 /// <summary>
@@ -444,6 +454,8 @@ public sealed class JointPlayer
         if (!track.Fading) track.Ending = float.PositiveInfinity;
     }
 
+    internal void WeighSlot(int slot, float weight) => _tracks[slot].Weight = weight;
+
     internal bool Live(int slot, int generation) => _tracks[slot].Clip != null && _tracks[slot].Generation == generation;
 
     internal float StartOf(int slot) => _tracks[slot].Start;
@@ -485,7 +497,7 @@ public sealed class JointPlayer
     /// <summary>Called every frame after the game's animation (LateUpdate): poses every body a clip is playing on.</summary>
     internal static void TickAll()
     {
-        var now = Time.time;
+        var now = ForgeCore.Frame.GameTime; // this frame's Time.time, read once by ForgeCore
         for (var i = Active.Count - 1; i >= 0; i--)
         {
             var player = Active[i];
@@ -496,9 +508,21 @@ public sealed class JointPlayer
                 player._playing = 0;
                 continue;
             }
+            if (player.Manual) continue;
             // One body's failure does not stop the others from posing this frame.
             try { player.PoseAll(now); } catch (Exception error) { Scene.StepFailed("joint clips", error); }
         }
+    }
+
+    /// <summary>Set: ForgeCore does not pose this body in its late update; its owner calls <see cref="Pose()"/> each frame where its other
+    /// posing of the same bones comes before or after it (a hand shape over a skin's finger turns, in the first-person holder's
+    /// <c>LateUpdate</c>), so which wins does not depend on the order Unity runs the scripts in.</summary>
+    public bool Manual { get; set; }
+
+    /// <summary>Poses the body now for the clips playing on it (for a <see cref="Manual"/> body; once a frame, after the game animated it).</summary>
+    public void Pose()
+    {
+        if (_playing > 0 && _root != null && !_root.WasCollected) PoseAll(ForgeCore.Frame.GameTime); // this frame's Time.time, read once by ForgeCore
     }
 
     /// <summary>Stops every clip (the level ended or a checkpoint reloaded): the bodies they were on are gone or rebuilt.</summary>

@@ -108,7 +108,7 @@ sealed class Flash : ITriggered
         {
             _rest[i] = materials[i].GetColor(SkinnedGear.EmissiveColor);
             _emissive[i] = materials[i].IsKeywordEnabled(SkinnedGear.EmissiveKeyword);
-            _peak[i] = ForgeVisual.Glow.Value(materials[i], ForgeVisual.Glow.EmissiveColorName, new Color(e.Color[0], e.Color[1], e.Color[2]), e.Intensity * MaterialParams.EmissionUnit);
+            _peak[i] = ForgeVisual.Glow.Value(materials[i], ForgeVisual.Glow.EmissiveColorName, new Color(e.Color[0], e.Color[1], e.Color[2]), e.Intensity * ForgeVisual.ColourSpace.EmissionPerUnit);
         }
         _seconds = Math.Max(e.Seconds, 0.01f);
     }
@@ -180,12 +180,16 @@ sealed class CharmLook
     readonly float[] _v, _n;
     readonly double[] _matrix = new double[16], _pose = new double[7], _body = new double[3];
 
+    // Every charm's root (its attachment's), for what must not count a charm's swinging meshes as the gear's (Inspect's bounds).
+    public static readonly HashSet<IntPtr> Roots = new();
+
     // `anchor`: the root's localToWorldMatrix as Read writes it, already read by the caller.
     public CharmLook(CharmRope rope, Transform root, double[] anchor, Transform pendant, Mesh mesh)
     {
         _rope = rope;
         _root = root;
         _pendant = pendant;
+        Roots.Add(root.Pointer);
         _mesh = mesh;
         int count = rope.VertexCount;
         _v = new float[count * 3];
@@ -221,11 +225,8 @@ sealed class CharmLook
         _pendant.SetPositionAndRotation(new Vector3((float)_pose[0], (float)_pose[1], (float)_pose[2]),
             new Quaternion((float)_pose[3], (float)_pose[4], (float)_pose[5], (float)_pose[6]));
         _rope.Mesh(_matrix, _v, _n);
-        for (int i = 0, o = 0; o < _v.Length; i++, o += 3)
-        {
-            _vertices[i] = new Vector3(_v[o], _v[o + 1], _v[o + 2]);
-            _normals[i] = new Vector3(_n[o], _n[o + 1], _n[o + 2]);
-        }
+        ForgeCore.Il2CppArrays.Overwrite(_vertices, _v);
+        ForgeCore.Il2CppArrays.Overwrite(_normals, _n);
         _mesh.vertices = _vertices;
         _mesh.normals = _normals;
     }

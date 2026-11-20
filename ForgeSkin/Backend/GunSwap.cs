@@ -15,8 +15,9 @@ namespace ForgeSkin.Backend;
 // and aim point go to the model's own when it has them, else stay the gun's.
 public static class GunSwap
 {
-    // ForgeCore GunNodes socket names (Visual/Native/Models.cs), keyed by the editor's hold point names.
-    static readonly (string Point, string Socket)[] Sockets = [("rightHand", "RightHand"), ("leftHand", "LeftHand"), ("muzzle", "muzzle"), ("sight", "SightLook")];
+    // ForgeCore GunNodes socket names (Visual/Native/Models.cs), keyed by the editor's hold point names, and the node a flashlight
+    // model names where its light shines from (the editor puts the flashlight's light point there).
+    static readonly (string Point, string Socket)[] Sockets = [("rightHand", "RightHand"), ("leftHand", "LeftHand"), ("muzzle", "muzzle"), ("sight", "SightLook"), ("light", "light")];
 
     static GunHoldRules? _rules;
     public static GunHoldRules Rules => _rules ??= ReadRules();

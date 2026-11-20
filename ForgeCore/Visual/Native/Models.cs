@@ -150,7 +150,8 @@ public static class Models
     /// <summary>Copies the pose of a body whose bones the caller found itself (an enemy, by the bone paths its content names) onto
     /// <paramref name="target"/>: <paramref name="bones"/>[i] is the body bone of link i and <paramref name="rest"/>[i] its rest pose in
     /// <paramref name="body"/>'s frame (read it from the body's model as the game ships it when the live body's meshes may have been
-    /// reshaped). <paramref name="animator"/>, when given, animates the body even while it is not drawn, until <see cref="PoseCopy.Release"/>.
+    /// reshaped). <paramref name="animator"/>, when given, animates the body even while the body's own renderers are hidden, until
+    /// <see cref="PoseCopy.Release"/>; once the copy follows (<see cref="PoseCopy.Follow"/>) only while the model is drawn or in view.
     /// Null (logged once) when a bone is missing or the counts disagree.</summary>
     public static PoseCopy? CopyPose(Transform body, IReadOnlyList<Transform> bones, IReadOnlyList<Matrix4x4> rest, Animator? animator, PoseTarget target, string label)
     {
@@ -215,6 +216,19 @@ public static class Models
     {
         if (body == null || body.WasCollected) throw new ArgumentNullException(nameof(body));
         return JointPlayer.Bind(body, _ => IkPause.None, label, out refusal);
+    }
+
+    /// <summary>Plays <see cref="JointClip"/>s on a pair of arms animated by <paramref name="arms"/> with no body below them (the game's own
+    /// first-person arms, <c>FPSArms.m_anim</c>): its bones are the animator's humanoid bones from the shoulders to the finger tips, there is no
+    /// IK to pause and its clips are not reported to ForgeCore <c>Recording</c>. A clip masked to the fingers (<see cref="BodyPart.LeftFingers"/>,
+    /// <see cref="BodyPart.RightFingers"/>, a shape from <see cref="ClipFingers"/>) shapes a hand while the game's IK keeps placing it; set
+    /// <see cref="JointPlayer.Manual"/> and call <see cref="JointPlayer.Pose()"/> after your own finger posing to put the shape over it. Bind once
+    /// per arms. Null (logged once) when the arms cannot take a clip, with <paramref name="refusal"/> saying why, as
+    /// <see cref="BindJoints(EnemyAgent, out string)"/>.</summary>
+    public static JointPlayer? BindArms(Animator arms, string label, out string? refusal)
+    {
+        if (arms == null || arms.WasCollected) throw new ArgumentNullException(nameof(arms));
+        return JointPlayer.Bind(arms, _ => IkPause.None, label, out refusal, RigShape.Arms);
     }
 
     /// <summary>Arms in front of the local player's first-person camera that play <see cref="JointClip"/>s: see <see cref="FirstPersonArms"/>.

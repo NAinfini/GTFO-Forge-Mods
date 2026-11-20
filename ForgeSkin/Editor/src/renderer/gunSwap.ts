@@ -90,15 +90,24 @@ function apply(d: SkinDocument, id: string, seat: GunSeat, parts: string[]) {
   ];
   for (const [point, at] of points) {
     const key = useStore.getState().preview?.points?.find((p) => p.point === point);
-    const obj = key && partTarget(key.part, key.path);
-    const vanilla = obj && viewRefs.vanilla.get(obj);
-    if (!key || !obj?.parent || !vanilla) continue;
-    const e = entry(key.part, key.path);
     // A point the model does not give stays the game's.
-    e.position = at ? overridesFor(vanilla, threeToUnity(obj.parent.worldToLocal(world(at)).sub(displayOffset(obj)), vanilla.quaternion, vanilla.scale)).position : null;
-    e.rotation = null;
+    if (key) placePoint(d, key, at && world(at));
   }
   dropEmptyParts(d);
+}
+
+/** Puts the point node `key` (a hold point or a flashlight's light) at `at`, a world point of the 3D view, as its part layout
+ * entry's position in `d`; its game rotation is kept. Null puts it back where the game has it. False when the node is not in
+ * the view. */
+export function placePoint(d: SkinDocument, key: { part: string; path: string }, at: Vector3 | null): boolean {
+  const obj = partTarget(key.part, key.path);
+  const vanilla = obj && viewRefs.vanilla.get(obj);
+  if (!obj?.parent || !vanilla) return false;
+  let e = partTransformOf(d, key.part, key.path);
+  if (!e) d.parts!.push((e = { part: key.part, path: key.path, position: null, rotation: null, scale: null, visible: null }));
+  e.position = at ? overridesFor(vanilla, threeToUnity(obj.parent.worldToLocal(at.clone()).sub(displayOffset(obj)), vanilla.quaternion, vanilla.scale)).position : null;
+  e.rotation = null;
+  return true;
 }
 
 /** The seat of the model with `sockets` and `bounds` at `scale` (null: the rule's own), or null with a message logged. */

@@ -2,7 +2,7 @@
   "name": "ForgeSkin",
   "version_number": "1.0.2",
   "website_url": "https://github.com/NAinfini/GTFO-Forge-Mods",
-  "description": "Applies ForgeSkin packs (textures, attachments, live ammo screens, animated layers) to your own weapons.",
+  "description": "Applies ForgeSkin packs: weapon skins (textures, attachments, live ammo screens, animated layers, sights, whole-gun models), character models for you, your bots and other players, and a weapon inspect key.",
   "dependencies": [
     "BepInEx-BepInExPack_GTFO-3.2.4",
     "NAinfini-ForgeCore-1.0.3"

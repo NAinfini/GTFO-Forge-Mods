@@ -1,0 +1,19 @@
+{
+  "repository": "https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK",
+  "tag": "v2.4.0",
+  "commit": "7539ae8b6568ad29ed78a753404351daf3b5cca7",
+  "files": {
+    "Kits/FidelityFX/docs/license.md": "32357259b965d6a8001e9e508ba60eda6034027c5923a7d226ffbaff813c2bfb",
+    "Kits/FidelityFX/signedbin/amd_fidelityfx_loader_dx12.dll": "e2191d3c0828be45eb8affd4e3ec0378f2293adc345b772a7170edcf3b021ecb",
+    "Kits/FidelityFX/signedbin/amd_fidelityfx_upscaler_dx12.dll": "aad4fccccb29084a655f9a4f9f613bd22c8c03fb4a0f8840148cc6543b4ccace",
+    "Kits/FidelityFX/api/include/ffx_api.h": "4d9dcf243ef5efbf03340a02f16b51a22053243a22e8a9a0b3ce91c26982b4bf",
+    "Kits/FidelityFX/api/include/ffx_api_types.h": "53f07c113a9ba493f297656e4481b6539aed0afc9f3cc8da682aa477d270c46c",
+    "Kits/FidelityFX/api/include/ffx_api_loader.h": "18d1901dbbc881e8131b91c65ad44bb3b4a1de6c31435d5b75236f16727ba80e",
+    "Kits/FidelityFX/api/include/dx12/ffx_api_dx12.h": "c9afbc3c4c673723e9e5369a666f0ff54560543b5a93537f8ff453bf1c3bf530",
+    "Kits/FidelityFX/upscalers/include/ffx_upscale.h": "13091e7fe5fd9c82b1fb7c044b9f08f664d9653f599d2ea500738709236fca4d",
+    "Kits/FidelityFX/signedbin/amd_fidelityfx_framegeneration_dx12.dll": "e6843252f58b0341a0d80f6a20bc0d840643ee95bc48c22cac08745344577bb6",
+    "Kits/FidelityFX/framegeneration/include/ffx_framegeneration.h": "bc78a18aa95f5157b4699b0602700592b624788c5bc55d1762cb46a1b6557ca1",
+    "Kits/FidelityFX/framegeneration/include/ffx_framegeneration_api_types.h": "396596af3df63310674e8036abd2ad0fcd061e61334e7a2c76653a2be3c686b4",
+    "Kits/FidelityFX/framegeneration/include/dx12/ffx_api_framegeneration_dx12.h": "8ddb1cb78f83caf3598509df4968e84c851504cd6c00d9923261a5fc2c7ef0ed"
+  }
+}

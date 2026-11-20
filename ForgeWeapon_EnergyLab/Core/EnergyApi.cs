@@ -261,7 +261,7 @@ public static class EnergyLab
     /// <summary>BepInEx dependency GUID.</summary>
     public const string PluginId = "NAinfini.ForgeWeaponEnergyLab";
     /// <summary>Plugin package version.</summary>
-    public const string Version = "1.0.2"; // package-version: NAinfini-ForgeWeapon_EnergyLab
+    public const string Version = "1.0.3"; // package-version: NAinfini-ForgeWeapon_EnergyLab
     private static readonly object Gate = new();
     private static readonly Dictionary<string, WeaponDefinition> Definitions = new(StringComparer.Ordinal);
     private static readonly List<string> Order = new();

@@ -9,11 +9,11 @@ using GTFO.API;
 namespace ForgeReplay;
 
 [BepInPlugin(Id, "Forge Replay", Version)]
-[BepInDependency("NAinfini.ForgeCore", ">=1.0.1")]
+[BepInDependency("NAinfini.ForgeCore", ">=1.0.3")]
 [BepInDependency("dev.gtfomodding.gtfo-api", ">=0.6.1")]
 internal sealed class Plugin : BasePlugin
 {
-    internal const string Id = "NAinfini.ForgeReplay", Version = "1.0.1"; // package-version: NAinfini-ForgeReplay
+    internal const string Id = "NAinfini.ForgeReplay", Version = "1.0.2"; // package-version: NAinfini-ForgeReplay
 
     internal static ModLog Logger { get; private set; } = null!;
     internal static ConfigEntry<bool> RecordingEnabled = null!;

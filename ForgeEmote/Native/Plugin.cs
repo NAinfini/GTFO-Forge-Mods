@@ -10,7 +10,7 @@ namespace ForgeEmote;
 [BepInDependency("NAinfini.ForgeCore", ">=1.0.2")]
 internal sealed class Plugin : BasePlugin
 {
-    internal const string Id = "NAinfini.ForgeEmote", Version = "1.0.2"; // package-version: NAinfini-ForgeEmote
+    internal const string Id = "NAinfini.ForgeEmote", Version = "1.0.3"; // package-version: NAinfini-ForgeEmote
 
     internal static ModLog Logger { get; private set; } = null!;
     internal static BepInEx.Logging.ManualLogSource Info { get; private set; } = null!;

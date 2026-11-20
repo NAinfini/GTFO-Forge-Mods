@@ -55,9 +55,8 @@ internal sealed class LocalCorpseVisuals
         var entry = new Entry(state, enemy, parts, solids, deadline);
         _due.Enqueue(entry, (deadline, _order++)); _states.Add(state.Pointer, entry); _enemies[enemy.Pointer] = entry; Seen++;
     }
-    internal void Tick()
+    internal void Tick(float now)
     {
-        var now = Time.time;
         while (_due.TryPeek(out var top, out var due) && due.Deadline <= now)
         {
             _due.Dequeue();
@@ -180,6 +179,10 @@ internal sealed class LocalCorpseVisuals
 public sealed class LoadSheddingWatch : MonoBehaviour
 {
     public LoadSheddingWatch(IntPtr pointer) : base(pointer) { }
-    public void Update() => LoadSheddingController.Current?.Tick();
+    public void Update()
+    {
+        ForgePerformance.Crowd.Probe.Frame();
+        LoadSheddingController.Current?.Tick();
+    }
     public void OnDestroy() { if (!Plugin.Quitting) LoadSheddingController.Current?.EndLevel(); }
 }

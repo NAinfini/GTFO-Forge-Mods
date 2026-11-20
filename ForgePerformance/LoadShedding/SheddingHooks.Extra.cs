@@ -32,7 +32,11 @@ internal sealed partial class SheddingHooks
     {
         [HarmonyPrefix]
         private static void Prefix(ref Camera camera)
-        { if (IrfCulling.WorldCameraOnly && LoadSheddingController.Current is { Active: true }) IrfCulling.RedirectDraw(ref camera); }
+        {
+            var started = ForgePerformance.Crowd.Probe.Begin();
+            if (IrfCulling.WorldCameraOnly && LoadSheddingController.Current is { Active: true }) IrfCulling.RedirectDraw(ref camera);
+            ForgePerformance.Crowd.Probe.End(ForgePerformance.Crowd.ProbePoint.OwnIrfDraw, started);
+        }
     }
 
     [HarmonyPatch(typeof(InstancedRenderFeature), nameof(InstancedRenderFeature.LateUpdate))]
@@ -40,7 +44,34 @@ internal sealed partial class SheddingHooks
     {
         [HarmonyPrefix]
         private static bool Prefix(InstancedRenderFeature __instance)
-            => !(IrfCulling.OffscreenSkip && LoadSheddingController.Current is { Active: true } && IrfCulling.ShouldSkip(__instance.Pointer));
+        {
+            var started = ForgePerformance.Crowd.Probe.Begin();
+            var run = !(IrfCulling.OffscreenSkip && LoadSheddingController.Current is { Active: true } && IrfCulling.ShouldSkip(__instance.Pointer));
+            ForgePerformance.Crowd.Probe.End(ForgePerformance.Crowd.ProbePoint.OwnIrfLateUpdate, started);
+            return run;
+        }
+    }
+
+    // Runs once per instanced-render feature per frame; reads one static flag first and does nothing else while it is off.
+    [HarmonyPatch(typeof(InstancedRenderFeatureRenderer), nameof(InstancedRenderFeatureRenderer.Update))]
+    private static class IrfPhysics
+    {
+        [HarmonyPrefix]
+        private static bool Prefix(InstancedRenderFeatureRenderer __instance, ref float deltaTime, out long __state)
+        {
+            __state = ForgePerformance.Crowd.Probe.Begin();
+            return !IrfCulling.PhysicsHalfRate || LoadSheddingController.Current is not { Active: true } || IrfCulling.PhysicsUpdate(__instance.Pointer, ref deltaTime);
+        }
+        [HarmonyPostfix]
+        private static void Postfix(long __state) => ForgePerformance.Crowd.Probe.End(ForgePerformance.Crowd.ProbePoint.IrfRendererUpdate, __state);
+    }
+
+    // Every Debug.LogError(object) passes here; only the game's tentacle-limit message is held back (TentacleLimitErrorFold).
+    [HarmonyPatch(typeof(Debug), nameof(Debug.LogError), new[] { typeof(Il2CppSystem.Object) })]
+    private static class TentacleError
+    {
+        [HarmonyPrefix]
+        private static bool Prefix(Il2CppSystem.Object message) => !TentacleErrorFold.Hold(message);
     }
 
     [HarmonyPatch(typeof(Decay), nameof(Decay.Initialize), new[] { typeof(SkinnedMeshRenderer), typeof(Il2CppSystem.Collections.Generic.List<InstancedRenderFeature>) })]
@@ -69,7 +100,15 @@ internal sealed partial class SheddingHooks
 
     [HarmonyPatch(typeof(EnemyAgent), nameof(EnemyAgent.OnDestroy))]
     private static class LeakEnemy
-    { [HarmonyPrefix] private static void Prefix(EnemyAgent __instance) => LoadSheddingController.Current?.Extras?.LeakEnemy(__instance); }
+    {
+        // The probe counts destroyed enemies per frame here (only when LeakCleanup installs this patch).
+        [HarmonyPrefix]
+        private static void Prefix(EnemyAgent __instance)
+        {
+            ForgePerformance.Crowd.Probe.Count(ForgePerformance.Crowd.ProbePoint.EnemyDestroyed);
+            LoadSheddingController.Current?.Extras?.LeakEnemy(__instance);
+        }
+    }
 
     [HarmonyPatch(typeof(InfectionSpitter), nameof(InfectionSpitter.Awake))]
     private static class SpitterAwake

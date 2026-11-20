@@ -388,7 +388,7 @@ internal static class WeaponModels
             if (!Mounted[i].Gun.Alive) Mounted.RemoveAt(i);
         if (!_ready) return;
         AdvanceLoad();
-        UnloadIdle(Time.time);
+        UnloadIdle(ForgeCore.Frame.GameTime);
         for (var i = Pending.Count - 1; i >= 0; i--)
         {
             var pending = Pending[i];

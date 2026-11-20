@@ -152,7 +152,7 @@ public static partial class AudioKit
             if (target.GetComponent<AkGameObj>() == null) target.AddComponent<AkGameObj>();
             return Played(eventId, AkSoundEngine.PostEvent(eventId, target));
         }
-        catch (Exception error) { AudioLog.Report(AudioError.VoiceFailed, "Game sound event " + eventId + " could not be played on " + target.name + ": " + error); return null; }
+        catch (Exception error) { AudioLog.Report(AudioError.VoiceFailed, "Game sound event " + eventId + " could not be played on its target object: " + error); return null; }
         finally { PostingOwn = false; }
     }
 

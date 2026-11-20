@@ -27,12 +27,6 @@ sealed class AmmoScreen
     readonly Format.Hologram? _hologram; // every surface a hologram, glowing even with GlowInGame off
     readonly float[] _textColor;
     readonly float[]? _lowColor;
-    // Emission per step of the Glow slider. Measured on the game's own glowing gear materials (Cell/Player gear shaders,
-    // _EmissiveColor x _EmissiveMap): the flashlight lens 1.0, HSU lights 0.54, the bio tracker / sentry screens 0.45-0.74,
-    // shotgun illumination 0.07, the dimmest sight dots 0.006-0.035. With 0.2 the default Glow 1.5 gives 0.3 (between the
-    // shotgun lights and the HSU lights) and the slider's top, 5, matches the flashlight lens.
-    const float GlowUnit = 0.2f;
-
     readonly float _gain; // emission multiplier of text and border; 0: not emissive
     readonly float _lowFraction;
     readonly bool _gradient; // blend the low colour in as the clip approaches the threshold
@@ -57,7 +51,7 @@ sealed class AmmoScreen
         _label = gear.Label;
         _pad = s.PadZero;
         _template = template;
-        _gain = s.GlowInGame ? s.Glow * GlowUnit : 0f;
+        _gain = s.GlowInGame ? s.Glow * (hologram != null ? Holograms.PerGlow : ForgeVisual.ColourSpace.EmissionPerUnit) : 0f;
         _textColor = s.TextColor;
         float w = s.Size[0], h = s.Size[1], bw = Math.Min(s.BorderWidth, Math.Min(w, h) * 0.5f);
         // A styled border is a traced mesh, height 1 and as wide as the screen's aspect.
@@ -66,7 +60,7 @@ sealed class AmmoScreen
         else if (s.BorderColor[3] > 0.01f && bw > 0)
             gear.Child(root, "border", gear.Own(Frame(w, h, bw)), _border = Surface(gear, s.BorderColor, _gain), -Step);
         if (s.PanelColor[3] > 0.01f)
-            gear.Child(root, "panel", gear.Own(Quad(w - 2 * bw, h - 2 * bw)), Surface(gear, s.PanelColor, s.GlowInGame ? MaterialParams.EmissionUnit : 0f), 0f);
+            gear.Child(root, "panel", gear.Own(Quad(w - 2 * bw, h - 2 * bw)), Surface(gear, s.PanelColor, s.GlowInGame ? ForgeVisual.ColourSpace.EmissionPerUnit : 0f), 0f);
 
         _text = Surface(gear, s.TextColor, _gain);
         Surfaces.Remove(_text);

@@ -27,14 +27,17 @@ sealed class Picker : PickerSource
     public static void Register()
     {
         _ui = UIKit.Mod(ForgeSkinPlugin.Guid);
-        // On the player's own bar, and for the host on each bot's bar (the host picks what a bot wears, as the game has the host pick its loadout).
+        // On the player's own bar, for the host on each bot's bar (the host picks what a bot wears, as the game has the host pick its
+        // loadout), and, with a character pack installed, on every other player's bar (a character shown for them on this machine only).
         var button = _ui.AddLobbyButton("Skins", LobbyArea.Below, LobbyWidth.Half, UIText.Key("lobby.button"), Instance.Toggle,
-            visible: bar => bar.m_player is { } player && (player.IsBot ? SNetwork.SNet.IsMaster : player.IsLocal));
+            visible: bar => bar.m_player is { } player && (player.IsBot ? SNetwork.SNet.IsMaster : player.IsLocal || Skins.Candidates.ContainsKey(CharacterSkin.Target)));
         if (button != null) button.WithoutApparel = true;
     }
 
-    // Whose skins the open picker shows and picks: -1 the local player's, else the bot in that slot (Looks.ChooseBot).
-    static int _bot = -1;
+    // Whose skins the open picker shows and picks: -1 the local player's, else the bot in that slot (Looks.ChooseBot), or the other
+    // player in that slot, whose character only (Looks.ChooseSlot).
+    static int _bot = -1, _other = -1;
+    static SNetwork.SNet_Player? _otherPlayer;
 
     // A pick or reload changed what the open picker shows.
     public static void Changed()
@@ -47,9 +50,12 @@ sealed class Picker : PickerSource
         if (!UIKit.IsShowing(this))
         {
             _bot = bar.m_player is { IsBot: true } bot ? bot.PlayerSlotIndex() : -1;
+            _otherPlayer = bar.m_player is { IsBot: false, IsLocal: false } other ? other : null;
+            _other = _otherPlayer?.PlayerSlotIndex() ?? -1;
             _keys.Clear();
-            // The character first (only with a character pack installed), then the gear by name.
-            _keys.AddRange(Skins.Candidates.Keys.OrderBy(k => k != CharacterSkin.Target).ThenBy(Name, StringComparer.CurrentCultureIgnoreCase));
+            // The character first (only with a character pack installed), then the gear by name; for another player the character alone.
+            _keys.AddRange(Skins.Candidates.Keys.Where(k => _other < 0 || k == CharacterSkin.Target)
+                .OrderBy(k => k != CharacterSkin.Target).ThenBy(Name, StringComparer.CurrentCultureIgnoreCase));
         }
         UIKit.TogglePicker(bar, this);
     }
@@ -90,7 +96,7 @@ sealed class Picker : PickerSource
 
     string? Key(int slot) => slot >= 0 && slot < _keys.Count ? _keys[slot] : null;
     static List<Skin> SkinsOf(string key) => Skins.Candidates.GetValueOrDefault(key) ?? new();
-    static Skin? Worn(string key) => _bot >= 0 ? Looks.BotPick(_bot, key) : Skins.Targets.TryGetValue(key, out var id) ? Skins.ById.GetValueOrDefault(id) : null;
+    static Skin? Worn(string key) => _bot >= 0 ? Looks.BotPick(_bot, key) : _other >= 0 ? Looks.SlotPick(_other) : Skins.Targets.TryGetValue(key, out var id) ? Skins.ById.GetValueOrDefault(id) : null;
     static string Title(Skin skin) => skin.Doc.Name.Length > 0 ? skin.Doc.Name : skin.Doc.Id;
 
     // A card's line under the name: the author.
@@ -133,7 +139,7 @@ sealed class Picker : PickerSource
         if (Key(slot) is not { } key) return Array.Empty<PickerCard>();
         var worn = Worn(key);
         // Each skin's card shows its pack's picture (read in the background; the picker is refreshed as each arrives).
-        var cards = new List<PickerCard> { new() { Title = T("picker.original"), Equipped = worn == null ? 1 : 0, Icon = Picture(key, null) } };
+        var cards = new List<PickerCard> { new() { Title = T(_other >= 0 ? "picker.followOwn" : "picker.original"), Equipped = worn == null ? 1 : 0, Icon = Picture(key, null) } };
         foreach (var skin in SkinsOf(key))
             cards.Add(new PickerCard { Title = Title(skin), Subtitle = Author(skin), Equipped = skin == worn ? 1 : 0, Icon = Picture(key, skin) });
         return cards;
@@ -198,7 +204,8 @@ sealed class Picker : PickerSource
             SchemeControls = _colourRows,
             Controls = _controls,
         };
-        if (Of(key, entry) is not { } skin) return panel;
+        // Another player's slot has no adjustments: they are this player's own values for the skin.
+        if (_other >= 0 || Of(key, entry) is not { } skin) return panel;
         _shown = skin;
         var mine = _mine == skin;
         var id = skin.Doc.Id;
@@ -294,6 +301,16 @@ sealed class Picker : PickerSource
             coming ? T("picker.previewLoading") : old ? MenuText.Tint(T("picker.previewOld"), MenuTone.Warn) : "",
             skin?.Doc.PlayerColors?.Count > 0 ? T("picker.coloursInLobby") : "",
         }.Where(l => l.Length > 0));
+        if (_otherPlayer != null)
+        {
+            // Another player's slot: what a pick here does, and whether their own choice keeps it off now.
+            var name = _otherPlayer.NickName;
+            var own = Looks.HasOwnCharacter(_otherPlayer) ? MenuText.Tint(T("picker.otherOwnNow", name), MenuTone.Warn) : "";
+            var body = string.Join("\n", new[] { T(skin == null ? "picker.followOwnBody" : "picker.forOtherBody", name), own, skin == null ? "" : waiting }.Where(l => l.Length > 0));
+            return skin == null
+                ? new PickerInfo { Title = T("picker.followOwn"), Subtitle = name, Icon = picture, Body = WithNotes(body) }
+                : new PickerInfo { Title = Title(skin), Subtitle = skin.Doc.Author.Length > 0 ? Author(skin) : name, Icon = picture, Body = WithNotes(body) };
+        }
         if (skin == null)
         {
             // Skins for every gear (not chosen here) stay on under the original look.
@@ -317,6 +334,7 @@ sealed class Picker : PickerSource
         _mine = null;
         var id = entry > 0 && entry <= skins.Count ? skins[entry - 1].Doc.Id : "";
         if (_bot >= 0) Looks.ChooseBot(_bot, key, id);
+        else if (_other >= 0) Looks.ChooseSlot(_other, id);
         else Skins.Choose(key, id);
         return null;
     }

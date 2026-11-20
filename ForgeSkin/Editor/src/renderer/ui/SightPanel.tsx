@@ -1,5 +1,5 @@
 // 整把枪 · 瞄准镜 (sight.ts): the lens, its reticle, the zoom and the aim point, as the game draws a sight.
-import { Button, Group, Select, Text } from '@mantine/core';
+import { Button, Group, Select, Text, Tooltip } from '@mantine/core';
 import { IconAdjustments, IconCrosshair, IconEye, IconFocus2, IconHandClick, IconSquarePlus, IconTarget, IconTrash, IconZoomIn } from '@tabler/icons-react';
 import { addPane, aimAtLens, aimPoint, editSight, LENS, lensStyles, sightView, useSights, useSightView, zoomSteps } from '../sight';
 import { useStore } from '../store';
@@ -95,9 +95,11 @@ export function SightPanel() {
               <Button size="xs" variant="light" onClick={() => useStore.getState().select({ kind: 'part', id: point.part, sub: point.path })}>
                 {t('sight.selectAim')}
               </Button>
-              <Button size="xs" variant="light" disabled={!lens} onClick={() => aimAtLens() || useStore.getState().toast('error', t('sight.aimFailed'))}>
-                {t('sight.aimAtLens')}
-              </Button>
+              <Tooltip label={t('sight.aimNeedsLens')} disabled={!!lens}>
+                <Button size="xs" variant="light" data-disabled={!lens || undefined} onClick={() => lens && (aimAtLens() || useStore.getState().toast('error', t('sight.aimFailed')))}>
+                  {t('sight.aimAtLens')}
+                </Button>
+              </Tooltip>
             </Group>
           </>
         ) : (

@@ -49,8 +49,8 @@ public sealed class GameCompass
 
     private void Read()
     {
-        if (_frame == Time.frameCount) return;
-        _frame = Time.frameCount;
+        if (_frame == ForgeCore.Frame.Count) return;
+        _frame = ForgeCore.Frame.Count;
         _reading.Begin();
         try
         {

@@ -3,6 +3,7 @@ import { IDENTITY, overridesFor, poseWith, type UnityPose, type Vec3 } from '../
 import { partTransformOf, useStore } from '../store';
 import { layoutTarget, viewRefs } from '../viewport/refs';
 import { TransformBlock } from './TransformBlock';
+import { LightStays } from './PartModel';
 import { t } from '../i18n';
 
 const v3 = (a: number[] | undefined, d: Vec3): Vec3 => (a && a.length === 3 ? (a as Vec3) : d);
@@ -17,14 +18,17 @@ function PartLayout({ part: selected, path: selectedPath }: { part: string; path
   if (!vanilla) return null;
   const { setPartTransform, resetPartTransform } = useStore.getState();
   return (
-    <TransformBlock
-      title={path ? t('selectionLayout.k1', { v0: path.split('/').pop() }) : t('selectionLayout.k2')}
-      pose={poseWith(vanilla, entry)}
-      onChange={(pose, key) => setPartTransform(part, path, (x) => void Object.assign(x, overridesFor(vanilla, pose)), key)}
-      onReset={(row) => resetPartTransform(part, path, row)}
-      visible={entry?.visible !== false}
-      onVisible={(v) => setPartTransform(part, path, (x) => void (x.visible = v ? null : false))}
-    />
+    <>
+      <TransformBlock
+        title={path ? t('selectionLayout.k1', { v0: path.split('/').pop() }) : t('selectionLayout.k2')}
+        pose={poseWith(vanilla, entry)}
+        onChange={(pose, key) => setPartTransform(part, path, (x) => void Object.assign(x, overridesFor(vanilla, pose)), key)}
+        onReset={(row) => resetPartTransform(part, path, row)}
+        visible={entry?.visible !== false}
+        onVisible={(v) => setPartTransform(part, path, (x) => void (x.visible = v ? null : false))}
+      />
+      <LightStays part={part} path={path} />
+    </>
   );
 }
 

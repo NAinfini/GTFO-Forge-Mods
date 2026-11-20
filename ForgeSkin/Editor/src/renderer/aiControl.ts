@@ -17,6 +17,7 @@ import { addImageHologram, addShape, MENU_SHAPES, PICTURE_TYPES, SHAPES, type Sh
 import { addHoloSet, HOLO_SETS, type HoloSet } from './holoSets';
 import { hologramEffects } from './hologram';
 import { placeOnSurface } from './viewport/ModalTransform';
+import { useCharacter } from './character/state';
 
 class AiError extends Error {
   constructor(
@@ -335,10 +336,11 @@ const COMMANDS: Record<string, { args: string; run: Handler }> = {
     }),
   },
   selectWeapon: {
-    args: '{id}: opens an item (waits for its 3D view)',
+    args: '{id}: opens an item in the weapon view, leaving a character model (waits for its 3D view)',
     run: async (a) => {
       const id = need<string>(a, 'id', isStr);
       if (!st().catalog.some((c) => c.id === id)) fail('not-found', `no item "${id}" (listWeapons)`);
+      useCharacter.setState({ mode: 'weapon' }); // as the works list's 武器皮肤 switch does: the weapon view shows again
       await st().selectWeapon(id);
       await viewReady();
       return { weaponId: st().weaponId, skinId: st().doc.id };

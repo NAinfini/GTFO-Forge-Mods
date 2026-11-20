@@ -43,7 +43,7 @@ internal static class MenuBar
         internal IntPtr Route;
         internal MenuBarPage? Page;
         internal int ClosedFrame = -1;
-        internal MenuBarTooltip? Tip;
+        internal MenuItemTooltip? Tip;
         internal bool TipTried;
     }
 
@@ -192,7 +192,8 @@ internal static class MenuBar
         {
             if (!hover || entry.TipTried || entry.Registration.Tooltip == null) return;
             entry.TipTried = true;
-            entry.Tip = MenuBarTooltip.On(item);
+            // The bar is the top of the screen: no room above, so the box goes under the button.
+            entry.Tip = MenuItemTooltip.On(item, box => new Rect(box.CenterX() - box.Width() * 4f, box.YMin() - box.Height() * 6f, box.Width() * 8f, box.Height() * 7f));
             if (entry.Tip == null) return;
         }
         entry.Tip.Show(hover ? entry.Registration.ShownTooltip : null, hover);

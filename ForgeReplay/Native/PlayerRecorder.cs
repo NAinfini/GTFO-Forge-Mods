@@ -68,6 +68,15 @@ internal static class PlayerRecorder
         return Parts[slot] = new PlayerParts { Agent = agent.Pointer, Damage = agent.Damage, Locomotion = agent.Locomotion, Inventory = agent.Inventory, Owner = agent.Owner, Holder = agent.FPItemHolder };
     }
 
+    /// <summary>The slot of the player whose agent object is at <paramref name="agent"/>, from the parts this tick read (every present
+    /// player's); -1 for any other object.</summary>
+    internal static int SlotOfAgent(IntPtr agent)
+    {
+        for (var slot = 0; slot < Parts.Length; slot++)
+            if (Parts[slot] is { } parts && parts.Agent == agent) return slot;
+        return -1;
+    }
+
     internal static uint Now => (uint)Clock.ElapsedMilliseconds;
 
     /// <summary>Counts an event the recorder just wrote, for the summary at the end of the file. Only the kinds the summary holds are read.</summary>

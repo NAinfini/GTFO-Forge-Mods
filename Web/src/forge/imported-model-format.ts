@@ -31,8 +31,14 @@ export function importedModelAdvice(descriptor: ImportedModelDescriptor): string
     return out;
 }
 
-/** 子网格的索引数之和：游戏按它建网格，子网格可以重叠，所以它可以大于 `mesh.indices`；面数与内存都按它算。 */
-export const importedDrawnIndices = (descriptor: ImportedModelDescriptor) => descriptor.submeshes.reduce((total, submesh) => total + submesh.count, 0);
+/** 子网格的索引数之和（朝向镜头的子件也算）：游戏按它建网格，子网格可以重叠，所以它可以大于 `mesh.indices`；面数与内存都按它算。 */
+export const importedDrawnIndices = (descriptor: ImportedModelDescriptor) =>
+    [descriptor.submeshes, ...(descriptor.facing ?? []).map(part => part.submeshes)].reduce(
+        (total, list) => total + list.reduce((sum, submesh) => sum + submesh.count, 0),
+        0
+    );
+/** 不转的那部分的顶点数：朝向镜头的子件的顶点接在它后面。 */
+export const importedStillVertices = (descriptor: ImportedModelDescriptor) => descriptor.facing?.[0]?.vertexStart ?? descriptor.mesh.vertices;
 export const importedMeshHeaderBytes = 16;
 const meshMagic = 0x48534d46;
 /** 每顶点：位置 3、法线 3、UV 2 个 float。 */
@@ -61,7 +67,16 @@ export type ImportedModelMaterial = {
 };
 /** 一根蒙皮骨骼：`parent` 是骨骼表里更靠前的下标（根为 -1），`rest` 是它在模型自身坐标（游戏轴）里的静止姿态，列主序 4×4。 */
 export type ImportedModelBone = {name: string; parent: number; rest: number[]};
-/** 格式 1 是静态模型；格式 2 多一份蒙皮骨架 `skin`，mesh 旁文件也是格式 2（多每顶点的四骨权重）。 */
+/** 一个碰撞形状（源文件里一个 `COL_` 节点）的顶点数与索引数；几何在 mesh 旁文件末尾，按描述符顺序。 */
+export type ImportedCollisionShape = {vertices: number; indices: number};
+type ImportedSubmesh = {start: number; count: number; material: number};
+/** A part that turns about the world's vertical axis to face the camera (a `FACE_` node of the source): its vertices are the run
+ *  `vertexStart`..+`vertexCount` of the mesh (after the still part's, parts in order), stored in its own frame: origin at `pivot`
+ *  (the node's origin in the model's frame) and its front (the node's +Z) along +Z. `yaw` (radians, Unity's turn about +Y) is the turn
+ *  that stands it as authored; its `submeshes` index only its own vertices. */
+export type ImportedFacingPart = {vertexStart: number; vertexCount: number; pivot: [number, number, number]; yaw: number; submeshes: ImportedSubmesh[]};
+/** 格式 1 是静态模型；格式 2 多一份蒙皮骨架 `skin`，mesh 旁文件也是格式 2（多每顶点的四骨权重）。`collision` 只在静态模型上、
+ *  且只在源文件带 `COL_` 节点时出现：游戏按它建碰撞，不画。 */
 export type ImportedModelDescriptor = {
     format: 1 | 2;
     mesh: {sha256: string; vertices: number; indices: number};
@@ -69,6 +84,8 @@ export type ImportedModelDescriptor = {
     materials: ImportedModelMaterial[];
     textures: {sha256: string; width: number; height: number}[];
     skin?: {bones: ImportedModelBone[]};
+    collision?: ImportedCollisionShape[];
+    facing?: ImportedFacingPart[];
 };
 
 const hashPattern = /^[0-9a-f]{64}$/;
@@ -104,7 +121,19 @@ function fields(value: unknown, names: readonly string[], code: string): asserts
 /** 描述符的结构读法，规则与 ForgeVisual `ImportedModelDescriptor.Parse` 一致；多余字段、缺字段、越界都拒绝。 */
 export function readImportedModelDescriptor(value: unknown): ImportedModelDescriptor {
     requireImported(isRecord(value) && (value.format === 1 || value.format === 2), 'descriptor-shape');
-    fields(value, ['format', 'mesh', 'submeshes', 'materials', 'textures', ...(value.format === 2 ? ['skin'] : [])], 'descriptor-shape');
+    fields(
+        value,
+        [
+            'format',
+            'mesh',
+            'submeshes',
+            'materials',
+            'textures',
+            ...(value.format === 2 ? ['skin'] : []),
+            ...['collision', 'facing'].filter(name => Object.hasOwn(value, name))
+        ],
+        'descriptor-shape'
+    );
     const mesh = value.mesh;
     fields(mesh, ['sha256', 'vertices', 'indices'], 'descriptor-shape');
     requireImported(typeof mesh.sha256 === 'string' && hashPattern.test(mesh.sha256), 'descriptor-hash');
@@ -173,29 +202,32 @@ export function readImportedModelDescriptor(value: unknown): ImportedModelDescri
             emissiveTexture: emissiveTexture as number
         };
     });
-    requireImported(Array.isArray(value.submeshes) && value.submeshes.length >= 1, 'descriptor-submesh');
     let drawn = 0;
-    const submeshes = value.submeshes.map(submesh => {
-        fields(submesh, ['start', 'count', 'material'], 'descriptor-submesh');
-        const {start, count, material} = submesh as {start: number; count: number; material: number};
-        requireImported(
-            Number.isSafeInteger(start) &&
-                Number.isSafeInteger(count) &&
-                Number.isSafeInteger(material) &&
-                start >= 0 &&
-                count >= 3 &&
-                start % 3 === 0 &&
-                count % 3 === 0 &&
-                start + count <= (indices as number) &&
-                material >= 0 &&
-                material < materials.length,
-            'descriptor-submesh'
-        );
-        // 同一段索引列两次算两次：游戏把所有子网格建成一个索引数组（与 ForgeVisual `DrawnIndices` 一致）。
-        drawn += count;
-        requireImported(drawn <= formatLimits.arrayBytes, 'descriptor-submesh');
-        return {start, count, material};
-    });
+    const readSubmeshes = (list: unknown, code: string): ImportedSubmesh[] => {
+        requireImported(Array.isArray(list) && list.length >= 1, code);
+        return list.map(submesh => {
+            fields(submesh, ['start', 'count', 'material'], code);
+            const {start, count, material} = submesh as ImportedSubmesh;
+            requireImported(
+                Number.isSafeInteger(start) &&
+                    Number.isSafeInteger(count) &&
+                    Number.isSafeInteger(material) &&
+                    start >= 0 &&
+                    count >= 3 &&
+                    start % 3 === 0 &&
+                    count % 3 === 0 &&
+                    start + count <= (indices as number) &&
+                    material >= 0 &&
+                    material < materials.length,
+                code
+            );
+            // 同一段索引列两次算两次：游戏把所有子网格建成一个索引数组（与 ForgeVisual `DrawnIndices` 一致）。
+            drawn += count;
+            requireImported(drawn <= formatLimits.arrayBytes, code);
+            return {start, count, material};
+        });
+    };
+    const submeshes = readSubmeshes(value.submeshes, 'descriptor-submesh');
     const out: ImportedModelDescriptor = {
         format: value.format as 1 | 2,
         mesh: {sha256: mesh.sha256 as string, vertices: vertices as number, indices: indices as number},
@@ -204,6 +236,48 @@ export function readImportedModelDescriptor(value: unknown): ImportedModelDescri
         textures
     };
     if (value.format === 2) out.skin = {bones: readBones(value.skin)};
+    if (Object.hasOwn(value, 'collision')) {
+        // 碰撞只给静态模型：蒙皮模型跟着骨头动，静态碰撞体跟不上。
+        requireImported(value.format === 1 && Array.isArray(value.collision) && value.collision.length >= 1, 'descriptor-collision');
+        out.collision = value.collision.map(shape => {
+            fields(shape, ['vertices', 'indices'], 'descriptor-collision');
+            const {vertices: count, indices: total} = shape as ImportedCollisionShape;
+            requireImported(Number.isSafeInteger(count) && count >= 3 && Number.isSafeInteger(total) && total >= 3 && total % 3 === 0, 'descriptor-collision');
+            return {vertices: count, indices: total};
+        });
+        requireImported(importedMeshFits(vertices as number, indices as number, false, out.collision), 'descriptor-collision');
+    }
+    if (Object.hasOwn(value, 'facing')) {
+        // 朝向镜头只给静态模型；子件的顶点按顺序接在不转的部分之后，一直到最后一个顶点。
+        requireImported(value.format === 1 && Array.isArray(value.facing) && value.facing.length >= 1, 'descriptor-facing');
+        let next = -1;
+        out.facing = value.facing.map(part => {
+            fields(part, ['vertexStart', 'vertexCount', 'pivot', 'yaw', 'submeshes'], 'descriptor-facing');
+            const {vertexStart, vertexCount, pivot, yaw} = part as ImportedFacingPart;
+            requireImported(
+                Number.isSafeInteger(vertexStart) &&
+                    Number.isSafeInteger(vertexCount) &&
+                    vertexStart >= 3 &&
+                    vertexCount >= 3 &&
+                    (next < 0 || vertexStart === next) &&
+                    Array.isArray(pivot) &&
+                    pivot.length === 3 &&
+                    pivot.every(entry => typeof entry === 'number' && Number.isFinite(Math.fround(entry))) &&
+                    typeof yaw === 'number' &&
+                    Number.isFinite(Math.fround(yaw)),
+                'descriptor-facing'
+            );
+            next = vertexStart + vertexCount;
+            return {
+                vertexStart,
+                vertexCount,
+                pivot: [pivot[0], pivot[1], pivot[2]],
+                yaw,
+                submeshes: readSubmeshes((part as {submeshes: unknown}).submeshes, 'descriptor-facing')
+            };
+        });
+        requireImported(next === vertices, 'descriptor-facing');
+    }
     return out;
 }
 
@@ -279,21 +353,31 @@ export interface ImportedMeshSkin {
     joints: Uint16Array;
     weights: Float32Array;
 }
-const meshBytes = (vertices: number, indices: number, skinned: boolean) =>
-    importedMeshHeaderBytes + vertices * importedMeshVertexBytes + indices * 4 + (skinned ? vertices * importedMeshSkinBytes : 0);
-/** 这些顶点与索引的 mesh 旁文件能否被游戏整份读成一个字节数组。 */
-export const importedMeshFits = (vertices: number, indices: number, skinned: boolean) => meshBytes(vertices, indices, skinned) <= formatLimits.arrayBytes;
+/** 一个碰撞形状的几何：每顶点 3 个 float 位置，每三角 3 个 uint32 索引（模型自身坐标、Unity 轴与绕向）。 */
+export interface ImportedCollisionMesh {
+    positions: Float32Array;
+    indices: Uint32Array;
+}
+const collisionBytes = (shapes: readonly ImportedCollisionShape[] = []) => shapes.reduce((total, shape) => total + shape.vertices * 12 + shape.indices * 4, 0);
+const meshBytes = (vertices: number, indices: number, skinned: boolean, collision?: readonly ImportedCollisionShape[]) =>
+    importedMeshHeaderBytes + vertices * importedMeshVertexBytes + indices * 4 + (skinned ? vertices * importedMeshSkinBytes : 0) + collisionBytes(collision);
+/** 这些顶点与索引（和碰撞形状）的 mesh 旁文件能否被游戏整份读成一个字节数组。 */
+export const importedMeshFits = (vertices: number, indices: number, skinned: boolean, collision?: readonly ImportedCollisionShape[]) =>
+    meshBytes(vertices, indices, skinned, collision) <= formatLimits.arrayBytes;
 /** mesh 旁文件：`FMSH`、格式（1 静态、2 蒙皮）、顶点数、索引数（各 uint32 小端），然后每顶点 8 个 float，然后 uint32 索引；
- *  格式 2 再接每顶点 4 个 uint16 骨骼下标与 4 个 float 权重。 */
+ *  格式 2 再接每顶点 4 个 uint16 骨骼下标与 4 个 float 权重。描述符列了 `collision` 时，末尾按顺序接每个碰撞形状的位置（每顶点 3 个
+ *  float）与索引（uint32）；没有碰撞的模型字节不变。 */
 export function writeImportedMesh(
     positions: Float32Array,
     normals: Float32Array,
     uvs: Float32Array,
     indices: Uint32Array,
-    skin?: ImportedMeshSkin
+    skin?: ImportedMeshSkin,
+    collision: readonly ImportedCollisionMesh[] = []
 ): Uint8Array {
     const vertices = positions.length / 3,
-        bytes = new Uint8Array(meshBytes(vertices, indices.length, !!skin)),
+        shapes = collision.map(shape => ({vertices: shape.positions.length / 3, indices: shape.indices.length})),
+        bytes = new Uint8Array(meshBytes(vertices, indices.length, !!skin, shapes)),
         view = new DataView(bytes.buffer);
     view.setUint32(0, meshMagic, true);
     view.setUint32(4, skin ? 2 : 1, true);
@@ -311,6 +395,10 @@ export function writeImportedMesh(
             for (let k = 0; k < 4; k++, at += 2) view.setUint16(at, skin.joints[vertex * 4 + k]!, true);
             for (let k = 0; k < 4; k++, at += 4) view.setFloat32(at, skin.weights[vertex * 4 + k]!, true);
         }
+    for (const shape of collision) {
+        for (const value of shape.positions) (view.setFloat32(at, value, true), (at += 4));
+        for (const value of shape.indices) (view.setUint32(at, value, true), (at += 4));
+    }
     return bytes;
 }
 
@@ -320,12 +408,15 @@ export interface ImportedMeshData {
     uvs: Float32Array;
     indices: Uint32Array;
     skin?: ImportedMeshSkin;
+    /** 描述符 `collision` 的每个形状，同序；没有碰撞时为空。 */
+    collision: ImportedCollisionMesh[];
 }
-/** 读 mesh 旁文件并做 ForgeVisual 同样的检查：长度、文件头、有限数、可用法线、索引不越过顶点；蒙皮的骨骼下标在骨骼表内、权重非负且和为 1。 */
+/** 读 mesh 旁文件并做 ForgeVisual 同样的检查：长度、文件头、有限数、可用法线、索引不越过顶点；蒙皮的骨骼下标在骨骼表内、权重非负且和为 1；
+ *  碰撞形状的位置是有限数、索引不越过本形状的顶点。 */
 export function readImportedMesh(bytes: Uint8Array, descriptor: ImportedModelDescriptor): ImportedMeshData {
     const {vertices, indices} = descriptor.mesh,
         bones = descriptor.skin?.bones.length ?? 0;
-    requireImported(bytes.length === meshBytes(vertices, indices, bones > 0), 'mesh-size');
+    requireImported(bytes.length === meshBytes(vertices, indices, bones > 0, descriptor.collision), 'mesh-size');
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     requireImported(view.getUint32(0, true) === meshMagic && view.getUint32(4, true) === descriptor.format, 'mesh-header');
     requireImported(view.getUint32(8, true) === vertices && view.getUint32(12, true) === indices, 'mesh-header');
@@ -351,7 +442,30 @@ export function readImportedMesh(bytes: Uint8Array, descriptor: ImportedModelDes
         requireImported(value < vertices, 'mesh-index', {index});
         triangles[index] = value;
     }
-    if (!bones) return {positions, normals, uvs, indices: triangles};
+    // Each part draws only its own vertices: the still part those before the first facing part, a facing part its own run.
+    const runs: [ImportedSubmesh[], number, number][] = [
+        [descriptor.submeshes, 0, importedStillVertices(descriptor)],
+        ...(descriptor.facing ?? []).map(part => [part.submeshes, part.vertexStart, part.vertexStart + part.vertexCount] as [ImportedSubmesh[], number, number])
+    ];
+    for (const [list, low, high] of runs)
+        for (const {start, count} of list)
+            for (let index = start; index < start + count; index++)
+                requireImported(triangles[index]! >= low && triangles[index]! < high, 'mesh-index', {index});
+    const collision = () =>
+        (descriptor.collision ?? []).map((shape, index) => {
+            const points = new Float32Array(shape.vertices * 3),
+                list = new Uint32Array(shape.indices);
+            for (let k = 0; k < points.length; k++, at += 4) {
+                points[k] = view.getFloat32(at, true);
+                requireImported(Number.isFinite(points[k]), 'mesh-collision', {shape: index});
+            }
+            for (let k = 0; k < list.length; k++, at += 4) {
+                list[k] = view.getUint32(at, true);
+                requireImported(list[k]! < shape.vertices, 'mesh-collision', {shape: index});
+            }
+            return {positions: points, indices: list};
+        });
+    if (!bones) return {positions, normals, uvs, indices: triangles, collision: collision()};
     const joints = new Uint16Array(vertices * 4),
         weights = new Float32Array(vertices * 4);
     for (let vertex = 0; vertex < vertices; vertex++) {
@@ -368,29 +482,45 @@ export function readImportedMesh(bytes: Uint8Array, descriptor: ImportedModelDes
         }
         requireImported(Math.abs(sum - 1) <= 0.01, 'mesh-skin', {vertex});
     }
-    return {positions, normals, uvs, indices: triangles, skin: {joints, weights}};
+    return {positions, normals, uvs, indices: triangles, skin: {joints, weights}, collision: collision()};
 }
 
-/** 包围盒尺寸（米）：单件资源引用的快照带它，模型被删后用来画占位框。 */
+/** 包围盒尺寸（米）：单件资源引用的快照带它，模型被删后用来画占位框。朝向镜头的子件按它在模型里的原位计入：顶点存在子件自己的坐标系里
+ *  （原点在枢轴，已转过负偏航角），先转回偏航角、再加枢轴。 */
 export function importedMeshSize(bytes: Uint8Array, descriptor: ImportedModelDescriptor): [number, number, number] {
     const {positions} = readImportedMesh(bytes, descriptor),
         low = [Infinity, Infinity, Infinity],
-        high = [-Infinity, -Infinity, -Infinity];
-    for (let at = 0; at < positions.length; at++) {
-        const axis = at % 3,
-            value = positions[at]!;
-        if (value < low[axis]!) low[axis] = value;
-        if (value > high[axis]!) high[axis] = value;
+        high = [-Infinity, -Infinity, -Infinity],
+        include = (x: number, y: number, z: number) => {
+            for (const [axis, value] of [x, y, z].entries()) {
+                if (value < low[axis]!) low[axis] = value;
+                if (value > high[axis]!) high[axis] = value;
+            }
+        },
+        vertices = positions.length / 3,
+        owned = new Uint8Array(vertices);
+    for (const {vertexStart, vertexCount, pivot, yaw} of descriptor.facing ?? []) {
+        const [cos, sin] = [Math.cos(yaw), Math.sin(yaw)];
+        for (let vertex = vertexStart; vertex < vertexStart + vertexCount; vertex++) {
+            owned[vertex] = 1;
+            const [x, y, z] = [positions[vertex * 3]!, positions[vertex * 3 + 1]!, positions[vertex * 3 + 2]!];
+            include(pivot[0] + x * cos + z * sin, pivot[1] + y, pivot[2] - x * sin + z * cos);
+        }
     }
+    for (let vertex = 0; vertex < vertices; vertex++)
+        if (!owned[vertex]) include(positions[vertex * 3]!, positions[vertex * 3 + 1]!, positions[vertex * 3 + 2]!);
     return [high[0]! - low[0]!, high[1]! - low[1]!, high[2]! - low[2]!];
 }
 
-/** 网格的每个三角（每个九个数，网格自身坐标），换回预览的轴与绕向（X 取反、绕向反过来，与 imported-model-scene.ts 同），给 model-hit-mesh.ts 做受击网格。 */
+/** 不转部分的每个三角（每个九个数，网格自身坐标），换回预览的轴与绕向（X 取反、绕向反过来，与 imported-model-scene.ts 同），给 model-hit-mesh.ts
+ *  做受击网格。朝向镜头的子件跟着镜头转，不进受击网格。 */
 export function importedMeshTriangles(bytes: Uint8Array, descriptor: ImportedModelDescriptor): number[] {
     const {positions, indices} = readImportedMesh(bytes, descriptor),
         out: number[] = [];
-    for (let at = 0; at < indices.length; at += 3)
-        for (const index of [indices[at]!, indices[at + 2]!, indices[at + 1]!])
-            out.push(-positions[3 * index]!, positions[3 * index + 1]!, positions[3 * index + 2]!);
+    const ranges = descriptor.facing ? descriptor.submeshes.map(({start, count}) => [start, start + count] as const) : [[0, indices.length] as const];
+    for (const [from, end] of ranges)
+        for (let at = from; at < end; at += 3)
+            for (const index of [indices[at]!, indices[at + 2]!, indices[at + 1]!])
+                out.push(-positions[3 * index]!, positions[3 * index + 1]!, positions[3 * index + 2]!);
     return out;
 }

@@ -37,13 +37,22 @@ public static partial class Players
     private static Action<SessionPlayer>? _joined, _left;
     private static readonly Action<PlayerInfo> ObserveMotion = static info => Observe(info.Agent, info.Slot);
 
-    /// <summary>The local player's agent; null when there is none (no level, between lives) or it was already collected.</summary>
+    // The agent last read, kept for the frame it was read in (Frame.Count) while it is alive as a native object: callers ask many times a frame.
+    private static PlayerAgent? _local;
+    private static int _localFrame = -1;
+
+    /// <summary>The local player's agent; null when there is none (no level, between lives) or it was already collected. The game is asked once a frame while an
+    /// agent is held; an agent the game destroyed is dropped at once, so a replacement is read without waiting for the next frame.</summary>
     public static PlayerAgent? Local
     {
         get
         {
+            var frame = Frame.Count;
+            if (frame == _localFrame && _local != null && !NativeObjects.Gone(_local)) return _local;
             var agent = PlayerManager.GetLocalPlayerAgent();
-            return agent == null || agent.WasCollected ? null : agent;
+            _local = agent == null || agent.WasCollected ? null : agent;
+            _localFrame = frame;
+            return _local;
         }
     }
 

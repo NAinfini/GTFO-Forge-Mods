@@ -1,12 +1,69 @@
 {
-  "//": "Weapon inspect motions (Docs/forge-skin/PLAN.md §4.14, the format in Mods/ForgeSkin/DEVELOPERS.md). Every motion shows the gun's left face (muzzle to the left, top slightly right), then turns it to its right side with the muzzle still up and to the left (pistols, revolvers and compact guns all the way over in the wrist: the gun upside down, the back of the grip hand toward the viewer; rifles, shotguns, machine guns and long guns in both hands a third of a turn the other way, enough to show the right side and top), then it goes back; the revolver alone adds a beat of its own before it goes back: it twirls twice on the trigger finger, upright, the hand going with it; the swing carries the hand up until the muzzle points up, and the off hand comes onto the top of the gun and presses it back down. gun: keys of the gun; { \"t\" } alone is the game's pose, otherwise turn (muzzle right +), tilt (muzzle up +), roll (about the bore, top to the right +) in degrees from the gun held level and pointing ahead, at [x, y] where the bounds centre should sit (-1..1 of the half view), fill the share of the half view the shown part stays in; rise (metres up) lifts the gun with both hands; spin (about the side axis) alone is a twirl on the trigger finger: the gun turns about its trigger guard and the hand goes with it; with flip (about the bore) or rise it is a toss about its bounds centre while the hand stays where the key holds it. Where the grip hand holds the gun, how far its elbow swings out and how wide the item camera looks are solved. hand: the off hand: grip, away (lowered out of view), under (without along: its own place on the gun), side, top, muzzle, mag. Rifles, shotguns, machine guns and long guns keep the off hand on the gun throughout (a short tap at most); only pistols, revolvers and compact guns go one-handed. gear: offline gear id -> motions, repeated presses take the next. fallback: by the gun's measured length in metres.",
+  "//": "Weapon inspect motions (Docs/forge-skin/PLAN.md §4.14; the format in full: Mods/ForgeSkin/DEVELOPERS.md). Times are the motion's own seconds; a kind's feel.slow stretches them. feel, per kind: the item's weight on the wrist that carries it over the keys (a spring of f hertz and zeta damping driven by the keys' own acceleration: the item hangs back as the hand starts and goes past as it stops; carry how much of that shows, wind the degrees it draws back before a large turn), hit [degrees, metres] the push of a knock, spin the most degrees a second it turns while held, slow. The grip hand's fingers are not keyed: its thumb and three fingers keep the game's own grip (the one finger pose that lies on its surface) and open only for a twirl or a toss, closing after the catch; its index finger leaves the trigger for the look and lies along the side of the gun (in the guard again for a twirl; in a motion from the hold it keeps the game's). The off hand's fingers close as far as its key says or until they come to a mesh of the gun; under the gun they are the game's own unless the key gives a shape. gun: turn, tilt, roll (degrees from the gun held level and ahead; in a motion with \"from\": \"hold\", as melee weapons have, from the hold the game has the item in, about the view's up, right and forward; with \"palm\": true from that hold with the grip hand's palm turned up, where an item is thrown from and caught), at [x, y] (the bounds centre in the half view), fill, rise, spin (a twirl between two keys, or whole turns end over end of a toss), flip (whole turns of a toss about the item's length), toss (metres up: the key is the catch; release, wind-up, follow-through, catch and sink are solved from toss and g), hold stock, windup, settle, through (a key the gun only passes: no dwell asked of it), hit (arriving is a knock), cue. hand (the off hand: it supports the gun from below, is out of the view, or works a part; it never takes the grip): on grip | away | under (along) | side | top | muzzle (along) | node | mag | open; node and mag take face (left, right, top, bottom of the part's drawn box), at [u along the gun, v across the face], offset [out, across, along] metres, spin (degrees the hand is turned on the face); a mag key with no at holds the magazine on its own box: with no face by its side (its back edge at the web of the thumb low down, the four fingers along its left face, the thumb round onto its right, the last two fingers under its base, nothing near its top; spin lifts the fingers toward its top), with face bottom, or where it is wider than the hand takes so, by its base (the base on the palm, the fingers up its front, the thumb up its left face); the offset of either is [to the magazine's left, up it, to its front]; tips on a node key puts the pads of the index and middle fingers on the point instead of the palm; fingers [thumb, index, middle, ring, pinky]; cue. parts: node (a name, or names of which the gun's first drawn one is taken; @mag, @round), about, optional, follow, symmetry (rest rolls to the nearest whole of it); keys move, out, clear (out as a share of the part's own height), turn, show, ease (in | out | spring, bounce), carry { at, dist, roll, tip } (held in the view: tip the degrees its top is turned from straight at the eye toward up), cue. A cue is played through sounds.cues as roles, each role resolved on the gun's own reload and fire sounds (match), else its default by kind. kinds: pools (a gun's kind lists the look, the toss, the magazine check and its own motions; a motion whose part a gun does not have is left out for that gun and logged once). gear: offline gear id -> pool and motions; each press plays one at random, never the last. fallback: the pool by measured length; entries with \"melee\": true are for melee weapons. default: the pool of anything held that is neither a gun nor a melee weapon (a tool, a pack, another mod's item) and of a gun or melee weapon that can play none of its own; its motions are from the hold.",
+  "feel": {
+    "pistol": { "f": 2.4, "zeta": 0.45, "carry": 1, "wind": 4, "hit": [5, 0.012], "spin": 900, "slow": 1 },
+    "highcal": { "f": 2.3, "zeta": 0.45, "carry": 1, "wind": 4, "hit": [5, 0.012], "spin": 900, "slow": 1 },
+    "revolver": { "f": 2.3, "zeta": 0.45, "carry": 1, "wind": 4, "hit": [5, 0.012], "spin": 900, "slow": 1 },
+    "compact": { "f": 2.2, "zeta": 0.48, "carry": 1, "wind": 4, "hit": [3.5, 0.01], "spin": 800, "slow": 1 },
+    "rifle": { "f": 1.9, "zeta": 0.5, "carry": 1, "wind": 5, "hit": [2.5, 0.008], "spin": 700, "slow": 1 },
+    "shotgun": { "f": 1.9, "zeta": 0.5, "carry": 1, "wind": 5, "hit": [2.5, 0.008], "spin": 700, "slow": 1 },
+    "long": { "f": 1.7, "zeta": 0.52, "carry": 1, "wind": 5, "hit": [2.5, 0.008], "spin": 600, "slow": 1.1 },
+    "heavy": { "f": 1.5, "zeta": 0.55, "carry": 1, "wind": 6, "hit": [1.5, 0.005], "spin": 500, "slow": 1.2 },
+    "knife": { "f": 3, "zeta": 0.45, "carry": 1, "wind": 4, "hit": [4, 0.01], "spin": 1200, "slow": 1 },
+    "bat": { "f": 2.2, "zeta": 0.5, "carry": 1, "wind": 5, "hit": [3, 0.01], "spin": 1200, "slow": 1 },
+    "hammer": { "f": 1.5, "zeta": 0.55, "carry": 1, "wind": 6, "hit": [2, 0.006], "spin": 600, "slow": 1.15 },
+    "spear": { "f": 1.7, "zeta": 0.55, "carry": 1, "wind": 5, "hit": [2, 0.006], "spin": 600, "slow": 1.1 },
+    "item": { "f": 2, "zeta": 0.5, "carry": 1, "wind": 4, "hit": [3, 0.01], "spin": 700, "slow": 1 }
+  },
+  "sounds": {
+    "//": "Roles resolve on each gun's own vanilla sounds (AUDIO research, read from the game's files, not yet heard in game).",
+    "roles": {
+      "start": { "default": "generic_reload_foley_quick" },
+      "turn": { "default": "generic_reload_foley_quick_soft" },
+      "settle": { "default": "generic_reload_foley_subtle" },
+      "whoosh": { "default": "melee_swish_regular" },
+      "regrip": { "match": ["generic_reload_grab_heavy_weapon*"], "default": {"pistol": "generic_reload_grab_heavy_weapon_soft", "highcal": "generic_reload_grab_heavy_weapon_soft", "revolver": "generic_reload_grab_heavy_weapon_soft", "compact": "generic_reload_grab_heavy_weapon_soft", "*":"generic_reload_grab_heavy_weapon"} },
+      "grab": { "match": ["*grab_mag"], "default": {"pistol": "pistol_reload_3_grab_mag", "highcal": "pistol_reload_3_grab_mag", "heavy": "cannon_reload_grab_mag", "long": "cannon_reload_grab_mag", "*":"carbine_reload_3_grab_mag"} },
+      "magOut": { "match": ["*mag_out", "revolver_open", "shotgun_reload_break_open"], "default": {"pistol": "pistol_reload_1_mag_out", "highcal": "pistol_reload_1_mag_out", "compact": "smg_reload_1_mag_out", "heavy": "cannon_reload_mag_out", "long": "cannon_reload_mag_out", "*":"carbine_reload_1_mag_out"} },
+      "magIn": { "match": ["*mag_in", "shotgun_reload_1_shell_in"], "default": {"pistol": "pistol_reload_2_mag_in", "highcal": "pistol_reload_2_mag_in", "compact": "smg_reload_2_mag_in", "heavy": "cannon_reload_mag_in", "long": "cannon_reload_mag_in", "*":"carbine_reload_2_mag_in"} },
+      "pat": { "match": ["*pat_mag", "generic_reload_pat_soft"], "default": "carbine_reload_4_pat_mag" },
+      "bump": { "default": "carbine_mag_bump" },
+      "pull": { "match": ["*slide_pull", "*pull_slide", "shotgun_reload_cock_back"], "default": {"pistol": "smg_reload_5_slide_pull", "highcal": "smg_reload_5_slide_pull", "compact": "smg_reload_5_slide_pull", "*":"carbine_reload_5_pull_slide"} },
+      "release": { "match": ["*slide_release", "*release_slide", "shotgun_reload_cock_forward", "shotgun_reload_2_cock"], "default": {"pistol": "smg_reload_5_slide_release", "highcal": "smg_reload_5_slide_release", "compact": "smg_reload_5_slide_release", "*":"carbine_reload_5_release_slide"} },
+      "chamber": { "default": {"pistol": "pistol_reload_5_chamber_bullet", "highcal": "pistol_reload_5_chamber_bullet", "*":"carbine_reload_5_chamber_bullet"} },
+      "open": { "match": ["revolver_open", "shotgun_reload_break_open"] },
+      "close": { "match": ["revolver_close", "shotgun_reload_break_close"] },
+      "rattle": { "match": ["revolver_reload_foley", "*_reload_foley*", "cannon_reload_foley_move"], "default": "generic_reload_foley_subtle" },
+      "sightIn": { "zoom": "in" },
+      "sightOut": { "zoom": "out" }
+    },
+    "cues": {
+      "toss": ["whoosh"],
+      "catch": ["regrip"],
+      "twirl-catch": ["regrip"],
+      "turn": ["turn"],
+      "settle": ["settle"],
+      "crane-open": ["open"],
+      "crane-close": ["close"],
+      "cylinder-spin": ["rattle"],
+      "slide-back": ["pull"],
+      "slide-home": ["release"],
+      "mag-out": ["magOut"],
+      "mag-look": ["rattle"],
+      "mag-seat": ["magIn",{"role": "pat", "after": 0.08}],
+      "charge-back": ["pull"],
+      "charge-home": ["release"],
+      "pump-back": ["pull"],
+      "pump-forward": ["release"]
+    }
+  },
   "motions": {
     "pistol": {
       "gun": [
         { "t": 0 },
-        { "t": 0.6, "turn": -40, "tilt": 5, "roll": 20 },
+        { "t": 0.6, "turn": -40, "tilt": 5, "roll": 20, "cue": "turn" },
         { "t": 1.3, "turn": -36, "tilt": 7, "roll": 24 },
-        { "t": 1.9, "turn": -65, "tilt": 45, "roll": -150 },
+        { "t": 1.9, "turn": -65, "tilt": 45, "roll": -150, "cue": "turn" },
         { "t": 2.6, "turn": -62, "tilt": 46, "roll": -155 },
         { "t": 3.2 }
       ],
@@ -20,11 +77,11 @@
     "revolver": {
       "gun": [
         { "t": 0 },
-        { "t": 0.6, "turn": -40, "tilt": 5, "roll": 20 },
+        { "t": 0.6, "turn": -40, "tilt": 5, "roll": 20, "cue": "turn" },
         { "t": 1.3, "turn": -36, "tilt": 7, "roll": 24 },
-        { "t": 1.9, "turn": -65, "tilt": 45, "roll": -150 },
+        { "t": 1.9, "turn": -65, "tilt": 45, "roll": -150, "cue": "turn" },
         { "t": 2.6, "turn": -62, "tilt": 46, "roll": -155 },
-        { "t": 3.0, "turn": -15, "tilt": 10, "roll": 8 },
+        { "t": 3, "turn": -15, "tilt": 10, "roll": 8 },
         { "t": 3.7, "turn": -15, "tilt": 10, "roll": 8, "spin": -720, "through": true },
         { "t": 3.9, "turn": -12, "tilt": 55, "roll": 0, "fill": 1.6, "spin": -720, "rise": 0.1 },
         { "t": 4.25, "turn": -12, "tilt": 50, "roll": 0, "fill": 1.6, "spin": -720, "rise": 0.09 },
@@ -40,9 +97,9 @@
     "compact": {
       "gun": [
         { "t": 0 },
-        { "t": 0.6, "turn": -45, "tilt": 0, "roll": 30 },
+        { "t": 0.6, "turn": -45, "tilt": 0, "roll": 30, "cue": "turn" },
         { "t": 1.3, "turn": -43, "tilt": 2, "roll": 32 },
-        { "t": 2.0, "turn": -35, "tilt": 50, "roll": -155 },
+        { "t": 2, "turn": -35, "tilt": 50, "roll": -155, "cue": "turn" },
         { "t": 2.7, "turn": -33, "tilt": 51, "roll": -158 },
         { "t": 3.35 }
       ],
@@ -56,10 +113,10 @@
     "rifle": {
       "gun": [
         { "t": 0 },
-        { "t": 0.6, "turn": -45, "tilt": 0, "roll": 30 },
+        { "t": 0.6, "turn": -45, "tilt": 0, "roll": 30, "cue": "turn" },
         { "t": 1.3, "turn": -43, "tilt": 2, "roll": 32 },
-        { "t": 2.0, "turn": -35, "tilt": 35, "roll": -90 },
-        { "t": 2.7, "turn": -33, "tilt": 36, "roll": -93 },
+        { "t": 2, "turn": -35, "tilt": 32, "roll": -78, "cue": "turn" },
+        { "t": 2.7, "turn": -33, "tilt": 33, "roll": -81 },
         { "t": 3.35 }
       ],
       "hand": [
@@ -74,10 +131,10 @@
     "shotgun": {
       "gun": [
         { "t": 0 },
-        { "t": 0.6, "turn": -45, "tilt": 0, "roll": 30 },
+        { "t": 0.6, "turn": -45, "tilt": 0, "roll": 30, "cue": "turn" },
         { "t": 1.3, "turn": -43, "tilt": 2, "roll": 32 },
-        { "t": 2.0, "turn": -35, "tilt": 35, "roll": -90 },
-        { "t": 2.7, "turn": -33, "tilt": 36, "roll": -93 },
+        { "t": 2, "turn": -35, "tilt": 32, "roll": -78, "cue": "turn" },
+        { "t": 2.7, "turn": -33, "tilt": 33, "roll": -81 },
         { "t": 3.35 }
       ],
       "hand": [
@@ -92,10 +149,10 @@
     "heavy": {
       "gun": [
         { "t": 0 },
-        { "t": 0.6, "turn": -45, "tilt": 0, "roll": 30 },
+        { "t": 0.6, "turn": -45, "tilt": 0, "roll": 30, "cue": "turn" },
         { "t": 1.3, "turn": -43, "tilt": 2, "roll": 32 },
-        { "t": 2.0, "turn": -35, "tilt": 35, "roll": -90 },
-        { "t": 2.7, "turn": -33, "tilt": 36, "roll": -93 },
+        { "t": 2, "turn": -35, "tilt": 32, "roll": -78, "cue": "turn" },
+        { "t": 2.7, "turn": -33, "tilt": 33, "roll": -81 },
         { "t": 3.35 }
       ],
       "hand": [
@@ -110,10 +167,10 @@
     "long": {
       "gun": [
         { "t": 0 },
-        { "t": 0.6, "turn": -45, "tilt": 0, "roll": 30 },
+        { "t": 0.6, "turn": -45, "tilt": 0, "roll": 30, "cue": "turn" },
         { "t": 1.3, "turn": -43, "tilt": 2, "roll": 32 },
-        { "t": 2.0, "turn": -35, "tilt": 35, "roll": -90 },
-        { "t": 2.7, "turn": -33, "tilt": 36, "roll": -93 },
+        { "t": 2, "turn": -35, "tilt": 32, "roll": -78, "cue": "turn" },
+        { "t": 2.7, "turn": -33, "tilt": 33, "roll": -81 },
         { "t": 3.35 }
       ],
       "hand": [
@@ -124,47 +181,846 @@
         { "t": 2.8, "on": "under", "along": 0.35 },
         { "t": 3.2, "on": "grip" }
       ]
+    },
+    "handgun-toss": {
+      "gun": [
+        { "t": 0 },
+        { "t": 0.5, "turn": -35, "tilt": 15, "roll": 15, "at": [0.25, -0.45], "through": true },
+        { "t": 0.9, "turn": -35, "tilt": 15, "roll": 15, "fill": 0.6, "through": true },
+        { "t": 1.6, "turn": -35, "tilt": 15, "roll": 15, "fill": 0.6, "spin": -360, "toss": 0.16, "g": 9.8, "through": true },
+        { "t": 2.05, "turn": -32, "tilt": 14, "roll": 17, "at": [0.25, -0.45], "spin": -360 },
+        { "t": 2.45, "turn": -32, "tilt": 14, "roll": 17, "at": [0.25, -0.45], "spin": -360 },
+        { "t": 3 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.4, "on": "away" },
+        { "t": 2.5, "on": "away" },
+        { "t": 2.9, "on": "grip" }
+      ]
+    },
+    "longgun-toss": {
+      "gun": [
+        { "t": 0 },
+        { "t": 0.6, "turn": -24, "tilt": 2, "roll": 16, "at": [0.3, -0.5], "fill": 2, "through": true },
+        { "t": 1, "turn": -24, "tilt": 4, "roll": 22, "at": [0.3, -0.5], "fill": 2, "through": true },
+        { "t": 1.75, "turn": -24, "tilt": 4, "roll": 22, "at": [0.3, -0.5], "fill": 2, "flip": -360, "toss": 0.12, "g": 9.8, "through": true },
+        { "t": 2.3, "turn": -22, "tilt": 4, "roll": 14, "at": [0.3, -0.5], "fill": 2, "flip": -360 },
+        { "t": 2.75, "turn": -22, "tilt": 4, "roll": 14, "at": [0.3, -0.5], "fill": 2, "flip": -360 },
+        { "t": 3.3 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.5, "on": "away" },
+        { "t": 1.9, "on": "away" },
+        { "t": 2.35, "on": "under", "along": 0.5 },
+        { "t": 2.8, "on": "under", "along": 0.5 },
+        { "t": 3.2, "on": "grip" }
+      ]
+    },
+    "handgun-mag": {
+      "gun": [
+        { "t": 0 },
+        { "t": 0.45, "turn": -25, "tilt": 12, "roll": 30, "at": [0.3, -0.2], "cue": "turn" },
+        { "t": 0.7, "turn": -24, "tilt": 13, "roll": 31, "at": [0.3, -0.2] },
+        { "t": 1.51, "turn": -23, "tilt": 15, "roll": 32, "at": [0.3, -0.2] },
+        { "t": 2.11, "turn": -24, "tilt": 14, "roll": 33, "at": [0.3, -0.2] },
+        { "t": 2.63, "turn": -27, "tilt": 10, "roll": 29, "at": [0.3, -0.2] },
+        { "t": 2.98, "turn": -25, "tilt": 12, "roll": 30, "at": [0.3, -0.2], "hit": true },
+        { "t": 3.43, "turn": -23, "tilt": 9, "roll": 26, "at": [0.3, -0.2] },
+        { "t": 3.88 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.5, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7] },
+        { "t": 0.7, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7], "cue": "mag-out" },
+        { "t": 1.06, "on": "mag", "fingers": [1, 0.9, 0.9, 0.9, 0.9], "regrip": true },
+        { "t": 2.56, "on": "mag", "fingers": [1, 0.9, 0.9, 0.9, 0.9] },
+        { "t": 2.86, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7], "regrip": true },
+        { "t": 2.98, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7] },
+        { "t": 3.05, "on": "mag", "face": "bottom", "fingers": [0.3, 0.4, 0.4, 0.45, 0.5], "offset": [0, 0.012, 0] },
+        { "t": 3.14, "on": "mag", "face": "bottom", "fingers": [0.3, 0.4, 0.4, 0.45, 0.5] },
+        { "t": 3.48, "on": "away" },
+        { "t": 3.78, "on": "grip" }
+      ],
+      "parts": [
+        {
+          "node": "@mag", "about": "side",
+          "keys": [
+            { "t": 0.73 },
+            { "t": 1.06, "clear": 1.1 },
+            { "t": 1.51, "carry": {"at": [-0.4, -0.55], "dist": 0.47, "roll": 75, "tip": 50}, "cue": "mag-look" },
+            { "t": 2.11, "carry": {"at": [-0.38, -0.57], "dist": 0.48, "roll": 79, "tip": 50} },
+            { "t": 2.56, "clear": 1.1 },
+            { "t": 2.86, "clear": 0.35 },
+            { "t": 2.98, "out": 0, "ease": "spring", "bounce": 0.015, "cue": "mag-seat" },
+            { "t": 3.08 }
+          ]
+        }
+      ]
+    },
+    "rifle-mag": {
+      "gun": [
+        { "t": 0 },
+        { "t": 0.5, "turn": -20, "tilt": 6, "roll": 30, "at": [0.25, -0.1], "cue": "turn" },
+        { "t": 0.9, "turn": -19, "tilt": 7, "roll": 31, "at": [0.25, -0.1] },
+        { "t": 1.71, "turn": -18, "tilt": 9, "roll": 32, "at": [0.25, -0.1] },
+        { "t": 2.31, "turn": -19, "tilt": 8, "roll": 33, "at": [0.25, -0.1] },
+        { "t": 2.83, "turn": -22, "tilt": 4, "roll": 29, "at": [0.25, -0.1] },
+        { "t": 3.18, "turn": -20, "tilt": 6, "roll": 30, "at": [0.25, -0.1], "hit": true },
+        { "t": 3.63, "turn": -18, "tilt": 3, "roll": 26, "at": [0.25, -0.1] },
+        { "t": 4.08 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.7, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7] },
+        { "t": 0.9, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7], "cue": "mag-out" },
+        { "t": 1.26, "on": "mag", "fingers": [1, 0.9, 0.9, 0.9, 0.9], "regrip": true },
+        { "t": 2.76, "on": "mag", "fingers": [1, 0.9, 0.9, 0.9, 0.9] },
+        { "t": 3.06, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7], "regrip": true },
+        { "t": 3.18, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7] },
+        { "t": 3.25, "on": "mag", "face": "bottom", "fingers": [0.3, 0.4, 0.4, 0.45, 0.5], "offset": [0, 0.012, 0] },
+        { "t": 3.34, "on": "mag", "face": "bottom", "fingers": [0.3, 0.4, 0.4, 0.45, 0.5] },
+        { "t": 3.68, "on": "away" },
+        { "t": 3.98, "on": "grip" }
+      ],
+      "parts": [
+        {
+          "node": "@mag", "about": "side",
+          "keys": [
+            { "t": 0.93 },
+            { "t": 1.26, "clear": 1.1 },
+            { "t": 1.71, "carry": {"at": [-0.45, -0.55], "dist": 0.48, "roll": 75, "tip": 50}, "cue": "mag-look" },
+            { "t": 2.31, "carry": {"at": [-0.43, -0.57], "dist": 0.49, "roll": 79, "tip": 50} },
+            { "t": 2.76, "clear": 1.1 },
+            { "t": 3.06, "clear": 0.35 },
+            { "t": 3.18, "out": 0, "ease": "spring", "bounce": 0.015, "cue": "mag-seat" },
+            { "t": 3.28 }
+          ]
+        }
+      ]
+    },
+    "heavy-mag": {
+      "gun": [
+        { "t": 0 },
+        { "t": 0.5, "turn": -30, "tilt": 10, "roll": 30, "at": [0.25, -0.05], "cue": "turn" },
+        { "t": 0.9, "turn": -29, "tilt": 11, "roll": 31, "at": [0.25, -0.05] },
+        { "t": 1.76, "turn": -28, "tilt": 13, "roll": 32, "at": [0.25, -0.05] },
+        { "t": 2.36, "turn": -29, "tilt": 12, "roll": 33, "at": [0.25, -0.05] },
+        { "t": 2.93, "turn": -32, "tilt": 8, "roll": 29, "at": [0.25, -0.05] },
+        { "t": 3.28, "turn": -30, "tilt": 10, "roll": 30, "at": [0.25, -0.05], "hit": true },
+        { "t": 3.73, "turn": -28, "tilt": 7, "roll": 26, "at": [0.25, -0.05] },
+        { "t": 4.18 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.7, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7] },
+        { "t": 0.9, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7], "cue": "mag-out" },
+        { "t": 1.26, "on": "mag", "fingers": [1, 0.9, 0.9, 0.9, 0.9], "regrip": true },
+        { "t": 2.86, "on": "mag", "fingers": [1, 0.9, 0.9, 0.9, 0.9] },
+        { "t": 3.16, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7], "regrip": true },
+        { "t": 3.28, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7] },
+        { "t": 3.35, "on": "mag", "face": "bottom", "fingers": [0.3, 0.4, 0.4, 0.45, 0.5], "offset": [0, 0.012, 0] },
+        { "t": 3.44, "on": "mag", "face": "bottom", "fingers": [0.3, 0.4, 0.4, 0.45, 0.5] },
+        { "t": 3.78, "on": "away" },
+        { "t": 4.08, "on": "grip" }
+      ],
+      "parts": [
+        {
+          "node": "@mag", "about": "side",
+          "keys": [
+            { "t": 0.93 },
+            { "t": 1.26, "clear": 1.1 },
+            { "t": 1.76, "carry": {"at": [-0.4, -0.75], "dist": 0.5, "roll": 75, "tip": 50}, "cue": "mag-look" },
+            { "t": 2.36, "carry": {"at": [-0.38, -0.77], "dist": 0.51, "roll": 79, "tip": 50} },
+            { "t": 2.86, "clear": 1.1 },
+            { "t": 3.16, "clear": 0.35 },
+            { "t": 3.28, "out": 0, "ease": "spring", "bounce": 0.015, "cue": "mag-seat" },
+            { "t": 3.38 }
+          ]
+        }
+      ]
+    },
+    "revolver-check": {
+      "gun": [
+        { "t": 0 },
+        { "t": 0.45, "turn": -22, "tilt": 8, "roll": 18, "at": [0.25, -0.45], "through": true },
+        { "t": 0.65, "turn": -25, "tilt": 10, "roll": -28, "at": [0.25, -0.45], "hit": true },
+        { "t": 1.2, "turn": -20, "tilt": 16, "roll": -24, "at": [0.25, -0.45] },
+        { "t": 2, "turn": -17, "tilt": 18, "roll": -27, "at": [0.25, -0.45] },
+        { "t": 2.2, "turn": -22, "tilt": 12, "roll": -34, "at": [0.25, -0.45], "through": true },
+        { "t": 2.45, "turn": -20, "tilt": 10, "roll": 14, "at": [0.25, -0.45], "hit": true },
+        { "t": 2.9, "turn": -22, "tilt": 9, "roll": 4, "at": [0.25, -0.45] },
+        { "t": 3.5 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.35, "on": "away" },
+        { "t": 2.9, "on": "away" },
+        { "t": 3.4, "on": "grip" }
+      ],
+      "parts": [
+        {
+          "node": "a_RevolverFold", "about": "bore",
+          "keys": [
+            { "t": 0.55 },
+            { "t": 0.72, "turn": 80, "ease": "spring", "bounce": 0.09, "cue": "crane-open" },
+            { "t": 2.33, "turn": 80 },
+            { "t": 2.45, "turn": 0, "ease": "spring", "bounce": 0.06, "cue": "crane-close" },
+            { "t": 2.55 }
+          ]
+        },
+        {
+          "node": "a_Drum", "about": "bore", "symmetry": 60,
+          "keys": [
+            { "t": 0.62, "cue": "cylinder-spin" },
+            { "t": 1.5, "turn": 120, "ease": "out" },
+            { "t": 2.33, "turn": 120 },
+            { "t": 2.55 }
+          ]
+        },
+        {
+          "node": "a_RevolverMag", "follow": "a_Drum", "optional": true,
+          "keys": [
+            { "t": 0.6 },
+            { "t": 2.55 }
+          ]
+        }
+      ]
+    },
+    "break-check": {
+      "gun": [
+        { "t": 0 },
+        { "t": 0.45, "turn": -25, "tilt": 30, "roll": 10, "at": [0.25, -0.45], "through": true },
+        { "t": 0.65, "turn": -27, "tilt": 6, "roll": 12, "at": [0.25, -0.45], "hit": true },
+        { "t": 1.2, "turn": -24, "tilt": 18, "roll": 8, "at": [0.25, -0.45] },
+        { "t": 2, "turn": -21, "tilt": 20, "roll": 5, "at": [0.25, -0.45] },
+        { "t": 2.2, "turn": -25, "tilt": 4, "roll": 10, "at": [0.25, -0.45], "through": true },
+        { "t": 2.45, "turn": -25, "tilt": 30, "roll": 10, "at": [0.25, -0.45], "hit": true },
+        { "t": 2.9, "turn": -26, "tilt": 20, "roll": 10, "at": [0.25, -0.45] },
+        { "t": 3.5 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.35, "on": "away" },
+        { "t": 2.9, "on": "away" },
+        { "t": 3.4, "on": "grip" }
+      ],
+      "parts": [
+        {
+          "node": "a_Fold", "about": "side",
+          "keys": [
+            { "t": 0.55 },
+            { "t": 0.72, "turn": 40, "ease": "spring", "bounce": 0.09, "cue": "crane-open" },
+            { "t": 2.33, "turn": 40 },
+            { "t": 2.45, "turn": 0, "ease": "spring", "bounce": 0.06, "cue": "crane-close" },
+            { "t": 2.55 }
+          ]
+        },
+        {
+          "node": "a_Drum", "about": "bore", "symmetry": 60,
+          "keys": [
+            { "t": 0.62, "cue": "cylinder-spin" },
+            { "t": 1.5, "turn": 120, "ease": "out" },
+            { "t": 2.33, "turn": 120 },
+            { "t": 2.55 }
+          ]
+        },
+        {
+          "node": "a_Mag", "follow": "a_Drum", "optional": true,
+          "keys": [
+            { "t": 0.6 },
+            { "t": 2.55 }
+          ]
+        }
+      ]
+    },
+    "revolver-swing": {
+      "gun": [
+        { "t": 0 },
+        { "t": 0.45, "turn": -28, "tilt": 6, "roll": 10, "at": [0.25, -0.45], "through": true },
+        { "t": 0.62, "turn": -30, "tilt": 5, "roll": 38, "at": [0.25, -0.45], "hit": true },
+        { "t": 1.2, "turn": -30, "tilt": 5, "roll": 35, "at": [0.25, -0.45] },
+        { "t": 2, "turn": -20, "tilt": 5, "roll": 25, "at": [0.25, -0.45] },
+        { "t": 2.85, "turn": -20, "tilt": 5, "roll": 25, "at": [0.25, -0.45] },
+        { "t": 3.05, "turn": -20, "tilt": 5, "roll": 25, "at": [0.25, -0.45], "hit": true },
+        { "t": 3.6, "turn": -22, "tilt": 8, "roll": 12, "at": [0.25, -0.45] },
+        { "t": 4.2 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.35, "on": "away" },
+        { "t": 0.7, "on": "away" },
+        { "t": 1.3, "on": "node", "node": "a_Drum", "face": "left", "at": [0.7, 0.6], "spin": -90, "tips": true, "fingers": [0.2, 0.3, 0.3, 0, 0] },
+        { "t": 1.4, "on": "node", "node": "a_Drum", "face": "left", "at": [0.7, 0.6], "spin": -90, "tips": true, "fingers": [0.2, 0.3, 0.3, 0, 0] },
+        { "t": 1.47, "on": "node", "node": "a_Drum", "face": "left", "at": [0.7, 0.6], "spin": -90, "tips": true, "fingers": [0.2, 0.3, 0.3, 0, 0] },
+        { "t": 1.9, "on": "away" },
+        { "t": 2.45, "on": "away" },
+        { "t": 2.85, "on": "node", "node": "a_RevolverFold", "face": "left", "at": [0.25, 0.8], "fingers": [0.2, 0.6, 0.8, 0.85, 0.9] },
+        { "t": 3.25, "on": "under", "along": 0.4, "fingers": [0.3, 0.3, 0.3, 0.3, 0.3] },
+        { "t": 3.75, "on": "under", "along": 0.4 },
+        { "t": 4.1, "on": "grip" }
+      ],
+      "parts": [
+        {
+          "node": "a_RevolverFold", "about": "bore",
+          "keys": [
+            { "t": 0.52 },
+            { "t": 0.7, "turn": 80, "ease": "spring", "bounce": 0.09, "cue": "crane-open" },
+            { "t": 2.95, "turn": 80 },
+            { "t": 3.05, "turn": 0, "ease": "spring", "bounce": 0.06, "cue": "crane-close" },
+            { "t": 3.15 }
+          ]
+        },
+        {
+          "node": "a_Drum", "about": "bore", "symmetry": 60,
+          "keys": [
+            { "t": 1.4, "cue": "cylinder-spin" },
+            { "t": 1.47, "turn": -24, "ease": "in" },
+            { "t": 2.75, "turn": -360, "ease": "out" },
+            { "t": 2.95, "turn": -360 },
+            { "t": 3.15 }
+          ]
+        },
+        {
+          "node": "a_RevolverMag", "follow": "a_Drum", "optional": true,
+          "keys": [
+            { "t": 0.6 },
+            { "t": 3.15 }
+          ]
+        }
+      ]
+    },
+    "revolver-break": {
+      "gun": [
+        { "t": 0 },
+        { "t": 0.45, "turn": -30, "tilt": 28, "roll": 15, "at": [0.25, -0.45], "through": true },
+        { "t": 0.62, "turn": -30, "tilt": 12, "roll": 15, "at": [0.25, -0.45], "hit": true },
+        { "t": 1.2, "turn": -30, "tilt": 15, "roll": 15, "at": [0.25, -0.45] },
+        { "t": 2, "turn": -25, "tilt": 30, "roll": 10, "at": [0.25, -0.45] },
+        { "t": 2.85, "turn": -25, "tilt": 30, "roll": 10, "at": [0.25, -0.45] },
+        { "t": 3.05, "turn": -25, "tilt": 30, "roll": 10, "at": [0.25, -0.45], "hit": true },
+        { "t": 3.6, "turn": -27, "tilt": 18, "roll": 12, "at": [0.25, -0.45] },
+        { "t": 4.2 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.35, "on": "away" },
+        { "t": 0.7, "on": "away" },
+        { "t": 1.3, "on": "node", "node": "a_Drum", "face": "left", "at": [0.45, 0.35], "spin": 100, "tips": true, "fingers": [0.2, 0.3, 0.3, 0, 0] },
+        { "t": 1.4, "on": "node", "node": "a_Drum", "face": "left", "at": [0.45, 0.35], "spin": 100, "tips": true, "fingers": [0.2, 0.3, 0.3, 0, 0] },
+        { "t": 1.47, "on": "node", "node": "a_Drum", "face": "left", "at": [0.45, 0.35], "spin": 100, "tips": true, "fingers": [0.2, 0.3, 0.3, 0, 0] },
+        { "t": 1.9, "on": "away" },
+        { "t": 2.45, "on": "away" },
+        { "t": 2.85, "on": "node", "node": "a_Fold", "face": "bottom", "at": [0.85, 0.5], "fingers": [0.4, 0.6, 0.7, 0.75, 0.8] },
+        { "t": 3.25, "on": "under", "along": 0.4, "fingers": [0.3, 0.3, 0.3, 0.3, 0.3] },
+        { "t": 3.75, "on": "under", "along": 0.4 },
+        { "t": 4.1, "on": "grip" }
+      ],
+      "parts": [
+        {
+          "node": "a_Fold", "about": "side",
+          "keys": [
+            { "t": 0.52 },
+            { "t": 0.7, "turn": 40, "ease": "spring", "bounce": 0.09, "cue": "crane-open" },
+            { "t": 2.95, "turn": 40 },
+            { "t": 3.05, "turn": 0, "ease": "spring", "bounce": 0.06, "cue": "crane-close" },
+            { "t": 3.15 }
+          ]
+        },
+        {
+          "node": "a_Drum", "about": "bore", "symmetry": 60,
+          "keys": [
+            { "t": 1.4, "cue": "cylinder-spin" },
+            { "t": 1.47, "turn": -24, "ease": "in" },
+            { "t": 2.75, "turn": -360, "ease": "out" },
+            { "t": 2.95, "turn": -360 },
+            { "t": 3.15 }
+          ]
+        },
+        {
+          "node": "a_Mag", "follow": "a_Drum", "optional": true,
+          "keys": [
+            { "t": 0.6 },
+            { "t": 3.15 }
+          ]
+        }
+      ]
+    },
+    "slide-rack": {
+      "gun": [
+        { "t": 0 },
+        { "t": 0.65, "turn": -25, "tilt": 12, "roll": -55, "at": [0.2, -0.3], "cue": "turn" },
+        { "t": 1.05, "turn": -25, "tilt": 13, "roll": -56, "at": [0.2, -0.3] },
+        { "t": 1.3, "turn": -26, "tilt": 11, "roll": -57, "at": [0.2, -0.31], "hit": true },
+        { "t": 2.1, "turn": -24, "tilt": 13, "roll": -54, "at": [0.2, -0.3] },
+        { "t": 2.2, "turn": -25, "tilt": 15, "roll": -55, "at": [0.2, -0.29], "hit": true },
+        { "t": 2.75, "turn": -27, "tilt": 10, "roll": -42, "at": [0.2, -0.32] },
+        { "t": 3.4 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.85, "on": "node", "node": "a_slide", "face": "top", "at": [0.12, 0], "spin": 90, "fingers": [0.6, 0.75, 0.75, 0.7, 0.7] },
+        { "t": 2.1, "on": "node", "node": "a_slide", "face": "top", "at": [0.12, 0], "spin": 90, "fingers": [0.6, 0.75, 0.75, 0.7, 0.7] },
+        { "t": 2.6, "on": "away" },
+        { "t": 3.3, "on": "grip" }
+      ],
+      "parts": [
+        {
+          "node": ["a_slide", "Front_UZI_ChargingHandle_1", "Front_UZI_ChargingHandle_2", "Front_Pistol_Slide_2"],
+          "keys": [
+            { "t": 1.05 },
+            { "t": 1.3, "move": [0, 0, -0.026], "ease": "in", "cue": "slide-back" },
+            { "t": 2.12, "move": [0, 0, -0.026] },
+            { "t": 2.18, "move": [0, 0, 0], "ease": "spring", "bounce": 0.12, "cue": "slide-home" },
+            { "t": 2.28 }
+          ]
+        },
+        {
+          "node": "@round", "optional": true,
+          "keys": [
+            { "t": 1.2 },
+            { "t": 1.26, "show": 1 },
+            { "t": 2.12, "show": 1 },
+            { "t": 2.15 }
+          ]
+        }
+      ]
+    },
+    "rifle-charge": {
+      "gun": [
+        { "t": 0 },
+        { "t": 0.4, "turn": -30, "tilt": 8, "roll": -5, "at": [0.25, -0.4], "cue": "turn" },
+        { "t": 0.9, "turn": -30, "tilt": 8, "roll": -5, "at": [0.25, -0.4] },
+        { "t": 1.15, "turn": -31, "tilt": 6, "roll": -7, "at": [0.25, -0.4], "hit": true },
+        { "t": 1.8, "turn": -29, "tilt": 8, "roll": -4, "at": [0.25, -0.4] },
+        { "t": 1.92, "turn": -30, "tilt": 10, "roll": -5, "at": [0.25, -0.4], "hit": true },
+        { "t": 2.5, "turn": -28, "tilt": 5, "roll": 0, "at": [0.25, -0.4], "through": true },
+        { "t": 3.1 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.35, "on": "under" },
+        { "t": 0.75, "on": "node", "node": "a_ChargingHandle", "face": "left", "clasp": true },
+        { "t": 1.76, "on": "node", "node": "a_ChargingHandle", "face": "left", "clasp": true },
+        { "t": 2.3, "on": "under" },
+        { "t": 2.55, "on": "under" },
+        { "t": 3, "on": "grip" }
+      ],
+      "parts": [
+        {
+          "node": "a_ChargingHandle",
+          "keys": [
+            { "t": 0.9 },
+            { "t": 1.15, "move": [0, 0, -0.065], "ease": "in", "cue": "charge-back" },
+            { "t": 1.76, "move": [0, 0, -0.065] },
+            { "t": 1.9, "move": [0, 0, 0], "ease": "spring", "bounce": 0.05, "cue": "charge-home" },
+            { "t": 2 }
+          ]
+        },
+        {
+          "node": "a_Bolt", "optional": true,
+          "keys": [
+            { "t": 0.9 },
+            { "t": 1.15, "move": [0, 0, -0.07], "ease": "in" },
+            { "t": 1.76, "move": [0, 0, -0.07] },
+            { "t": 1.9, "move": [0, 0, 0], "ease": "spring", "bounce": 0.05 },
+            { "t": 2 }
+          ]
+        },
+        {
+          "node": "@round", "optional": true,
+          "keys": [
+            { "t": 1.08 },
+            { "t": 1.13, "show": 1 },
+            { "t": 1.76, "show": 1 },
+            { "t": 1.8 }
+          ]
+        }
+      ]
+    },
+    "shotgun-pump": {
+      "gun": [
+        { "t": 0 },
+        { "t": 0.5, "turn": -42, "tilt": -2, "roll": 18, "at": [0.2, -0.6], "fill": 1.3, "cue": "turn" },
+        { "t": 0.9, "turn": -41, "tilt": -1, "roll": 17, "at": [0.2, -0.6], "fill": 1.3 },
+        { "t": 1.15, "turn": -43, "tilt": -4, "roll": 16, "at": [0.2, -0.6], "fill": 1.3, "hit": true },
+        { "t": 1.5, "turn": -41, "tilt": -2, "roll": 19, "at": [0.2, -0.6], "fill": 1.3 },
+        { "t": 1.62, "turn": -42, "tilt": 0, "roll": 18, "at": [0.2, -0.6], "fill": 1.3, "hit": true },
+        { "t": 2.2, "turn": -40, "tilt": 0, "roll": 17, "at": [0.2, -0.6], "fill": 1.3 },
+        { "t": 2.9 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.75, "on": "node", "node": "a_Pump", "face": "bottom", "at": [0.5, 0.5], "fingers": [0.5, 0.75, 0.8, 0.85, 0.9] },
+        { "t": 1.6, "on": "node", "node": "a_Pump", "face": "bottom", "at": [0.5, 0.5], "fingers": [0.5, 0.75, 0.8, 0.85, 0.9] },
+        { "t": 2.05, "on": "under" },
+        { "t": 2.35, "on": "under" },
+        { "t": 2.8, "on": "grip" }
+      ],
+      "parts": [
+        {
+          "node": "a_Pump",
+          "keys": [
+            { "t": 0.9 },
+            { "t": 1.15, "move": [0, 0, -0.085], "ease": "in", "cue": "pump-back" },
+            { "t": 1.46, "move": [0, 0, -0.085] },
+            { "t": 1.6, "move": [0, 0, 0], "ease": "spring", "bounce": 0.05, "cue": "pump-forward" },
+            { "t": 1.7 }
+          ]
+        },
+        {
+          "node": "a_Bolt", "optional": true,
+          "keys": [
+            { "t": 0.9 },
+            { "t": 1.15, "move": [0, 0, -0.09], "ease": "in" },
+            { "t": 1.46, "move": [0, 0, -0.09] },
+            { "t": 1.6, "move": [0, 0, 0], "ease": "spring", "bounce": 0.05 },
+            { "t": 1.7 }
+          ]
+        }
+      ]
+    },
+    "heavy-charge": {
+      "gun": [
+        { "t": 0 },
+        { "t": 0.6, "turn": -35, "tilt": 5, "roll": 10, "at": [0.3, -0.4], "cue": "turn" },
+        { "t": 0.95, "turn": -34, "tilt": 6, "roll": 9, "at": [0.3, -0.4] },
+        { "t": 1.2, "turn": -36, "tilt": 3, "roll": 8, "at": [0.3, -0.4], "hit": true },
+        { "t": 1.8, "turn": -34, "tilt": 5, "roll": 11, "at": [0.3, -0.4] },
+        { "t": 1.92, "turn": -35, "tilt": 7, "roll": 10, "at": [0.3, -0.4], "hit": true },
+        { "t": 2.5, "turn": -33, "tilt": 6, "roll": 12, "at": [0.3, -0.4] },
+        { "t": 3.2 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.8, "on": "node", "node": "Front_MachineGun_ChargingHandle_2", "face": "left", "clasp": true },
+        { "t": 1.76, "on": "node", "node": "Front_MachineGun_ChargingHandle_2", "face": "left", "clasp": true },
+        { "t": 2.3, "on": "under" },
+        { "t": 2.65, "on": "under" },
+        { "t": 3.1, "on": "grip" }
+      ],
+      "parts": [
+        {
+          "node": "Front_MachineGun_ChargingHandle_2",
+          "keys": [
+            { "t": 0.95 },
+            { "t": 1.2, "move": [0, 0, -0.07], "ease": "in", "cue": "charge-back" },
+            { "t": 1.76, "move": [0, 0, -0.07] },
+            { "t": 1.9, "move": [0, 0, 0], "ease": "spring", "bounce": 0.05, "cue": "charge-home" },
+            { "t": 2 }
+          ]
+        },
+        {
+          "node": "@round", "optional": true,
+          "keys": [
+            { "t": 1.13 },
+            { "t": 1.18, "show": 1 },
+            { "t": 1.76, "show": 1 },
+            { "t": 1.8 }
+          ]
+        }
+      ]
+    },
+    "knife-look": {
+      "from": "hold",
+      "gun": [
+        { "t": 0 },
+        { "t": 0.5, "turn": 55, "tilt": 15, "roll": -20, "cue": "turn" },
+        { "t": 1.15, "turn": 51, "tilt": 17, "roll": -17 },
+        { "t": 1.7, "turn": -65, "tilt": 20, "roll": 25, "cue": "turn" },
+        { "t": 2.35, "turn": -61, "tilt": 22, "roll": 22 },
+        { "t": 2.95 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.35, "on": "away" },
+        { "t": 2.45, "on": "away" },
+        { "t": 2.9, "on": "grip" }
+      ]
+    },
+    "knife-twirl": {
+      "from": "hold",
+      "gun": [
+        { "t": 0 },
+        { "t": 0.55, "turn": 0, "tilt": 0, "roll": 0, "palm": true, "fill": 0.6, "cue": "turn" },
+        { "t": 0.85, "turn": 1, "tilt": 1, "roll": -1, "palm": true, "fill": 0.6, "through": true },
+        { "t": 1.45, "turn": 0, "tilt": 0, "roll": 0, "palm": true, "fill": 0.6, "spin": 360, "toss": 0.07, "g": 9.8, "through": true },
+        { "t": 1.85, "turn": 3, "tilt": 2, "roll": -3, "palm": true, "fill": 0.6, "spin": 360 },
+        { "t": 2.2, "turn": 1, "tilt": 3, "roll": -1, "palm": true, "fill": 0.6, "spin": 360 },
+        { "t": 2.8 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.3, "on": "away" },
+        { "t": 2.25, "on": "away" },
+        { "t": 2.75, "on": "grip" }
+      ]
+    },
+    "knife-toss": {
+      "from": "hold",
+      "gun": [
+        { "t": 0 },
+        { "t": 0.55, "turn": 0, "tilt": 0, "roll": 0, "palm": true, "fill": 0.6, "cue": "turn" },
+        { "t": 0.9, "turn": 1, "tilt": 1, "roll": -1, "palm": true, "fill": 0.6, "through": true },
+        { "t": 1.65, "turn": 0, "tilt": 0, "roll": 0, "palm": true, "fill": 0.6, "spin": 720, "toss": 0.14, "g": 9.8, "through": true },
+        { "t": 2.1, "turn": 4, "tilt": 3, "roll": -4, "palm": true, "fill": 0.6, "spin": 720 },
+        { "t": 2.5, "turn": 2, "tilt": 4, "roll": -2, "palm": true, "fill": 0.6, "spin": 720 },
+        { "t": 3.1 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.3, "on": "away" },
+        { "t": 2.55, "on": "away" },
+        { "t": 3.05, "on": "grip" }
+      ]
+    },
+    "bat-look": {
+      "from": "hold",
+      "gun": [
+        { "t": 0 },
+        { "t": 0.55, "turn": 45, "tilt": 12, "roll": -18, "cue": "turn" },
+        { "t": 1.25, "turn": 41, "tilt": 14, "roll": -15 },
+        { "t": 1.85, "turn": -50, "tilt": 15, "roll": 22, "cue": "turn" },
+        { "t": 2.55, "turn": -46, "tilt": 17, "roll": 19 },
+        { "t": 3.2 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.35, "on": "away" },
+        { "t": 2.65, "on": "away" },
+        { "t": 3.15, "on": "grip" }
+      ]
+    },
+    "bat-twirl": {
+      "from": "hold",
+      "gun": [
+        { "t": 0 },
+        { "t": 0.6, "turn": 0, "tilt": 0, "roll": 0, "palm": true, "fill": 0.6, "cue": "turn" },
+        { "t": 0.95, "turn": 1, "tilt": 1, "roll": -1, "palm": true, "fill": 0.6, "through": true },
+        { "t": 1.6, "turn": 0, "tilt": 0, "roll": 0, "palm": true, "fill": 0.6, "spin": 360, "toss": 0.1, "g": 9.8, "through": true },
+        { "t": 2.05, "turn": 3, "tilt": 2, "roll": -3, "palm": true, "fill": 0.6, "spin": 360 },
+        { "t": 2.45, "turn": 1, "tilt": 3, "roll": -1, "palm": true, "fill": 0.6, "spin": 360 },
+        { "t": 3.1 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.3, "on": "away" },
+        { "t": 2.5, "on": "away" },
+        { "t": 3.05, "on": "grip" }
+      ]
+    },
+    "bat-toss": {
+      "from": "hold",
+      "gun": [
+        { "t": 0 },
+        { "t": 0.6, "turn": 0, "tilt": 0, "roll": 0, "palm": true, "fill": 0.6, "cue": "turn" },
+        { "t": 1, "turn": 1, "tilt": 1, "roll": -1, "palm": true, "fill": 0.6, "through": true },
+        { "t": 1.8, "turn": 0, "tilt": 0, "roll": 0, "palm": true, "fill": 0.6, "spin": 360, "toss": 0.25, "g": 9.8, "through": true },
+        { "t": 2.3, "turn": 4, "tilt": 3, "roll": -4, "palm": true, "fill": 0.6, "spin": 360 },
+        { "t": 2.75, "turn": 2, "tilt": 4, "roll": -2, "palm": true, "fill": 0.6, "spin": 360 },
+        { "t": 3.4 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.3, "on": "away" },
+        { "t": 2.8, "on": "away" },
+        { "t": 3.35, "on": "grip" }
+      ]
+    },
+    "hammer-look": {
+      "from": "hold",
+      "gun": [
+        { "t": 0 },
+        { "t": 0.7, "turn": 50, "tilt": 10, "roll": -15, "cue": "turn" },
+        { "t": 1.5, "turn": 46, "tilt": 12, "roll": -12 },
+        { "t": 2.3, "turn": -55, "tilt": 15, "roll": 20, "cue": "turn" },
+        { "t": 3.1, "turn": -51, "tilt": 17, "roll": 17 },
+        { "t": 3.9 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.35, "on": "away" },
+        { "t": 3.2, "on": "away" },
+        { "t": 3.85, "on": "grip" }
+      ]
+    },
+    "hammer-spin": {
+      "from": "hold",
+      "gun": [
+        { "t": 0 },
+        { "t": 0.7, "turn": 0, "tilt": 0, "roll": 0, "palm": true, "fill": 1.2, "at": [0.3, -0.9], "cue": "turn" },
+        { "t": 1.05, "turn": 1, "tilt": 1, "roll": -1, "palm": true, "fill": 1.2, "at": [0.3, -0.9], "through": true },
+        { "t": 1.75, "turn": 0, "tilt": 0, "roll": 0, "palm": true, "fill": 1.2, "at": [0.3, -0.9], "flip": 720, "toss": 0.1, "g": 9.8, "through": true },
+        { "t": 2.25, "turn": 3, "tilt": 2, "roll": -3, "palm": true, "fill": 1.2, "at": [0.3, -0.9], "flip": 720 },
+        { "t": 2.75, "turn": 1, "tilt": 3, "roll": -1, "palm": true, "fill": 1.2, "at": [0.3, -0.9], "flip": 720 },
+        { "t": 3.4 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.3, "on": "away" },
+        { "t": 2.8, "on": "away" },
+        { "t": 3.35, "on": "grip" }
+      ]
+    },
+    "hammer-toss": {
+      "from": "hold",
+      "gun": [
+        { "t": 0 },
+        { "t": 0.7, "turn": 0, "tilt": 0, "roll": 0, "palm": true, "fill": 1.2, "at": [0.3, -0.9], "cue": "turn" },
+        { "t": 1.1, "turn": 1, "tilt": 1, "roll": -1, "palm": true, "fill": 1.2, "at": [0.3, -0.9], "through": true },
+        { "t": 2, "turn": 0, "tilt": 0, "roll": 0, "palm": true, "fill": 1.2, "at": [0.3, -0.9], "flip": 360, "toss": 0.12, "g": 9.8, "through": true },
+        { "t": 2.6, "turn": 3, "tilt": 2, "roll": -3, "palm": true, "fill": 1.2, "at": [0.3, -0.9], "flip": 360 },
+        { "t": 3.1, "turn": 1, "tilt": 3, "roll": -1, "palm": true, "fill": 1.2, "at": [0.3, -0.9], "flip": 360 },
+        { "t": 3.8 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.3, "on": "away" },
+        { "t": 3.15, "on": "away" },
+        { "t": 3.75, "on": "grip" }
+      ]
+    },
+    "spear-look": {
+      "from": "hold",
+      "gun": [
+        { "t": 0 },
+        { "t": 0.7, "turn": 35, "tilt": 25, "roll": -12, "cue": "turn" },
+        { "t": 1.5, "turn": 31, "tilt": 27, "roll": -9 },
+        { "t": 2.3, "turn": -40, "tilt": 28, "roll": 15, "cue": "turn" },
+        { "t": 3.1, "turn": -36, "tilt": 30, "roll": 12 },
+        { "t": 3.9 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.35, "on": "away" },
+        { "t": 3.2, "on": "away" },
+        { "t": 3.85, "on": "grip" }
+      ]
+    },
+    "spear-thrust": {
+      "from": "hold",
+      "gun": [
+        { "t": 0 },
+        { "t": 0.6, "turn": -12, "tilt": -14, "roll": 6, "cue": "turn" },
+        { "t": 1.2, "turn": -10, "tilt": -12, "roll": 7 },
+        { "t": 1.55, "turn": -11, "tilt": -10, "roll": 6, "fill": 1.3 },
+        { "t": 1.75, "turn": -12, "tilt": -16, "roll": 5, "fill": 0.55, "hit": true, "cue": "settle" },
+        { "t": 2.3, "turn": -10, "tilt": -13, "roll": 7, "fill": 0.8 },
+        { "t": 2.8, "turn": -8, "tilt": -8, "roll": 6 },
+        { "t": 3.4 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.35, "on": "away" },
+        { "t": 2.85, "on": "away" },
+        { "t": 3.35, "on": "grip" }
+      ]
+    },
+    "spear-toss": {
+      "from": "hold",
+      "gun": [
+        { "t": 0 },
+        { "t": 0.7, "turn": 0, "tilt": 0, "roll": 0, "palm": true, "fill": 0.8, "cue": "turn" },
+        { "t": 1.1, "turn": 1, "tilt": 1, "roll": -1, "palm": true, "fill": 0.8, "through": true },
+        { "t": 1.9, "turn": 0, "tilt": 0, "roll": 0, "palm": true, "fill": 0.8, "flip": 360, "toss": 0.15, "g": 9.8, "through": true },
+        { "t": 2.45, "turn": 3, "tilt": 2, "roll": -3, "palm": true, "fill": 0.8, "flip": 360 },
+        { "t": 2.95, "turn": 1, "tilt": 3, "roll": -1, "palm": true, "fill": 0.8, "flip": 360 },
+        { "t": 3.6 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 0.3, "on": "away" },
+        { "t": 3, "on": "away" },
+        { "t": 3.55, "on": "grip" }
+      ]
+    },
+    "item-look": {
+      "from": "hold",
+      "gun": [
+        { "t": 0 },
+        { "t": 0.55, "turn": 28, "tilt": 6, "roll": -12, "cue": "turn" },
+        { "t": 1.25, "turn": 25, "tilt": 8, "roll": -10 },
+        { "t": 1.85, "turn": -30, "tilt": 8, "roll": 14, "cue": "turn" },
+        { "t": 2.55, "turn": -27, "tilt": 10, "roll": 12 },
+        { "t": 3.15 }
+      ],
+      "hand": [
+        { "t": 0, "on": "grip" },
+        { "t": 3.1, "on": "grip" }
+      ]
     }
   },
+  "kinds": {
+    "pistol": ["pistol", "handgun-toss", "handgun-mag"],
+    "highcal": ["pistol", "handgun-toss", "handgun-mag", "slide-rack"],
+    "revolver": ["revolver", "handgun-toss"],
+    "compact": ["compact", "longgun-toss", "rifle-mag", "rifle-charge"],
+    "rifle": ["rifle", "longgun-toss", "rifle-mag", "rifle-charge"],
+    "shotgun": ["shotgun", "longgun-toss", "rifle-mag", "shotgun-pump", "rifle-charge"],
+    "heavy": ["heavy", "longgun-toss", "heavy-mag", "heavy-charge"],
+    "long": ["long", "longgun-toss", "rifle-mag", "rifle-charge"],
+    "knife": ["knife-look", "knife-twirl", "knife-toss"],
+    "bat": ["bat-look", "bat-twirl", "bat-toss"],
+    "hammer": ["hammer-look", "hammer-spin", "hammer-toss"],
+    "spear": ["spear-look", "spear-thrust", "spear-toss"],
+    "item": ["item-look"]
+  },
   "gear": {
-    "3": ["pistol"],
-    "67": ["pistol"],
-    "29": ["pistol"],
-    "45": ["pistol"],
-    "63": ["pistol"],
-    "15": ["revolver"],
-    "47": ["revolver"],
-    "4": ["compact"],
-    "60": ["compact"],
-    "49": ["compact"],
-    "34": ["compact"],
-    "66": ["compact"],
-    "51": ["compact"],
-    "40": ["rifle"],
-    "5": ["rifle"],
-    "50": ["rifle"],
-    "12": ["rifle"],
-    "30": ["rifle"],
-    "41": ["rifle"],
-    "46": ["rifle"],
-    "61": ["shotgun"],
-    "65": ["shotgun"],
-    "13": ["shotgun"],
-    "31": ["shotgun"],
-    "56": ["shotgun"],
-    "44": ["shotgun"],
-    "16": ["heavy"],
-    "38": ["heavy"],
-    "39": ["heavy"],
-    "43": ["heavy"],
-    "62": ["long"],
-    "14": ["long"],
-    "42": ["long"]
+    "3": ["@highcal"],
+    "4": ["@compact"],
+    "5": ["@rifle"],
+    "9": ["@hammer"],
+    "12": ["@rifle"],
+    "13": ["@shotgun"],
+    "14": ["@long"],
+    "15": ["@revolver", "revolver-check", "revolver-swing"],
+    "16": ["@heavy"],
+    "26": ["@hammer"],
+    "27": ["@hammer"],
+    "28": ["@hammer"],
+    "29": ["@pistol"],
+    "30": ["@rifle"],
+    "31": ["@shotgun"],
+    "34": ["@compact"],
+    "38": ["@heavy"],
+    "39": ["@heavy"],
+    "40": ["@rifle"],
+    "41": ["@rifle"],
+    "42": ["@long"],
+    "43": ["@heavy"],
+    "44": ["@shotgun"],
+    "45": ["@pistol"],
+    "46": ["@rifle"],
+    "47": ["@revolver", "break-check", "revolver-break"],
+    "49": ["@compact"],
+    "50": ["@rifle"],
+    "51": ["@compact"],
+    "53": ["@knife"],
+    "54": ["@spear"],
+    "55": ["@bat"],
+    "56": ["@shotgun"],
+    "57": ["@hammer"],
+    "60": ["@compact"],
+    "61": ["@shotgun"],
+    "62": ["@long"],
+    "63": ["@highcal"],
+    "65": ["@shotgun"],
+    "66": ["@compact"],
+    "67": ["@pistol"],
+    "68": ["@knife"],
+    "69": ["@bat"],
+    "70": ["@spear"]
   },
   "fallback": [
-    { "upTo": 0.35, "motions": ["pistol"] },
-    { "upTo": 0.7, "motions": ["compact"] },
-    { "upTo": 1.0, "motions": ["rifle"] },
-    { "motions": ["long"] }
-  ]
+    { "upTo": 0.35, "motions": ["@pistol"] },
+    { "upTo": 0.7, "motions": ["@compact"] },
+    { "upTo": 1, "motions": ["@rifle"] },
+    { "motions": ["@long"] },
+    { "melee": true, "upTo": 0.5, "motions": ["@knife"] },
+    { "melee": true, "upTo": 0.75, "motions": ["@bat"] },
+    { "melee": true, "upTo": 1.1, "motions": ["@hammer"] },
+    { "melee": true, "motions": ["@spear"] }
+  ],
+  "default": ["@item"]
 }

@@ -637,18 +637,23 @@ body {
   left: 14px;
   bottom: 14px;
 }
-/* The character tab's moves (two labelled rows and the play controls) with the spring swings under them, one column centred above
-   the bottom controls, so neither covers the other at any width. */
+/* The character tab's moves (two labelled rows and the play controls) with the spring swings under them, one column centred on the
+   bottom row where the weapon view has its event buttons; a narrow view lifts it above the view controls, as it lifts those. */
 .stage-moves {
   position: absolute;
   left: 14px;
   right: 14px;
-  bottom: 58px;
+  bottom: 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   pointer-events: none;
+}
+@container (max-width: 900px) {
+  .stage-moves {
+    bottom: 58px;
+  }
 }
 .stage-moves > * {
   position: static;
@@ -914,6 +919,11 @@ body {
 }
 .insp-name .mantine-Input-input:hover {
   border-color: var(--line);
+}
+/* A thing not yet renamed shows its given name as the placeholder: it is still its name, not a greyed-out field. */
+.insp-name .mantine-Input-input::placeholder {
+  color: var(--mantine-color-text);
+  opacity: 1;
 }
 .insp-name .mantine-Input-input:focus {
   border-color: var(--accent);
@@ -2050,7 +2060,9 @@ button.section-toggle:hover .chev {
   right: 4px;
   visibility: hidden;
 }
+/* The open work's 更多 always shows (the guide points at it); the others' on hover. */
 .work:hover .more,
+.work[aria-current='true'] .more,
 .work .more[aria-expanded='true'] {
   visibility: visible;
 }

@@ -53,11 +53,14 @@ internal static class VisualFrame
     /// <summary>Joint clips, the pose copies that follow a body, then the outlines, after animation and movement, before the cameras render.</summary>
     internal static void LateUpdate()
     {
+        try { PoseCopy.WakeAll(); } catch (Exception error) { Scene.StepFailed("pose copies by sight", error); }
         try { JointPlayer.TickAll(); } catch (Exception error) { Scene.StepFailed("joint clips", error); }
         try { PoseCopy.TickAll(); } catch (Exception error) { Scene.StepFailed("pose copies", error); }
         try { Chains.TickAll(); } catch (Exception error) { Scene.StepFailed("chain physics", error); }
         try { FirstPersonArms.TickAll(); } catch (Exception error) { Scene.StepFailed("first-person arms", error); }
         try { FirstPersonWear.TickAll(); } catch (Exception error) { Scene.StepFailed("first-person wear", error); }
+        // The facing pass itself runs as the first camera culls, after every LateUpdate; this only marks the frame.
+        CameraFacing.NewFrame();
         try { OutlineDraw.Tick(); }
         catch (Exception error) { Plugin.Logger.ErrorOnce("visual-outline-update-failed", "ForgeVisual outline update failed: " + error); }
     }
@@ -104,7 +107,7 @@ internal static class Scene
     internal static void Tick()
     {
         Now = ForgeCore.Frame.GameTime;
-        Delta = Time.deltaTime;
+        Delta = ForgeCore.Frame.DeltaTime;
         ReadEye();
         // Held items a pose copy carried to a model's hand go back where the game keeps them before its animation and IK run.
         try { PoseCopy.RestoreHeld(); } catch (Exception error) { StepFailed("held items", error); }

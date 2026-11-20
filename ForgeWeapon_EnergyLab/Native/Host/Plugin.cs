@@ -10,7 +10,7 @@ namespace ForgeWeaponEnergyLab.Native;
 
 [BepInPlugin(Id, "Forge Weapon Energy Lab", Version)]
 [BepInDependency("dev.gtfomodding.gtfo-api", ">=0.6.1")]
-[BepInDependency("NAinfini.ForgeCore", ">=1.0.1")]
+[BepInDependency("NAinfini.ForgeCore", ">=1.0.3")]
 // MTFO marks the game as modded (achievements and public matchmaking off), so the guns stay out of official play.
 [BepInDependency("com.dak.MTFO", ">=4.6.3")]
 internal sealed class Plugin : BasePlugin

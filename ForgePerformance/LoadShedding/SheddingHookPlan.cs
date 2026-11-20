@@ -44,6 +44,8 @@ internal enum SheddingHookId
     MeleePacket,
     IrfDraw,
     IrfLateUpdate,
+    IrfPhysics,
+    TentacleError,
     MagazineDrop,
     RepellerState
 }
@@ -61,13 +63,15 @@ internal sealed class SheddingHookPlan
             || settings.GuiMirrorOff || settings.LowQualitySpitter || settings.LeakCleanup || settings.DecayCleanup
             || settings.DebrisFreeze || settings.GlueSoundRecycle || settings.DroppedMagazineCleanup
             || settings.SpentFogRepellerCleanup;
+        RequiresCrowd = settings.CrowdHooks;
     }
 
     internal SheddingSettings Settings { get; }
     internal IReadOnlyList<SheddingHookId> Hooks => _hooks;
     internal bool RequiresDecorationAnimationScan { get; }
     internal bool RequiresExtras { get; }
-    internal bool HasShedding => _hooks.Length != 0 || RequiresDecorationAnimationScan || RequiresExtras;
+    internal bool RequiresCrowd { get; }
+    internal bool HasShedding => _hooks.Length != 0 || RequiresDecorationAnimationScan || RequiresExtras || RequiresCrowd;
 
     internal void Install(Action<SheddingHookId> install)
     {
@@ -81,8 +85,8 @@ internal sealed class SheddingHookPlan
         var hooks = new List<SheddingHookId>(30);
         void Add(bool enabled, SheddingHookId hook) { if (enabled) hooks.Add(hook); }
 
-        Add(settings.FastCorpseHide || settings.CorpseShadows, SheddingHookId.CorpseSetup);
-        Add(settings.FastCorpseHide || settings.CorpseShadows, SheddingHookId.DeadEnter);
+        Add(settings.FastCorpseHide || settings.CorpseShadows || settings.CrowdHooks, SheddingHookId.CorpseSetup);
+        Add(settings.FastCorpseHide || settings.CorpseShadows || settings.CrowdHooks, SheddingHookId.DeadEnter);
         Add(settings.FastCorpseHide || settings.CorpseRecycle, SheddingHookId.CorpseMove);
         Add(settings.RagdollCap || settings.RagdollNodeRefresh, SheddingHookId.RagdollToggle);
         Add(settings.FastCorpseHide || settings.RagdollCap, SheddingHookId.DecayHidden);
@@ -120,6 +124,8 @@ internal sealed class SheddingHookPlan
         Add(settings.MeleePacketReuse, SheddingHookId.MeleePacket);
         Add(settings.IrfWorldCameraOnly, SheddingHookId.IrfDraw);
         Add(settings.IrfOffscreenSkip, SheddingHookId.IrfLateUpdate);
+        Add(settings.IrfPhysicsHalfRate, SheddingHookId.IrfPhysics);
+        Add(settings.TentacleLimitErrorFold, SheddingHookId.TentacleError);
         Add(settings.DroppedMagazineCleanup, SheddingHookId.MagazineDrop);
         Add(settings.SpentFogRepellerCleanup, SheddingHookId.RepellerState);
         return new SheddingHookPlan(settings, hooks.ToArray());

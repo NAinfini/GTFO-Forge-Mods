@@ -134,6 +134,8 @@ public static class PackBuilder
                 }
             }
 
+            // The author's own inspect motions (no editor page): an inspect.json beside the project goes in as it is.
+            if (File.Exists(Path.Combine(projectDir, SkinPack.InspectName))) Copy(SkinPack.InspectName, Path.Combine(projectDir, SkinPack.InspectName));
             if (doc.Picture != null)
             {
                 Copy("picture.png", doc.Picture);

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.3
+
+Needs ForgeCore 1.0.3. No change to how actions work; this version carries the new icon and depends on the current ForgeCore.
 ## 1.0.2
 
 Needs ForgeCore 1.0.2, which carries these fixes.

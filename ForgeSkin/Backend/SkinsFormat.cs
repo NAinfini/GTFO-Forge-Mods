@@ -356,6 +356,7 @@ public static class SkinsFormat
                     entries.Add((gear, pack, group.Last()));
                 }
                 Notes(doc, dropped);
+                if (pack.Inspect != null) dropped.Add(new("inspect", doc.Name, null, pack.Inspect.Motions.Count()));
             }
             if (gears.Count == 0) return false;
 
@@ -406,7 +407,7 @@ public static class SkinsFormat
                 if (p.EmissiveEnabled != null || emissive) properties["_EnableEmissive"] = Property("Float", new JsonObject { ["value"] = (p.EmissiveEnabled ?? true) ? 1 : 0 });
                 if (p.EmissiveColor != null || p.EmissiveIntensity != null)
                 {
-                    var c = ForgeVisual.ColourSpace.Glow(p.EmissiveColor ?? [1, 1, 1], (p.EmissiveIntensity ?? 1) * MaterialParams.EmissionUnit, game?.Hdr.Contains("_EmissiveColor") ?? true); // the game's units
+                    var c = ForgeVisual.ColourSpace.Glow(p.EmissiveColor ?? [1, 1, 1], (p.EmissiveIntensity ?? 1) * ForgeVisual.ColourSpace.EmissionPerUnit, game?.Hdr.Contains("_EmissiveColor") ?? true); // the game's units
                     properties["_EmissiveColor"] = Property("Color", new JsonObject { ["r"] = c[0], ["g"] = c[1], ["b"] = c[2], ["a"] = 1 });
                 }
                 if (p.Metallic is float metal) properties["_Metallic"] = Property("Float", new JsonObject { ["value"] = metal });

@@ -256,7 +256,8 @@ internal sealed partial class DecorationShedding
             _shadowPlanHits++;
             for (var i = 0; i < plan.Length; i++)
             {
-                scope.Remove(list, plan.IndexAt(i), plan.ItemAt(i).Culler); _shadowCalls++;
+                if (!scope.Remove(list, plan.IndexAt(i), plan.ItemAt(i).Culler)) break;
+                _shadowCalls++;
             }
         }
         else
@@ -278,7 +279,8 @@ internal sealed partial class DecorationShedding
             if (!_visuals.TryGetValue(NativeList<C_Cullable>.Item(id, i), out var entry)
                 || !entry.ShadowEligible
                 || !DecorationClassifier.Allows(DecorationClass.VisualRotator, entry.Risks, DecorationUse.Shadow)) continue;
-            scope.Remove(list, i, entry.Culler); _shadowCalls++;
+            if (!scope.Remove(list, i, entry.Culler)) break;
+            _shadowCalls++;
             plan?.Add(i, entry);
             if (!entry.Shadowed) { entry.Shadowed = true; _shadowChanged++; }
         }
@@ -347,7 +349,7 @@ internal sealed partial class DecorationShedding
         _decalRetired++;
         entry.Effect.ReturnToPool();
     }
-    internal void TickDecals() => _decalBudget.Expire(Time.time, _retire);
+    internal void TickDecals(float now) => _decalBudget.Expire(now, _retire);
 
     // The lights the game or an objective controls are marked first, one piece per scan of the scene; every ambient light is classified after all of
     // them (the queue keeps its order), one piece each.
@@ -617,10 +619,22 @@ internal sealed partial class DecorationShedding
         private readonly (Il2CppSystem.Collections.Generic.List<T> list, int index, T value)[] _removed = new (Il2CppSystem.Collections.Generic.List<T>, int, T)[4096];
         private int _count;
         internal bool Active;
-        internal void Remove(Il2CppSystem.Collections.Generic.List<T> list, int index, T value)
+        internal const string LimitCode = "perf.decoration-removal-limit";
+        private static bool _limitLogged;
+        // False at the table's end: the items not yet taken out keep their place, and the cap is logged once.
+        internal bool Remove(Il2CppSystem.Collections.Generic.List<T> list, int index, T value)
         {
-            if (_count == _removed.Length) throw new InvalidOperationException("Decoration list exceeds 4096 removals.");
+            if (_count == _removed.Length)
+            {
+                if (!_limitLogged)
+                {
+                    _limitLogged = true;
+                    LoadSheddingController.Current?.LogExtraFailure(LimitCode, "a decoration list holds more than " + _removed.Length + " removable items; the rest keep their place");
+                }
+                return false;
+            }
             _removed[_count++] = (list, index, value); list.RemoveAt(index);
+            return true;
         }
         internal int Restore()
         {

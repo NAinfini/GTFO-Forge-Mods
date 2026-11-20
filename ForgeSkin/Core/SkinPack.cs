@@ -37,15 +37,21 @@ public sealed class SkinPack : IDisposable
     /// <summary>The longest one sound may play; the editor's build and the plugin's load refuse a longer one (bad-audio).</summary>
     public const double MaxSoundSeconds = 10;
 
+    /// <summary>The pack's own weapon inspect motions, beside the manifest (PLAN §4.14), the shape of Core/inspect-motions.json.</summary>
+    public const string InspectName = "inspect.json";
+
     readonly ZipArchive _zip;
     public SkinDocument Manifest { get; }
     public string FilePath { get; }
+    /// <summary>The pack's inspect motions (InspectTable owned by the skin id), or null when it has none.</summary>
+    public InspectTable? Inspect { get; }
 
-    SkinPack(string path, ZipArchive zip, SkinDocument manifest)
+    SkinPack(string path, ZipArchive zip, SkinDocument manifest, InspectTable? inspect)
     {
         FilePath = path;
         _zip = zip;
         Manifest = manifest;
+        Inspect = inspect;
     }
 
     public static SkinPack Open(string path)
@@ -57,13 +63,25 @@ public sealed class SkinPack : IDisposable
             using var reader = new StreamReader(entry.Open());
             var doc = SkinJson.Read(reader.ReadToEnd());
             Validate(doc, name => Head(zip.GetEntry(name)));
-            return new SkinPack(path, zip, doc);
+            return new SkinPack(path, zip, doc, zip.GetEntry(InspectName) is { } inspect ? ReadInspect(doc, inspect) : null);
         }
         catch
         {
             zip.Dispose();
             throw;
         }
+    }
+
+    // A pack's inspect.json, read as a skin pack's table of the skin's id (bad-inspect when it cannot be).
+    static InspectTable ReadInspect(SkinDocument doc, ZipArchiveEntry entry)
+    {
+        if (doc.Target.Weapon == CharacterSkin.Target) throw new SkinFormatException("bad-inspect", $"{InspectName}: a character skin has no weapon inspect motions");
+        using var reader = new StreamReader(entry.Open());
+        var table = new InspectTable(doc.Id);
+        try { table.Add(reader.ReadToEnd()); }
+        catch (Exception e) when (e is FormatException or JsonException or InvalidOperationException or KeyNotFoundException)
+        { throw new SkinFormatException("bad-inspect", $"{InspectName}: {e.Message}"); }
+        return table;
     }
 
     static byte[]? Head(ZipArchiveEntry? entry)
@@ -137,6 +155,9 @@ public sealed class SkinPack : IDisposable
         {
             Vec(p.EmissiveColor, 3, where);
             Vec(p.Tint, 4, where);
+            // The plugin writes these straight to the shader, where NaN or infinity cannot go.
+            if (new[] { p.Metallic, p.Smoothness, p.EmissiveIntensity }.Any(v => v is { } f && !float.IsFinite(f)))
+                throw new SkinFormatException("bad-vector", $"{where}: metallic, smoothness and emissive intensity must be finite numbers");
             foreach (var (channel, r) in p.Reticles ?? new Dictionary<TextureChannel, Reticle>())
             {
                 // A reticle needs a reticle channel to name its layer; NaN or infinity cannot go to the shader.

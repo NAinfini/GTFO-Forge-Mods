@@ -64,11 +64,23 @@ public sealed record ImportedTexture(string Sha256, int Width, int Height);
 /// model's own frame (Unity axes) as a column-major 4×4.</summary>
 public sealed record ImportedBone(string Name, int Parent, float[] Rest);
 
+/// <summary>One collision shape of a still model (a <c>COL_</c> node of its source): how many points and indices it has in the mesh sidecar.
+/// The geometry is read with the mesh and built once per model (<see cref="ImportedModel.CollisionMeshes"/>); it is never drawn.</summary>
+public sealed record ImportedCollisionShape(int Vertices, int Indices);
+
+/// <summary>A drawn part that turns about the world's vertical axis to face the camera (a <c>FACE_</c> node of its source): the vertex run
+/// <paramref name="VertexStart"/>..+<paramref name="VertexCount"/>, stored in the part's own frame (origin at <paramref name="Pivot"/>, the node's
+/// origin in the model's frame; its front, the node's +Z, along +Z), drawn by its own <paramref name="Submeshes"/> over those vertices only.
+/// <paramref name="Yaw"/> (radians about +Y) stands it as authored.</summary>
+public sealed record ImportedFacingPart(int VertexStart, int VertexCount, float[] Pivot, float Yaw, IReadOnlyList<ImportedSubmesh> Submeshes);
+
 /// <summary>
 /// The description of an imported model, the part of the Forge model package that is JSON: which mesh bytes it draws (by
 /// content hash, vertex and index counts), how the indices split into submeshes, the material of each submesh and the textures the
 /// materials use. Format 1 is a still model; format 2 adds the skeleton its mesh is skinned to (<c>"skin": { "bones": [ { "name",
-/// "parent", "rest" } ] }</c>, parents first), and its mesh carries four bone weights per vertex. The mesh itself and the PNGs travel
+/// "parent", "rest" } ] }</c>, parents first), and its mesh carries four bone weights per vertex. A still model may list
+/// <c>"collision": [ { "vertices", "indices" } ]</c>: the shapes of its source's <c>COL_</c> nodes, whose geometry follows the drawn mesh
+/// in the sidecar; without it the model only decorates. The mesh itself and the PNGs travel
 /// beside it as bytes the caller read and checked against these hashes; this library reads no file and computes no hash.
 /// <code>
 /// { "format": 1,
@@ -87,18 +99,19 @@ public sealed class ImportedModelDescriptor
     // largest array, Array.MaxLength); a bone index is 16 bits in the mesh file; a texture side is what Unity's Direct3D 11 takes.
     public const int MaxArray = 0x7FFFFFC7, MaxTextureSide = 16384, MaxBones = 65536;
 
-    private ImportedModelDescriptor(string key, string meshSha256, int vertices, int indices, ImportedSubmesh[] submeshes, ImportedMaterial[] materials, ImportedTexture[] textures, ImportedBone[]? bones)
+    private ImportedModelDescriptor(string key, string meshSha256, int vertices, int indices, ImportedSubmesh[] submeshes, ImportedMaterial[] materials, ImportedTexture[] textures, ImportedBone[]? bones, ImportedCollisionShape[] collision, ImportedFacingPart[] facing, int drawn)
     {
         Key = key;
+        Collision = collision;
+        Facing = facing;
         Bones = bones;
         MeshSha256 = meshSha256;
         Vertices = vertices;
         Indices = indices;
         Submeshes = submeshes;
-        foreach (var submesh in submeshes) DrawnIndices += submesh.IndexCount;
+        DrawnIndices = drawn;
         Materials = materials;
         Textures = textures;
-        foreach (var material in materials) HasNormalMap |= material.NormalTexture >= 0;
     }
 
     /// <summary>Every value the descriptor holds, as one canonical text: what a cache keys the built model by. Two models may share a mesh
@@ -120,16 +133,25 @@ public sealed class ImportedModelDescriptor
     /// <summary>The skeleton of a skinned model (format 2), parents first; null for a still one.</summary>
     public IReadOnlyList<ImportedBone>? Bones { get; }
 
-    /// <summary>Whether any material has a normal map: the built mesh then carries tangents.</summary>
-    public bool HasNormalMap { get; }
+    /// <summary>The collision shapes of a still model, in the order their geometry follows the drawn mesh in the sidecar; empty for a model
+    /// that only decorates.</summary>
+    public IReadOnlyList<ImportedCollisionShape> Collision { get; }
 
-    /// <summary>What the model holds once built, in bytes: 32 per vertex (48 with tangents), 4 per index, and each texture as RGBA with its mip chain.
+    /// <summary>The parts that turn about the world's vertical axis to face the camera (the source's <c>FACE_</c> nodes), whose vertices follow
+    /// the still part's in order; empty when the model has none.</summary>
+    public IReadOnlyList<ImportedFacingPart> Facing { get; }
+
+    /// <summary>How many of the first vertices the still part (<see cref="Submeshes"/>) draws: all, or those before the first facing part.</summary>
+    public int StillVertices => Facing.Count == 0 ? Vertices : Facing[0].VertexStart;
+
+    /// <summary>What the model holds once built, in bytes: 48 per vertex (the built mesh always carries tangents), 4 per index, and each texture as RGBA with its mip chain.
     /// What a caller with a per-level budget checks before it hands the bytes over.</summary>
     public long EstimatedBytes
     {
         get
         {
-            var total = Vertices * (HasNormalMap ? 48L : 32L) + DrawnIndices * 4L + (Bones == null ? 0L : Vertices * 32L);
+            var total = Vertices * 48L + DrawnIndices * 4L + (Bones == null ? 0L : Vertices * 32L);
+            foreach (var shape in Collision) total += shape.Vertices * 12L + shape.Indices * 4L;
             foreach (var texture in Textures) total += (long)texture.Width * texture.Height * 16L / 3L;
             return total;
         }
@@ -143,6 +165,18 @@ public sealed class ImportedModelDescriptor
         public MaterialEntry[]? materials { get; set; }
         public TextureEntry[]? textures { get; set; }
         public SkinEntry? skin { get; set; }
+        public CollisionEntry[]? collision { get; set; }
+        public FacingEntry[]? facing { get; set; }
+    }
+
+    private sealed class CollisionEntry { public int vertices { get; set; } public int indices { get; set; } }
+    private sealed class FacingEntry
+    {
+        public int vertexStart { get; set; }
+        public int vertexCount { get; set; }
+        public float[]? pivot { get; set; }
+        public float yaw { get; set; }
+        public SubmeshEntry[]? submeshes { get; set; }
     }
 
     private sealed class SkinEntry { public BoneEntry[]? bones { get; set; } }
@@ -180,7 +214,15 @@ public sealed class ImportedModelDescriptor
         if (d.mesh == null || !IsHash(d.mesh.sha256)) { failure = Refuse("the mesh has no SHA-256"); return null; }
         if (d.mesh.vertices < 3) { failure = Refuse("the mesh has " + d.mesh.vertices + " vertices (3 or more)"); return null; }
         if (d.mesh.indices < 3 || d.mesh.indices % 3 != 0) { failure = Refuse("the mesh has " + d.mesh.indices + " indices (a multiple of 3)"); return null; }
-        if (ImportedMesh.Bytes(d.mesh.vertices, d.mesh.indices, d.skin != null) > MaxArray) { failure = Refuse("the mesh file of " + d.mesh.vertices + " vertices and " + d.mesh.indices + " indices passes " + MaxArray + " bytes"); return null; }
+        var collision = new ImportedCollisionShape[d.collision?.Length ?? 0];
+        if (d.collision != null && (collision.Length < 1 || d.skin != null)) { failure = Refuse("collision comes only with a still model and lists one shape or more"); return null; }
+        for (var i = 0; i < collision.Length; i++)
+        {
+            var c = d.collision![i];
+            if (c == null || c.vertices < 3 || c.indices < 3 || c.indices % 3 != 0) { failure = Refuse("collision shape " + i + " is not 3 or more points and whole triangles"); return null; }
+            collision[i] = new ImportedCollisionShape(c.vertices, c.indices);
+        }
+        if (ImportedMesh.Bytes(d.mesh.vertices, d.mesh.indices, d.skin != null, collision) > MaxArray) { failure = Refuse("the mesh file of " + d.mesh.vertices + " vertices and " + d.mesh.indices + " indices passes " + MaxArray + " bytes"); return null; }
 
         var textures = new ImportedTexture[d.textures?.Length ?? 0];
         for (var i = 0; i < textures.Length; i++)
@@ -216,18 +258,39 @@ public sealed class ImportedModelDescriptor
             materials[i] = new ImportedMaterial(name, (float[])colour.Clone(), m.texture, m.metallic, m.roughness, cutout, m.cutoff, m.normalTexture, m.metalTexture, (float[])emissive.Clone(), m.emissiveTexture, glass);
         }
 
-        var submeshes = new ImportedSubmesh[d.submeshes?.Length ?? 0];
-        if (submeshes.Length < 1) { failure = Refuse("the model has no submesh"); return null; }
         long drawn = 0;
-        for (var i = 0; i < submeshes.Length; i++)
+        string? fault = null;
+        ImportedSubmesh[]? Runs(SubmeshEntry[]? rows, string owner)
         {
-            var s = d.submeshes![i];
-            if (s == null) { failure = Refuse("submesh " + i + " is empty"); return null; }
-            if (s.start < 0 || s.count < 3 || s.count % 3 != 0 || s.start % 3 != 0 || (long)s.start + s.count > d.mesh.indices) { failure = Refuse("submesh " + i + " (" + s.start + ", " + s.count + ") is not whole triangles inside the " + d.mesh.indices + " indices"); return null; }
-            if (s.material < 0 || s.material >= materials.Length) { failure = Refuse("submesh " + i + " names the unknown material " + s.material); return null; }
-            submeshes[i] = new ImportedSubmesh(s.start, s.count, s.material);
-            drawn += s.count;
-            if (drawn > MaxArray) { failure = Refuse("the submeshes draw " + drawn + " indices in all (up to " + MaxArray + "); a range listed twice counts twice"); return null; }
+            var runs = new ImportedSubmesh[rows?.Length ?? 0];
+            if (runs.Length < 1) { fault = owner + " has no submesh"; return null; }
+            for (var i = 0; i < runs.Length; i++)
+            {
+                var s = rows![i];
+                if (s == null) { fault = owner + " submesh " + i + " is empty"; return null; }
+                if (s.start < 0 || s.count < 3 || s.count % 3 != 0 || s.start % 3 != 0 || (long)s.start + s.count > d.mesh.indices) { fault = owner + " submesh " + i + " (" + s.start + ", " + s.count + ") is not whole triangles inside the " + d.mesh.indices + " indices"; return null; }
+                if (s.material < 0 || s.material >= materials.Length) { fault = owner + " submesh " + i + " names the unknown material " + s.material; return null; }
+                runs[i] = new ImportedSubmesh(s.start, s.count, s.material);
+                drawn += s.count;
+                if (drawn > MaxArray) { fault = "the submeshes draw " + drawn + " indices in all (up to " + MaxArray + "); a range listed twice counts twice"; return null; }
+            }
+            return runs;
+        }
+        var submeshes = Runs(d.submeshes, "the model");
+        if (submeshes == null) { failure = Refuse(fault!); return null; }
+        var facing = new ImportedFacingPart[d.facing?.Length ?? 0];
+        if (d.facing != null && (facing.Length < 1 || d.skin != null)) { failure = Refuse("facing comes only with a still model and lists one part or more"); return null; }
+        for (int i = 0, next = -1; i < facing.Length; i++)
+        {
+            var f = d.facing![i];
+            if (f == null || f.vertexStart < 3 || f.vertexCount < 3 || next >= 0 && f.vertexStart != next || (long)f.vertexStart + f.vertexCount > d.mesh.vertices)
+            { failure = Refuse("facing part " + i + " is not the next run of 3 or more vertices after the still part"); return null; }
+            if (f.pivot is not { Length: 3 } pivot || !Array.TrueForAll(pivot, float.IsFinite) || !float.IsFinite(f.yaw)) { failure = Refuse("facing part " + i + " needs a finite pivot and yaw"); return null; }
+            var runs = Runs(f.submeshes, "facing part " + i);
+            if (runs == null) { failure = Refuse(fault!); return null; }
+            next = f.vertexStart + f.vertexCount;
+            facing[i] = new ImportedFacingPart(f.vertexStart, f.vertexCount, (float[])pivot.Clone(), f.yaw, runs);
+            if (i == facing.Length - 1 && next != d.mesh.vertices) { failure = Refuse("the facing parts end at vertex " + next + ", not at the mesh's " + d.mesh.vertices); return null; }
         }
         ImportedBone[]? bones = null;
         if (d.skin != null)
@@ -245,7 +308,7 @@ public sealed class ImportedModelDescriptor
                 bones[i] = new ImportedBone(b.name, b.parent, (float[])rest.Clone());
             }
         }
-        return new ImportedModelDescriptor(JsonSerializer.Serialize(d), d.mesh.sha256!, d.mesh.vertices, d.mesh.indices, submeshes, materials, textures, bones);
+        return new ImportedModelDescriptor(JsonSerializer.Serialize(d), d.mesh.sha256!, d.mesh.vertices, d.mesh.indices, submeshes, materials, textures, bones, collision, facing, (int)drawn);
     }
 
     /// <summary>Whether the files beside the descriptor are what building the model reads them as, short of the GPU: as many textures as it
@@ -303,8 +366,9 @@ internal sealed class ImportedMesh
     public const uint Magic = 0x48534D46;
     private const float MinNormalSquared = 0.25f;
 
-    private ImportedMesh(float[] positions, float[] normals, float[] uvs, int[] indices, int[]? boneIndices, float[]? boneWeights)
+    private ImportedMesh(float[] positions, float[] normals, float[] uvs, int[] indices, int[]? boneIndices, float[]? boneWeights, (float[] Positions, int[] Indices)[] collision)
     {
+        Collision = collision;
         Positions = positions;
         Normals = normals;
         Uvs = uvs;
@@ -326,8 +390,17 @@ internal sealed class ImportedMesh
     public float[] Uvs { get; }
     public int[] Indices { get; }
 
-    /// <summary>The sidecar's size for these counts.</summary>
-    public static long Bytes(long vertices, long indices, bool skinned) => HeaderBytes + vertices * 32L + indices * 4L + (skinned ? vertices * 24L : 0L);
+    /// <summary>Each collision shape's points (three floats each) and triangle indices (into its own points), in the descriptor's order.</summary>
+    public (float[] Positions, int[] Indices)[] Collision { get; }
+
+    /// <summary>The sidecar's size for these counts: after the drawn mesh (and a skinned mesh's weights) each collision shape's points as
+    /// three floats and its indices as 32-bit numbers, in order.</summary>
+    public static long Bytes(long vertices, long indices, bool skinned, IReadOnlyList<ImportedCollisionShape>? collision = null)
+    {
+        var size = HeaderBytes + vertices * 32L + indices * 4L + (skinned ? vertices * 24L : 0L);
+        if (collision != null) foreach (var shape in collision) size += shape.Vertices * 12L + shape.Indices * 4L;
+        return size;
+    }
 
     /// <summary>The mesh in <paramref name="bytes"/>, which must be exactly what <paramref name="descriptor"/> declares; null with the first
     /// fault otherwise.</summary>
@@ -338,7 +411,7 @@ internal sealed class ImportedMesh
         var indices = descriptor.Indices;
         var bones = descriptor.Bones?.Count ?? 0;
         var version = (uint)(bones == 0 ? ImportedModelDescriptor.Format : ImportedModelDescriptor.SkinnedFormat);
-        var size = Bytes(vertices, indices, bones != 0);
+        var size = Bytes(vertices, indices, bones != 0, descriptor.Collision);
         if (bytes.Length != size)
         {
             failure = Bad("the mesh is " + bytes.Length + " bytes, the descriptor's " + vertices + " vertices and " + indices + " indices make " + size);
@@ -369,7 +442,11 @@ internal sealed class ImportedMesh
             if (index >= (uint)vertices) { failure = Bad("index " + i + " is " + index + ", past the " + vertices + " vertices"); return null; }
             triangles[i] = (int)index;
         }
-        if (bones == 0) return new ImportedMesh(positions, normals, uvs, triangles, null, null);
+        // The still part draws only the vertices before the facing parts, and each facing part only its own run.
+        if (!Within(triangles, descriptor.Submeshes, 0, descriptor.StillVertices, out failure)) return null;
+        foreach (var part in descriptor.Facing)
+            if (!Within(triangles, part.Submeshes, part.VertexStart, part.VertexStart + part.VertexCount, out failure)) return null;
+        if (bones == 0) return ReadCollision(bytes, at, descriptor, out failure) is { } shapes ? new ImportedMesh(positions, normals, uvs, triangles, null, null, shapes) : null;
         var boneIndices = new int[vertices * 4];
         var boneWeights = new float[vertices * 4];
         for (var v = 0; v < vertices; v++)
@@ -385,7 +462,40 @@ internal sealed class ImportedMesh
             }
             if (Math.Abs(sum - 1f) > 0.01f) { failure = Bad("vertex " + v + " has bone weights that sum to " + sum); return null; }
         }
-        return new ImportedMesh(positions, normals, uvs, triangles, boneIndices, boneWeights);
+        return new ImportedMesh(positions, normals, uvs, triangles, boneIndices, boneWeights, Array.Empty<(float[], int[])>());
+    }
+
+    /// <summary>Whether every index <paramref name="runs"/> draw lies in the vertices <paramref name="first"/>..<paramref name="end"/> (end excluded).</summary>
+    private static bool Within(int[] triangles, IReadOnlyList<ImportedSubmesh> runs, int first, int end, out ImportedModelFailure failure)
+    {
+        failure = default;
+        foreach (var run in runs)
+            for (var i = run.IndexStart; i < run.IndexStart + run.IndexCount; i++)
+                if (triangles[i] < first || triangles[i] >= end) { failure = Bad("index " + i + " is " + triangles[i] + ", outside its part's vertices " + first + ".." + end); return false; }
+        return true;
+    }
+
+    /// <summary>The collision shapes after the drawn mesh, from <paramref name="at"/>: finite points, indices inside each shape's own points.</summary>
+    private static (float[] Positions, int[] Indices)[]? ReadCollision(byte[] bytes, int at, ImportedModelDescriptor descriptor, out ImportedModelFailure failure)
+    {
+        failure = default;
+        var shapes = new (float[], int[])[descriptor.Collision.Count];
+        for (var s = 0; s < shapes.Length; s++)
+        {
+            var spec = descriptor.Collision[s];
+            var points = new float[spec.Vertices * 3];
+            for (var k = 0; k < points.Length; k++, at += 4)
+                if (!float.IsFinite(points[k] = BitConverter.ToSingle(bytes, at))) { failure = Bad("collision shape " + s + " holds a number that is not finite"); return null; }
+            var list = new int[spec.Indices];
+            for (var k = 0; k < list.Length; k++, at += 4)
+            {
+                var index = BitConverter.ToUInt32(bytes, at);
+                if (index >= (uint)spec.Vertices) { failure = Bad("collision shape " + s + " index " + k + " is past its " + spec.Vertices + " points"); return null; }
+                list[k] = (int)index;
+            }
+            shapes[s] = (points, list);
+        }
+        return shapes;
     }
 
     private static ImportedModelFailure Bad(string detail) => new(ImportedModelCodes.Mesh, detail);

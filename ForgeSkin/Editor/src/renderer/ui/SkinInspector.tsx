@@ -194,8 +194,8 @@ function EmissiveSection({ material }: { material: string }) {
   const head = { id: 'tex-glow', title: t('skinInspector.k13'), icon: IconSun, color: 'var(--warn)' };
   if (!hasEmissive)
     return (
-      <Section {...head}>
-        <p className="hint">{t('skinInspector.k12')}</p>
+      <Section {...head} info={t('skinInspector.k12')}>
+        <Empty>{t('skinInspector.noGlow')}</Empty>
       </Section>
     );
   // Shown as the game shows it (the slider reaches the game's own glow, often far above 1); an edit sets colour and
@@ -261,8 +261,8 @@ function MaterialParams({ material }: { material: string }) {
   const has = (v: unknown) => !game || v != null;
   const none = game && game.metallic == null && game.smoothness == null && game.tint == null;
   return (
-    <Section id="tex-material" title={t('skinInspector.k29')} icon={IconAdjustmentsHorizontal} color="var(--scan)">
-      {none && <p className="hint">{t('skinInspector.noParams')}</p>}
+    <Section id="tex-material" title={t('skinInspector.k29')} icon={IconAdjustmentsHorizontal} color="var(--scan)" info={none ? t('skinInspector.noParams') : undefined}>
+      {none && <Empty>{t('skinInspector.noParamsShort')}</Empty>}
       {!none && has(game?.metallic) && (
         <Field label={t('skinInspector.k22')}>
           <Slider value={p.metallic ?? 1} onChange={(v) => setParams(material, { metallic: v }, `met-${material}`)} />
@@ -1026,8 +1026,8 @@ export function SkinInspector() {
         kind={selection?.kind === 'part' && selection.sub ? t('skinInspector.k52', { v0: partLabel(part) }) : t('skinInspector.k53')}
         icon={IconComponents}
         color="var(--flare)"
-        title={selection?.kind === 'part' && selection.sub ? pieceLabel(selection.sub) : partLabel(part)}
-        meta={`${item ? localName(item) : ''} · ${part.role}`}
+        title={selection?.kind === 'part' && selection.sub ? pieceLabel(part.id, selection.sub) : partLabel(part)}
+        meta={item ? localName(item) : undefined}
       />
       <PartPanel key={part.id} part={part} />
     </>

@@ -1,0 +1,19 @@
+# R8A1 ("Order") zone 7, the heaviest garden zone: 60 s baseline standing still in god mode, then 48 aggressive Strikers
+# spawned in four groups of 12 in front of the player, 60 s under that load, then the enemies are cleared. Run PresentMon
+# alongside; the command times in the console run's commands.jsonl split its CSV and ForgeDevelopment's performance log
+# into the two halves. Needs a session started from any package; it drops into R8A1 itself.
+level 35 1 0
+god on
+teleport zone=0/MainLayer/7 area=0 as=zone7
+wait 5s
+player as=zone7_pos
+wait 60s
+spawn Striker 12 at=front:6 as=load1
+spawn Striker 12 at=front:9 as=load2
+spawn Striker 12 at=front:12 as=load3
+spawn Striker 12 at=front:15 as=load4
+enemies as=load_count
+wait 60s
+enemies as=load_count_end
+clear enemies
+wait 5s

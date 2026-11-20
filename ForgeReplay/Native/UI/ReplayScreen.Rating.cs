@@ -18,6 +18,8 @@ internal static partial class ReplayScreen
     private static readonly RadarChart BigRadar = new();
     private static readonly HudTable CompareTable = new();
     private static string[] _dimensionLabels = Array.Empty<string>();
+    // What each table row's score is worked out from (the dimensions, then the overall), shown while the pointer is on the row.
+    private static string[] _ratingTips = Array.Empty<string>();
     private static string _ratingLegend = "", _compareFor = "";
     private static int _ratingPick = -1, _ratingDrawn = -2;
     private static float _ratingBody = 640f;
@@ -33,7 +35,13 @@ internal static partial class ReplayScreen
         ClearRating();
         var table = RatingStore.Table;
         _dimensionLabels = new string[RatingMetrics.Dimensions.Length];
-        for (var d = 0; d < _dimensionLabels.Length; d++) _dimensionLabels[d] = _ui.Text("rating.dim." + RatingMetrics.Dimensions[d]);
+        _ratingTips = new string[RatingMetrics.Dimensions.Length + 1];
+        for (var d = 0; d < _dimensionLabels.Length; d++)
+        {
+            _dimensionLabels[d] = _ui.Text("rating.dim." + RatingMetrics.Dimensions[d]);
+            _ratingTips[d] = _ui.Text("rating.dim." + RatingMetrics.Dimensions[d] + ".tip");
+        }
+        _ratingTips[^1] = _ui.Text("rating.total.tip");
         for (var slot = 0; slot < 4; slot++)
         {
             if (!EverHeld[slot]) continue;
@@ -81,7 +89,7 @@ internal static partial class ReplayScreen
 
     // ---- Tables -----------------------------------------------------------------------------------------------------------------
 
-    // Rows are the dimensions and the overall grade, columns the players; the highest of each row is green. Made again only when a name changes.
+    // Rows are the dimensions and the overall grade, columns the players. Made again only when a name changes.
     private static void BuildCompare()
     {
         var slots = new List<int>();
@@ -100,8 +108,6 @@ internal static partial class ReplayScreen
             var total = d == RatingMetrics.Dimensions.Length;
             var scores = new double?[slots.Count];
             for (var i = 0; i < slots.Count; i++) scores[i] = total ? Ratings[slots[i]]?.Score : Ratings[slots[i]]?.Dimensions[d].Score;
-            double best = double.NegativeInfinity; var known = 0;
-            foreach (var s in scores) if (s is { } v) { best = Math.Max(best, v); known++; }
             var cells = new TableCell[slots.Count + 1];
             cells[0] = new TableCell(total ? _ui.Text("rating.total") : _dimensionLabels[d], total ? UIKitColors.GameText : Dim, total);
             for (var i = 0; i < slots.Count; i++)
@@ -111,11 +117,9 @@ internal static partial class ReplayScreen
                     : total ? Cell(!Array.Exists(rating!.Dimensions, x => x.Estimated), CardGrades[slots[i]].Length > 0 ? CardGrades[slots[i]] : "—")
                     : Cell(!rating!.Dimensions[d].Estimated, Whole((float)(score * 100.0)));
                 if (total && rating != null && rating.Grade < 0) cell = None;
-                var green = known > 1 && scores[i] is { } mine && mine >= best && cell.Quality != StatQuality.Empty;
-                // A value is HUD text, a guess the warning colour and an empty cell dimmed; the best of the row stays green. Drawn in the
-                // regular weight as the row names are: in the game font's bold the values came out nearly black on the panel (11-15).
-                var shade = cell.Quality switch { StatQuality.Estimate => UIKitColors.Warn, StatQuality.Empty => Fade(UIKitColors.GameText, 0.55f), _ => UIKitColors.GameText };
-                cells[i + 1] = new TableCell(cell.Text, green ? UIKitColors.Good : shade);
+                // Every value and grade is white, in the regular weight: a dimmed or tinted value read as dark grey on the panel. A guess still
+                // says so in its text (the estimate mark).
+                cells[i + 1] = new TableCell(cell.Text, UIKitColors.Bright);
             }
             CompareTable.AddRow(cells);
         }
@@ -159,8 +163,33 @@ internal static partial class ReplayScreen
         var radarWidth = 2f * (box.Radius + RatingSide);
         var grid = Fade(UIKitColors.GameText, 0.4f);
         BigRadar.Draw(c, x + radarWidth / 2f, radarTop - RatingLabel - box.Radius, box.Radius, grid, _dimensionLabels, 17f, Fade(UIKitColors.GameText, 0.9f));
-        if (box.Wide) CompareTable.Draw(c, x + radarWidth + RatingGap - CompareTable.Pad, radarTop);
-        else CompareTable.Draw(c, x - CompareTable.Pad, radarTop - 2f * (box.Radius + RatingLabel) - RatingGap);
+        var tableLeft = box.Wide ? x + radarWidth + RatingGap - CompareTable.Pad : x - CompareTable.Pad;
+        var tableTop = box.Wide ? radarTop : radarTop - 2f * (box.Radius + RatingLabel) - RatingGap;
+        CompareTable.Draw(c, tableLeft, tableTop);
+        RatingRowTip(hud, c, tableLeft, tableTop);
+    }
+
+    private const float TipPx = 16f, TipPad = 12f, TipHeight = 30f;
+
+    // The row under the pointer says how its score is worked out, in a small box under the row, its right edge on the table's.
+    private static void RatingRowTip(HudElement hud, HudCanvas c, float left, float top)
+    {
+        var t = CompareTable;
+        var rowWidth = t.Width - 2f * t.Pad;
+        var cx = left + t.Width / 2f;
+        for (var r = t.First; r < t.First + t.Shown && r < _ratingTips.Length; r++)
+        {
+            var cy = top - t.HeadHeight - t.RowHeight / 2f - (r - t.First) * t.RowHeight;
+            if (!HudPointer.Hover(hud, cx, cy, rowWidth, t.RowHeight)) continue;
+            var text = _ratingTips[r];
+            if (text.Length == 0) return;
+            var width = c.TextWidth(text, TipPx) + 2f * TipPad;
+            var right = left + t.Width - t.Pad;
+            var y = cy - t.RowHeight / 2f - TipHeight / 2f - 4f;
+            c.Plate(right - width / 2f, y, width, TipHeight, Cut, new Color(0.03f, 0.04f, 0.047f, 0.94f));
+            c.Text(text, right - width + TipPad, y, TipPx, UIKitColors.Bright);
+            return;
+        }
     }
 
     // One player's card: the name in the player's colour, the grade in big letters, a small radar of the same shape; a click picks the player.

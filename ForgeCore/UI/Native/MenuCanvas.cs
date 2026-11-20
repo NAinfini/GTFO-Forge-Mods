@@ -362,15 +362,16 @@ internal sealed class MenuCanvas
         label.richText = rich;
         label.enableWordWrapping = true;
         label.overflowMode = TextOverflowModes.Ellipsis;
-        label.fontSizeMax = size / Math.Max(1e-5f, scale.y);
-        label.fontSizeMin = label.fontSizeMax * 0.6f;
+        var largest = size / Math.Max(1e-5f, scale.y);
+        label.fontSizeMax = largest;
+        label.fontSizeMin = largest * 0.6f;
         label.enableAutoSizing = true;
         var t = label.rectTransform;
         t.pivot = new Vector2(0f, 1f);
         t.sizeDelta = new Vector2(box.Width() / Math.Max(1e-5f, scale.x), box.Height() / Math.Max(1e-5f, scale.y));
         label.alignment = TextAlignmentOptions.TopLeft;
         NativeUi.SetText(label, text);
-        label.transform.localPosition = new Vector3(box.XMin(), box.YMax(), 0f);
+        t.localPosition = new Vector3(box.XMin(), box.YMax(), 0f); // the label's rect transform is its transform
         label.color = colour;
         Settle(index, label, order);
         _textLast[index] = new TextLast { Text = text, X = box.XMin(), Y = box.YMax(), Width = box.Width(), Height = box.Height(), Size = size, Colour = colour, Rich = rich, Order = order, Wrap = true };

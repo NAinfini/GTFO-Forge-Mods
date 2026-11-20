@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- ForgeFrameGen's BepInEx preloader patcher; shipped in patchers/ of the package (tools/package_release.py). -->
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>ForgeFrameGen.Preloader</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DebugType>embedded</DebugType>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <Target Name="RequireBepInEx" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(GTFOBepInExPath)/core/BepInEx.Preloader.Core.dll')" Text="Set GTFOBepInExPath to a GTFO BepInEx IL2CPP profile." />
+  </Target>
+  <ItemGroup>
+    <Compile Include="Preloader.cs;../PackageFiles.cs" />
+    <Reference Include="BepInEx.Core" HintPath="$(GTFOBepInExPath)/core/BepInEx.Core.dll" Private="false" />
+    <Reference Include="BepInEx.Preloader.Core" HintPath="$(GTFOBepInExPath)/core/BepInEx.Preloader.Core.dll" Private="false" />
+  </ItemGroup>
+</Project>

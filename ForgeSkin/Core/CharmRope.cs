@@ -19,6 +19,9 @@ public sealed class CharmRope
     public const int CordSides = 6, CordSub = 3, LinkRing = 8, LinkTube = 4, BeadLat = 4, BeadLon = 6;
     public const double LinkLength = 1.7, LinkWire = 0.17, LinkPitch = 1.1, BeadPitch = 1.2; // times Thickness
 
+    static readonly double[] SideCos = Enumerable.Range(0, CordSides).Select(s => Math.Cos(2 * Math.PI * s / CordSides)).ToArray(),
+        SideSin = Enumerable.Range(0, CordSides).Select(s => Math.Sin(2 * Math.PI * s / CordSides)).ToArray();
+
     // Metallic and smoothness of the rope's surface per style (the editor's preview takes them from the backend).
     public static double Metallic(CharmStyle s) => s == CharmStyle.Cord ? 0 : s == CharmStyle.Chain ? 0.9 : 0.8;
     public static double Smoothness(CharmStyle s) => s == CharmStyle.Cord ? 0.2 : s == CharmStyle.Chain ? 0.65 : 0.7;
@@ -169,7 +172,7 @@ public sealed class CharmRope
             for (int j = 0; j < _curvePoints; j++)
                 for (int s = 0; s < CordSides; s++)
                 {
-                    double th = 2 * Math.PI * s / CordSides, cs = Math.Cos(th), sn = Math.Sin(th);
+                    double cs = SideCos[s], sn = SideSin[s];
                     int f6 = j * 6;
                     double nx = _frame[f6] * cs + _frame[f6 + 3] * sn, ny = _frame[f6 + 1] * cs + _frame[f6 + 4] * sn, nz = _frame[f6 + 2] * cs + _frame[f6 + 5] * sn;
                     Emit(vertices, normals, n++, _curve[j * 3] + nx * _radius, _curve[j * 3 + 1] + ny * _radius, _curve[j * 3 + 2] + nz * _radius, nx, ny, nz, tx, ty, tz, anchor);

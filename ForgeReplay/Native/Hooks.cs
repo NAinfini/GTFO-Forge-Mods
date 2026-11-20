@@ -22,7 +22,7 @@ internal static partial class Hooks
     {
         typeof(ShotHeavy), typeof(Melee),
         typeof(SecurityDoor), typeof(Scan), typeof(WaveStart), typeof(ChatMessage),
-        typeof(Interact), typeof(Throw), typeof(Sentry), typeof(Mine), typeof(Tongue), typeof(Projectiles), typeof(Scout), typeof(Noise), typeof(Ping), typeof(Wake),
+        typeof(Interact), typeof(Throw), typeof(Mine), typeof(Tongue), typeof(Projectiles), typeof(Scout), typeof(Noise), typeof(Ping), typeof(Wake),
         typeof(Environment), typeof(Presence), typeof(OwnDamage), typeof(ReviveBy), typeof(Supply), typeof(Disinfection),
         typeof(Say), typeof(TerminalOutput), typeof(TerminalUse), typeof(LockHook), typeof(BulkheadHook), typeof(HsuHook), typeof(PortalHook), typeof(ClusterHook), typeof(TurbineHook), typeof(PuzzleClusterHook), typeof(LaidHook), typeof(ScanMovedHook), typeof(HeldHook), typeof(RemoteChargeHook), typeof(HeartbeatHook), typeof(MeleeHitHook),
     };

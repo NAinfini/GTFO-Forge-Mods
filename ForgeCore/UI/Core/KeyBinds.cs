@@ -62,17 +62,6 @@ internal static class KeyModeSet
     /// <see cref="KeyMode.Double"/>).</summary>
     internal static bool HandsBack(KeyMode mode) => Defers(mode) || mode == KeyMode.Double;
 
-    /// <summary>The allowed mode after <paramref name="mode"/>, wrapping around.</summary>
-    internal static KeyMode Next(KeyModes set, KeyMode mode)
-    {
-        for (var step = 1; step <= 5; step++)
-        {
-            var next = (KeyMode)(((int)mode + step) % 5);
-            if (Allows(set, next)) return next;
-        }
-        return mode;
-    }
-
     internal static bool TryParse(string text, out KeyMode mode) => Enum.TryParse(text.Trim(), true, out mode) && Enum.IsDefined(typeof(KeyMode), mode);
 }
 
@@ -162,6 +151,51 @@ internal static class KeyChords
         if (text.Equals("Shift", StringComparison.OrdinalIgnoreCase)) return KeyMods.Shift;
         if (text.Equals("Alt", StringComparison.OrdinalIgnoreCase)) return KeyMods.Alt;
         return KeyMods.None;
+    }
+}
+
+/// <summary>Key and game action names as a player reads them, from the names in code (Unity key codes, the game's input actions).</summary>
+internal static class KeyNames
+{
+    /// <summary>A key code name as a player reads it: arrows for the arrow keys, the sign for a punctuation key, a digit for the number
+    /// row, the usual short names (Enter, Esc, Ctrl), else the name's words apart (<c>PageDown</c> is "Page Down", <c>Keypad5</c> "Keypad 5").</summary>
+    internal static string Readable(string key) => key switch
+    {
+        "UpArrow" => "↑",
+        "DownArrow" => "↓",
+        "LeftArrow" => "←",
+        "RightArrow" => "→",
+        "Return" => "Enter",
+        "Escape" => "Esc",
+        "LeftControl" => "Left Ctrl",
+        "RightControl" => "Right Ctrl",
+        "LeftBracket" => "[",
+        "RightBracket" => "]",
+        "Comma" => ",",
+        "Period" => ".",
+        "Slash" => "/",
+        "Backslash" => "\\",
+        "Semicolon" => ";",
+        "Quote" => "'",
+        "BackQuote" => "`",
+        "Minus" => "-",
+        "Equals" => "=",
+        _ when key.Length == 6 && key.StartsWith("Alpha", StringComparison.Ordinal) && char.IsDigit(key[5]) => key.Substring(5),
+        _ => Words(key),
+    };
+
+    /// <summary>A name written in one run (<c>TerminalUp</c>, <c>Mouse3</c>) with its words apart: a space before a capital or a digit that
+    /// follows a small letter ("Terminal Up", "Mouse 3"; "F12" stays as it is).</summary>
+    internal static string Words(string name)
+    {
+        var text = new StringBuilder(name.Length + 4);
+        for (var i = 0; i < name.Length; i++)
+        {
+            var c = name[i];
+            if (i > 0 && char.IsLower(name[i - 1]) && (char.IsUpper(c) || char.IsDigit(c))) text.Append(' ');
+            text.Append(c);
+        }
+        return text.ToString();
     }
 }
 

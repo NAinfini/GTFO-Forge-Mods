@@ -95,8 +95,8 @@ public sealed class GameLocation
 
     private void Read()
     {
-        if (_frame == Time.frameCount) return;
-        _frame = Time.frameCount;
+        if (_frame == ForgeCore.Frame.Count) return;
+        _frame = ForgeCore.Frame.Count;
         try
         {
             var agent = ForgeCore.Players.Local;
@@ -160,8 +160,8 @@ public sealed class GameVitals
 
     private void Read()
     {
-        if (_frame == Time.frameCount) return;
-        _frame = Time.frameCount;
+        if (_frame == ForgeCore.Frame.Count) return;
+        _frame = ForgeCore.Frame.Count;
         _health = _infection = 0f;
         _alive = _downed = false;
         _held = PlayerHold.None;
@@ -291,9 +291,9 @@ public sealed class GameTeammates
 
     private void Read()
     {
-        if (_frame == Time.frameCount) return;
+        if (_frame == ForgeCore.Frame.Count) return;
         _lastFrame = _frame;
-        _frame = Time.frameCount;
+        _frame = ForgeCore.Frame.Count;
         _count = 0;
         try
         {

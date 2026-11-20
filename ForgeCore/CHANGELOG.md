@@ -4,15 +4,37 @@
 
 In multiplayer the host and every client should run this version.
 
+- Changed: the HUD kit does less each frame: it finds the game's weapon list pieces every two seconds instead of twice a second, keeps each element's pieces between measures, and checks the game's objects without calling into the game. The HUD updates as promptly as before.
 - Fixed: a hit on an enemy is not counted twice when packets are lost or late, and a client that lags behind no longer subtracts the same hit again from the health the host reports.
 - Fixed: a large state sent to a player who just joined no longer holds back the updates every other player gets meanwhile.
 - Fixed: a player who joined late could miss what the others had already shared (a picked skin, a chosen loadout, enemy health) until someone changed it again; a player who asks again is now sent everything again. A player who joins a level after a checkpoint reload stays in the host's world for that level.
 - Fixed: character models (ForgeSkin) could stop moving with their players after the game removed one player's body, for example when someone left.
+- Fixed: guns no longer flash in the middle of the map, for example at the start of a level or after a skin change. To draw each weapon picture the game builds the gun there, one part per frame; that gun is now hidden from every camera from its first part until the picture is drawn.
+- Fixed: character models (ForgeSkin) are now drawn with Forge's own lit shader, their solid materials too, instead of the game's gear shader. This fixes the strange glow some of them showed when moving fast or inspecting a gun, such as Tda Miku Append TdaStyle's first-person arms taking on the colour of the gun. Other imported models keep the game's gear shader.
+- Changed: imported models are built with tangents also without a normal map, which takes 16 more bytes of video memory per vertex. `MeshArrays.Build` no longer takes `computeTangents`.
+- New: mods can bend the fingers of your first-person hands while the game keeps the hands where they are; ForgeSkin's weapon inspect uses it.
 - Fixed: changing a gun's hand shape in first person (ForgeSkin's hand pose) plays through the game's own grip animation; playing it directly on the hand layer changed nothing.
-- Added: `HumanRig.Links(bones, rest)`, `HumanRig.ArmWear(bones, rest)` and `HumanRig.Unposed(links)`. A model mapped onto the humanoid needs a bone only for its hips: any other joint without one is left out of the pose copy and keeps its rest pose on the bone above it, so a model without fingers, without an arm or with unlike sides follows a body (ForgeSkin's character models). A limb with a joint left out is not bent onto the body's, and a model whose hips rest on its own floor keeps its rest height; each is logged once.
+- Added: `HumanRig.Links(bones, rest)`, `HumanRig.ArmWear(bones, rest)` and `HumanRig.Unposed(links)`. A model mapped onto the humanoid needs a bone only for its hips: any other joint without one is left out of the pose copy and keeps its rest pose on the bone above it, so a model without fingers, without an arm or with unlike sides follows a body (ForgeSkin's character models). A limb with a joint left out is not bent onto the body's, and a model whose hips rest on its own floor keeps its rest height; each is logged once. `HumanRig.Unposed(links, optional: false)` leaves out of its list the upper chest and the shoulders, which many skeletons have no bone for.
+- Added: `GearIcons.IsBuilding(holder)`, which tells whether a gun is the one the game is building for a weapon picture (ForgeSkin dresses that gun for its picture).
 - Added: `JointClip.FromTurns(rate, joints, turns, hips, name)`, a clip built in code with a name, so recordings show it and `JointClip.Find` finds it (ForgeSkin's weapon inspect).
 - Added: the lobby button option `WithoutApparel`: the button also shows on a bot's bar (ForgeSkin's SKINS button for bots).
-- Removed or changed public interfaces: none.
+- Added: `SightLenses`, a vanilla sight's lens on any mesh: a copy of the game's holographic or thermal lens material that draws the same reticles (ForgeSkin's sight on an imported model; ForgeEngine's thermal sight now uses it too).
+- Added: `HeldSettings`, one item's first-person settings and aim zoom changed without touching the blocks other guns share (ForgeSkin's sight zoom; the hold rule of a mounted gun now goes through it).
+- Changed: less work every frame while weapon pictures are drawn and while fingers are posed; the game's gun in each picture is worked out once instead of every frame.
+- Changed: local rundown progress is kept only for rundowns a Forge package registers. Rundowns MTFO loads from its own game data are no longer taken over and follow that mod's rules again.
+- Fixed: when a hook on a game method that another mod also patches is refused, the log no longer attributes the other mod's patch to ForgeCore.
+- Fixed: a body with a zero-length arm or leg bone no longer stops following its player's pose (character models, replay stand-ins).
+- Changed: a settings row holds only its name and control; its explanation is the game's own hover tip, shown under the row like the game's.
+- Fixed: world labels far away turned into solid white blocks at low resolutions; they use ForgeCore's own text font with wider edges.
+- Fixed: four game hooks that never ran because the game inlines their target now sit on the code that runs: a special weapon's "needs ammo" state, the map page's disabled state (it was cleared by opening the map or taking damage), the melee push, and the weapon slot name translation.
+- Fixed: the log of a hook that is refused, and the check that a hook target is safe to patch, now work for every package at run time, not only offline.
+- Changed: the key settings page is one row per action (name, small label, key box); the trigger and hold time open on the row, a key used twice gets a red mark on its box with the reason in the hover tip, and key names are written the same way everywhere (arrows, Enter, digits). Disabled menu buttons say why on hover.
+- Changed: less work every frame, with the same behaviour: time, focus and "who is the local player" are read once per frame; the HUD and crosshair write only when something changed; empty-table early outs in the hit, projectile, player-property and device hooks; outlines, sprites, effect copies and chain physics skip what has not changed; off-screen custom models are not posed; the stacked-volume hook is installed only when a level uses it.
+- Changed: log lines of Info and Debug level are written only with the developer log on; Warning and Error are always written.
+- Changed: imported models can carry their own collision shapes (`COL_` nodes) and parts that always face the camera (`FACE_` nodes); one drawn for the camera is turned just before culling.
+- Added: `Frame.DeltaTime`, `Frame.Count`, `Frame.Focus`, `Frame.OnPreCull(modId, callback)` (ForgeCore owns the one native pre-cull subscription, held only while someone subscribes), `Frame.OnHudComposite(...)` and `Frame.StandInForHud` (a stand-in compositor for a mod that presents the HUD itself, with the outline drawn at full size).
+- Added: `GunMount.HeldItem`, `JointPlayer.Manual` with `Pose()`, `ColourSpace.EmissionPerUnit` (one glow unit for every screen), `AudioKit.HasGameEvent`, and `ClipFingers` / `FingerBend` with `Models.BindArms` for finger bend clips on the game's own first-person arms.- Removed or changed public interfaces: none.
+- Removed or changed public interfaces: `MeshArrays.Build` no longer takes `computeTangents`; nothing else.
 
 ## 1.0.2
 
@@ -55,7 +77,7 @@ Everything since 1.0.0. This version stays at 1.0.x although it removes and chan
 - Added: `GameHooks.HibernatingNoiseHeard`, `HibernateWakeupStarted`, `HibernateDetectionStarted`, `HibernateDetectionEnded` and `EnemyTargetInjected`, for sleeping enemies hearing a noise, waking and being handed a target, shared by every package that reads them.
 - Added: `Players.SimulatedHere(player)` (whether this machine moves that player: the local player, and on the host its bots), `LimbReach.Bend` (a two-bone reach to a target point), `NativeObjects.FieldOffset<T>(name)` (a game field's offset, resolved once) and `FileHashes.Sha256Hex(path)`.
 - Fixed: a claimed weapon-list line (`WeaponListLine`) recognises the line it renamed or hid on later passes, so a renamed line keeps its claim, a hidden line that stops matching shows again at once, and the inventory reads the renamed text.
-- Logs: by default only errors are written. `[Logging] DeveloperLogs` in `NAinfini.ForgeCore.cfg` (off by default, always on with ForgeDevelopment installed) brings back the warnings and information lines; `Log.Developer` and `Log.DevelopmentInstalled` tell a mod which applies.
+- Logs: by default errors and warnings are written. `[Logging] DeveloperLogs` in `NAinfini.ForgeCore.cfg` (off by default, always on with ForgeDevelopment installed) brings back the information and debug lines; `Log.Developer` and `Log.DevelopmentInstalled` tell a mod which applies.
 - Settings: the interface, sound and visual settings moved from `NAinfini.ForgeUI.cfg`, `NAinfini.ForgeAudio.cfg` and `NAinfini.ForgeVisual.cfg` into `NAinfini.ForgeCore.cfg`, and changed keys from `NAinfini.ForgeUI.keys.cfg` into `NAinfini.ForgeCore.keys.cfg`; the old files are no longer read, so set them again once.
 - The hash of the game's `GameAssembly.dll` is kept between starts in `BepInEx/cache/ForgeCore/file-sha256.txt` and computed again only when the file changes.
 - Fixed: the lobby buttons no longer all hide when the lobby opens (the space was measured while the player bar was still sliding in).

@@ -13,11 +13,11 @@ public static class MeshArrays
 {
     /// <summary>A readable mesh named <paramref name="name"/>: <paramref name="positions"/> xyz per vertex, <paramref name="normals"/> xyz
     /// (null: computed from the faces), <paramref name="uv"/> uv (null: none), <paramref name="tangents"/> xyzw (null: computed from the UVs
-    /// when <paramref name="computeTangents"/> and there are UVs), <paramref name="indices"/> triangles, split into
+    /// when there are UVs), <paramref name="indices"/> triangles, split into
     /// <paramref name="submeshes"/> (start and count in <paramref name="indices"/>; null: one submesh of all). More than 65535 vertices use
     /// 32-bit indices. The lengths are the caller's to have checked.</summary>
     public static Mesh Build(string name, float[] positions, float[]? normals, float[]? uv, float[]? tangents, int[] indices,
-        IReadOnlyList<(int Start, int Count)>? submeshes = null, bool computeTangents = true)
+        IReadOnlyList<(int Start, int Count)>? submeshes = null)
     {
         var count = positions.Length / 3;
         var mesh = new Mesh { name = name, indexFormat = count > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16 };
@@ -54,8 +54,8 @@ public static class MeshArrays
             }
         }
         if (normals == null) mesh.RecalculateNormals();
-        // The gear shader reads a normal map against tangents.
-        if (tangents == null && uv != null && computeTangents) mesh.RecalculateTangents();
+        // The gear shader always reads a normal map (its flat default when none is set) against tangents; without them its normal is degenerate.
+        if (tangents == null && uv != null) mesh.RecalculateTangents();
         mesh.RecalculateBounds();
         return mesh;
     }

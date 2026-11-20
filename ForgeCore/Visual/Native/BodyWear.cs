@@ -44,8 +44,12 @@ internal static class BodyConvert
 {
     internal static NVector3 N(Vector3 v) => new(v.x, v.y, v.z);
     internal static NQuaternion N(Quaternion q) => new(q.x, q.y, q.z, q.w);
-    internal static Quaternion U(NQuaternion q) => new(q.X, q.Y, q.Z, q.W);
-    internal static Vector3 U(NVector3 v) => new(v.X, v.Y, v.Z);
+    // Field by field: the interop's constructors, operators and helpers on Unity's structs are calls into the game.
+    internal static Quaternion U(NQuaternion q) => new() { x = q.X, y = q.Y, z = q.Z, w = q.W };
+    internal static Vector3 U(NVector3 v) => new() { x = v.X, y = v.Y, z = v.Z };
+
+    /// <summary>The world position of a held transform by its pointer (<see cref="ForgeCore.EngineCalls.Position(IntPtr)"/>).</summary>
+    internal static NVector3 Position(IntPtr transform) => N(ForgeCore.EngineCalls.Position(transform));
 
     /// <summary>The rest pose of every bone skinned by the renderers under <paramref name="root"/> (hidden or not), in
     /// <paramref name="frame"/>'s space, from their meshes' bind poses; the first renderer that skins a bone gives it.</summary>

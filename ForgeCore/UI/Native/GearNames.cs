@@ -40,6 +40,7 @@ internal static class GearNames
 {
     private static readonly GearNameBook Book = new();
     private static readonly InventorySlot[] GearSlots = { InventorySlot.GearStandard, InventorySlot.GearSpecial, InventorySlot.GearMelee, InventorySlot.GearClass };
+    private static readonly InventorySlot[] AllSlots = Enum.GetValues<InventorySlot>();
     // Per gear slot: the gear packet last read and the rule it matched (null: none), so an unchanged item costs no text reads.
     private static readonly IntPtr[] SlotItem = new IntPtr[4], SlotRange = new IntPtr[4];
     private static readonly GearNameRule?[] SlotRule = new GearNameRule?[4];
@@ -144,36 +145,36 @@ internal static class GearNames
         if (line != null && !line.WasCollected && line.text != name) line.text = name;
     }
 
-    /// <summary>A weapon list name text the game is about to set takes the registered text (<see cref="SlotNameCalls"/>).</summary>
-    internal static void TranslateListName(ref string name)
+    /// <summary>A weapon list wrote a row's names (<c>UpdateInfoForItem</c> in <see cref="InventoryListCalls"/>): every row's three name
+    /// lines take the registered text. <c>PUI_InventoryItem.SetArchetypeName</c> and <c>SetDetailedName</c> only set those lines' texts and
+    /// have no caller of their own in this build (<c>UpdateInfoForItem</c> inlines them), so the text is translated after the write.</summary>
+    internal static void ListRowsNamed(PUI_Inventory list)
     {
         if (Book.IsEmpty) return;
-        try { name = Book.Display(name); }
+        try
+        {
+            var lines = list.m_inventorySlots;
+            if (lines == null) return;
+            foreach (var slot in AllSlots)
+            {
+                // Not TryGetValue: see NameSlots.
+                if (!lines.ContainsKey(slot)) continue;
+                var line = lines[slot];
+                if (line == null || line.WasCollected) continue;
+                Retext(line.m_slim_archetypeName);
+                Retext(line.m_selected_archetypeName);
+                Retext(line.m_selected_detailedName);
+            }
+        }
         catch (Exception error) { Plugin.Error("ui-gear-name-weapon-list", "A gear name in the weapon list could not be translated: " + error); }
     }
 
-    /// <summary>The weapon list set a name: the slots registered by packet name show it again (<see cref="SlotNameCalls"/> and <see cref="ListSlotName"/>).</summary>
+    /// <summary>The weapon list set a name: the slots registered by packet name show it again (<c>UpdateInfoForItem</c> /
+    /// <c>UpdateAllSlots</c> in <see cref="InventoryListCalls"/>).</summary>
     internal static void ListSlotNamed()
     {
         try { NameSlots(); }
         catch (Exception error) { Plugin.Error("ui-gear-names-gear-name-weapon-list", "A gear name in the weapon list could not be set: " + error); }
-    }
-
-    /// <summary>The weapon list's other calls that fill the name lines, for a slot whose item is registered by packet name (its two name
-    /// calls are <see cref="SlotNameCalls"/>).</summary>
-    [PatchGroup(PatchGroup.GearNames)]
-    [HarmonyPatch]
-    private static class ListSlotName
-    {
-        private static IEnumerable<MethodBase> TargetMethods()
-        {
-            // UpdateItemUI needs no patch: its native body calls UpdateInfoForItem, then only UpdateAmmoForItem, which sets no name.
-            yield return AccessTools.Method(typeof(PUI_Inventory), nameof(PUI_Inventory.UpdateInfoForItem));
-            yield return AccessTools.Method(typeof(PUI_Inventory), nameof(PUI_Inventory.UpdateAllSlots));
-        }
-
-        [HarmonyPostfix]
-        private static void Postfix() => ListSlotNamed();
     }
 
     /// <summary>The loadout picker and every lobby gear slot (the local player's and other players') load and re-read their texts here.</summary>
@@ -208,34 +209,5 @@ internal static class GearNames
             try { RetextChildren(__instance); }
             catch (Exception error) { Plugin.Error("ui-gear-name-lobby-weapon-window", "A gear name in the lobby weapon window could not be translated: " + error); }
         }
-    }
-}
-
-/// <summary>The weapon list row's two name calls (<c>PUI_InventoryItem.SetArchetypeName</c>, <c>SetDetailedName</c>), which the inventory
-/// readout and the gear names both read: one patch class (group <see cref="PatchGroup.SlotNames"/>, put on with either feature). In this
-/// order: before the body the gear names translate the text the game sets; after it the inventory readout marks its rows for the read at
-/// the end of the frame, then the gear names draw the registered names on the slot's lines (the mark is read later, so it never sees a
-/// half-drawn row).</summary>
-[PatchGroup(PatchGroup.SlotNames)]
-[HarmonyPatch]
-internal static class SlotNameCalls
-{
-    private static IEnumerable<MethodBase> TargetMethods()
-    {
-        yield return AccessTools.Method(typeof(PUI_InventoryItem), nameof(PUI_InventoryItem.SetArchetypeName));
-        yield return AccessTools.Method(typeof(PUI_InventoryItem), nameof(PUI_InventoryItem.SetDetailedName));
-    }
-
-    [HarmonyPrefix]
-    private static void Prefix(ref string name)
-    {
-        if (PatchGroups.Has(PatchGroup.GearNames)) GearNames.TranslateListName(ref name);
-    }
-
-    [HarmonyPostfix]
-    private static void Postfix()
-    {
-        if (PatchGroups.Has(PatchGroup.Inventory)) UIKit.InventoryReading.MarkNamesDirty();
-        if (PatchGroups.Has(PatchGroup.GearNames)) GearNames.ListSlotNamed();
     }
 }

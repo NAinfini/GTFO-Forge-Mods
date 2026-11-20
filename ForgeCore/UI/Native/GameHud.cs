@@ -732,7 +732,8 @@ internal static class GameHud
     }
 
     /// <summary>The stamina read-out (<see cref="GameHudPart.Stamina"/>) has no renderers to switch off: while hidden, the game's stamina
-    /// update does not run (a warning loop already running is told to end) and no new low-stamina warning starts.</summary>
+    /// update does not run (a warning loop already running is told to end) and no new low-stamina warning starts: the game
+    /// starts its warning only from inside UpdateStamina (StartStaminaWarning is inlined there and has no caller of its own).</summary>
     [PatchGroup(PatchGroup.HudHides)]
     [HarmonyPatch(typeof(PUI_LocalPlayerStatus), nameof(PUI_LocalPlayerStatus.UpdateStamina))]
     private static class StaminaUpdate
@@ -743,13 +744,6 @@ internal static class GameHud
             if (__instance.m_staminaWarningLooping) __instance.m_staminaWarningLooping = false;
             return false;
         }
-    }
-
-    [PatchGroup(PatchGroup.HudHides)]
-    [HarmonyPatch(typeof(PUI_LocalPlayerStatus), nameof(PUI_LocalPlayerStatus.StartStaminaWarning))]
-    private static class StaminaWarning
-    {
-        private static bool Prefix() => (Hidden & GameHudPart.Stamina) == GameHudPart.None;
     }
 
     /// <summary>The level ended (<see cref="ForgeCore.GameEvents.LevelEnded"/>): every claim ends with the level.</summary>

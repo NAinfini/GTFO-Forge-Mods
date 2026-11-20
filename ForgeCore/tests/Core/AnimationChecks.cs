@@ -25,6 +25,7 @@ internal static class AnimationChecks
         clip.Evaluate(clip.Duration, false, turns, out var hip2);
         check(rest < 0.01f && Math.Abs(Angle(turns[11]) - 20f) < 0.05f && Math.Abs(Angle(turns[12]) - 20f) < 0.05f && Angle(turns[15]) < 0.01f, "animation: the left arm turns 20 degrees with its upper arm, the right arm stays at rest");
         check(Math.Abs(hip2.X - hip0.X + 0.02f) < 1e-5f && Math.Abs(hip0.Y) < 1e-5f, "animation: the hip travels 2 cm (mirrored into the game's axes)");
+        Fingers(check);
 
         string json = Encoding.UTF8.GetString(good, 20, (int)BitConverter.ToUInt32(good, 12));
         var broken = new (string Label, byte[] File)[]
@@ -119,5 +120,47 @@ internal static class AnimationChecks
         foreach (var line in refused) Console.WriteLine("animations: refused " + line);
         check(refused.Count == 0 && evaluated == 0, "animation: every local action file reads and plays without allocating");
         GC.KeepAlive(clips);
+    }
+
+    // Finger shapes (ClipFingers): no bend is the hand's own turn on every finger; a fist brings each finger's last joint toward the
+    // wrist and the thumb's toward the middle knuckle, on both hands alike (mirrored); a turned hand turns its bent fingers with it.
+    private static void Fingers(Action<bool, string> check)
+    {
+        var hand = Quaternion.CreateFromAxisAngle(Vector3.Normalize(new Vector3(0.3f, 1f, 0.2f)), 0.7f);
+        var flat = new Quaternion[15];
+        ClipFingers.Turns(true, hand, new FingerBend(0f, 0f, 0f, 0f, 0f), flat);
+        check(flat.All(q => MathF.Abs(Quaternion.Dot(q, hand)) > 0.99999f), "fingers: no bend leaves every finger on the hand's turn");
+        Vector3[] Points(bool right, Quaternion turn, FingerBend bend)
+        {
+            var turns = new Quaternion[ClipRig.Count];
+            Array.Fill(turns, turn);
+            ClipFingers.Turns(right, turn, bend, turns.AsSpan(right ? ClipRig.BodyCount + 15 : ClipRig.BodyCount));
+            var world = new Quaternion[ClipRig.Count];
+            var at = new Vector3[ClipRig.Count];
+            for (var j = 0; j < ClipRig.Count; j++)
+            {
+                world[j] = ClipRig.Mirror(turns[j]) * ClipRig.RestWorld[j];
+                var parent = ClipRig.Parent[j];
+                at[j] = parent < 0 ? ClipRig.Offset[j] : at[parent] + Vector3.Transform(ClipRig.Offset[j], world[parent]);
+            }
+            return at;
+        }
+        var fist = new FingerBend(1f, 1f, 1f, 1f, 1f);
+        foreach (var right in new[] { false, true })
+        {
+            int wrist = right ? ClipRig.RightHand : ClipRig.LeftHand, first = right ? ClipRig.BodyCount + 15 : ClipRig.BodyCount;
+            var open = Points(right, Quaternion.Identity, default);
+            var closed = Points(right, Quaternion.Identity, fist);
+            var curled = Enumerable.Range(1, 4).All(f => Vector3.Distance(closed[first + f * 3 + 2], closed[wrist]) < 0.8f * Vector3.Distance(open[first + f * 3 + 2], open[wrist]));
+            var across = Vector3.Distance(closed[first + 2], closed[first + 6]) < Vector3.Distance(open[first + 2], open[first + 6]);
+            check(curled && across, $"fingers: the {(right ? "right" : "left")} fist closes every finger toward the wrist and the thumb toward the middle knuckle");
+        }
+        var left = Points(false, Quaternion.Identity, fist)[ClipRig.BodyCount + 5];
+        var rightTip = Points(true, Quaternion.Identity, fist)[ClipRig.BodyCount + 20];
+        check(Vector3.Distance(left, new Vector3(-rightTip.X, rightTip.Y, rightTip.Z)) < 1e-3f, "fingers: the two hands bend alike, mirrored");
+        var turned = Points(true, hand, fist);
+        var still = Points(true, Quaternion.Identity, fist);
+        Vector3 Local(Vector3[] p, Quaternion q) => Vector3.Transform(p[ClipRig.BodyCount + 20] - p[ClipRig.RightHand], Quaternion.Inverse(ClipRig.Mirror(q)));
+        check(Vector3.Distance(Local(turned, hand), Local(still, Quaternion.Identity)) < 1e-3f, "fingers: a turned hand carries its bent fingers");
     }
 }

@@ -10,8 +10,10 @@ static class Holograms
     const string ShaderName = "Cell/Player/Display_Hologram";
     const string Name = "ForgeSkin hologram";
     internal static bool UseShader = true; // HologramShader in ForgeSkin.cfg
-    // Brightness of a hologram that sets none: the default screen glow (Glow 1.5 x GlowUnit 0.2).
-    internal const float Glow = 0.3f;
+    // Emission per step of a screen's Glow slider on this shader (its own measured gain, not the gear shaders' ColourSpace.EmissionPerUnit),
+    // and the brightness of a hologram that sets none: the default screen glow (Glow 1.5).
+    internal const float PerGlow = 0.2f;
+    internal const float Glow = 1.5f * PerGlow;
     // Which of these the shader has is logged by Source; the colour goes to them, colour x gain to its glow colour (Glow).
     static readonly string[] ColourProperties = { "_Color", "_TintColor", "_MainColor", "_HoloColor" };
     static Material? _source;
@@ -51,7 +53,7 @@ static class Holograms
         return _source;
     }
 
-    // A hologram surface showing `picture` (white when null) in `colour`, glowing by `gain` (MaterialParams.EmissionUnit: as itself).
+    // A hologram surface showing `picture` (white when null) in `colour`, glowing by `gain` (ColourSpace.EmissionPerUnit: as itself).
     public static Material Surface(SkinnedGear gear, Material template, Texture? picture, Color colour, float gain)
     {
         var source = UseShader ? Source() : null;

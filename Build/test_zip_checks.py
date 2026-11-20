@@ -1,6 +1,8 @@
 """Detection test for verify_release's zip checks: a zip PNG with a local path in a text chunk must be reported, a clean one and a stripped
 one must not; a zip laid out like the published 1.0.0 packages (lang/ and fonts/ at the root, which r2modman flattened so every text showed
-its key) must be reported, as must flattened names colliding and a language table missing or out of step, while the zip_entry layout passes.
+its key) must be reported, as must flattened names colliding and a language table missing or out of step, while the zip_entry layout passes,
+a preloader patcher under patchers/ with it; a file at the root of another install route must still be reported. A third party's
+LICENSE.txt passes the config-file check, any other .txt or .json of a package must not.
 check_reproducible must pass a fixture built twice under the shared build settings and catch it built without determinism or path map."""
 import struct
 import subprocess
@@ -12,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_reproducible import differences  # noqa: E402
 from package_common import PNG_SIGNATURE, manager_install, strip_png_text, zip_entry  # noqa: E402
-from verify_release import install_problems, language_problems, plugin_files, png_metadata_problems  # noqa: E402
+from verify_release import config_extension_problems, install_problems, language_problems, plugin_files, png_metadata_problems  # noqa: E402
 
 
 def chunk(kind: bytes, body: bytes) -> bytes:
@@ -49,6 +51,17 @@ if not any("both install as" in problem for problem in install_problems("ForgeRe
     failures.append("flattened name collision not detected")
 if not language_problems("ForgeReplay", {"lang/en.forge": TABLE}) or not language_problems("ForgeReplay", {"lang/en.forge": TABLE, "lang/zh.forge": b"{}"}):
     failures.append("missing or out-of-step language table not detected")
+patcher = {zip_entry("ForgeFrameGen", path): b"MZ" for path in ("ForgeFrameGen.dll", "ForgeFrameGen.Native.dll", "patchers/ForgeFrameGen.Preloader.dll")}
+if "patchers/ForgeFrameGen.Preloader.dll" not in patcher or install_problems("ForgeFrameGen", patcher):
+    failures.append("a preloader patcher under patchers/ flagged")
+if manager_install("NAinfini-ForgeFrameGen", "patchers/ForgeFrameGen.Preloader.dll") != "patchers/NAinfini-ForgeFrameGen/ForgeFrameGen.Preloader.dll":
+    failures.append("patchers/ not installed where BepInEx loads patchers from")
+if not install_problems("ForgeFrameGen", {"core/ForgeFrameGen.Preloader.dll": b"MZ"}):
+    failures.append("a file under another install route (core/) not detected")
+if config_extension_problems("ForgeFrameGen", {"NVIDIA-RTX-SDKs-LICENSE.txt": b"x", "manifest.json": b"{}", "LICENSE": b"x"}):
+    failures.append("a third party's LICENSE.txt or the manifest flagged as a config file")
+if len(config_extension_problems("ForgeFrameGen", {"notes.txt": b"x", "settings.json": b"{}", "licence-list.txt": b"x"})) != 3:
+    failures.append("a package's own .txt or .json not detected as a config-listed file")
 
 # Reproducible build (check_reproducible): a fixture assembly compiled under the shared Mods build settings into two output
 # directories must compare equal; with determinism off, or with the path map replaced, the comparison must catch it.

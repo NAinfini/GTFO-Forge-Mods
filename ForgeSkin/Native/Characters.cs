@@ -16,7 +16,8 @@ namespace ForgeSkin.Plugin;
 // the body through PlayerLooks.Hang (this look's own hold keeps it, a hold that is not a look, an exosuit worn over the person, hides it with
 // the person until it lets go; the own-body view draws it, a copy of the body leaves it out). The local
 // player wears their own pick; a teammate the character their look names (a pack installed here with the same content, else the
-// original person); a bot the character the host picked for it (Looks). The shared look (Looks, character and gear skins together) is also ForgeCore's player
+// original person), or, when their look names none or they have no ForgeSkin, the character this player gave their slot (Looks.SlotPick,
+// this machine only; a replay stand-in keeps the shared look); a bot the character the host picked for it (Looks). The shared look (Looks, character and gear skins together) is also ForgeCore's player
 // look (PlayerLooks): a replay stand-in asks for it, wears the character on its own body and its weapons' skins through Hold. A model
 // that cannot be read or does not fit its skeleton leaves the original person, one line. In first person the local player sees the
 // model's own arms (Arms below). The lobby's figure behind each player's loadout wears the same character, the way a stand-in does (Lobby).
@@ -92,7 +93,8 @@ static class Characters
 
     public static void Register() => _looks = PlayerLooks.Provide(ForgeSkinPlugin.Guid, new Provider());
 
-    // Something that decides who wears what changed (a pick, a reload, a teammate's look, a skin loaded, a player made, a level state).
+    // Something that decides who wears what changed (a pick, a reload, a teammate's look, a skin loaded, a player made, a lobby bar's
+    // player or figure, a level state).
     public static void Dirty() => _dirty = true;
 
     // `player`'s shared look changed: ForgeCore's player looks tell their users.
@@ -110,6 +112,10 @@ static class Characters
     {
         if (Skins.Own(CharacterSkin.Target) is { } own) used.Add(own);
         Looks.Wearing(CharacterSkin.Target, used);
+        var players = SNet.LobbyPlayers;
+        if (players != null)
+            foreach (var player in players)
+                if (player != null && !player.IsLocal && !player.IsBot && Looks.CharacterOf(player) is { } theirs) used.Add(theirs);
         foreach (var (_, worn) in ByAgent.Values) used.Add(worn.Skin);
         foreach (var (_, worn) in InLobby.Values) used.Add(worn.Skin);
         StandIns.RemoveAll(d => d.Released || d.Person == null || NativeObjects.Gone(d.Person.Model));
@@ -131,7 +137,7 @@ static class Characters
     {
         foreach (var (_, worn) in ByAgent.Values)
             if (Loss(worn) != null) return true;
-        // A figure the lobby rebuilt; one it has not built yet keeps Lobby waiting.
+        // A figure the lobby rebuilt; one it has not built yet is looked at when it is (LobbyBarHook).
         foreach (var (body, worn) in InLobby.Values)
             if (NativeObjects.Gone(worn.Model) || NativeObjects.Gone(body) || worn.Hide is { Active: false }) return true;
         return false;
@@ -148,59 +154,66 @@ static class Characters
 
     static readonly List<(IntPtr Bar, Animator Body, SNet_Player Player)> FiguresNow = new();
 
-    // The lobby's figures shown now: each lobby bar with a player whose figure is spawned and drawn, and the figure's animator. In the
-    // lobby, a bar that has no player yet (the game gives a bar its player when the host's slots arrive, which for a player who joins
-    // is after the lobby state, the agents and the looks) and a player whose figure is not built or drawn yet keep Reconcile looking
-    // (_waiting): the figure wears its character when it appears, whichever came first, the look or the figure.
-    static List<(IntPtr Bar, Animator Body, SNet_Player Player)> Figures()
+    // The lobby's figures: each lobby bar with a player whose figure is spawned, and the figure's animator, whether or not the figure is
+    // drawn now. The game keeps a figure while its page is closed (the generation, the level, the bars' intro) and shows it again when
+    // the page opens (the in-level menu): so a figure is dressed while it lives, drawn or not, and shows its character whenever the page
+    // shows it. A bar's player and figure are set by the game's CM_PlayerLobbyBar.UpdatePlayer (LobbyBarHook: Dirty after it), in any
+    // game state, so a bar without either yet is looked at again when it gets them, whichever came first, the look or the figure.
+    // Null with no loadout page: what is worn stays (Lost takes off what the game destroyed).
+    static List<(IntPtr Bar, Animator Body, SNet_Player Player)>? Figures()
     {
         FiguresNow.Clear();
-        var inLobby = GameStateManager.CurrentStateName == eGameStateName.Lobby;
         var page = CM_PageLoadout.Current;
         var bars = page == null || page.WasCollected ? null : page.m_playerLobbyBars;
-        if (bars == null) { _waiting |= inLobby; return FiguresNow; }
+        if (bars == null) return null;
         for (var i = 0; i < bars.Length; i++)
         {
             var bar = bars[i];
-            if (bar == null || bar.WasCollected || bar.m_player is not { } player) { _waiting |= inLobby; continue; }
+            if (bar == null || bar.WasCollected || bar.m_player is not { } player) continue;
             var figure = bar.m_playerModelSpawned ? bar.m_playerModel : null;
-            if (figure == null || figure.WasCollected || !figure.activeInHierarchy || figure.GetComponentInChildren<Animator>() is not { } body)
-            {
-                _waiting |= inLobby && Wanted(player) != null;
-                continue;
-            }
+            if (figure == null || figure.WasCollected || Body(figure) is not { } body) continue;
             FiguresNow.Add((bar.Pointer, body, player));
         }
         return FiguresNow;
     }
 
-    // A lobby figure that shows the game's own person now (no character worn on it), for the picker's picture of the original look; null
-    // when every figure wears one or none is drawn.
-    internal static Animator? OriginalFigure()
+    // A figure's body: its first animator switched on within the figure (the figure itself may be hidden with its page), not a spare's.
+    static Animator? Body(GameObject figure)
     {
-        foreach (var (bar, body, _) in Figures())
-            if (!InLobby.ContainsKey(bar)) return body;
+        foreach (var animator in figure.GetComponentsInChildren<Animator>(true))
+            if (animator != null && On(animator.transform, figure.transform)) return animator;
         return null;
     }
 
-    // Any lobby figure's body, animated by the game whether it shows its person or wears a character: the stance a character's picture copies.
-    internal static Animator? AnyFigure()
+    // Whether `node` is switched on below `root`: it and every object up to `root` active themselves, whether or not `root` is drawn now.
+    static bool On(Transform node, Transform root)
     {
-        foreach (var (_, body, _) in Figures()) return body;
-        return null;
+        for (var at = node; at != null; at = at.parent)
+        {
+            if (!at.gameObject.activeSelf) return false;
+            if (at.Pointer == root.Pointer) return true;
+        }
+        return true;
     }
 
     // The lobby figures put right: each wears the character its player wears (the local pick, a teammate's look), else its own person.
     static void Lobby(float now)
     {
+        if (Figures() is not { } figures) return;
         var seen = new HashSet<IntPtr>();
-        foreach (var (bar, body, player) in Figures())
+        foreach (var (bar, body, player) in figures)
         {
             seen.Add(bar);
             var want = Wanted(player);
             if (InLobby.TryGetValue(bar, out var had))
             {
-                if (had.Worn.Skin == want && had.Body.Pointer == body.Pointer && !NativeObjects.Gone(had.Worn.Model) && had.Worn.Hide is not { Active: false }) continue;
+                var loss = had.Worn.Skin != want ? "another character is worn now"
+                    : had.Body.Pointer != body.Pointer ? "the lobby built the figure again"
+                    : NativeObjects.Gone(had.Worn.Model) ? "its model is gone"
+                    : had.Worn.Hide is { Active: false } ? "the person's hold ended"
+                    : null;
+                if (loss == null) continue;
+                ForgeSkinPlugin.Info($"character {had.Worn.Skin.Doc.Id} in the lobby by {player.NickName} taken off: {loss}");
                 had.Worn.Release();
                 InLobby.Remove(bar);
             }
@@ -211,6 +224,7 @@ static class Characters
         }
         foreach (var gone in InLobby.Keys.Where(k => !seen.Contains(k)).ToList())
         {
+            ForgeSkinPlugin.Info($"character {InLobby[gone].Worn.Skin.Doc.Id} in the lobby taken off: its bar has no player or figure now");
             InLobby[gone].Worn.Release();
             InLobby.Remove(gone);
         }
@@ -264,11 +278,14 @@ static class Characters
         Lobby(now);
     }
 
-    // The character skin `player` wears: their own pick, a teammate's look, a bot's the one the host picked (null: the original person).
+    // The character skin `player` wears: their own pick, a teammate's look (else what this player gave their slot), a bot's the one the
+    // host picked (null: the original person).
     static Skin? Wanted(SNet_Player player)
     {
         // A bot is asked first: on the host's machine its player is a local one.
-        var skin = !player.IsBot && player.IsLocal ? Skins.Own(CharacterSkin.Target) : Looks.WornBy(Looks.Key(player), CharacterSkin.Target)?.Skin;
+        var skin = player.IsBot ? Looks.WornBy(Looks.Key(player), CharacterSkin.Target)?.Skin
+            : player.IsLocal ? (_bare ? null : Skins.Own(CharacterSkin.Target))
+            : Looks.CharacterOf(player);
         return skin == null || skin.Retired || Broken.Contains(skin) ? null : skin;
     }
 
@@ -287,9 +304,10 @@ static class Characters
             root.localScale = Vector3.one * (size / body.transform.lossyScale.x);
             worn.Model = skin.Character!.Spawn(root, Label);
             var renderer = worn.Model.GetComponent<SkinnedMeshRenderer>();
-            // Drawn as the body it replaces is (the local player's third-person body only casts the shadow): a mesh shown now, not one of
-            // the inactive spares the lobby's figure keeps for the other characters (on a layer its camera does not draw), nor the person's
-            // ghost copies (they cast no shadow), nor a look's model (the one being taken off is destroyed only at the frame's end).
+            // Drawn as the body it replaces is (the local player's third-person body only casts the shadow): a mesh switched on within the
+            // body (a lobby figure may be hidden with its page), not one of the inactive spares the lobby's figure keeps for the other
+            // characters (on a layer its camera does not draw), nor the person's ghost copies (they cast no shadow), nor a look's model (the
+            // one being taken off is destroyed only at the frame's end).
             var model = body.GetComponentInParent<PlayerSyncModelData>();
             var ghosts = model != null ? model.m_ghostRenderers : null;
             bool Ghost(Renderer r)
@@ -297,7 +315,7 @@ static class Characters
                 if (ghosts != null) foreach (var g in ghosts) if (g != null && g.Pointer == r.Pointer) return true;
                 return false;
             }
-            var original = body.GetComponentsInChildren<SkinnedMeshRenderer>(true).FirstOrDefault(r => r.gameObject.activeInHierarchy && !r.transform.IsChildOf(root) && !PlayerLooks.Worn(r.transform) && !Ghost(r));
+            var original = body.GetComponentsInChildren<SkinnedMeshRenderer>(true).FirstOrDefault(r => On(r.transform, body.transform) && !r.transform.IsChildOf(root) && !PlayerLooks.Worn(r.transform) && !Ghost(r));
             if (original != null)
             {
                 worn.Model.layer = original.gameObject.layer;
@@ -410,6 +428,16 @@ static class Characters
         foreach (var (_, worn) in InLobby.Values) ShowToon(worn, Label + " " + worn.Skin.Doc.Id + " in the lobby");
         foreach (var dressed in StandIns) if (!dressed.Released && dressed.Person is { } person) ShowToon(person, Label + " " + person.Skin.Doc.Id + " on a stand-in");
     }
+
+    /// <summary>For in-game screenshots: the local player shows the original person (<c>on</c> true) or their own pick again, for this
+    /// session only; the pick itself is not changed or saved (<c>drive_cli.py call static:ForgeSkin.Plugin.Characters Bare true</c>).</summary>
+    internal static string Bare(bool on)
+    {
+        _bare = on;
+        OwnLookChanged();
+        return on ? "local player: original person (session only)" : "local player: own pick " + (Skins.Own(CharacterSkin.Target)?.Doc.Id ?? "none");
+    }
+    static bool _bare;
 
     /// <summary>The toon setting by name (forward, deferred, off), written as the picker's choice writes it: for
     /// <c>drive_cli.py call static:ForgeSkin.Plugin.Characters Toon deferred</c>.</summary>

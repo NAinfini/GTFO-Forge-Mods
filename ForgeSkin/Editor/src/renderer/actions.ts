@@ -5,7 +5,21 @@ import { bakeHolograms } from './hologram';
 import { drawUvWireframe, liveryViewReady, meshesOf, uvRenderer } from './viewport/liveryGpu';
 import { LiveryPreview } from './viewport/liveryPreview';
 import { skinPicture } from './viewport/thumbnails';
-import { attachedOf, attachmentMaterial, call, CHANNELS, dirName, type CatalogItem, type Profile, type SkinDocument, type SkinsImport, type SkinsNote, type WeaponPreview } from './protocol';
+import {
+  attachedOf,
+  attachmentMaterial,
+  call,
+  CHANNELS,
+  dirName,
+  type Attachment,
+  type CatalogItem,
+  type MeshImport,
+  type Profile,
+  type SkinDocument,
+  type SkinsImport,
+  type SkinsNote,
+  type WeaponPreview,
+} from './protocol';
 import { autosavePath, autosaveRoot, currentItem, DATA_NOTICE, attachmentName, editorOf, hangAsCharm, persistAutosave, useStore, type Selection } from './store';
 import { lang, localName, partLabel, t } from './i18n';
 import { confirmInGame } from './gameLog';
@@ -631,8 +645,9 @@ export async function exportUvTemplates(): Promise<void> {
   });
 }
 
-/** Imports a model as an attachment on the selected part; `charm` hangs it as a charm. */
-export async function importMesh(charm = false, file?: string): Promise<void> {
+/** Imports a model as an attachment on the selected part; `charm` hangs it as a charm, `place` changes the new attachment and the
+ * document further in the same undo step (with what the import read). */
+export async function importMesh(charm = false, file?: string, place?: (a: Attachment, d: SkinDocument, r: MeshImport) => void): Promise<void> {
   const s = st();
   const [glb] = file ? [file] : await window.forge.openDialog('file', [{ name: t('actions.k24'), extensions: ['glb', 'gltf'] }]);
   if (!glb) return;
@@ -640,10 +655,11 @@ export async function importMesh(charm = false, file?: string): Promise<void> {
   try {
     const r = await call('mesh.import', { glb });
     // The model keeps its own pictures and colours; the attachment's colour and settings work on top as on any model.
-    s.addAttachment('mesh', { forgeskinmesh: r.forgeskinmesh, glb: r.glb }, (a) => {
+    s.addAttachment('mesh', { forgeskinmesh: r.forgeskinmesh, glb: r.glb }, (a, _, d) => {
       a.material = { ...a.material, textures: r.textures, color: r.color ?? [1, 1, 1, 1] };
       if (r.emissive) a.material.params = { ...a.material.params, emissiveEnabled: true, emissiveColor: r.emissive.color.slice(0, 3), emissiveIntensity: r.emissive.intensity };
       if (charm) hangAsCharm(a);
+      place?.(a, d, r);
     });
     s.toast('ok', t('actions.k26'));
     if (Object.keys(r.textures).length) s.log(t('actions.modelPictures', { v0: r.notes.join('; ') }));

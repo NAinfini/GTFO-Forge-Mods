@@ -336,7 +336,8 @@ internal static class OwnHits
         GameHooks.EnemyHitSent.Before(Sent);
         GameHooks.EnemyDead.Before(Gone);
         GameHooks.EnemyDespawned.Before(Gone);
-        Net.WorldChanged += static _ => { Changed.Clear(); Counts.Clear(); Combat.ClearPredictions(); };
+        // Pending hits name the old world's receivers; the report clock and the hearers' cache start again with the new world.
+        Net.WorldChanged += static _ => { Changed.Clear(); Counts.Clear(); Waiting.Clear(); Hearers.Clear(); _nextReport = 0f; Combat.ClearPredictions(); };
         Frame.OnLateUpdate(Plugin.Id, Flush);
     }
 
@@ -480,16 +481,25 @@ internal static class OwnHits
 
     // Whose machine hears a hit of this source: a human player's, and the slot the player holds. A bot's lookup is never a
     // compatible peer, so nothing is sent for it.
+    // A source's lookup and slot are read from the game once per frame and agent (a shotgun's pellets ask many times a frame); the cache is
+    // dropped each frame, so a player who left and an agent made at its address never answer for each other.
+    private static readonly Dictionary<IntPtr, (ulong Lookup, int Slot)> Hearers = new(4);
+    private static int _hearersFrame = -1;
+
     private static bool Hearer(Agent? source, out ulong to, out int slot)
     {
         to = 0;
         slot = -1;
         if (source == null || !NativeObjects.Is<PlayerAgent>(source)) return false;
-        var player = source.TryCast<PlayerAgent>();
-        var owner = player?.Owner;
-        if (owner == null) return false;
-        slot = owner.PlayerSlotIndex();
-        var lookup = owner.Lookup;
+        if (_hearersFrame != Frame.Count) { Hearers.Clear(); _hearersFrame = Frame.Count; }
+        if (!Hearers.TryGetValue(source.Pointer, out var known))
+        {
+            var owner = source.TryCast<PlayerAgent>()?.Owner;
+            if (owner == null) return false;
+            Hearers[source.Pointer] = known = (owner.Lookup, owner.PlayerSlotIndex());
+        }
+        slot = known.Slot;
+        var lookup = known.Lookup;
         to = lookup == Session.LocalLookup ? 0UL : lookup;
         return to == 0 ? Combat.OwnHitHeard : _send != null && Session.IsHost;
     }

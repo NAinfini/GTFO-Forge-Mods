@@ -1,15 +1,27 @@
 # Changelog
 
+## 1.0.2
+
+Needs ForgeCore 1.0.3.
+
+- Recordings are stored in a newer format (12) so a replay can copy a worn model's pose from the right player. This version cannot read recordings made with 1.0.1; they are listed under "Unreadable files" in the replays list.
+- The stand-in is built from the game's own player body: it wears the recorded clothing and face, a ForgeSkin character skin and gun skins when the recording has them (and the viewer has those packs), and holds its weapon the way the game holds it for a teammate, with both hands on the gun and aiming where the player aimed. A look that is still loading is asked for again until it is ready; a look that cannot be worn falls back to the original.
+- The stand-in holds the same item the recorded player held (guns, resource packs, consumables, carried objects), made through the game's own item spawn, so what other mods put on that item shows too. An exosuit shows the weapon in its hand.
+- The outline of a watched player covers the whole character model and follows a change of look.
+- Recordings also carry the pickups lying in the level when recording starts and objects other Forge mods place in the level (their position, size, visibility and state), so a replay shows them where they were.
+- The terminal panel in a replay is laid out like the game's: command lists in two aligned columns, long lines wrapped instead of cut, the newest line at the bottom, each line recorded once.
+- A recording that cannot be played is dimmed in the list with "UNAVAILABLE", and under the play button it says what is missing and what to do (the rundown not installed, the level missing, a file that cannot be read).
+- Fixed: after a player left an exosuit, their character stayed hidden for the rest of the replay. It is shown again when the suit is let go.
+- Fixed: dragging the time bar back no longer puts items that only appear later back into the level, and a resource pack no longer sits at the map origin before it is spawned.
+- Fixed: the rating table showed every number in white. The scores are named Damage, Kills, Accuracy, Survival, Support, Objective and Overall, each with a hover explanation.
+- Fixed: the View menu, the centred score board, the key hints, the mission card and the hold-Esc bar now own the mouse: the player cards, panels and buttons under them no longer light up or get clicked.
+- Changed: shorter key names in the key settings, long explanations moved into hover tips; the "cannot play in a level" hint is shorter.
+- Changed: less work every frame while recording (enemy sampling, empty-table early outs); a new icon.
 ## 1.0.1
 
 - Recordings are stored in a new way: they are much smaller and get on better with other mods. Because of this change, this version cannot read the old way of storing them, so recordings made with 1.0.0 cannot be played in this version; they are listed under "Unreadable files" in the replays list.
 - Needs ForgeCore 1.0.1.
 - Every player, yourself included, is played back by the same stand-in body, which now replays the recorded body animation layers (stance, movement, interactions, throws, melee, shooting).
-- The stand-in is built from the game's own player body: it wears the recorded clothing and face, a ForgeSkin character skin and gun skins when the recording has them (and the viewer has those packs), and holds its weapon the way the game holds it for a teammate, with both hands on the gun and aiming where the player aimed. A look that is still loading is asked for again until it is ready; a look that cannot be worn falls back to the original.
-- The outline of a watched player covers the whole character model and follows a change of look.
-- Recordings also carry the pickups lying in the level when recording starts and objects other Forge mods place in the level (their position, size, visibility and state), so a replay shows them where they were.
-- The terminal panel in a replay is laid out like the game's: command lists in two aligned columns, long lines wrapped instead of cut, the newest line at the bottom, each line recorded once.
-- A recording that cannot be played is dimmed in the list with "UNAVAILABLE", and under the play button it says what is missing and what to do (the rundown not installed, the level missing, a file that cannot be read).
 - The Chase camera no longer turns with the mouse: it stays behind the player and looks where they looked. Orbit still circles the player with the mouse.
 - Replay screen and replays list redesigned: four fixed player cards, collapsed to a narrow strip at the right edge by default and opened on mouse-over; one bottom panel with the time bar and play controls; list filters as tabs (result, rundown, unreadable files) with the total size.
 - The events page lists wake-ups: who woke which enemy and how.

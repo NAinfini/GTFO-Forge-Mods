@@ -31,6 +31,9 @@ internal sealed partial class LoadSheddingController
     internal readonly ExtraCuts Extras;
     internal readonly ClosedDoorDepth Doors;
     private readonly SheddingHooks _hooks = new();
+    // The enemy-crowd options and the probe's per-level part; null when none of them is configured.
+    internal readonly ForgePerformance.Crowd.CrowdLoad? CrowdWork;
+    private int _deferredFrame = -2;
     private bool _installed, _restoring, _evicting;
     private readonly Dictionary<IntPtr, ShadowState> _shadows = new();
     private readonly Dictionary<IntPtr, ES_Dead> _ragdolls = new();
@@ -48,6 +51,8 @@ internal sealed partial class LoadSheddingController
     private long _gardenSeen, _gardenChanged;
     private long _corpseShadowSeen, _corpseShadowChanged, _corpseShadowRestored;
     private readonly Dictionary<IntPtr, Renderer> _stealthBodies = new();
+    // Enemies whose renderers this mod changed at death, by EnemyAgent pointer; the wrapper is held in the renderer tables.
+    private readonly HashSet<IntPtr> _touchedEnemies = new();
     private long _stealthHidden, _stealthRestored;
     private long _ragdollSeen, _ragdollEvicted, _ambientChanged;
     private long _ragdollRefreshSeen, _ragdollRefreshed, _ragdollRefreshFailures;
@@ -69,6 +74,7 @@ internal sealed partial class LoadSheddingController
         Visor = new VisorLiquidSuppression(RefuseVisor);
         Extras = new ExtraCuts(this, settings);
         Doors = new ClosedDoorDepth(settings.ClosedDoorDepth);
+        if (settings.CrowdHooks) CrowdWork = new ForgePerformance.Crowd.CrowdLoad(settings, line => log.LogError(line));
     }
 
     internal void Install()
@@ -80,7 +86,7 @@ internal sealed partial class LoadSheddingController
         Current = this;
         try
         {
-            _hooks.Install(_plan);
+            _hooks.Install(_plan, line => _log.LogError(line));
             Extras.Install();
             // GTFO-API's event: the game's own GameStateManager.OnGameStateChanged delegate added from a mod never fires.
             EventAPI.OnGameStateChanged += OnStateChanged;
@@ -97,6 +103,10 @@ internal sealed partial class LoadSheddingController
 
     private void OnStateChanged(eGameStateName oldState, eGameStateName newState)
     {
+        // One line per state change with both clocks, so a frame capture taken beside the game can be cut by level afterwards.
+        if (Settings.SummaryLog)
+            _log.LogInfo("type=performance_state\tfrom=" + oldState + "\tto=" + newState + "\tlevel=" + RundownManager.ActiveExpeditionUniqueKey
+                + "\tutc=" + DateTime.UtcNow.ToString("O") + "\tqpc=" + System.Diagnostics.Stopwatch.GetTimestamp());
         // A failing EndLevel must not stop the event's other subscribers or the BeginLevel below.
         if (Active && !LevelBuilt(newState))
             try { EndLevel(); } catch (Exception error) { LogExtraFailure("end-level", error.GetType().Name + ": " + error.Message); }
@@ -149,6 +159,7 @@ internal sealed partial class LoadSheddingController
         {
             Shadow(renderer, false, true);
         }
+        _touchedEnemies.Add(enemy.Pointer);
         RefreshShadow(enemy);
     }
     // The enemy's shadow is not drawn from the renderers' current state: C_MovingCuller_Cullbucket keeps a list of
@@ -180,14 +191,31 @@ internal sealed partial class LoadSheddingController
             renderer.enabled = false; renderer.shadowCastingMode = ShadowCastingMode.Off;
             _stealthBodies[renderer.Pointer] = renderer; _stealthHidden++; changed = true;
         }
-        if (changed) RefreshShadow(enemy);
+        if (changed) { _touchedEnemies.Add(enemy.Pointer); RefreshShadow(enemy); }
+    }
+    // EnemyAgent.Setup: an enemy this mod changed at death (stealth body or corpse shadows) gets its renderers back. The game
+    // spawns every enemy as a new instance, so with SetupRendererLookup a fresh enemy is answered from _touchedEnemies without
+    // walking its renderers; off, both restores walk them as before (each walk allocates the renderer array).
+    internal void EnemySetup(EnemyAgent enemy)
+    {
+        if (ForgePerformance.Crowd.CrowdSwitches.SetupRendererLookup)
+        {
+            if (!_touchedEnemies.Remove(enemy.Pointer)) return;
+            Renderers? renderers = null;
+            RestoreStealthBodies(enemy, ref renderers);
+            RestoreCorpseShadows(enemy, ref renderers);
+            return;
+        }
+        Renderers? first = null, second = null;
+        RestoreStealthBodies(enemy, ref first);
+        RestoreCorpseShadows(enemy, ref second);
     }
     // A pooled enemy set up again is alive: the shadows its corpse lost come back now, not at the end of the level.
-    internal void RestoreCorpseShadows(EnemyAgent enemy)
+    private void RestoreCorpseShadows(EnemyAgent enemy, ref Renderers? renderers)
     {
         if (!Settings.CorpseShadows || _shadows.Count == 0) return;
         var changed = false;
-        foreach (var renderer in enemy.GetComponentsInChildren<Renderer>(true))
+        foreach (var renderer in renderers ??= enemy.GetComponentsInChildren<Renderer>(true))
         {
             if (renderer == null || !_shadows.TryGetValue(renderer.Pointer, out var state) || !state.Corpse) continue;
             _shadows.Remove(renderer.Pointer);
@@ -199,16 +227,16 @@ internal sealed partial class LoadSheddingController
     {
         renderer.shadowCastingMode = ShadowCastingMode.ShadowsOnly; renderer.enabled = true; _stealthRestored++;
     }
-    internal void RestoreStealthBodies(EnemyAgent? enemy)
+    internal void RestoreStealthBodies()
+    {
+        foreach (var renderer in _stealthBodies.Values) if (renderer != null) RestoreStealthBody(renderer);
+        _stealthBodies.Clear(); _touchedEnemies.Clear();
+    }
+    private void RestoreStealthBodies(EnemyAgent enemy, ref Renderers? renderers)
     {
         if (_stealthBodies.Count == 0) return;
-        if (enemy == null)
-        {
-            foreach (var renderer in _stealthBodies.Values) if (renderer != null) RestoreStealthBody(renderer);
-            _stealthBodies.Clear(); return;
-        }
         var changed = false;
-        foreach (var renderer in enemy.GetComponentsInChildren<Renderer>(true))
+        foreach (var renderer in renderers ??= enemy.GetComponentsInChildren<Renderer>(true))
             if (renderer != null && _stealthBodies.Remove(renderer.Pointer)) { RestoreStealthBody(renderer); changed = true; }
         if (changed) RefreshShadow(enemy);
     }
@@ -304,10 +332,18 @@ internal sealed partial class LoadSheddingController
     internal void Tick()
     {
         if (!Active) return;
+        var frame = Time.frameCount;
+        var now = Time.time;
+        IrfCulling.NewFrame(frame, Time.deltaTime);
+        CrowdWork?.Tick(frame, now);
+        // SpawnFrameDefer: an enemy already spawned this frame (its Setup ran before this Update); this mod's own periodic work
+        // waits one frame, never two in a row, so a wave that spawns every frame still lets it run every other frame.
+        if (CrowdWork != null && ForgePerformance.Crowd.CrowdSwitches.SpawnFrameDefer && CrowdWork.LastSetupFrame == frame && _deferredFrame != frame - 1)
+        { _deferredFrame = frame; CrowdWork.DeferredTicks++; return; }
         Work.Run(GameStateManager.CurrentStateName == eGameStateName.InLevel ? LevelWork.LevelSliceMilliseconds : LevelWork.ElevatorSliceMilliseconds);
-        if (Settings.FastCorpseHide && !IsRefused(SheddingCut.CorpseTimer)) Corpses.Tick();
-        if (Settings.CombatDecals) Decorations.TickDecals();
-        if (Settings.DecayCleanup || Settings.DebrisFreeze || Settings.DroppedMagazineCleanup) Extras.Tick();
+        if (Settings.FastCorpseHide && !IsRefused(SheddingCut.CorpseTimer)) Corpses.Tick(now);
+        if (Settings.CombatDecals) Decorations.TickDecals(now);
+        if (Settings.DecayCleanup || Settings.DebrisFreeze || Settings.DroppedMagazineCleanup) Extras.Tick(now);
     }
     internal void CorpseComplete(ES_Dead._DecayDelayed_d__20 iterator) => _corpseIterators.Remove(iterator.Pointer);
     internal void Ragdoll(ES_Dead state, bool enabled, bool wasRagdoll)
@@ -387,7 +423,9 @@ internal sealed partial class LoadSheddingController
             try { Doors.EndLevel(); } catch (Exception error) { first ??= error; }
         // Try every restore even if one native call fails. Failures remain
         // explicit; the counts distinguish restoration from requested changes.
-        try { RestoreStealthBodies(null); } catch (Exception error) { first ??= error; }
+        try { RestoreStealthBodies(); } catch (Exception error) { first ??= error; }
+        if (CrowdWork != null)
+            try { CrowdWork.EndLevel(); } catch (Exception error) { first ??= error; }
         foreach (var value in _shadows.Values)
             try
             {
@@ -442,6 +480,7 @@ internal sealed partial class LoadSheddingController
             if (Settings.VisorLiquidOff) LogItem("visor-liquid-off", Visor.Seen, Visor.Changed, Visor.Restored,
                 "rendering=" + (Visor.Refused ? "vanilla_refused" : "off") + "\trefusals_session=" + Visor.Refusals + "\tskipped_commands=" + Visor.SkippedCommands + "\thealth=unchanged\tinfection=unchanged");
             if (Settings.ShellEjection) LogItem("shell-ejection", _shellSeen, _shellSuppressed, 0, "limit_per_frame=" + Settings.ShellLimit + "\trestore=scope_ended");
+            if (CrowdWork != null) LogItem("crowd", 0, 0, 0, "switches=" + ForgePerformance.Crowd.CrowdSwitches.Describe() + "\t" + CrowdWork.Summary());
             if (_levelSetupFailures != 0) LogItem("setup-failures", _levelSetupFailures, 0, 0, "scope=level;retry=next_level");
         }
         _shadows.Clear(); _ambient.Clear(); _air.Clear(); _ragdolls.Clear(); _requestedRagdolls.Clear();
@@ -465,6 +504,9 @@ internal sealed partial class LoadSheddingController
         var line = "type=load_shedding_setup_failure\titem=" + item + "\tlevel_seq=" + LevelSequence + "\treason=" + reason;
         _log.LogError(line);
     }
+    // A game error this mod holds back during the level (TentacleLimitErrorFold): the first one when it happens, the count when the level ends.
+    internal void LogFoldedError(string code, string state, long count, string message)
+        => _log.LogError("type=load_shedding_folded_error\tcode=" + code + "\tstate=" + state + "\tlevel_seq=" + LevelSequence + "\tcount=" + count + "\tmessage=" + message);
     private void RefuseVisor(string reason, bool session) => RefuseCut(SheddingCut.Visor, reason, session);
     internal void LogInspectionFailure(string reason)
     {

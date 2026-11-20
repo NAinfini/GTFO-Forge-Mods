@@ -89,6 +89,12 @@ internal static class CrosshairAttachments
         internal Image Ring = null!, Dot = null!, Mark = null!;
         internal readonly Image[] Ticks = new Image[MaxTicks];
         internal Color Colour = new(0f, 0f, 0f, -1f);
+        // What this pass last wrote, so an unchanged frame reads no native switch. Pieces are made with the images off and live exactly as
+        // long as the page they were built for, so a rebuilt page starts from these empty values.
+        internal bool? RootOn;
+        internal Vector3? RootAt;
+        internal bool RingOn, DotOn, MarkOn;
+        internal int TickMask;
     }
 
     internal static bool Add(CrosshairAttachment attachment)
@@ -180,9 +186,17 @@ internal static class CrosshairAttachments
     private static void Place(CrosshairAttachment a, Pieces p, Vector3 centre, Vector2 size, float unit, float dt)
     {
         var visible = a.Visible && !HudFocus.Away;
-        if (p.Root.activeSelf != visible) p.Root.SetActive(visible);
+        if (p.RootOn != visible)
+        {
+            if (p.Root.activeSelf != visible) p.Root.SetActive(visible);
+            p.RootOn = visible;
+        }
         if (!visible) return;
-        if (p.Root.transform.localPosition != centre) p.Root.transform.localPosition = centre;
+        if (p.RootAt != centre)
+        {
+            if (p.Root.transform.localPosition != centre) p.Root.transform.localPosition = centre;
+            p.RootAt = centre;
+        }
         a.Shown = Ease.Damp(a.Shown, Ease.Clamp01(a.Tighten), 1f / 0.15f, dt);
         var radius = a.Radius * (1f - 0.5f * a.Shown) * unit;
         if (p.Colour != a.Colour)
@@ -192,24 +206,30 @@ internal static class CrosshairAttachments
             foreach (var t in p.Ticks) t.color = a.Colour;
         }
         var drawn = CrosshairRules.Drawn(true, a.HideWhileAiming, UIKit.Inventory.Aiming);
-        Show(p.Ring, drawn && a.Ring);
+        Show(p.Ring, ref p.RingOn, drawn && a.Ring);
         if (drawn && a.Ring) Size(p.Ring, Vector2.zero, radius * 2f, radius * 2f, 0f);
-        Show(p.Dot, drawn && a.Dot);
+        Show(p.Dot, ref p.DotOn, drawn && a.Dot);
         if (drawn && a.Dot) Size(p.Dot, Vector2.zero, 4f * unit, 4f * unit, 0f);
         var ticks = drawn ? Math.Clamp(a.Ticks, 0, MaxTicks) : 0;
-        for (var i = 0; i < MaxTicks; i++)
-        {
-            var on = i < ticks;
-            Show(p.Ticks[i], on);
-            if (!on) continue;
-            var angle = 90f - i * 360f / ticks;
-            var r = angle * Mathf.Deg2Rad;
-            var along = radius + a.TickLength * unit / 2f + 2f * unit;
-            Size(p.Ticks[i], new Vector2(Mathf.Cos(r) * along, Mathf.Sin(r) * along), a.TickLength * unit, 2f * unit, angle);
-        }
+        if (ticks != 0 || p.TickMask != 0)
+            for (var i = 0; i < MaxTicks; i++)
+            {
+                var on = i < ticks;
+                var was = (p.TickMask >> i & 1) != 0;
+                if (on != was)
+                {
+                    p.Ticks[i].gameObject.SetActive(on);
+                    p.TickMask ^= 1 << i;
+                }
+                if (!on) continue;
+                var angle = 90f - i * 360f / ticks;
+                var r = angle * Mathf.Deg2Rad;
+                var along = radius + a.TickLength * unit / 2f + 2f * unit;
+                Size(p.Ticks[i], new Vector2(Mathf.Cos(r) * along, Mathf.Sin(r) * along), a.TickLength * unit, 2f * unit, angle);
+            }
         var at = Vector2.zero;
         var marked = CrosshairRules.Graphics(true, a.HideWhileAiming, UIKit.Inventory.Aiming, false, false, 0, a.HasMark) > 0 && Project(a.MarkAt, size, out at);
-        Show(p.Mark, marked);
+        Show(p.Mark, ref p.MarkOn, marked);
         if (!marked) return;
         var colour = a.MarkOk ? UIKitColors.Accent : UIKitColors.Dim;
         if (p.Mark.color != colour) p.Mark.color = colour;
@@ -228,9 +248,11 @@ internal static class CrosshairAttachments
         return true;
     }
 
-    private static void Show(Image image, bool on)
+    private static void Show(Image image, ref bool shown, bool on)
     {
-        if (image.gameObject.activeSelf != on) image.gameObject.SetActive(on);
+        if (shown == on) return;
+        image.gameObject.SetActive(on);
+        shown = on;
     }
 
     private static void Size(Image image, Vector2 at, float width, float height, float degrees)

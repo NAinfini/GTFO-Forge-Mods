@@ -49,8 +49,37 @@ internal sealed record SheddingSettings
     internal bool MeleePacketReuse { get; init; }
     internal bool IrfWorldCameraOnly { get; init; }
     internal bool IrfOffscreenSkip { get; init; }
+    internal bool IrfPhysicsHalfRate { get; init; }
+    internal bool TentacleLimitErrorFold { get; init; }
     internal bool RagdollNodeRefresh { get; init; }
     internal bool ClosedDoorDepthLimit { get; init; }
     internal int ClosedDoorDepth { get; init; }
     internal bool TextureStreamingOff { get; init; }
+    internal bool SetupRendererLookup { get; init; }
+    internal bool SpawnFrameDefer { get; init; }
+    internal bool FarAnimatorThrottle { get; init; }
+    internal float FarAnimatorDistance { get; init; }
+    internal int FarAnimatorInterval { get; init; }
+    internal bool FarSkinQuality { get; init; }
+    internal float FarSkinDistance { get; init; }
+    internal bool ClientHiddenSyncThrottle { get; init; }
+    internal float HiddenSyncDistance { get; init; }
+    internal int HiddenSyncInterval { get; init; }
+    internal bool UpdateBudgets { get; init; }
+    internal string BudgetBehaviour { get; init; } = "";
+    internal string BudgetDetection { get; init; } = "";
+    internal string BudgetNetwork { get; init; } = "";
+    internal string BudgetLocomotion { get; init; } = "";
+    internal string BudgetFixedLocomotion { get; init; } = "";
+    internal string BudgetNodes { get; init; } = "";
+    internal bool AvoidanceQuality { get; init; }
+    internal int AvoidanceType { get; init; }
+    internal bool PathfindingIterations { get; init; }
+    internal int PathfindingIterationsPerFrame { get; init; }
+    internal bool HitReactKeepsAgent { get; init; }
+    internal bool Probe { get; init; }
+    internal float ProbeSeconds { get; init; }
+    // The enemy-crowd options and the probe: they need the enemy setup and death hooks and the per-frame controller.
+    internal bool CrowdHooks => Probe || SpawnFrameDefer || FarAnimatorThrottle || FarSkinQuality
+        || ClientHiddenSyncThrottle || UpdateBudgets || AvoidanceQuality || PathfindingIterations || HitReactKeepsAgent;
 }

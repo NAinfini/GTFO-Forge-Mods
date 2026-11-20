@@ -1,0 +1,14 @@
+# R8A1 ("Order"), whose every main-layer zone is the Gardens sub-complex: the two largest garden zones, the 70 m zone
+# (local index 3) and the 60-80 m zone (local index 7), sampled for 20 seconds each from the zone's first area, standing
+# still in god mode. The marks split ForgeDevelopment's performance log; read it with tools/analyze_probe.py --forgedev or
+# Mods/ForgeDevelopment/tools/analyze_performance.py. Needs a session started from any package; it drops into R8A1 itself.
+level 35 1 0
+god on
+teleport zone=0/MainLayer/3 area=0 as=zone3
+wait 5s
+player as=zone3_pos
+wait 20s
+teleport zone=0/MainLayer/7 area=0 as=zone7
+wait 5s
+player as=zone7_pos
+wait 20s

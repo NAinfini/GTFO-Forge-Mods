@@ -50,7 +50,7 @@ public static class AudioVolumes
     /// <summary>Per frame: writes the file once a change has rested for <see cref="SaveDelay"/>.</summary>
     internal static void Tick()
     {
-        if (_saveAt < 0f || Time.unscaledTime < _saveAt) return;
+        if (_saveAt < 0f || ForgeCore.Frame.UnscaledTime < _saveAt) return;
         _saveAt = -1f;
         Plugin.SaveVolumes();
     }

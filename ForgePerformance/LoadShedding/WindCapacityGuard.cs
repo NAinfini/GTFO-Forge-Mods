@@ -10,7 +10,9 @@ namespace ForgePerformance.LoadShedding;
 // No Update component. Called only at the vanilla UpdateVolume boundary.
 internal sealed class WindCapacityGuard
 {
-    internal const int RefreshBudget = 64;
+    // Candidates whose distance a steady update reads. Each read is a Transform.position and an isActiveAndEnabled call into the
+    // game; at 64 per update the sweep cost 3.2 ms per second in the R8 garden. A full sweep over N wind effects now takes N/16 updates.
+    internal const int RefreshBudget = 16;
     private readonly int _limit;
     private readonly Dictionary<IntPtr, CameraEntry> _cameras = new();
     private readonly Scope[] _scopes = { new(), new(), new(), new() };

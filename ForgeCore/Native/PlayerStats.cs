@@ -70,6 +70,11 @@ public static class PlayerStats
 
     private static T[] Without<T>(T[] sources, T source) where T : class => Array.FindAll(sources, other => !ReferenceEquals(other, source));
 
+    // The hooks' first test: no source subscribed, no native read in the game's per-frame call.
+    internal static bool Walking => _walk.Length != 0;
+
+    internal static bool Jumping => _jump.Length != 0;
+
     internal static bool Unslowed() => AnyOf(_unslowed);
 
     internal static bool Calm() => AnyOf(_noFlinch);
@@ -132,6 +137,7 @@ internal static class PlayerWalkHook
     [HarmonyPostfix]
     private static void After(PLOC_Base __instance, ref Vector3 __result)
     {
+        if (!PlayerStats.Walking) return;
         var owner = __instance.m_owner;
         if (owner != null && owner.IsLocallyOwned) __result = PlayerStats.Walked(owner, __result);
     }
@@ -144,6 +150,7 @@ internal static class PlayerRiseHook
     private static void Before(PLOC_Base __instance, out float __state)
     {
         __state = 0f;
+        if (!PlayerStats.Jumping) return;
         var owner = __instance.m_owner;
         var speed = PlayerStats.JumpSpeed(owner);
         if (speed == 1f || owner!.Locomotion == null || owner.Locomotion.VerticalVelocity.y <= 0f) return;
@@ -169,6 +176,7 @@ internal static class PlayerJumpHook
     private static void Before(PLOC_Jump __instance, out float __state)
     {
         __state = 0f;
+        if (!PlayerStats.Jumping) return;
         var owner = __instance.m_owner;
         var speed = PlayerStats.JumpSpeed(owner);
         if (speed == 1f) return;

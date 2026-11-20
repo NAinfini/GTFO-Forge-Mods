@@ -625,6 +625,9 @@ internal static class EventPresenter
             foreach (var (touched, touchedAt) in Touched)
             {
                 if (PuzzleRebuild.Owns(touched.Kind) || state.Objects.ContainsKey(touched) || state.Extras.ContainsKey(touched)) continue;
+                // An item spawned after this moment was hidden by Spawns above: put into the level's first state it would be shown again (the game
+                // shows a pickup set to lie in the level), at the place it was first seen.
+                if (touched.Kind == EventKind.ItemState && Setter != null && Setter.NotSpawnedYet(touched.Key)) { Applied.Remove(touched); continue; }
                 var (first, firstExtra) = Originals.TryGetValue(touched, out var original) ? original : (FirstState(touched.Kind), 0UL);
                 if (Holds(touched, first, firstExtra)) continue;
                 // A pickup goes back where the level had it, not where the recording last had it.

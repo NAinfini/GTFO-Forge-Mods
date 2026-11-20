@@ -72,11 +72,12 @@ public static partial class LoanedGun
         EndSwap();
     }
 
-    /// <summary>The spawner coroutine <paramref name="parts"/> of <paramref name="spawner"/> took a step (<paramref name="more"/>: it is not
+    /// <summary>The spawner coroutine <paramref name="step"/> of <paramref name="spawner"/> took a step (<paramref name="more"/>: it is not
     /// over): kept, with its part holder, while a swap is in flight.</summary>
-    internal static void PartsStepped(GearPartSpawner spawner, Il2CppSystem.Collections.IEnumerator parts, bool more)
+    internal static void PartsStepped(GearPartSpawner spawner, GearPartSpawner._SpawnAllParts_d__15 step, bool more)
     {
         if (!_swapping || _finishing) return;
+        var parts = step.Cast<Il2CppSystem.Collections.IEnumerator>();
         for (var i = Assembling.Count - 1; i >= 0; i--)
         {
             if (Assembling[i].Parts.Pointer != parts.Pointer) continue;
@@ -89,7 +90,8 @@ public static partial class LoanedGun
 }
 
 /// <summary>Each step of the game's part spawner coroutine (the compiler-made iterator of <c>GearPartSpawner.SpawnAllParts</c>), whose
-/// first step runs when the game starts it: the coroutine is handed to <see cref="LoanedGun"/> while a swap is in flight. The
+/// first step runs when the game starts it: the coroutine is handed to <see cref="LoanedGun"/> while a swap is in flight, and the
+/// spawner to ForgeUI's <c>GearIcons</c>, which keeps the gun the icon renderer builds hidden part by part. The
 /// iterator's creating method is not hooked: it is a one-line stub the game's code does not call through the patched entry. The
 /// coroutine itself is the game's; nothing is replaced or sent.</summary>
 [HarmonyPatch(typeof(GearPartSpawner._SpawnAllParts_d__15), nameof(GearPartSpawner._SpawnAllParts_d__15.MoveNext))]
@@ -101,7 +103,9 @@ internal static class GearPartsStartedHook
         try
         {
             var spawner = __instance.__4__this;
-            if (spawner != null) LoanedGun.PartsStepped(spawner, __instance.Cast<Il2CppSystem.Collections.IEnumerator>(), __result);
+            if (spawner == null) return;
+            LoanedGun.PartsStepped(spawner, __instance, __result);
+            ForgeUI.GearIcons.PartsStepped(spawner);
         }
         catch (Exception error) { Plugin.Logger.ErrorOnce("core-reading-games-part-spawner-failed", "Reading the game's part spawner failed: " + error); }
     }

@@ -90,16 +90,44 @@ internal static class BorkenCells
                 "Writes the game's \"Borken cell\" error once per grid cell and level instead of every frame while a player stands outside the rooms.").Value) return;
         LevelAPI.OnBuildStart += Forget;
         LevelAPI.OnLevelCleanup += Forget;
-        LevelAPI.OnBuildDone += static () =>
+        LevelAPI.OnBuildDone += static () => { _built = true; _live = _hooked; };
+        // The lookup is patched only once the game has written its first "Borken cell" line (or a package registers a room): a level in which
+        // nobody stands outside the rooms never pays the prefix. That first line is the game's own; the cell is remembered from the next call.
+        BepInEx.Logging.Logger.Listeners.Add(_watch);
+        Frame.OnUpdate(Plugin.Id, static () =>
         {
-            try { Patches.Ensure(Modules.StackedVolumes, typeof(GeomorphVolumeLookupHook)); _live = true; }
-            catch (Exception error) { Plugin.Logger.ErrorOnce("core-borken-cell-hook-failed", "The Borken cell line stays every frame: " + error); }
-        };
+            if (!_seen || _hooked) return;
+            try
+            {
+                Patches.Ensure(Modules.StackedVolumes, typeof(GeomorphVolumeLookupHook));
+                _hooked = true;
+                _live = _built;
+            }
+            catch (Exception error) { _hooked = true; Plugin.Logger.ErrorOnce("core-borken-cell-hook-failed", "The Borken cell line stays every frame: " + error); }
+        });
+    }
+
+    private static readonly BorkenWatch _watch = new();
+    private static volatile bool _seen;
+    private static bool _hooked, _built;
+
+    /// <summary>Sees the game's first "Borken cell" line (afterwards one flag test per log line; the log's list is never changed while it may be walked).</summary>
+    private sealed class BorkenWatch : BepInEx.Logging.ILogListener
+    {
+        public void LogEvent(object sender, BepInEx.Logging.LogEventArgs args)
+        {
+            if (_seen || args.Data is not { } data || !data.ToString()!.Contains("Borken cell")) return;
+            _seen = true;
+        }
+
+        public BepInEx.Logging.LogLevel LogLevelFilter => BepInEx.Logging.LogLevel.All;
+
+        public void Dispose() { }
     }
 
     private static void Forget()
     {
-        _live = false;
+        _live = _built = false;
         Written.Clear();
         Grids.Clear();
     }

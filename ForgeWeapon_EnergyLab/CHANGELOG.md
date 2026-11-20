@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.3
+
+Needs ForgeCore 1.0.3.
+
+- Changed: less work every frame: the energy guns take part in the game's pre-draw step through ForgeCore only while a beam, flame or charge is being drawn, and check the camera first; time reads come from ForgeCore's per-frame value.
+- Changed: a new icon.
+
 ## 1.0.2
 
 - Needs ForgeCore 1.0.1.

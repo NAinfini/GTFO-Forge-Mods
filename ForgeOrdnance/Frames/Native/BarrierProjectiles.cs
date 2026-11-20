@@ -18,6 +18,8 @@ internal static class BarrierProjectiles
 {
     // Where each live projectile was the last frame, and this frame (swapped every frame, so a projectile that ended drops out).
     private static Dictionary<IntPtr, Vector3> _last = new(), _now = new();
+    // The raised domes and their centres, resolved once a frame before the projectile loop.
+    private static readonly List<(FrameUnit Unit, Vector3 Centre)> Domes = new();
 
     internal static void Tick()
     {
@@ -25,12 +27,14 @@ internal static class BarrierProjectiles
         try
         {
             if (AnyBarrier() && ProjectileManager.Current?.m_projectiles is { } list)
+            {
+                FrameWorld.RaisedDomes(Domes);
                 for (var i = 0; i < list.Count; i++)
                 {
                     var projectile = list[i];
                     if (projectile == null || !projectile.m_active) continue;
                     var at = projectile.m_myPos;
-                    if (_last.TryGetValue(projectile.Pointer, out var was) && FrameWorld.ShelterFor(at, was) is { } unit)
+                    if (_last.TryGetValue(projectile.Pointer, out var was) && FrameWorld.ShelterIn(Domes, at, was) is { } unit)
                     {
                         projectile.m_endLifeTime = float.MinValue;
                         if (ForgeCore.Session.IsHost) Charge(unit, projectile, was);
@@ -38,6 +42,7 @@ internal static class BarrierProjectiles
                     }
                     _now[projectile.Pointer] = at;
                 }
+            }
         }
         catch (Exception error) { Plugin.Logger.ErrorOnce("frames-barrier-projectiles-failed", "exosuit barrier projectile check failed: " + error); }
         (_last, _now) = (_now, _last);

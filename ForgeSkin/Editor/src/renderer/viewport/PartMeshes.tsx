@@ -3,7 +3,7 @@
 import { useGLTF } from '@react-three/drei';
 import { createPortal } from '@react-three/fiber';
 import { useEffect, useMemo } from 'react';
-import type { Material, Mesh, Object3D } from 'three';
+import type { BufferGeometry, Material, Mesh, Object3D } from 'three';
 import { fileUrl } from '../protocol';
 import { partMeshKey, useStore } from '../store';
 import { ownMeshes, partTarget, useSceneVersion } from './refs';
@@ -14,7 +14,9 @@ function Replacement({ glb, node }: { glb: string; node: Object3D }) {
   const scene = useMemo(() => Object.assign(gltf.scene.clone(true), { userData: { sfReplacement: true } }), [gltf.scene]);
   useEffect(() => {
     const own = ownMeshes(node);
-    const material = own[0]?.material as Material | undefined;
+    // The node's whole material set, in slot order (glTF split a multi-material model into one mesh per slot). The imported
+    // model is one submesh, which Unity draws once with every material of the renderer, one over the other: so does the view.
+    const materials = own.flatMap((m) => (Array.isArray(m.material) ? m.material : [m.material]));
     // Per mesh, so a material other meshes share keeps drawing them.
     const hidden = own.map((m) => {
       const original = m.material;
@@ -23,10 +25,22 @@ function Replacement({ glb, node }: { glb: string; node: Object3D }) {
       m.material = off;
       return [m, original] as const;
     });
+    const layered: BufferGeometry[] = [];
     scene.traverse((o) => {
-      if ((o as Mesh).isMesh && material) (o as Mesh).material = material;
+      const mesh = o as Mesh;
+      if (!mesh.isMesh || !materials.length) return;
+      if (materials.length === 1) return void (mesh.material = materials[0]);
+      // The loader's geometry is shared with other copies of this model: the groups go on a copy of it.
+      const g = mesh.geometry.clone();
+      const count = g.index?.count ?? g.getAttribute('position').count;
+      materials.forEach((_, i) => g.addGroup(0, count, i));
+      layered.push((mesh.geometry = g));
+      mesh.material = materials;
     });
-    return () => hidden.forEach(([m, original]) => ((m.material as Material).dispose(), (m.material = original)));
+    return () => {
+      hidden.forEach(([m, original]) => ((m.material as Material).dispose(), (m.material = original)));
+      layered.forEach((g) => g.dispose());
+    };
   }, [scene, node]);
   return createPortal(<primitive object={scene} />, node);
 }

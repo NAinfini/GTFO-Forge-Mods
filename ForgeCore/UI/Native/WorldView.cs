@@ -21,7 +21,7 @@ internal static class WorldView
     /// <summary>The view of this frame; false while there is no camera or the engine calls are missing (logged once).</summary>
     internal static bool Read(out ClipTransform clip, out Vector3 eye)
     {
-        var frame = Time.frameCount;
+        var frame = ForgeCore.Frame.Count;
         if (frame != _frame)
         {
             _frame = frame;

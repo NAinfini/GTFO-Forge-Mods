@@ -41,6 +41,7 @@ sealed partial class SkinnedGear
     readonly bool _world, _pickup;
     readonly string? _fixedKey;
     readonly ItemEquippable? _item; // null for the menu preview
+    readonly bool _firstPerson; // _item is the local player's first-person copy (read once: it never changes)
     readonly IntPtr _holderPointer;
     readonly string _label;
     public string Label => _label;
@@ -72,7 +73,7 @@ sealed partial class SkinnedGear
     readonly bool _gun; // a ranged gun: its Fire is a shot that hits or misses
     int _shotFrame = -1, _hitFrame = -1; // frame of the unresolved shot (-1: none) and of the last hit it sent on an enemy (HitSent)
     readonly List<AmmoScreen> _screens = new();
-    readonly List<Transform> _faceCamera = new();
+    readonly List<IDisposable> _faceCamera = new();
     readonly List<PartPose> _poses = new();
     // The grip animations the gun's parts gave its hands, while a skin's hand shapes stand in for them.
     (string Left, string Right)? _ownHands;
@@ -116,6 +117,7 @@ sealed partial class SkinnedGear
         _root = (Component?)holder ?? item!;
         _itemId = itemId;
         _item = item;
+        _firstPerson = item != null && item.m_isFirstPerson;
         _holderPointer = _root.Pointer;
         _itemPointer = item?.Pointer ?? IntPtr.Zero;
         _clipSize = item?.ClipSize ?? 0;
@@ -155,7 +157,7 @@ sealed partial class SkinnedGear
                 if (Noting(holder)) ForgeSkinPlugin.Info($"{holder.GearIDRange?.PublicGearName} [menu]: considered");
                 Track(holder, null);
             }
-            else if (Icons.IsJob(holder))
+            else if (ForgeUI.GearIcons.IsBuilding(holder))
             {
                 if (Noting(holder)) ForgeSkinPlugin.Info($"{holder.GearIDRange?.PublicGearName} [icon]: skinned for its icon");
                 Track(new SkinnedGear(holder, null, icon: true));
@@ -198,7 +200,7 @@ sealed partial class SkinnedGear
         foreach (var g in Live)
             if (g._holderPointer == pointer) return;
         // The icon renderer's gear is skinned now: it is rendered before the pending list is looked at again.
-        if (Icons.IsJob(holder))
+        if (ForgeUI.GearIcons.IsBuilding(holder))
         {
             if (Noting(holder)) ForgeSkinPlugin.Info($"{item.PublicName} [icon]: skinned for its icon");
             Track(new SkinnedGear(holder, item, icon: true));
@@ -781,6 +783,7 @@ sealed partial class SkinnedGear
         _lastClip = _lastReserve = -1;
         _layerCount = 0;
         _screens.Clear();
+        foreach (var facing in _faceCamera) facing.Dispose();
         _faceCamera.Clear();
         _roots.Clear();
     }
@@ -980,9 +983,9 @@ sealed partial class SkinnedGear
         if (p.EmissiveColor != null || p.EmissiveIntensity != null)
         {
             if (!m.HasProperty(EmissiveColor)) Missing("emissive colour");
-            // The skin's colour is in "as itself" units (MaterialParams.EmissionUnit); without one the material's own glow
+            // The skin's colour is in "as itself" units (ForgeVisual.ColourSpace.EmissionPerUnit); without one the material's own glow
             // colour, already in the game's units, is scaled.
-            else Glow.SetColour(m, p.EmissiveColor is { } e ? Glow.Value(m, Glow.EmissiveColorName, new Color(e[0], e[1], e[2]), MaterialParams.EmissionUnit * (p.EmissiveIntensity ?? 1f))
+            else Glow.SetColour(m, p.EmissiveColor is { } e ? Glow.Value(m, Glow.EmissiveColorName, new Color(e[0], e[1], e[2]), ForgeVisual.ColourSpace.EmissionPerUnit * (p.EmissiveIntensity ?? 1f))
                 : m.GetColor(EmissiveColor) * (p.EmissiveIntensity ?? 1f));
         }
         if (p.Metallic is float metal) { if (m.HasProperty(Metallic)) m.SetFloat(Metallic, metal); else Missing("metallic"); }
@@ -1158,9 +1161,10 @@ sealed partial class SkinnedGear
         t.localPosition = new Vector3(a.Position[0], a.Position[1], a.Position[2]);
         t.localRotation = Quaternion.Euler(a.Rotation[0], a.Rotation[1], a.Rotation[2]);
         t.localScale = new Vector3(a.Scale[0], a.Scale[1], a.Scale[2]);
-        if (a.FaceCamera) _faceCamera.Add(t);
-        // The camera: what a face-camera attachment turns to, and the player's body for a charm's rope.
-        if (a.FaceCamera || a.Charm != null) _camera ??= PlayerManager.GetLocalPlayerAgent()?.FPSCamera?.transform;
+        // Local +Z away from the local player's camera: the screen's visible -Z face looks at it (ForgeCore's one facing pass).
+        if (a.FaceCamera) _faceCamera.Add(ForgeVisual.CameraFacing.Follow(t, ForgeVisual.Facing.AwayFromCamera));
+        // The camera: the player's body for a charm's rope.
+        if (a.Charm != null && ForgeCore.NativeObjects.Gone(_camera)) _camera = PlayerManager.GetLocalPlayerAgent()?.FPSCamera?.transform;
         // A charm's model and screen hang on its rope's end: under a pendant object the rope moves.
         var body = root;
         if (a.Charm != null)
@@ -1401,7 +1405,7 @@ sealed partial class SkinnedGear
     // Where each attachment really is: after every apply and at the first wield (the pose differs while holstered).
     void LogAttachments()
     {
-        var eye = _camera ?? PlayerManager.GetLocalPlayerAgent()?.FPSCamera?.transform;
+        var eye = !ForgeCore.NativeObjects.Gone(_camera) ? _camera : PlayerManager.GetLocalPlayerAgent()?.FPSCamera?.transform;
         foreach (var (root, id, template) in _roots)
         {
             if (root == null) continue;
@@ -1588,6 +1592,14 @@ sealed partial class SkinnedGear
         }
     }
 
+    // The skins the local player's `item` shows now (its own and the global ones; none while it is in its original look).
+    public static IEnumerable<Skin> ShownOn(IntPtr item)
+    {
+        foreach (var gear in Live)
+            if (gear._itemPointer == item && !gear.Remote && !gear._icon) return gear._shown;
+        return Array.Empty<Skin>();
+    }
+
     // A kill of the local player as the host settled it: what is saved (wear with kills) counts only these, never a prediction.
     public static void Settled(bool killed)
     {
@@ -1695,7 +1707,7 @@ sealed partial class SkinnedGear
             // picker's pictures) the picture is its surface instead, and the icon shows the colour the player gave it.
             m.SetTexture(MainTex, _icon ? Tex(TextureChannel.Albedo) ?? Solid(color) : Texture2D.blackTexture);
             m.SetTexture(EmissiveMap, Tex(TextureChannel.Albedo) ?? Texture2D.whiteTexture);
-            SetEmission(m, color, MaterialParams.EmissionUnit);
+            SetEmission(m, color, ForgeVisual.ColourSpace.EmissionPerUnit);
             if (!_icon) _pictureGlows.Add(m.Pointer);
             return m;
         }
@@ -1756,7 +1768,9 @@ sealed partial class SkinnedGear
         if (_shotFrame >= 0 && CurrentFrame > _shotFrame + 1) ResolveShot(time);
         // A teammate's gear is drawn as the menu preview is: no ammo, no counts, no aim of the local player's (their backpack and
         // hands are not this machine's to read).
-        if (_item != null && !_icon && !Remote && (_screens.Count > 0 || _lowAmmo.Count > 0 || _on[(int)Trigger.Empty].Count > 0))
+        // A first-person gun out of the local player's hands is put away: not drawn, and its magazine does not change until it is taken out.
+        if (_item != null && !_icon && !Remote && (_screens.Count > 0 || _lowAmmo.Count > 0 || _on[(int)Trigger.Empty].Count > 0)
+            && (_itemPointer == _wielded || !_firstPerson))
         {
             int clip = _item.GetCurrentClip();
             if (clip == 0 && _lastClip > 0) Raise(Trigger.Empty, _on[(int)Trigger.Empty], time);
@@ -1783,7 +1797,7 @@ sealed partial class SkinnedGear
             if (_lastReserve >= 0 && reserve > _lastReserve) Raise(Trigger.AmmoPickup, _on[(int)Trigger.AmmoPickup], time);
             _lastReserve = reserve;
         }
-        if (_item != null && _item.m_isFirstPerson && _on[(int)Trigger.AimEnd].Count > 0)
+        if (_item != null && _firstPerson && _on[(int)Trigger.AimEnd].Count > 0)
         {
             if (_hands == null) _hands = _item.FPItemHolder;
             bool aiming = _hands != null && _hands.ItemAimTrigger && Native.Field(_hands, HandsWielded) == _itemPointer;
@@ -1800,18 +1814,11 @@ sealed partial class SkinnedGear
             t.Dirty = false;
             t.Texture.GenerateMips();
         }
-        // The camera is the player's body for the charms (CharmRope: they ride along with most of its move).
-        var eye = _camera != null ? _camera.position : default;
-        if (_itemPointer == _wielded)
-            for (int i = 0; i < _charms.Count; i++) _charms[i].Update(time, eye);
-        if (_camera != null)
+        // The camera is the player's body for the charms (CharmRope: they ride along with most of its move), read only for a gear with charms in hand.
+        if (_itemPointer == _wielded && _charms.Count > 0)
         {
-            for (int i = 0; i < _faceCamera.Count; i++)
-            {
-                var t = _faceCamera[i];
-                // Local +Z away from the camera: the screen's visible -Z face looks at it.
-                t.rotation = Quaternion.LookRotation(t.position - eye);
-            }
+            var eye = _camera != null ? _camera.position : default;
+            for (int i = 0; i < _charms.Count; i++) _charms[i].Update(time, eye);
         }
     }
 }

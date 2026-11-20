@@ -86,7 +86,8 @@ export function CharacterSteps() {
               <span className="label">
                 {i + 1}. {stepTitle(x)}
               </span>
-              <span className="row-actions" data-keep>
+              {/* Always shown (row actions show only on hover): where each step stands. */}
+              <span style={{ display: 'flex', alignItems: 'center' }}>
                 <StepState step={x} />
               </span>
             </UnstyledButton>
@@ -755,12 +756,11 @@ const PANELS: Record<Step, () => React.ReactElement> = {
 
 export function CharacterInspector() {
   const step = useCharacter((s) => s.step);
-  const model = useCharacter((s) => s.model);
   const Panel = PANELS[step];
   const S = STEP[step];
   return (
     <>
-      <InspHead kind={t('character.title')} icon={S.icon} color={S.color} title={stepTitle(step)} meta={model ? model.split(/[\\/]/).pop() : undefined} />
+      <InspHead kind={t('character.title')} icon={S.icon} color={S.color} title={stepTitle(step)} />
       <Panel />
     </>
   );

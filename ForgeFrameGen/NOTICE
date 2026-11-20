@@ -1,0 +1,42 @@
+ForgeFrameGen - notices and credits
+Copyright (c) 2026 NAinfini. The plugin and its native bridge are licensed under the MIT License (see LICENSE), except for the
+third-party material listed below, which keeps its own licence.
+
+This is an unofficial fan-made mod for GTFO. It is not made, endorsed or supported by 10 Chambers Collective.
+GTFO and its game data belong to their owners; no file taken from the game is included in this package.
+
+NVIDIA® DLSS
+- nvngx_dlss.dll and nvngx_dlssg.dll are NVIDIA DLSS runtime libraries, copied unchanged from NVIDIA's DLSS SDK
+  (https://github.com/NVIDIA/DLSS, tag v310.9.16). The native bridge links NVIDIA's NGX SDK library from the same release.
+- They are distributed under the NVIDIA RTX SDKs License; its full text ships beside them as NVIDIA-RTX-SDKs-LICENSE.txt.
+  You may not distribute these libraries on their own, outside this mod.
+- NVIDIA, RTX, DLSS and Reflex are trademarks and/or registered trademarks of NVIDIA Corporation in the U.S. and other countries.
+  Copyright (c) NVIDIA Corporation. All rights reserved.
+- This mod is not an NVIDIA product and is not made, endorsed or supported by NVIDIA.
+
+NVIDIA® DLSS Frame Generation and NVIDIA® Reflex, through NVIDIA Streamline
+- sl.interposer.dll, sl.common.dll, sl.dlss_g.dll, sl.reflex.dll and sl.pcl.dll are NVIDIA Streamline libraries, copied unchanged
+  (signed by NVIDIA) from the Streamline SDK release v2.14.16 (https://github.com/NVIDIA-RTX/Streamline).
+- Streamline is licensed by NVIDIA under the MIT-style licence that ships beside them as NVIDIA-Streamline-LICENSE.txt,
+  Copyright (c) 2023 NVIDIA CORPORATION. These libraries are not covered by this mod's MIT licence and are only distributed as part
+  of this mod.
+- sl.reflex.dll carries NVIDIA® Reflex and is distributed under NVIDIA's "License Agreement for NVIDIA Software Development Kits" with
+  its "Reflex Low Latency SDK Supplement", the licence NVIDIA ships beside the library in the Streamline release; its full text ships
+  as NVIDIA-Reflex-LICENSE.txt. It is distributed in object code, unchanged, only as part of this mod and only for use by this mod, on
+  systems with NVIDIA graphics cards. You may not distribute it on its own, outside this mod.
+
+AMD FSR™ upscaling and frame generation, through the AMD FidelityFX™ SDK
+- amd_fidelityfx_loader_dx12.dll, amd_fidelityfx_upscaler_dx12.dll and amd_fidelityfx_framegeneration_dx12.dll are AMD FidelityFX SDK libraries, copied unchanged (signed by
+  AMD) from the SDK's Kits/FidelityFX/signedbin at tag v2.4.0 (https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK). The
+  native bridge is compiled with the SDK's FFX API headers from the same commit.
+- The SDK's licence lists these libraries and headers under the MIT License; its full text ships as AMD-FSR-SDK-LICENSE.txt.
+  Copyright (c) Advanced Micro Devices, Inc. All rights reserved.
+- AMD, the AMD Arrow logo, Radeon, FidelityFX and FSR are trademarks of Advanced Micro Devices, Inc.
+- This mod is not an AMD product and is not made, endorsed or supported by AMD.
+
+RiskOfRainUpscaling (https://github.com/xanderfrangos/RiskOfRainUpscaling, MIT License)
+- Parts of the native bridge are adapted from RiskOfRainUpscaling (commit 2bea5e1e): the graphics hooks and the D3D11 to D3D12
+  present bridge (native/Presentation/GraphicsHooks.cpp, native/FrameGeneration/FrameBridge.cpp) and the Streamline setup
+  (native/FrameGeneration/DlssFrameGenerator.cpp, FrameGenerationSpace.h). Copyright (c) 2026 Xander Frangos; the full licence
+  text ships as RiskOfRainUpscaling-LICENSE.txt.
+- The jitter offset handed to DLSS is measured on Unity's GPU projection for a render target, as RiskOfRainUpscaling does.

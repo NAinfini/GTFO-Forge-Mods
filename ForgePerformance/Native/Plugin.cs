@@ -7,8 +7,9 @@ using UnityEngine;
 namespace ForgePerformance;
 
 /// <summary>Speed-ups only. The plugin installs a piece when its setting is on and nothing otherwise: with every setting off it
-/// registers no hook, no component and no quit callback, so it costs nothing. Measuring frames is ForgeDevelopment's job.</summary>
-[BepInPlugin("NAinfini.ForgePerformance", "Forge Performance", "1.0.1")] // package-version: NAinfini-ForgePerformance
+/// registers no hook, no component and no quit callback, so it costs nothing. The developer probe (Probe option, off by default)
+/// measures frame time and the game's enemy work for this mod's own tuning.</summary>
+[BepInPlugin("NAinfini.ForgePerformance", "Forge Performance", "1.0.2")] // package-version: NAinfini-ForgePerformance
 [BepInDependency("dev.gtfomodding.gtfo-api", ">=0.6.1")]
 public sealed class Plugin : BasePlugin
 {
@@ -25,14 +26,23 @@ public sealed class Plugin : BasePlugin
         if (settings.WindCapacityProtection || settings.WindNearest)
         {
             _wind = new LoadShedding.WindCapacityProtection(Log, settings);
-            _wind.Install();
+            try { _wind.Install(); }
+            catch (Exception error) { Log.LogError("performance-install-failed: wind protection is off: " + error); _wind = null; }
         }
+        Crowd.CrowdSwitches.Configure(settings, settings.CrowdHooks);
+        if (settings.Probe) Crowd.Probe.Start(Paths.BepInExRootPath, settings.ProbeSeconds, Crowd.CrowdSwitches.Describe, line => Log.LogError(line));
+        if (settings.Probe || settings.ClientHiddenSyncThrottle || settings.HitReactKeepsAgent || settings.FarAnimatorThrottle)
+            Crowd.CrowdPatches.Install(settings, line => { Log.LogError(line); Crowd.Probe.Line(line); });
         var plan = LoadShedding.SheddingHookPlan.Create(settings);
         if (plan.HasShedding)
         {
             _shedding = new LoadShedding.LoadSheddingController(Log, plan);
-            _shedding.Install();
-            _sheddingWatch = AddComponent<LoadShedding.LoadSheddingWatch>(); // drains the level-start queue (LevelWork)
+            try
+            {
+                _shedding.Install();
+                _sheddingWatch = AddComponent<LoadShedding.LoadSheddingWatch>(); // drains the level-start queue (LevelWork)
+            }
+            catch (Exception error) { Log.LogError("performance-install-failed: load shedding is off: " + error); _shedding = null; }
         }
         if (_wind == null && _shedding == null) return;
         // dump.cs: UnityEngine.Application.add_quitting (RVA 0x1DD0930),
@@ -69,6 +79,7 @@ public sealed class Plugin : BasePlugin
         if (_wind is { } wind && Cleanup(wind.Dispose)) _wind = null;
         if (_shedding is { } shedding && Cleanup(shedding.Dispose)) _shedding = null;
         if (_sheddingWatch is { } sheddingWatch && Cleanup(() => sheddingWatch.enabled = false)) _sheddingWatch = null;
+        Cleanup(ForgePerformance.Crowd.CrowdPatches.Uninstall);
         if (_quitting is { } quitting && Cleanup(() => Application.remove_quitting(quitting))) _quitting = null;
         if (failure != null) throw failure;
         return true;

@@ -127,15 +127,31 @@ public static partial class AudioKit
     /// and kept. Returns false (and logs why) when the name is empty or the game has no event of that name.</summary>
     public static bool TryGameEventId(string eventName, out uint id)
     {
+        if (string.IsNullOrEmpty(eventName)) { id = 0; AudioLog.Report(AudioError.InvalidOptions, "A game sound event needs a name."); return false; }
+        return LookUpGameEvent(eventName, out id, quiet: false);
+    }
+
+    /// <summary>As <see cref="TryGameEventId"/>, for a name a mod only tries (the <c>_3rd</c> form of an event, which only some events
+    /// have): a name the game has no event of returns false without a log.</summary>
+    public static bool HasGameEvent(string eventName, out uint id)
+    {
         id = 0;
-        if (string.IsNullOrEmpty(eventName)) { AudioLog.Report(AudioError.InvalidOptions, "A game sound event needs a name."); return false; }
+        return !string.IsNullOrEmpty(eventName) && LookUpGameEvent(eventName, out id, quiet: true);
+    }
+
+    static bool LookUpGameEvent(string eventName, out uint id, bool quiet)
+    {
         if (GameEventIds.TryGetValue(eventName, out id)) return true;
         try
         {
             const BindingFlags flags = BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase;
             var events = typeof(AK.EVENTS);
             var value = events.GetProperty(eventName, flags)?.GetValue(null) ?? events.GetField(eventName, flags)?.GetValue(null);
-            if (value == null) { AudioLog.Report(AudioError.CueNotFound, "The game has no sound event named '" + eventName + "' (AK.EVENTS)."); return false; }
+            if (value == null)
+            {
+                if (!quiet) AudioLog.Report(AudioError.CueNotFound, "The game has no sound event named '" + eventName + "' (AK.EVENTS).");
+                return false;
+            }
             id = Convert.ToUInt32(value);
         }
         catch (Exception error)

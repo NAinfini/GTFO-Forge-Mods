@@ -150,10 +150,4 @@ public static class LitMaterial
         // This library's own surfaces (the cut-out, the toon shader) read the map only when told to.
         if (material.HasProperty(UseNormalMap)) material.SetFloat(UseNormalMap, 1f);
     }
-
-    /// <summary>The `_EmissiveColor` multiple that shows a linear emission of 1 (glTF's full-brightness emission) as its own colour. The gear
-    /// shader's self-illumination gain is very large: in game (S8-MESH, orange 1 / 0.35 / 0 in an unlit room) a multiple of 0.01 keeps the colour,
-    /// 0.03 already shifts it to yellow and 0.1 or more washes it out to white.</summary>
-    public const float EmissionPerUnit = 0.01f;
-
 }

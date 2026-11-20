@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using HarmonyLib;
 using Player;
 
 namespace ForgeUI;
@@ -18,7 +17,8 @@ public static partial class UIKit
 /// The game's weapon list held still while the local backpack holds an item a mod hid (<see cref="UIKit.HideInWeaponList"/>): the game's
 /// own refresh of the whole list is skipped, and so is every per-item update of the hidden item (its name, icon, state and counts). Every
 /// other slot's counts still update. Once the item leaves the backpack the game's next refresh redraws the list as usual. Only the local
-/// player's list is held; the lobby's copies of other players' lists are untouched.
+/// player's list is held; the lobby's copies of other players' lists are untouched. The four list calls are patched once, with the gear
+/// names and the inventory readout (<see cref="InventoryListCalls"/>).
 /// </summary>
 internal static class WeaponListHidden
 {
@@ -26,7 +26,7 @@ internal static class WeaponListHidden
 
     internal static void Add(uint id)
     {
-        PatchGroups.Ensure(PatchGroup.WeaponListHidden);
+        PatchGroups.Ensure(PatchGroup.ListCalls);
         Ids.Add(id);
     }
 
@@ -43,6 +43,15 @@ internal static class WeaponListHidden
     private static bool HiddenIn(InventorySlot slot) =>
         ForgeCore.Players.Local != null && PlayerBackpackManager.LocalBackpack is { } backpack && backpack.TryGetBackpackItem(slot, out var item) && Hidden(item);
 
+    /// <summary>The local list holds a hidden item, so its whole refresh is skipped (<see cref="InventoryListCalls"/>).</summary>
+    internal static bool HoldsAll(PUI_Inventory inventory) => Own(inventory) && Holding(inventory);
+
+    /// <summary>The local list's update of <paramref name="item"/> is skipped: the item is hidden.</summary>
+    internal static bool Holds(PUI_Inventory inventory, BackpackItem item) => Own(inventory) && Hidden(item);
+
+    /// <summary>The local list's counts of <paramref name="slot"/> are skipped: the slot holds a hidden item.</summary>
+    internal static bool HoldsSlot(PUI_Inventory inventory, InventorySlot slot) => Own(inventory) && HiddenIn(slot);
+
     /// <summary>Any slot of the list holds a hidden item.</summary>
     private static bool Holding(PUI_Inventory inventory)
     {
@@ -51,56 +60,5 @@ internal static class WeaponListHidden
         for (var i = 0; i < order.Length; i++)
             if (HiddenIn(order[i])) return true;
         return false;
-    }
-
-    [PatchGroup(PatchGroup.WeaponListHidden)]
-    [HarmonyPatch(typeof(PUI_Inventory), nameof(PUI_Inventory.UpdateAllSlots))]
-    private static class AllSlots
-    {
-        private static bool Prefix(PUI_Inventory __instance)
-        {
-            try
-            {
-                if (!Own(__instance)) return true;
-                return !Holding(__instance);
-            }
-            catch (Exception error)
-            {
-                Plugin.Error("ui-holding-weapon-list-hidden-item-failed", "Holding the weapon list for a hidden item failed: " + error);
-                return true;
-            }
-        }
-    }
-
-    // PUI_Inventory.UpdateItemUI needs no patch: its native body only calls UpdateInfoForItem and UpdateAmmoForItem for the same
-    // item, and both are held below.
-
-    [PatchGroup(PatchGroup.WeaponListHidden)]
-    [HarmonyPatch(typeof(PUI_Inventory), nameof(PUI_Inventory.UpdateInfoForItem))]
-    private static class ItemInfo
-    {
-        private static bool Prefix(PUI_Inventory __instance, BackpackItem bpItem) => !(Own(__instance) && Hidden(bpItem));
-    }
-
-    [PatchGroup(PatchGroup.WeaponListHidden)]
-    [HarmonyPatch(typeof(PUI_Inventory), nameof(PUI_Inventory.UpdateAmmoForItem))]
-    private static class ItemAmmo
-    {
-        private static bool Prefix(PUI_Inventory __instance, BackpackItem bpItem) => !(Own(__instance) && Hidden(bpItem));
-    }
-
-    [PatchGroup(PatchGroup.WeaponListHidden)]
-    [HarmonyPatch(typeof(PUI_Inventory), nameof(PUI_Inventory.SetSlotAmmo))]
-    private static class SlotAmmo
-    {
-        private static bool Prefix(PUI_Inventory __instance, InventorySlot slot)
-        {
-            try { return !(Own(__instance) && HiddenIn(slot)); }
-            catch (Exception error)
-            {
-                Plugin.Error("ui-holding-weapon-lists-counts-hidden-item", "Holding the weapon list's counts for a hidden item failed: " + error);
-                return true;
-            }
-        }
     }
 }

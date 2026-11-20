@@ -45,9 +45,9 @@
     <Compile Include="..\..\ForgeCore\Visual\Core\ColourSpace.cs" Link="ForgeCore\ColourSpace.cs" />
     <!-- ForgeCore's one chain physics (charm ropes, spring bones), pure; the plugin's through ForgeCore.dll. -->
     <Compile Include="..\..\ForgeCore\Visual\Core\ChainPhysics.cs" Link="ForgeCore\ChainPhysics.cs" />
-    <!-- Character skins (Core/Character.cs): ForgeCore's canonical humanoid, its rest-pose check and the imported-model descriptor with its
+    <!-- Character skins (Core/Character.cs) and the inspect motions' finger shapes (Core/InspectMotion.cs): ForgeCore's canonical humanoid, its finger shapes, its rest-pose check and the imported-model descriptor with its
          one file check (and the PNG header reader it uses), pure; the plugin's through ForgeCore.dll. -->
-    <Compile Include="..\..\ForgeCore\Visual\Core\JointClip.cs;..\..\ForgeCore\Visual\Core\JointClipGlb.cs;..\..\ForgeCore\Visual\Core\RigMap.cs;..\..\ForgeCore\Visual\Core\JointRetarget.cs;..\..\ForgeCore\Visual\Core\BodyRig.cs;..\..\ForgeCore\Visual\Core\ImportedModelFormat.cs;..\..\ForgeCore\Once\Png.cs" Link="ForgeCore\%(Filename)%(Extension)" />
+    <Compile Include="..\..\ForgeCore\Visual\Core\JointClip.cs;..\..\ForgeCore\Visual\Core\JointClipGlb.cs;..\..\ForgeCore\Visual\Core\JointClipFingers.cs;..\..\ForgeCore\Visual\Core\RigMap.cs;..\..\ForgeCore\Visual\Core\JointRetarget.cs;..\..\ForgeCore\Visual\Core\BodyRig.cs;..\..\ForgeCore\Visual\Core\ImportedModelFormat.cs;..\..\ForgeCore\Once\Png.cs" Link="ForgeCore\%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\ForgeCore\Visual\Data\fx-programs.json" LogicalName="ForgeVisual.Data.fx-programs.json" />
     <!-- The whole-gun model's hold points (GunSwap) by ForgeCore's one gun model placement and its rule file, pure; the plugin's through ForgeCore.dll. -->
     <Compile Include="..\..\ForgeCore\Visual\Core\GunHold.cs;..\..\ForgeCore\Once\FormatVersion.cs" Link="ForgeCore\%(Filename)%(Extension)" />

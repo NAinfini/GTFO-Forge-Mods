@@ -58,6 +58,39 @@ public sealed class MenuScreen
 
     internal string Text(UIText text) => (text ?? UIText.Empty).In(_texts);
 
+    // The disabled buttons' reasons, shown as a tooltip while the pointer is on the button (the canvas is made at its first hover).
+    private sealed class Tip
+    {
+        internal CM_Item Item = null!;
+        internal string Text = "";
+        internal MenuItemTooltip? Shown;
+        internal bool Tried;
+    }
+
+    private readonly List<Tip> _tips = new();
+
+    internal void AddTip(CM_Item item, string text) => _tips.Add(new Tip { Item = item, Text = text });
+
+    /// <summary>Per frame: each reason's tooltip while its button is hovered. The tooltip stands over the button (the window is above it),
+    /// or under it with no room there, within two buttons' width either side.</summary>
+    internal void ShowTips()
+    {
+        foreach (var tip in _tips)
+        {
+            var item = tip.Item;
+            if (item == null || item.WasCollected) continue;
+            var hover = item.m_isHovering;
+            if (tip.Shown == null)
+            {
+                if (!hover || tip.Tried) continue;
+                tip.Tried = true;
+                tip.Shown = MenuItemTooltip.On(item, box => new Rect(box.XMin() - box.Width() * 2f, box.YMin() - box.Height() * 4f, box.Width() * 5f, box.Height() * 9f));
+                if (tip.Shown == null) continue;
+            }
+            tip.Shown.Show(tip.Text, hover);
+        }
+    }
+
     /// <summary>A section button in the left column, under the ones before it, as the settings sections are; the selected one keeps its
     /// text bright.</summary>
     public void AddSection(UIText text, bool selected, Action onClick)
@@ -84,6 +117,10 @@ public sealed class MenuScreen
         // A copy carries only what the game saves with the window: its set-up (content lists that SetSize walks, the clipping that
         // shows the rows) runs again, as the settings page runs it on each window it makes.
         window.Setup();
+        // Setup takes where the rows start from the copied content container, which stands wherever the player last scrolled the settings
+        // window: copied from a scrolled window, the rows started that far up, above the window, with no scroll bar to bring them back. The
+        // copy starts where the settings window itself started.
+        window.m_posStart = WindowTemplate.m_posStart;
         window.SetSize(new Vector2(width, height));
         window.SetHeader(Text(header));
         go.transform.localPosition = new Vector3(_nextX, top, 0f);
@@ -779,55 +816,26 @@ public sealed class MenuScreenWindow
 
     /// <summary>A button under the window, in <paramref name="column"/> (see <see cref="Buttons"/>) below the ones already there: the
     /// settings section button, or the red one (larger) for the main action. With <paramref name="enabled"/> false it stands in its place
-    /// faded, frame and text, and takes no press or hover; <paramref name="why"/> (one sentence: what is missing and what to do) is written
-    /// under it in the warning colour.</summary>
+    /// faded, frame and text, and takes no press; <paramref name="why"/> (one short sentence: what to do) is its tooltip while the pointer
+    /// is on it (without one it takes no hover either).</summary>
     public void AddButton(UIText text, Action onClick, bool main = false, int column = 0, bool enabled = true, UIText? why = null)
     {
         var template = main && enabled && _screen.RedTemplate != null ? _screen.RedTemplate : _screen.SectionTemplate;
-        var item = _screen.Button(template, enabled ? _screen.Text(text) : MenuText.Tint(_screen.Text(text), MenuTone.Dim), onClick);
-        var box = Place(item, column, main);
+        var item = _screen.Button(template, enabled ? _screen.Text(text) : MenuText.Tint(_screen.Text(text), MenuTone.Dim), enabled ? onClick : () => { });
+        Place(item, column, main);
         MenuScreen.Bright(item, main && enabled);
         if (enabled) return;
-        if (item.m_collider != null) item.m_collider.enabled = false;
         foreach (var sprite in item.GetComponentsInChildren<SpriteRenderer>(true))
         {
             var colour = sprite.color;
             sprite.color = new Color(colour.r, colour.g, colour.b, colour.a * DisabledAlpha);
         }
-        if (why is { } reason) Note(item, box, column, MenuText.Tint(_screen.Text(reason), MenuTone.Warn));
+        if (why is { } reason) _screen.AddTip(item, _screen.Text(reason));
+        else if (item.m_collider != null) item.m_collider.enabled = false;
     }
 
     // How much of a disabled button's frame still shows.
     private const float DisabledAlpha = 0.3f;
-
-    // A line of text under a button in its column (a copy of the button's own label, so it has the menu's font and size), wrapped to the
-    // column's width; the next button goes under it.
-    private void Note(CM_Item item, Rect box, int column, string text)
-    {
-        var source = item.GetComponentInChildren<TMPro.TextMeshPro>(true);
-        if (source == null) return;
-        var note = _screen.Copy(source.gameObject, "ForgeUI.ButtonNote").GetComponent<TMPro.TextMeshPro>();
-        note.alignment = TMPro.TextAlignmentOptions.TopLeft;
-        note.enableWordWrapping = true;
-        note.overflowMode = TMPro.TextOverflowModes.Overflow;
-        note.fontSize = source.fontSize * 0.8f;
-        // Drawn at the label's size on screen (the button was shrunk to its column), measured in the holder's units.
-        var scale = Math.Max(1e-4f, source.transform.lossyScale.x / Math.Max(1e-4f, _screen.Holder.lossyScale.x));
-        note.transform.localScale = Vector3.one * scale;
-        note.transform.localRotation = Quaternion.identity;
-        note.rectTransform.pivot = new Vector2(0f, 1f);
-        note.rectTransform.sizeDelta = new Vector2(box.width / scale, 0f);
-        note.text = text;
-        note.ForceMeshUpdate(true);
-        var height = note.preferredHeight * scale;
-        note.rectTransform.sizeDelta = new Vector2(box.width / scale, height / scale);
-        note.transform.localPosition = new Vector3(box.xMin, box.yMin - NoteGap, 0f);
-        _buttons.Add(note.transform);
-        column = Math.Clamp(column, 0, _weights.Length - 1);
-        _cursor[column] -= height + NoteGap;
-    }
-
-    private const float NoteGap = 6f;
 
     /// <summary>A button under the window that asks before it acts, in place and without a pop-up: the first press turns it into the red
     /// <paramref name="confirm"/> button with a <paramref name="cancel"/> button under it in the same column; <paramref name="onConfirm"/>
@@ -1022,6 +1030,7 @@ internal static class MenuScreens
         Yield(ForgeCore.Frame.Focus == eFocusState.GlobalPopupMessage);
         Hide();
         _open.Hold();
+        _open.ShowTips();
         Cover(_open);
     }
 

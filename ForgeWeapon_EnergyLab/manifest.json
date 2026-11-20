@@ -1,12 +1,12 @@
 {
   "name": "ForgeWeapon_EnergyLab",
-  "version_number": "1.0.2",
+  "version_number": "1.0.3",
   "website_url": "https://github.com/NAinfini/GTFO-Forge-Mods",
   "description": "Eight standalone energy guns for GTFO: beams, chain lightning, charged plasma, explosions, ricochets, flame, and gravity control.",
   "dependencies": [
     "BepInEx-BepInExPack_GTFO-3.2.4",
     "GTFOModding-GTFO_API-0.6.1",
     "dakkhuza-MTFO-4.6.3",
-    "NAinfini-ForgeCore-1.0.2"
+    "NAinfini-ForgeCore-1.0.3"
   ]
 }
