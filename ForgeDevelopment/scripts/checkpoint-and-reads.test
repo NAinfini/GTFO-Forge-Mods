@@ -1,0 +1,14 @@
+# Checkpoint, noise and the state readbacks. No room or door ids: it works on whatever level the session holds.
+# Run as in combat-basics.test.
+stop-on-fail
+player as=here
+state lifecycle as=life
+state ammo as=ammo
+state stamina
+
+checkpoint save as=saved
+checkpoint confirm
+noise 20
+wait 2s
+enemies 30 as=near
+expect log !contains "Exception"

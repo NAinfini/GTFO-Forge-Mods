@@ -1,0 +1,15 @@
+{
+  "profile": "author-door-size-clearance",
+  "enabledByDefault": false,
+  "entries": [
+    {
+      "type": "LevelGeneration.LG_Gate",
+      "methods": ["GetAlignRef", "GetBoundingSize", "SetInternalTraversable", "BakeNavigationObstacles"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["name", "Type", "DimensionIndex", "IsTraversable", "HasBeenOpenedDuringPlay", "transform.position", "transform.rotation", "transform.lossyScale"],
+      "maxPerSecond": 80,
+      "onOverflow": "count"
+    }
+  ]
+}

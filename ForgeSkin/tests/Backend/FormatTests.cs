@@ -554,6 +554,9 @@ public class FormatTests(ITestOutputHelper output)
             var misfit = OnDisk();
             misfit.Character!.Bones["head"] = "NoSuchBone";
             Assert.Equal("bad-character-rig", Assert.Throws<SkinFormatException>(() => ForgeSkin.Backend.PackBuilder.Build(misfit, Path.Combine(dir, "misfit.forgeskinproj"), Path.Combine(dir, "misfit.forgeskin"), [], [], -1)).Code);
+            // A skin for no gear or item (older editors made sight, magazine, light and ammo skins for every gear) is refused.
+            var forNoGear = new SkinDocument { Id = "sight-only", Name = "sight only" };
+            Assert.Equal("no-gear-target", Assert.Throws<ForgeSkin.Backend.BackendException>(() => ForgeSkin.Backend.PackBuilder.Build(forNoGear, Path.Combine(dir, "sight.forgeskinproj"), Path.Combine(dir, "sight.forgeskin"), [], [], -1)).Code);
         }
         finally
         {

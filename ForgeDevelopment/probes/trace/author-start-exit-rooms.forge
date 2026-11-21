@@ -1,0 +1,249 @@
+{
+  "profile": "author-start-exit-rooms",
+  "enabledByDefault": false,
+  "entries": [
+    {
+      "type": "GameData.ComplexResourceSetDataBlock",
+      "methods": [
+        "GetElevatorTile"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "persistentID",
+        "m_elevatorShafts_1x1.Length"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_SetupFloor",
+      "methods": [
+        "Build"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "m_floor.ID",
+        "m_position",
+        "m_rotation"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_Floor",
+      "methods": [
+        "CreateFloorTransition",
+        "SetupZoneForExpansion"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "ID",
+        "m_zoneCount"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LG_FloorTransition",
+      "methods": [
+        "SetPlaced"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "name",
+        "m_geoPrefab.name",
+        "m_shapeType",
+        "m_spawnPoints.Length"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ElevatorShaftLanding",
+      "methods": [
+        "Start",
+        "OnDestroy"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "name",
+        "transform.position",
+        "transform.rotation",
+        "m_securityScanAlign.position",
+        "m_cargoCageAlign.position"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ElevatorShaftLanding",
+      "methods": [
+        "OnBuildDone"
+      ],
+      "record": "args+result",
+      "instance": [
+        "name",
+        "SpawnArea.UID",
+        "SpawnArea.m_geomorph.name",
+        "SpawnArea.m_zone.DimensionIndex",
+        "SpawnArea.m_zone.m_layer.m_type",
+        "SpawnArea.m_zone.LocalIndex",
+        "m_securityScanAlign.position",
+        "m_cargoCageAlign.position",
+        "m_puzzle.m_puzzleUID"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ElevatorShaftLanding",
+      "methods": [
+        "GetExitScanData"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ElevatorCage",
+      "methods": [
+        "RegisterSpawnPoints",
+        "EnablePlayerAtPoint"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "name",
+        "m_spawnPoints.Length",
+        "m_playerLandingAligns.Length",
+        "m_seatsFromShaft.Length",
+        "m_cargoCage.name"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "GS_StopElevatorRide",
+      "methods": [
+        "OnElevatorHasArrived"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "IsActive"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_LevelExitGeo",
+      "methods": [
+        "Start",
+        "OnDestroy"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "name",
+        "transform.position",
+        "transform.rotation",
+        "m_exitArea.UID",
+        "m_exitArea.m_geomorph.name",
+        "m_exitArea.m_zone.DimensionIndex",
+        "m_exitArea.m_zone.m_layer.m_type",
+        "m_exitArea.m_zone.LocalIndex",
+        "m_securityScanAlign.position"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_ZoneJob_CreateExpandFromData",
+      "methods": [
+        "SetupZoneForExpansion",
+        "IsExpanderFree"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "m_mainStatus",
+        "m_subStatus",
+        "m_currentExpansionType",
+        "m_inFailFallbackPass"
+      ],
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_Plug",
+      "methods": [
+        "SetPlaced",
+        "TryPair"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "m_dir",
+        "m_position",
+        "m_linkPosition",
+        "m_forward"
+      ],
+      "maxPerSecond": 80,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_BuildSecurityDoorLockJob",
+      "methods": [
+        "CheckFlip"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "m_door"
+      ],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_BuildChainedPuzzleDoorLockJob",
+      "methods": [
+        "Build"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "m_puzzleId"
+      ],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ElevatorCargoCage",
+      "methods": [
+        "SetupForWardenObjective"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "m_placementSlots"
+      ],
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    }
+  ]
+}

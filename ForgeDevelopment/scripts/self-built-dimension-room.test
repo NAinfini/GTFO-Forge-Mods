@@ -1,0 +1,44 @@
+# A dimension whose first room is a self-built room: the room takes that dimension's floor transition, the team warps in onto the
+# dimension landings set in the room, and the game sends it back to reality afterwards; the room build is not refused.
+# V1 E1 carries it: the self-built 闪入小屋 (24 x 24 m, no ceiling, dimension 2) with four dimension landings. In the level its
+# 闪入终端 (assembly hall, command WARP, 20 seconds) sends the team there; this script fires the same vanilla flash event from the
+# console instead (no walking to the terminal: the terminal itself is the owner's hand test, timed-dimension.test).
+# Start a session on a freshly loaded E1 of the V1 package, then run:
+#   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package NAinfini-Forge_V1_Rundown --level E1 --work-dir artifacts/work/drivesession/<name>
+#   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name> run Mods/ForgeDevelopment/scripts/self-built-dimension-room.test
+# Authored sky (the editor's 正午 preset, the Flyer Arena atmosphere without sandstorm): IsOutside true, Sandstorm false, Exposure 1.43,
+# AmbientIntensity 1.106, LightAzimuth -4.7, LightElevation 81.4, LightIntensity 0.3198.
+# One drive session checks the local player; that the other players land in the room and return with it is the owner's multiplayer run.
+# The host is slot 0, whose landing is (-4, 0, -4) in the room's published frame, (4, 0, -4) in the room-local Unity metres
+# `teleport room=` takes (Unity x = editor -x); a teleport to that point inside the dimension reads where the game puts a body there. DimensionIndex and LocalIndex read `<number>/<name>` (2/Dimension_2, 0/Zone_0).
+god on
+
+# in reality, the dimension's room was built and not refused
+player as=start
+expect $start.DimensionIndex contains "Reality"
+expect log --all !contains "room.build-refused"
+expect log --all !contains "recipe-"
+
+# the flash (vanilla event 7, the one the terminal's WARP writes) puts the team in the dimension's first zone, in the self-built room,
+# on slot 0's landing
+event {"Type":7,"DimensionIndex":2,"Layer":0,"LocalIndex":0,"Duration":20}
+wait 4s
+player Alive Position DimensionIndex CourseNode.m_zone.LocalIndex CourseNode.m_zone.DimensionIndex as=inside
+expect $inside.Alive == "True"
+expect $inside.DimensionIndex contains "Dimension_2"
+expect $inside.CourseNode.m_zone.DimensionIndex == $inside.DimensionIndex
+expect $inside.CourseNode.m_zone.LocalIndex contains "Zone_0"
+step {"target":"allOfType:LevelGeneration.LG_Zone","steps":[{"read":["DimensionIndex","LocalIndex","Dimension.DimensionData.IsOutside","Dimension.DimensionData.Sandstorm","Dimension.DimensionData.Exposure","Dimension.DimensionData.AmbientIntensity","Dimension.DimensionData.LightAzimuth","Dimension.DimensionData.LightElevation","Dimension.DimensionData.LightIntensity"]}]} as=sky
+screenshot as=shot_room
+teleport room=b3f3a19d-2aa6-49bb-95bb-6281f092c57b 4 0.12 -4 as=slot0_at
+expect $inside.Position.x ~1.5 $slot0_at.landed.x
+expect $inside.Position.z ~1.5 $slot0_at.landed.z
+
+# when the seconds run out the game sends the team back where it stood
+wait 18s
+player as=back
+expect $back.DimensionIndex contains "Reality"
+expect $back.Alive == "True"
+expect $back.Position.x ~1.5 $start.Position.x
+expect $back.Position.z ~1.5 $start.Position.z
+expect log --all !contains "Exception"

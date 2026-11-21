@@ -1,0 +1,273 @@
+{
+  "profile": "everything",
+  "enabledByDefault": false,
+  "entries": [
+    {
+      "type": "LevelGeneration.*",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "add_*",
+        "remove_*",
+        "MoveNext",
+        "System_*",
+        "__c*",
+        "_*"
+      ],
+      "record": "count",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.*",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "add_*",
+        "remove_*",
+        "MoveNext",
+        "System_*",
+        "__c*",
+        "_*"
+      ],
+      "record": "count",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Player.*",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "add_*",
+        "remove_*",
+        "MoveNext",
+        "System_*",
+        "__c*",
+        "_*"
+      ],
+      "record": "count",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Agents.*",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "add_*",
+        "remove_*",
+        "MoveNext",
+        "System_*",
+        "__c*",
+        "_*"
+      ],
+      "record": "count",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.*",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "add_*",
+        "remove_*",
+        "MoveNext",
+        "System_*",
+        "__c*",
+        "_*"
+      ],
+      "record": "count",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Gear.*",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "add_*",
+        "remove_*",
+        "MoveNext",
+        "System_*",
+        "__c*",
+        "_*"
+      ],
+      "record": "count",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "GameData.*",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "add_*",
+        "remove_*",
+        "MoveNext",
+        "System_*",
+        "__c*",
+        "_*"
+      ],
+      "record": "count",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SNetwork.*",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "LateUpdate",
+        "SNetUpdate",
+        "DevUpdate",
+        "get_*",
+        "set_*",
+        "add_*",
+        "remove_*",
+        "MoveNext",
+        "System_*",
+        "__c*",
+        "_*"
+      ],
+      "record": "count",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SNetwork_Transport.*",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "add_*",
+        "remove_*",
+        "MoveNext",
+        "System_*",
+        "__c*",
+        "_*"
+      ],
+      "record": "count",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_*",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "add_*",
+        "remove_*",
+        "MoveNext",
+        "System_*",
+        "__c*",
+        "_*"
+      ],
+      "record": "count",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "CellMenu.*",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "add_*",
+        "remove_*",
+        "MoveNext",
+        "System_*",
+        "__c*",
+        "_*"
+      ],
+      "record": "count",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Globals.*",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "add_*",
+        "remove_*",
+        "MoveNext",
+        "System_*",
+        "__c*",
+        "_*",
+        "BoxIl2CppObject"
+      ],
+      "record": "count",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    }
+  ]
+}

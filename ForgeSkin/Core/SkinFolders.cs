@@ -35,6 +35,27 @@ public static class SkinFolders
         }
     }
 
+    /// <summary>Skin files under `plugins` that ModPacks never reads, as a line each saying where they belong: a marker not directly in a
+    /// mod folder (in plugins itself, or a folder deeper, as a zip with a top folder unpacks), and a pack in plugins itself or in a mod
+    /// folder with no marker at its top. A pack a marker leaves out is the mod's own choice and not listed. Names only; nothing is read.</summary>
+    public static IEnumerable<(string File, string Problem)> Misplaced(string plugins)
+    {
+        if (!Directory.Exists(plugins)) yield break;
+        var all = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true };
+        foreach (var file in Directory.EnumerateFiles(plugins, "*", all))
+        {
+            var name = Path.GetFileName(file);
+            bool marker = name.Equals(ModMarker, StringComparison.OrdinalIgnoreCase);
+            if (!marker && !name.EndsWith(SkinPack.Extension, StringComparison.OrdinalIgnoreCase)) continue;
+            var rel = Path.GetRelativePath(plugins, file).Replace('\\', '/');
+            int depth = rel.Count(c => c == '/');
+            if (marker && depth != 1)
+                yield return (file, $"plugins/{rel}: a skin mod's {ModMarker} is read only directly inside its mod folder (plugins/<folder>/{ModMarker}); this one is not read");
+            else if (!marker && (depth == 0 || !File.Exists(Path.Combine(plugins, rel[..rel.IndexOf('/')], ModMarker))))
+                yield return (file, $"plugins/{rel}: a skin pack is read from the plugins folder only when plugins/<folder>/{ModMarker} lists it; this one is not read (or install it into BepInEx/ForgeSkin/skins)");
+        }
+    }
+
     public static string Readback(string bepInEx) => Path.Combine(Root(bepInEx), "readback");
 
     /// <summary>Where earlier editors installed their own copy of the plugin DLL (the editor now installs where a mod manager does,

@@ -1,0 +1,183 @@
+[
+  {
+    "id": "stamina-read",
+    "title": "体力：读本机玩家的储备、比例与上限",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.StateReadbackDrive",
+    "timeoutSeconds": 30,
+    "steps": [
+      {
+        "call": "StaminaRead"
+      }
+    ],
+    "notes": [
+      "只读；非本机持有的玩家读不到，返回 unavailable 而不是 0。"
+    ]
+  },
+  {
+    "id": "stamina-use",
+    "title": "体力：走一次原版 UseStamina 消耗并读回",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.StateReadbackDrive",
+    "timeoutSeconds": 30,
+    "steps": [
+      {
+        "call": "StaminaRead"
+      },
+      {
+        "call": "StaminaUse",
+        "args": [
+          "0.25"
+        ]
+      },
+      {
+        "call": "StaminaRead"
+      }
+    ],
+    "notes": [
+      "消耗走游戏自己的 UseStamina（战斗内外同价，重置恢复计时）；读回含游戏的非战斗下限，比对前后两次读数。"
+    ]
+  },
+  {
+    "id": "stamina-reset",
+    "title": "体力：原版 ResetStamina 回满并读回",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.StateReadbackDrive",
+    "timeoutSeconds": 30,
+    "steps": [
+      {
+        "call": "StaminaUse",
+        "args": [
+          "0.5"
+        ]
+      },
+      {
+        "call": "StaminaReset"
+      },
+      {
+        "call": "StaminaRead"
+      }
+    ],
+    "notes": [
+      "先消耗再回满，回满后储备应等于上限。"
+    ]
+  },
+  {
+    "id": "stamina-write-capped",
+    "title": "体力：带上限的直接写并读回",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.StateReadbackDrive",
+    "timeoutSeconds": 30,
+    "steps": [
+      {
+        "call": "StaminaWrite",
+        "args": [
+          "0.9",
+          "0.4"
+        ]
+      },
+      {
+        "call": "StaminaRead"
+      }
+    ],
+    "notes": [
+      "直接写入 min(值, 上限)；读回应不高于上限（自然恢复可能随后略升）。"
+    ]
+  },
+  {
+    "id": "ammo-read",
+    "title": "开枪与弹药：读手持枪弹匣与五个弹药池",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.StateReadbackDrive",
+    "timeoutSeconds": 30,
+    "steps": [
+      {
+        "call": "AmmoRead"
+      }
+    ],
+    "notes": [
+      "开枪前后各读一次；开枪用 input-drive 的 Hold/Let，不模拟键鼠。"
+    ]
+  },
+  {
+    "id": "intel-and-net",
+    "title": "警示 HUD 状态与本机 SNet 玩家 Lookup",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.StateReadbackDrive",
+    "timeoutSeconds": 30,
+    "steps": [
+      {
+        "call": "IntelRead"
+      },
+      {
+        "call": "NetLookup"
+      }
+    ],
+    "notes": [
+      "离线单人下 local 应非 0。"
+    ]
+  },
+  {
+    "id": "fog-read",
+    "title": "雾：Unity 环境光强度与雾色透明度",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.StateReadbackDrive",
+    "timeoutSeconds": 30,
+    "steps": [
+      {
+        "call": "FogRead"
+      }
+    ],
+    "notes": [
+      "只读场景级值；写入值与实际值比对由使用方在改雾前后各读一次。"
+    ]
+  },
+  {
+    "id": "clip-set",
+    "title": "开枪与弹药：对手持枪走原生 SetCurrentClip 并读回弹匣",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.StateReadbackDrive",
+    "timeoutSeconds": 30,
+    "steps": [
+      {
+        "call": "AmmoRead"
+      },
+      {
+        "call": "ClipSet",
+        "args": [
+          "1"
+        ]
+      },
+      {
+        "call": "AmmoRead"
+      }
+    ],
+    "notes": [
+      "先用 input-select-special 装备枪；调用方须记下第一次读到的弹匣并用 ClipSet 写回。"
+    ]
+  },
+  {
+    "id": "fog-change",
+    "title": "雾：改 Unity 场景雾密度并前后读回",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.StateReadbackDrive",
+    "timeoutSeconds": 30,
+    "steps": [
+      {
+        "call": "FogRead"
+      },
+      {
+        "call": "FogSet",
+        "args": [
+          "0.05"
+        ]
+      },
+      {
+        "call": "FogRead"
+      }
+    ],
+    "notes": [
+      "测试动作直接写场景雾密度；调用方须用 FogSet 写回第一次读到的 fogDensity。"
+    ]
+  }
+]

@@ -1,10 +1,14 @@
 # Changelog
 
+## 1.0.4
+
+- Added: diagnostic measurement for every Forge package: `HookCounters`, `DiagnosticCpuBudget`, `DropTimingMetrics`, `GenerationAttempt` and `GameFloor.Components`, moved here from Forge Engine so Forge Development can measure any level without it.
+- Changed: the HUD kit does less each frame: it finds the game's weapon list pieces every two seconds instead of twice a second, keeps each element's pieces between measures, and checks the game's objects without calling into the game. The HUD updates as promptly as before.
+
 ## 1.0.3
 
 In multiplayer the host and every client should run this version.
 
-- Changed: the HUD kit does less each frame: it finds the game's weapon list pieces every two seconds instead of twice a second, keeps each element's pieces between measures, and checks the game's objects without calling into the game. The HUD updates as promptly as before.
 - Fixed: a hit on an enemy is not counted twice when packets are lost or late, and a client that lags behind no longer subtracts the same hit again from the health the host reports.
 - Fixed: a large state sent to a player who just joined no longer holds back the updates every other player gets meanwhile.
 - Fixed: a player who joined late could miss what the others had already shared (a picked skin, a chosen loadout, enemy health) until someone changed it again; a player who asks again is now sent everything again. A player who joins a level after a checkpoint reload stays in the host's world for that level.

@@ -1,0 +1,69 @@
+[
+  {
+    "id": "input-use-press",
+    "title": "输入驱动：按住原版使用键 1 秒后松开（领取、登乘）",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.GameInputDrive",
+    "timeoutSeconds": 30,
+    "steps": [
+      {"call": "Hold", "args": ["Use"]},
+      {"wait": {"seconds": 1}},
+      {"call": "Let", "args": ["Use"]},
+      {"wait": {"seconds": 0.5}},
+      {"call": "LetAll"}
+    ],
+    "notes": ["经 HeldInputLease 回答游戏自己的输入查询，不发键鼠事件。Hold 与 Let 的步骤读回含按下帧与游戏查询到该按下的帧（downQueryFrame）；downQueryFrame 为 -1 表示游戏没有读到这次按下。本命令不证明按下的后果，后果读各模组自己的日志。"]
+  },
+  {
+    "id": "input-select-special",
+    "title": "输入驱动：按一次原版特殊武器选择键",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.GameInputDrive",
+    "timeoutSeconds": 30,
+    "steps": [
+      {"call": "Hold", "args": ["SelectSpecial"]},
+      {"wait": {"seconds": 0.3}},
+      {"call": "Let", "args": ["SelectSpecial"]},
+      {"wait": {"seconds": 0.5}},
+      {"call": "LetAll"}
+    ],
+    "notes": ["同 input-use-press。重武器借还的来回切换读 Arsenal 日志，不读本命令。"]
+  },
+  {
+    "id": "input-frames-rockets",
+    "title": "输入驱动：按一次战甲火箭键（ForgeUI 按键动作 NAinfini.ForgeOrdnance/Rockets）",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.GameInputDrive",
+    "timeoutSeconds": 30,
+    "steps": [
+      {"call": "HoldKey", "args": ["NAinfini.ForgeOrdnance/Rockets"]},
+      {"wait": {"seconds": 0.3}},
+      {"call": "LetKey", "args": ["NAinfini.ForgeOrdnance/Rockets"]},
+      {"wait": {"seconds": 0.5}}
+    ],
+    "notes": ["覆盖 ForgeUI 逐帧按键状态，战甲插件读到的就是一次按下。按键动作不存在（战甲包未装）时 HoldKey 失败，步骤读回含 input.unknown-key-action。"]
+  },
+  {
+    "id": "input-frames-exit",
+    "title": "输入驱动：按住战甲下机键 1.5 秒（需按住 0.8 秒）",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.GameInputDrive",
+    "timeoutSeconds": 30,
+    "steps": [
+      {"call": "HoldKey", "args": ["NAinfini.ForgeOrdnance/Exit"]},
+      {"wait": {"seconds": 1.5}},
+      {"call": "LetKey", "args": ["NAinfini.ForgeOrdnance/Exit"]},
+      {"wait": {"seconds": 0.5}}
+    ],
+    "notes": ["同 input-frames-rockets。"]
+  },
+  {
+    "id": "input-release-all",
+    "title": "输入驱动：放开全部由驱动按住的输入",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.GameInputDrive",
+    "timeoutSeconds": 15,
+    "steps": [{"call": "LetAll"}],
+    "notes": ["世界变化（离关）时租约守卫也会自动还原；本命令用于收尾确认。"]
+  }
+]

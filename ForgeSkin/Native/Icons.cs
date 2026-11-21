@@ -11,8 +11,6 @@ static class Icons
 {
     static Dictionary<string, string> _shown = new(); // target key -> active skin id and pack time the icons show
     static readonly HashSet<string> Due = new(); // target keys whose icons are to be rendered again
-    static bool _globalsChanged;
-    static string _globals = "";
 
     /// <summary>After a reload or a pick: notes every target whose shown skin changed.</summary>
     public static void SkinsChanged()
@@ -22,8 +20,6 @@ static class Icons
         foreach (var key in now.Keys.Union(_shown.Keys))
             if (!now.TryGetValue(key, out var a) || !_shown.TryGetValue(key, out var b) || a != b) Due.Add(key);
         _shown = now;
-        var globals = Skins.GlobalsLook();
-        if (globals != _globals) (_globals, _globalsChanged) = (globals, true);
     }
 
     static readonly HashSet<string> Early = new(); // target keys whose icon was rendered while their skins were still loading
@@ -43,7 +39,7 @@ static class Icons
     public static void Tick()
     {
         if (Early.Count > 0) Early.RemoveWhere(Loaded);
-        if (Due.Count == 0 && !_globalsChanged) return;
+        if (Due.Count == 0) return;
         if (GearManager.Current == null) return;
         int rendered = 0;
         foreach (var slot in SkinnedGear.GearSlots)
@@ -53,14 +49,13 @@ static class Icons
             foreach (var range in all)
             {
                 if (range == null || SkinnedGear.Offline(range.PlayfabItemInstanceId) is not { } id) continue;
-                // Only the icons of a gear whose shown skin changed (any gear when a global skin did); a gear whose icons another
+                // Only the icons of a gear whose shown skin changed; a gear whose icons another
                 // package supplies (ForgeUI GearIcons.Supply) is drawn again by that package's own model.
-                if (!_globalsChanged && !Due.Contains(SkinTarget.GearKey(id))) continue;
+                if (!Due.Contains(SkinTarget.GearKey(id))) continue;
                 if (ForgeUI.GearIcons.Redraw(range)) rendered++;
             }
         }
         Due.Clear();
-        _globalsChanged = false;
         if (rendered > 0) ForgeSkinPlugin.Info($"icons: rendering {rendered} gear icons again for their skins");
     }
 }

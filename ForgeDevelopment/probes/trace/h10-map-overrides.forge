@@ -1,0 +1,149 @@
+{
+  "profile": "h10-map-overrides",
+  "enabledByDefault": true,
+  "entries": [
+    {
+      "entryId": "h10.map.light.expedition-start",
+      "target": {
+        "declaringType": "WardenObjectiveManager",
+        "method": "OnLocalPlayerStartExpedition",
+        "parameterTypes": [],
+        "returnType": "System.Void",
+        "static": true
+      },
+      "record": "observe",
+      "phases": "after",
+      "maxPerSecond": 4
+    },
+    {
+      "entryId": "h10.map.light.course-node",
+      "target": {
+        "declaringType": "Player.PlayerAgent",
+        "method": "set_CourseNode",
+        "parameterTypes": ["AIGraph.AIG_CourseNode"],
+        "returnType": "System.Void",
+        "static": false
+      },
+      "record": "observe",
+      "phases": "after",
+      "maxPerSecond": 32
+    },
+    {
+      "entryId": "h10.map.light.base-enabled",
+      "target": {
+        "declaringType": "LevelGeneration.LG_Light",
+        "method": "SetEnabled",
+        "parameterTypes": ["System.Boolean"],
+        "returnType": "System.Void",
+        "static": false
+      },
+      "record": "observe",
+      "phases": "after",
+      "maxPerSecond": 64
+    },
+    {
+      "entryId": "h10.map.light.point-enabled",
+      "target": {
+        "declaringType": "LevelGeneration.LG_PointLight",
+        "method": "SetEnabled",
+        "parameterTypes": ["System.Boolean"],
+        "returnType": "System.Void",
+        "static": false
+      },
+      "record": "observe",
+      "phases": "after",
+      "maxPerSecond": 64
+    },
+    {
+      "entryId": "h10.map.light.point-enabled-reason",
+      "target": {
+        "declaringType": "LevelGeneration.LG_PointLight",
+        "method": "SetEnabled",
+        "parameterTypes": ["System.Boolean", "System.String"],
+        "returnType": "System.Void",
+        "static": false
+      },
+      "record": "observe",
+      "phases": "after",
+      "maxPerSecond": 64
+    },
+    {
+      "entryId": "h10.map.light.spot-enabled",
+      "target": {
+        "declaringType": "LevelGeneration.LG_SpotLight",
+        "method": "SetEnabled",
+        "parameterTypes": ["System.Boolean"],
+        "returnType": "System.Void",
+        "static": false
+      },
+      "record": "observe",
+      "phases": "after",
+      "maxPerSecond": 64
+    },
+    {
+      "entryId": "h10.map.light.spot-enabled-reason",
+      "target": {
+        "declaringType": "LevelGeneration.LG_SpotLight",
+        "method": "SetEnabled",
+        "parameterTypes": ["System.Boolean", "System.String"],
+        "returnType": "System.Void",
+        "static": false
+      },
+      "record": "observe",
+      "phases": "after",
+      "maxPerSecond": 64
+    },
+    {
+      "entryId": "h10.map.light.ambient-enabled-common",
+      "target": {
+        "declaringType": "LevelGeneration.LG_SpotLightAmbient",
+        "method": "SetEnabledCommon",
+        "parameterTypes": ["System.Boolean"],
+        "returnType": "System.Void",
+        "static": false
+      },
+      "record": "observe",
+      "phases": "after",
+      "maxPerSecond": 64
+    },
+    {
+      "entryId": "h10.map.light.zone-mode",
+      "target": {
+        "declaringType": "EnvironmentStateManager",
+        "method": "AttemptSetExpeditionLightModeInZone",
+        "parameterTypes": ["GlobalZoneIndex", "System.Boolean", "pLightSequenceData"],
+        "returnType": "System.Void",
+        "static": true
+      },
+      "record": "observe",
+      "phases": "after",
+      "maxPerSecond": 32
+    },
+    {
+      "entryId": "h10.map.failure.decision",
+      "target": {
+        "declaringType": "WardenObjectiveManager",
+        "method": "CheckExpeditionFailed",
+        "parameterTypes": [],
+        "returnType": "System.Boolean",
+        "static": true
+      },
+      "record": "observe",
+      "phases": "after",
+      "maxPerSecond": 4
+    },
+    {
+      "entryId": "h10.map.interaction.terminal-prompt",
+      "target": {
+        "declaringType": "Interact_ComputerTerminal",
+        "method": "get_InteractionMessage",
+        "parameterTypes": [],
+        "returnType": "System.String",
+        "static": false
+      },
+      "record": "observe",
+      "phases": "after",
+      "maxPerSecond": 16
+    }
+  ]
+}

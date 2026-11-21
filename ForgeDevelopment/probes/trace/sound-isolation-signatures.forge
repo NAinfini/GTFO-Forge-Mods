@@ -1,0 +1,16 @@
+{
+  "profile": "sound-isolation-signatures",
+  "enabledByDefault": false,
+  "entries": [
+    {
+      "type": "Enemies.ES_HibernateWakeUp",
+      "methods": [
+        "DoHibernateWakeupPropagation"
+      ],
+      "record": "count",
+      "signatureOnly": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    }
+  ]
+}

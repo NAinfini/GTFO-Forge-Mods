@@ -1,0 +1,197 @@
+{
+  "profile": "dimension-landings",
+  "enabledByDefault": true,
+  "entries": [
+    {
+      "type": "LG_Dimension",
+      "methods": [
+        "AddSpawnPoint",
+        "AddSpawnPoints",
+        "GetPlayerSpawnPoint",
+        "GetRandomSpawnPoint",
+        "GetSpawnPoint"
+      ],
+      "record": "args+result",
+      "instance": [
+        "Pointer",
+        "WasCollected",
+        "name",
+        "m_playerSpawnType",
+        "m_spawnPoints.Pointer",
+        "m_spawnPoints.Count",
+        "m_spawnPoints"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.Dimension",
+      "methods": [
+        "SpawnDimensionRoot",
+        "GetValidDimensionWarpPoint",
+        "GetValidWarpPointFromWorldEventObject",
+        "OnLevelCleanup"
+      ],
+      "record": "args+result",
+      "instance": [
+        "DimensionIndex",
+        "CreationOrderIndex",
+        "DimensionData.DimensionGeomorph",
+        "DimensionLevel.Pointer",
+        "DimensionLevel.WasCollected",
+        "DimensionLevel.name",
+        "DimensionLevel.m_playerSpawnType",
+        "DimensionLevel.m_spawnPoints.Pointer",
+        "DimensionLevel.m_spawnPoints.Count",
+        "DimensionLevel.m_spawnPoints"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LG_DimensionRoot",
+      "methods": [
+        "Setup",
+        "OnLevelGenDone",
+        "OnDestroy"
+      ],
+      "record": "args+result",
+      "instance": [
+        "Pointer",
+        "WasCollected",
+        "name",
+        "LinkedDimensionIndex"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_Factory",
+      "methods": [
+        "FactoryDone"
+      ],
+      "record": "args+result",
+      "instance": [
+        "BuildDone",
+        "m_currentBatchName"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 15,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.Builder",
+      "methods": [
+        "OnFactoryDone",
+        "BuildDone",
+        "OnLevelCleanup"
+      ],
+      "record": "args+result",
+      "instance": [],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_Floor",
+      "methods": [
+        "OnLevelGenDone",
+        "StaticLevelSetup",
+        "SetupStaticLevel"
+      ],
+      "record": "args+result",
+      "instance": [
+        "IsBuilt"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "WorldEventManager",
+      "methods": [
+        "ExecuteEvent",
+        "ExecuteEvent_Internal",
+        "DoExcecuteEvent"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_stateReplicator.State",
+        "m_stateReplicator"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Player.PlayerAgent",
+      "methods": [
+        "RequestWarpToSync",
+        "TryWarpTo",
+        "WarpTo",
+        "WarpBack",
+        "TeleportTo"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "Pointer",
+        "PlayerSlotIndex",
+        "Sync.SlotIndex",
+        "IsLocallyOwned",
+        "CourseNode.m_zone.DimensionIndex",
+        "CourseNode.m_zone.Dimension.DimensionLevel.Pointer",
+        "transform.position",
+        "transform.forward",
+        "Damage.Health",
+        "m_alive",
+        "Locomotion.Downed",
+        "Damage.Infection"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Player.PlayerSync",
+      "methods": [
+        "SendDimensionChange",
+        "IncomingDimensionChange",
+        "SendSyncWarp",
+        "IncomingSyncWarp"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "Pointer",
+        "SlotIndex",
+        "m_agent.Pointer",
+        "m_agent.PlayerSlotIndex",
+        "m_agent.CourseNode.m_zone.DimensionIndex",
+        "m_agent.transform.position",
+        "m_agent.transform.forward"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "GameStateManager",
+      "methods": [
+        "ChangeState",
+        "DoChangeState"
+      ],
+      "record": "args+result",
+      "instance": [
+        "CurrentStateName",
+        "CurrentState"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    }
+  ]
+}

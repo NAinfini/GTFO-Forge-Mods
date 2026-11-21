@@ -580,12 +580,8 @@ sealed partial class SkinnedGear
             return;
         }
         var key = _key; // Refresh's
+        // Only this gear's own skin dresses it: its sight, magazine, light and ammo materials too, on this instance alone.
         var overrides = new Dictionary<string, (Skin Skin, MaterialOverride Override)>();
-        // The local player's global skins are theirs: a teammate's gear wears only what their look names.
-        if (!Remote)
-            foreach (var id in Skins.Globals)
-                if (Skins.ById.TryGetValue(id, out var global))
-                    foreach (var m in Skins.Painted(global).Materials) overrides[m.Material] = (global, m);
         Skin? weapon = null;
         SkinDocument? doc = null; // the weapon skin as its owner coloured it
         _mate = _dressed ?? (Remote ? Looks.WornBy(_owner, key) : null);
@@ -871,9 +867,8 @@ sealed partial class SkinnedGear
         }
         foreach (var (name, o) in overrides)
         {
-            // A global skin (mags, sights, lights, ammo) covers every gear; only the ones that use its materials take it. A placed
-            // mine or a pickup shares only some materials with the gear its skin was made for: its kept slots are logged above.
-            if (looks.ContainsKey(o.Override) || o.Skin.Doc.Target.Weapon == null || _world) continue;
+            // A placed mine or a pickup shares only some materials with the gear its skin was made for: its kept slots are logged above.
+            if (looks.ContainsKey(o.Override) || _world) continue;
             // The ejected casing exists only once fired: its own pool takes the skin (SkinCasings).
             if (o.Override.Part == "ammo_shell") continue;
             // No scene-wide search for where else it is drawn: over every renderer of a level that stalls the game for
@@ -1592,7 +1587,7 @@ sealed partial class SkinnedGear
         }
     }
 
-    // The skins the local player's `item` shows now (its own and the global ones; none while it is in its original look).
+    // The skins the local player's `item` shows now (its own; none while it is in its original look).
     public static IEnumerable<Skin> ShownOn(IntPtr item)
     {
         foreach (var gear in Live)

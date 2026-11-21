@@ -1,0 +1,159 @@
+{
+  "profile": "author-room-wall",
+  "enabledByDefault": false,
+  "entries": [
+    {
+      "type": "GameData.ComplexResourceSetDataBlock",
+      "methods": ["PrepareForBuild", "PopulateInitialResourceArrays", "PopulateFullResourceArrays", "GetCustomGeomorph"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["persistentID", "m_prefabSpawnerCounter.Count", "m_allCustomGeomorphsPerPath.Count"],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_LevelBuilder",
+      "methods": ["PlaceRoot"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["m_currentFloor.ID", "m_currentFloor.IsBuilt"],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LG_Geomorph",
+      "methods": ["ScanPrefabSpawners", "ScanChildrenAreas", "SetPlaced"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["name", "m_buildScanPerformed", "m_placed", "m_areasSetup", "m_gatesSetup"],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_BuildGeomorphJob",
+      "methods": ["Build"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["m_dimensionIndex", "m_geomorph.name", "m_geomorph.m_buildScanPerformed"],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_PrefabSpawner",
+      "methods": ["OnBuild"],
+      "record": "args+result",
+      "instance": ["m_prefab.name", "m_area.UID", "m_area.m_geomorph.m_geoPrefab.name", "m_isBuilt", "m_disableCollision", "m_useNoGraphLayerOverride"],
+      "maxPerSecond": 80,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LG_BuildUnityGraphJob",
+      "methods": ["Build", "NavmeshDone"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["m_isSetup", "m_timeCost", "IgnoreUnityBuildJob"],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "AIGraph.AIG_NodeVolume",
+      "methods": ["PrepareBuild", "StartBuild", "EndBuild"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["DimensionIndex", "m_bounds", "m_voxelSize", "m_nodeClusters.Count"],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_BuildAIGraphJob_Prepare",
+      "methods": ["Build"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["m_dimensionIndex", "m_doneCount"],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_BuildAIGraphJob_Start",
+      "methods": ["Build"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["m_doneCount"],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_BuildAIGraphJob_End",
+      "methods": ["Build"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["m_doneCount"],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "AIGraph.LG_CreateCourseGraphJob",
+      "methods": ["Build"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["m_floor.ID", "m_dimension.DimensionIndex"],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "CullingSystem.C_BuildCullerNode",
+      "methods": ["Build"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["m_node.CourseNode.Name"],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "CullingSystem.C_BuildCullerPortal",
+      "methods": ["Build"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["m_dimensionIndex", "m_needsNodeFlip"],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "CullingSystem.C_NodeGenerateCullers",
+      "methods": ["Build"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["m_state", "m_clusterStep", "m_clusterMax", "m_singleCullerStep", "m_singleCullerMax"],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_CollectZoneLightsJob",
+      "methods": ["Build"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["m_zone.DimensionIndex", "m_zone.LocalIndex"],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_BuildZoneLightsJob",
+      "methods": ["Build"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["m_zone.DimensionIndex", "m_zone.LocalIndex", "m_zone.m_lightsInZone.Length"],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.Builder",
+      "methods": ["Build", "StartFactory", "CleanupBeforeGeneration"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["BuildSeed", "CombinedCheckSum"],
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    }
+  ]
+}

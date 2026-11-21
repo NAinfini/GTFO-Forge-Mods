@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1
+
+- No source change. Rebuilt with Forge Core 1.0.4 (now depends on Forge Core 1.0.4).
+
 ## 1.0.0
 
 - NVIDIA DLSS Super Resolution in place of the game's own anti-aliasing: DLAA at your screen's resolution, or Quality, Balanced, Performance and Ultra Performance, which render the world smaller and bring it up to your screen's. The HUD stays at full resolution. `Off` returns the game's own rendering.

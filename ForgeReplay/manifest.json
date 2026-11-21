@@ -6,6 +6,6 @@
   "dependencies": [
     "BepInEx-BepInExPack_GTFO-3.2.4",
     "GTFOModding-GTFO_API-0.6.1",
-    "NAinfini-ForgeCore-1.0.3"
+    "NAinfini-ForgeCore-1.0.4"
   ]
 }

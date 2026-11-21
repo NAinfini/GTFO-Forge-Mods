@@ -1,0 +1,39 @@
+# Time bomb after a checkpoint reload (official mechanism m-time-bomb): the countdown lives in the level half of the mechanism,
+# so reloading a checkpoint taken during the countdown starts it again from the rounds left at the save, and it still goes off.
+# Build the level in the map editor first: put "定时炸弹" on a door within 10 m of where the team lands, pick a defuse terminal
+# and a wave of this level, warning interval 5 seconds, 12 warnings (60 s in all). Export, load the level, then run:
+#   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package <package> --level <level> --work-dir artifacts/work/drivesession/<name>
+#   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name> run Mods/ForgeDevelopment/scripts/time-bomb-checkpoint.test
+# Timeline: the door opens at 0 s; the save at about 12 s holds the flag 2 and 10 rounds left; after the reload the bomb needs
+# those 10 rounds (50 s) again. Before the fix the flag came back as 2 with no timer, so no warning and no wave ever followed.
+# The bomb's two level variables (flag and rounds left) are the mechanism's own: their var.g identities depend on the package
+# and the level, so the script records every level variable (as=armed / as=resumed) and the run record keeps the values.
+stop-on-fail
+god on
+
+# open the bomb door: the countdown starts, nothing has gone off yet
+door open near:10
+wait 12s
+alarms as=counting
+expect $counting.waves == 0
+state variables var.g as=armed
+
+# save during the countdown
+checkpoint save as=saved
+checkpoint confirm as=stored
+expect $stored.result contains "save"
+
+# whole team down, load the checkpoint
+checkpoint wipe
+wait 7s
+checkpoint restore
+checkpoint confirm as=restored
+expect $restored.result contains "restore"
+state variables var.g as=resumed
+
+# the countdown goes on from the rounds left at the save: still quiet 20 s later, the wave comes within the remaining time
+wait 20s
+alarms as=still_counting
+expect $still_counting.waves == 0
+wait until alarms waves >= 1 timeout=45s
+expect log --all !contains "Exception"

@@ -35,7 +35,6 @@ public static class Install
         var json = File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path)) as JsonObject : null;
         json ??= new JsonObject();
         if (json["targets"] is not JsonObject) json["targets"] = new JsonObject();
-        if (json["global"] is not JsonArray) json["global"] = new JsonArray();
         return json;
     }
 
@@ -44,18 +43,17 @@ public static class Install
         AtomicFile.WriteText(ActiveFile(profile), json.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
     }
 
+    // A skin for no gear (older editors made those for every gear) is refused; active.json's old `global` list of them, which
+    // the plugin no longer reads, goes at the first write.
     static void SetActive(string profile, SkinDocument doc, bool active)
     {
+        if (active && doc.Target.Key() == null)
+            throw new BackendException("no-gear-target", $"{doc.Name}: the skin names no gear; make it a skin of the gun that carries it");
         var json = ReadActive(profile);
         var targets = json["targets"]!.AsObject();
-        var global = json["global"]!.AsArray();
         foreach (var key in targets.Where(kv => (string?)kv.Value == doc.Id).Select(kv => kv.Key).ToList()) targets.Remove(key);
-        foreach (var node in global.Where(n => (string?)n == doc.Id).ToList()) global.Remove(node);
-        if (active)
-        {
-            if (doc.Target.Key() is { } key) targets[key] = doc.Id;
-            else global.Add(doc.Id);
-        }
+        if (json.Remove("global", out var global)) Log.Write($"active.json: dropped its global list {global?.ToJsonString()}; skins for every gear are no longer supported");
+        if (active) targets[doc.Target.Key()!] = doc.Id;
         WriteActive(profile, json);
     }
 
@@ -139,9 +137,9 @@ public static class Install
     {
         OldSkinMove.Run(profile);
         var dir = Skins(profile);
-        var json = Directory.Exists(dir) ? ReadActive(profile) : new JsonObject { ["targets"] = new JsonObject(), ["global"] = new JsonArray() };
+        var json = Directory.Exists(dir) ? ReadActive(profile) : new JsonObject { ["targets"] = new JsonObject() };
         var targets = json["targets"]!.AsObject().Where(kv => kv.Value is JsonValue).ToDictionary(kv => kv.Key, kv => (string?)kv.Value);
-        var active = targets.Values.Concat(json["global"]!.AsArray().Select(n => (string?)n)).ToHashSet();
+        var active = targets.Values.ToHashSet();
         var packs = Directory.Exists(dir) ? Read(dir) : [];
         var dropped = tidy ? Dedupe(packs) : new();
         var mods = SkinFolders.ModPacks(Path.Combine(profile, "BepInEx", "plugins")).Where(m => m.Problem == null).Select(m => m.Pack).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -157,7 +155,7 @@ public static class Install
             if (d?.Target.Key() is { } key) shown.TryAdd(key, d.Id);
         return all.Select(p => p.Doc is { } d
             ? new InstalledSkin(d.Id, d.Name, p.File, d.Target.Weapon, active.Contains(d.Id), null, dropped.GetValueOrDefault(d.Id), SourceOf(p.File, d.Id, p.Mod), p.Mod,
-                d.Target.Key() is { } key ? shown.GetValueOrDefault(key) == d.Id : active.Contains(d.Id), Stamp(p.File))
+                d.Target.Key() is { } key && shown.GetValueOrDefault(key) == d.Id, Stamp(p.File))
             : new InstalledSkin(Path.GetFileNameWithoutExtension(p.File), Path.GetFileName(p.File), p.File, null, false, p.Error, null, SourceOf(p.File, null, p.Mod), p.Mod, false, Stamp(p.File))).ToList();
     }
 

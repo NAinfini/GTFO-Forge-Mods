@@ -57,8 +57,10 @@ public static class PackBuilder
         {
             var item = Catalog.Item(catalog, weapon);
             (doc.Target.GearId, doc.Target.ItemId) = (item.GearId, item.ItemId);
-            if (item.GearId == null && item.ItemId == null) doc.Target.Weapon = null; // attachment, lens or ammo skin: applies wherever its materials are used
         }
+        // A skin dresses one gear or item: sights, magazines, lights and ammo are edited as part of a gun's skin, on that gun alone.
+        if (doc.Character == null && doc.Target.GearId == null && doc.Target.ItemId == null)
+            throw new BackendException("no-gear-target", $"{doc.Name}: the skin targets {doc.Target.Weapon ?? "nothing"}, which is no gun, tool or item; make it a skin of the gun that carries it");
         if (string.IsNullOrWhiteSpace(doc.Id)) doc.Id = "skin-" + Guid.NewGuid().ToString("N")[..12];
         // A pack's player colours hold their defaults, so the plugin shows the skin as built until the player picks.
         foreach (var c in doc.PlayerColors ?? []) c.Paint(doc, c.Default);

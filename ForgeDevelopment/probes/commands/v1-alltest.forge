@@ -1,0 +1,17 @@
+[
+  {
+    "id": "v1t-enable-observations",
+    "title": "V1 合测：进关前开启 Y15 层构建观察",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.RecTracerRuntime",
+    "requires": [
+      "Recorder.Enabled 与 TraceEnabled 开启，TraceAllProfiles 关闭；必须在关卡生成前运行（run-drive-session.py 启动时自动运行）。"
+    ],
+    "steps": [
+      { "call": "SetProfileEnabled", "args": ["author-y15-layer-fields", true] }
+    ],
+    "notes": [
+      "只改变诊断 profile 开关，不创建、移动或删除游戏对象。命令 Passed 只证明开关调用完成；读回另行用 drive_cli 指令。"
+    ]
+  }
+]

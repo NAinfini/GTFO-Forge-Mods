@@ -31,7 +31,6 @@
   "picker.previewLoading": "预览图准备中……",
   "picker.previewOld": "这个皮肤包没有预览图，用新版 ForgeSkin 编辑器重新导出一次就有了。",
   "picker.coloursInLobby": "选的颜色在大厅里自己的装备上看得到。",
-  "picker.globalsStay": "所有装备通用的 {0} 款皮肤仍然套在上面。",
   "picker.off": "皮肤已关闭，所有装备显示原版外观。点右上角的齿轮打开「显示皮肤」。",
   "settings.all": "皮肤设置 · 所有装备",
   "settings.enabled": "显示皮肤",

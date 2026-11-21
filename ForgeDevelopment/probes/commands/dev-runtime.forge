@@ -1,0 +1,105 @@
+[
+  {
+    "id": "runtime-overhead-window",
+    "title": "采集开销窗口：60 秒内每 5 秒记录一次帧数与已写记录数",
+    "points": [
+      "development.collector-overhead",
+      "forgeengine.tick-overhead-in-game"
+    ],
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.RecSession",
+    "steps": [
+      {
+        "call": "PendingRecords"
+      },
+      {
+        "repeat": {
+          "times": 12,
+          "steps": [
+            {
+              "target": "static:ForgeDevelopment.Native.RecTime",
+              "call": "Frame"
+            },
+            {
+              "call": "Active"
+            },
+            {
+              "call": "PendingRecords"
+            },
+            {
+              "call": "BytesWritten"
+            },
+            {
+              "call": "Dropped"
+            },
+            {
+              "wait": {
+                "seconds": 5.0
+              }
+            }
+          ]
+        }
+      },
+      {
+        "screenshot": "overhead-window"
+      }
+    ],
+    "notes": [
+      "只读采集器自身状态；call读取现有静态属性，不能用read把RuntimeType当状态对象。命令done只说明读取步骤完成，不代表采集性能或游戏语义通过。"
+    ]
+  },
+  {
+    "id": "runtime-session-state",
+    "title": "会话状态与丢弃计数（退出前读一次，和收尾记录对照）",
+    "points": [
+      "runtime.log-managed-thread"
+    ],
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.RecSession",
+    "steps": [
+      {
+        "call": "Active"
+      },
+      {
+        "call": "SessionId"
+      },
+      {
+        "call": "Directory"
+      },
+      {
+        "call": "BytesWritten"
+      },
+      {
+        "call": "Dropped"
+      },
+      {
+        "call": "BudgetReached"
+      },
+      {
+        "call": "PendingRecords"
+      },
+      {
+        "screenshot": "session-state"
+      }
+    ],
+    "notes": [
+      "只读采集器自身状态；call读取现有静态属性，不能用read把RuntimeType当状态对象。命令done只说明读取步骤完成，不代表采集性能或游戏语义通过。"
+    ]
+  },
+  {
+    "id": "runtime-shared-counters-now",
+    "title": "共享原生入口计数：按需写一次当前快照（boundary=on-demand）",
+    "host": "any",
+    "target": "static:ForgeEngine.GameBindings.NativeHookRegistration",
+    "steps": [
+      {
+        "call": "LogSharedCountersNow"
+      }
+    ],
+    "notes": [
+      "结果是写出的行数；每行是一条 native-hook.shared-counters（Info），与生命周期边界行同一写入器，仅 boundary=on-demand 不同。Runtime 未启动或 Info 关闭时命令明确失败。",
+      "读法：callbacks 是该行 consumer 这一份订阅租约在当前租期内收到的次数；providerCallbacks 是该入口进程累计被调用次数（含无订阅者的调用），比较同一租期两次快照的差值。phase 是订阅所在的阶段，consumer=none / status=no-subscribers 只表示该 phase 当下没有订阅者，不表示整个入口没有订阅者。installations 是物理安装数，应为 1。",
+      "在检查开始前与结束后各执行一次，取两次之差；不会每帧轮询。"
+    ]
+  }
+]

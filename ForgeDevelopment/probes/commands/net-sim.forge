@@ -1,0 +1,40 @@
+[
+  {
+    "id": "net-sim-250",
+    "title": "网络模拟：本机发出的包延迟 250 毫秒（两台机器各开一次，才是双向各 250）",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.NetSim",
+    "steps": [{ "call": "Set", "args": [250, 0, 0] }],
+    "notes": [
+      "只管本机发出的包（游戏自己的和所有模组的，都经 SNet_Core_STEAM.SendBytes）；两台机器都要执行，各自延迟自己发出的方向。语音若不走这条路则不受影响。",
+      "结果行写明实际参数；钩子装不上时结果以 refused 开头，模拟不生效，日志里记一行错误。",
+      "有别的玩家在会话里时指令台是关的，这条指令跑不了：联机测试改用设置文件 [Network Simulation] 的 DelayMs / JitterMs / LossPercent，两台机器各填一次，重启后从第一帧起生效。"
+    ]
+  },
+  {
+    "id": "net-sim-250-jitter-loss",
+    "title": "网络模拟：延迟 250 毫秒、抖动 30 毫秒、不可靠包丢 2%",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.NetSim",
+    "steps": [{ "call": "Set", "args": [250, 30, 2] }],
+    "notes": [
+      "可靠包不丢，丢包率对它表现为多等一次延迟；发给同一玩家的可靠包保持发送顺序，不分通道。"
+    ]
+  },
+  {
+    "id": "net-sim-report",
+    "title": "网络模拟：读当前参数与计数",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.NetSim",
+    "steps": [{ "call": "Report" }],
+    "notes": ["held 是被延迟的包数，released 已放行，dropped 已丢弃，waiting 正在等。"]
+  },
+  {
+    "id": "net-sim-off",
+    "title": "网络模拟：关闭，等着的包立即按序发出",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.NetSim",
+    "steps": [{ "call": "Off" }],
+    "notes": ["钩子留在原处，关闭后全部直通。"]
+  }
+]

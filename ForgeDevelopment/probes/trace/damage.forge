@@ -1,0 +1,265 @@
+{
+  "profile": "damage",
+  "enabledByDefault": true,
+  "entries": [
+    {
+      "type": "Dam_EnemyDamageBase",
+      "methods": [
+        "BulletDamage",
+        "MeleeDamage",
+        "ExplosionDamage",
+        "ReceiveBulletDamage",
+        "ReceiveMeleeDamage",
+        "ReceiveExplosionDamage",
+        "ReceiveFireDamage",
+        "ReceiveFreezeDamage",
+        "SendDestroyLimb",
+        "ReceiveDestroyLimb"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "Owner",
+        "Health",
+        "HealthMax",
+        "DamageMax",
+        "m_lastTimeInHeat",
+        "m_attachedGlueVolume",
+        "IsStuckInGlue"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 80,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Dam_EnemyDamageBase",
+      "methods": [
+        "ProcessReceivedDamage"
+      ],
+      "record": "args+result",
+      "instance": [
+        "Owner.GlobalID",
+        "Health",
+        "HealthMax"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 80,
+      "onOverflow": "count",
+      "phases": "before+after"
+    },
+    {
+      "type": "Dam_EnemyDamageLimb",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "SetLimbDamageType"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_limbID",
+        "m_type",
+        "m_health",
+        "m_healthMax",
+        "m_weakspotDamageMulti",
+        "m_armorDamageMulti",
+        "IsDestroyed",
+        "DebugName",
+        "DestructionType"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 80,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Dam_EnemyDamageLimb",
+      "methods": [
+        "SetLimbDamageType"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_limbID",
+        "m_type",
+        "m_weakspotDamageMulti",
+        "m_armorDamageMulti",
+        "m_base.Owner.GlobalID"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 80,
+      "onOverflow": "count",
+      "phases": "before+after"
+    },
+    {
+      "type": "Dam_EnemyDamageLimb_Custom",
+      "methods": [
+        "ApplyWeakspotAndArmorModifiers",
+        "TestDamageModifiers",
+        "DestroyLimb"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_limbID",
+        "m_health",
+        "m_healthMax",
+        "m_weakspotDamageMulti",
+        "m_armorDamageMulti",
+        "IsDestroyed",
+        "m_clampDamageToLimbMaxHealth"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 80,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Dam_PlayerDamageBase",
+      "methods": [
+        "ReceiveAddHealth",
+        "CheckDestruction",
+        "OnDead",
+        "ModifyInfection",
+        "ReceiveSetHealth",
+        "ReceiveTentacleAttackDamage",
+        "ReceiveTentacleTrapGrabDamage",
+        "ReceiveTentacleTankGrabDamage",
+        "ReceiveTentacleGrabStop",
+        "ReceiveParasiteTrapDamage",
+        "ReceiveParasiteDamage",
+        "ReceiveShooterProjectileDamage",
+        "ReceiveNoAirDamage",
+        "ReceiveFallDamage",
+        "ReceiveStickyDamage",
+        "ReceivePushDamage"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "Owner",
+        "Owner.PlayerSlotIndex",
+        "Health",
+        "HealthMax",
+        "Infection",
+        "Air",
+        "DamageMax"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Dam_SyncedDamageBase",
+      "methods": [
+        "BulletDamage",
+        "MeleeDamage",
+        "ExplosionDamage",
+        "ReceiveAddHealth",
+        "SendSetDead",
+        "SendSetHealth",
+        "ReceiveSetHealth"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "instance": null,
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SurvivalWave",
+      "methods": [
+        "StartWave",
+        "RegisterGroup",
+        "RegisterCost",
+        "StopEvent",
+        "TryEndEvent",
+        "SetSettings",
+        "TryPlayWaveDialogSound",
+        "TriggerDirRandomization",
+        "GetScoredSpawnPoint",
+        "SpawnGroup"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "SNetwork_IReplicatorSupplier_*",
+        "Method_Internal_*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_isNewWave",
+        "m_waveSpawnTimer",
+        "m_populationPointsPerWaveMax",
+        "m_spawnType",
+        "m_courseNode.NodeID",
+        "m_courseNode.m_nodeCluster.ID",
+        "m_settings.persistentID",
+        "m_settings.name",
+        "m_settings.m_overrideWaveSpawnType",
+        "m_settings.m_survivalWaveSpawnType"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Mastermind",
+      "methods": [
+        "AddEvent",
+        "RemoveEvent",
+        "RegisterGroup",
+        "UnregisterGroup",
+        "HasEventOfType",
+        "UpdateEvents",
+        "MaintainGroups",
+        "SpawnGroup"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "GameStateUpdate*"
+      ],
+      "record": "args+result",
+      "instance": null,
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Dam_StaticEnemyDamage",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "instance": null,
+      "firstStack": null,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    }
+  ]
+}

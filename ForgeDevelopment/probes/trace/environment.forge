@@ -1,0 +1,198 @@
+{
+  "profile": "environment",
+  "enabledByDefault": true,
+  "entries": [
+    {
+      "type": "EnvironmentStateManager",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*", "SNetwork_*", "UpdateAtmosphereAndClouds", "UpdateWetnessAndDust", "UpdateFog"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_Light",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*", "SetEnabled", "AddCullingLight", "RegisterLightEmitterMesh", "GetUnityLights"],
+      "record": "args+result",
+      "instance": ["m_category", "m_color"],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_PointLight",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*", "AddCullingLight", "GetUnityLights"],
+      "record": "args+result",
+      "instance": ["m_category", "m_color"],
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_SpotLight",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*", "AddCullingLight", "GetUnityLights"],
+      "record": "args+result",
+      "instance": ["m_category", "m_color"],
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_SpotLightAmbient",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*", "AddCullingLight", "GetUnityLights"],
+      "record": "args+result",
+      "instance": ["m_category", "m_color"],
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_LightCollection",
+      "methods": ["Create", "RemoveLights", "ScanForLights", "SetMode", "UpdateRandomMode", "UpdateModeOnDistance", "DoValueSort", "ResetUpdateValues"],
+      "record": "args+result",
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_LightEmitterMesh",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*"],
+      "record": "args+result",
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "FogRepeller_Sphere",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*", "_LightColorUpdate*", "StartRepelling", "StopRepelling"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "FogRepeller_Sphere",
+      "methods": ["StartRepelling", "StopRepelling"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["RepellerEnabled", "CurrentState", "m_currentRange", "m_position", "m_isInitialized"],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "FogSphereHandler",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "m_colorMin.r", "m_colorMin.g", "m_colorMin.b", "m_colorMin.a",
+        "m_colorMax.r", "m_colorMax.g", "m_colorMax.b", "m_colorMax.a",
+        "m_densityAmountMin", "m_densityAmountMax",
+        "m_densityMin", "m_densityMax",
+        "m_intensityMin", "m_intensityMax",
+        "m_rangeMin", "m_rangeMax",
+        "m_totalLength", "m_startTime", "IsPlaying", "m_sphere.Pointer"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "FogSphereAllocator",
+      "methods": ["TryAllocate", "Deallocate", "SetPositionRange"],
+      "record": "args+result",
+      "instance": ["IsAllocated"],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "EffectVolumeManager",
+      "methods": ["RegisterVolume", "UnregisterVolume"],
+      "record": "args",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "HeavyFogRepellerGlobalState",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*", "AttemptInteract", "OnStateChange"],
+      "record": "args+result",
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "HeavyFogRepellerGlobalState",
+      "methods": ["AttemptInteract", "OnStateChange"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": ["CurrentState.status", "CurrentState.owner", "CurrentState.player", "CurrentState.staticPosition", "m_repellerSphere.RepellerEnabled", "m_repellerSphere.CurrentState", "m_staticPosition"],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "DecontaminatorEvent",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*", "_UpdateFog*"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "CellSound",
+      "methods": ["Post", "PostDelayed", "EnqueueEvent", "ProcessEventQueue", "RemoveQueuedEvent", "Register", "Remove", "StopAll", "SetState", "SetGlobalRTPCValue"],
+      "record": "count",
+      "firstStack": true,
+      "maxPerSecond": 100,
+      "onOverflow": "count"
+    },
+    {
+      "type": "CellSoundEmitter",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*"],
+      "record": "count",
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_AnimationSequencer",
+      "methods": ["DoTriggerSequence", "StartSequence", "StopSequence", "TriggerAnimationAction"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_WorldEventAnimationTrigger",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LG_EnvironmentFeedbackPlayer",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*"],
+      "record": "args+result",
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "GameData.FogSettingsDataBlock",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*"],
+      "record": "count",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    }
+  ]
+}

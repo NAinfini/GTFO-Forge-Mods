@@ -1,0 +1,33 @@
+{
+  "profile": "cov4-stamina",
+  "enabledByDefault": true,
+  "entries": [
+    {
+      "type": "PlayerStamina",
+      "methods": [
+        "UseWeaponChargedSwingStamina",
+        "UseWeaponLightSwingStamina",
+        "UsePushStamina",
+        "UseStamina"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "DramaManager",
+      "methods": [
+        "get_InActionState"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [],
+      "firstStack": false,
+      "maxPerSecond": 120,
+      "onOverflow": "count"
+    }
+  ]
+}

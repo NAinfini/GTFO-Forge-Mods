@@ -1,0 +1,152 @@
+[
+  {
+    "id": "model-workshop-components",
+    "title": "M11：B1 模型馆场景组件辅助观察",
+    "host": "any",
+    "target": "allOfType:UnityEngine.MeshFilter",
+    "requires": [
+      "冻结同一份 V1 包及模型目录：记录模型 id/revision、catalog SHA-256、每个资源的完整原生名与子级选择、游戏 revision/GameAssembly SHA-256、ForgeDevelopment/ForgeEngine DLL SHA-256、导出包及依赖 SHA-256。每端、每次探针的 raw JSONL 与 result 文件必须成对保存；核对 result.rawLog.path、sha256、bytes 与对应 raw 文件。",
+      "分别在武器、敌人、房间、地图编辑器选用同一冻结 revision，保存重开并导出；需要多人结论时，主机和客户端对同一 B1 模型馆输入分别运行本观察并保留各自场景证据。",
+      "四个外形样本固定为 architecture-0343189e66da9ba4、architecture-b552487a1977253a、architecture-78f83750824f024c、architecture-a769c2608c29a761，从冻结的模型目录取精确 resource/revision/locator/selection。网页和编辑器导出分别留图，游戏生产装配取相同视角；不能用相近名称或换一个通过家族补缺。弹药堆用 pnpm ts Tools/Models/build-ammo-pile.ts --out artifacts/work/m11-model/ammo-pile.forge-model 生成普通组合模型，由 D2 所有者替换原摆件引用、保留交互对象身份与补弹行为。未接入 D2 不算替换完成。"
+    ],
+    "steps": [
+      {
+        "target": "allOfType:UnityEngine.MeshFilter",
+        "read": [
+          "name",
+          "gameObject.layer",
+          "gameObject.activeInHierarchy",
+          "transform.position",
+          "transform.rotation",
+          "transform.lossyScale",
+          "sharedMesh.name",
+          "sharedMesh.vertexCount",
+          "sharedMesh.subMeshCount",
+          "sharedMesh.indexFormat",
+          "sharedMesh.isReadable",
+          "sharedMesh.bounds.center",
+          "sharedMesh.bounds.size"
+        ]
+      },
+      {
+        "target": "allOfType:UnityEngine.MeshRenderer",
+        "read": [
+          "name",
+          "enabled",
+          "gameObject.layer",
+          "gameObject.activeInHierarchy",
+          "transform.position",
+          "transform.rotation",
+          "transform.lossyScale",
+          "sharedMaterials.Length",
+          "bounds.center",
+          "bounds.size"
+        ]
+      },
+      {
+        "target": "allOfType:UnityEngine.BoxCollider",
+        "read": [
+          "name",
+          "enabled",
+          "isTrigger",
+          "gameObject.layer",
+          "gameObject.activeInHierarchy",
+          "transform.position",
+          "transform.rotation",
+          "transform.lossyScale",
+          "center",
+          "size",
+          "bounds.center",
+          "bounds.size"
+        ]
+      },
+      {
+        "target": "allOfType:UnityEngine.MeshCollider",
+        "read": [
+          "name",
+          "enabled",
+          "isTrigger",
+          "gameObject.layer",
+          "gameObject.activeInHierarchy",
+          "transform.position",
+          "transform.rotation",
+          "transform.lossyScale",
+          "convex",
+          "cookingOptions",
+          "sharedMesh.name",
+          "sharedMesh.vertexCount",
+          "sharedMesh.subMeshCount",
+          "bounds.center",
+          "bounds.size"
+        ]
+      },
+      {
+        "target": "allOfType:UnityEngine.SphereCollider",
+        "read": [
+          "name",
+          "enabled",
+          "isTrigger",
+          "gameObject.layer",
+          "gameObject.activeInHierarchy",
+          "transform.position",
+          "transform.rotation",
+          "transform.lossyScale",
+          "center",
+          "radius",
+          "bounds.center",
+          "bounds.size"
+        ]
+      },
+      {
+        "target": "allOfType:UnityEngine.CapsuleCollider",
+        "read": [
+          "name",
+          "enabled",
+          "isTrigger",
+          "gameObject.layer",
+          "gameObject.activeInHierarchy",
+          "transform.position",
+          "transform.rotation",
+          "transform.lossyScale",
+          "center",
+          "radius",
+          "height",
+          "direction",
+          "bounds.center",
+          "bounds.size"
+        ]
+      },
+      {
+        "target": "allOfType:UnityEngine.AI.NavMeshObstacle",
+        "read": [
+          "name",
+          "enabled",
+          "gameObject.layer",
+          "gameObject.activeInHierarchy",
+          "transform.position",
+          "transform.rotation",
+          "transform.lossyScale",
+          "shape",
+          "center",
+          "size",
+          "radius",
+          "height",
+          "carving",
+          "carveOnlyStationary",
+          "carvingMoveThreshold",
+          "carvingTimeToStationary"
+        ]
+      }
+    ],
+    "notes": [
+      "截图一：原版对照、整面重染 tint=[0.1,0.6,0.9]、HDR tint=[1.5,0.2,0.1]、glow={color:[0.1,0.6,1],brightness:4} 四组在同一灯雾、距离和机位下逐槽独立读回并拍全景及近景。看整个表面是否重染、HDR 是否明亮、发光是否有明显光晕，同源未改实例与原 prefab 保持原样；网页及游戏图均附模型版本、作者路径、owner/instance、机位和阶段。没有可信的原生逐槽只读入口时列 NT，不能用截图补原生读回；实际执行后读回丢失为 Fail。此处不扩做透明度或表面编辑交互，分别归 Y13、W3。",
+      "截图二：同一冻结零件经正常敌人编辑器装为普通／护甲／弱点三种独立部位，保留装饰附件对照；按正常出生和射击路径逐个命中，只改变所命中部位。调用现有 enemy-model-limb-parts、enemy-model-limb-effects、enemy-model-limb-counts 在未受伤、跨每个 crackAt 阈值、断裂后逐阶段读 owner/肢体编号、血量、倍率、StageRows、IsDestroyed、显隐、特效与计数，并各拍一张。无真实刺激／夹具／只读入口则 NT；执行后必要读回缺失、串伤、裂纹或断裂错误为 Fail。不能以血量变化证明裂纹和断裂的画面正确。",
+      "截图三：完整可用分母逐家族分别放进普通房间和地图生产载荷，记录 owner→房间→模型资源→精确子级→实例链。在房间构建、导航生成前保留碰撞组件与来源几何证据，生成后记录该 owner 的碰撞形状、开口处实走及原生路径查询结果；在场景中途加 NavMeshObstacle 或只见到 collider 均不能证明构建期参与。每个家族保留全景、接触边缘、可通行开口与路径图；没有可通行开口也须说明具体几何，不能删检查项。失败家族继续拒绝生产准入，记录拒绝及未执行原因，不为了探针临时放行。",
+      "生产清理：同一输入／seed 正常进 B1、退大厅、稳定后重进至少三轮；每轮在同一阶段按本轮 owner 读实例、碰撞、材质副本、裂纹和订阅计数及源材质数组，比较基线→应用→退图→重进。任何生产计数持续增长、清理报错或已执行清理却缺读回为 Fail；仅被动观察而无读取入口为 NT。探针暂存体归零不证明生产对象释放，不能重启游戏掩盖残留。",
+      "allOfType 是全场活动组件查询，不按模型 owner、资源、子路径或 room 过滤；名称、bounds、顶点数和材质槽数不能证明读到的组件属于该输入。必须用冻结输入、夹具 owner、操作时间线与实例身份配对；全量结果、记录或文本若被截断、省略、溢出、丢行或无法配对，一律证据不足，不按缺行认定没有对象。",
+      "本命令只读场景状态。Collider 与 NavMeshObstacle 摘要不证明来源几何一致、材质正确、完整层级、实际碰撞形状、开口可通行、导航烘焙或寻路可用；须另做实走、路径查询、主客机一致性与退图重进检查。两端各自加载成功不证明网络生成。",
+      "按夹具 owner 清理本轮创建的实例、碰撞与自有资源，保存清理前后和退图重进后的计数/日志证据；不得调用 DestroyAll，不得清理原版资源、他人对象或共享缓存。组件未出现在全场查询中不能单独证明已释放。",
+      "探针仅在对应输入、游戏构建、资源身份和子级选择完全匹配，且 raw/result 哈希配对有效、该 family 明确 passed 时，才为原生名加载与定位提供证据；命令运行成功、截图或存在组件都不代表 M11 已通过。"
+    ]
+  }
+]

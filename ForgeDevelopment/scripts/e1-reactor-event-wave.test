@@ -1,0 +1,42 @@
+# V1 E1 reactor, the event wave (official mechanism m-reactor-event-wave on the main objective, wave 2, the second round whose
+# verification E1 sets to "by event"): holding 事件波装置 before or during the second round makes that round pass by itself when it waits
+# to verify. Start a session on a freshly loaded E1 of the V1 package, then run:
+#   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package NAinfini-Forge_V1_Rundown --level E1 --work-dir artifacts/work/drivesession/<name>
+#   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name> run Mods/ForgeDevelopment/scripts/e1-reactor-event-wave.test
+#
+# Room 反应堆 room:f647838df0fed5c9ecd600fd75fb; teleport points are room-local Unity metres (the editor's x mirrored).
+# 事件波装置 v1-button-fb572607578e9031de1ce983f753, 反应堆启动 (passes the round waiting to verify) v1-button-a19f9c354eef0558dc43688eba7a;
+# in game the objects ForgeInteractionPoint:<id>.
+# Level variables (var.g + sha256 of [NAinfini-Forge_V1_Rundown, E1 expedition:12f5cfc8c8f25a073c8783d900e7, row id]):
+#   反应堆事件波 · steps.progress level.v429b26cad4424cc281bf89f3fb49568d  var.g11ef13080ffc034a62555c7d2c496ec8b360bc7f927daf87d2ed83a84cbd2a44
+#   反应堆事件波 · reactor.wave   level.v4d0318762c154a8c9e0f2f757e8c4e9c  var.g88171064df443a6717c773616db13df3145bf592f4a862de59bd4e80dcccb47c
+# Not verified in game: that the reactor wave trigger counts the second round as 2 (the mechanism compares it with 2), and that the HUD
+# shows the word REACTOR_VERIFY while a round waits to verify. Entering the terminal and holding the devices by name depend on the
+# console interact fix of the devconsole-interact lane.
+stop-on-fail
+god on
+
+# hold the event device first: the condition is noted
+teleport room=room:f647838df0fed5c9ecd600fd75fb -8.5 0 25
+interact name=v1-button-fb572607578e9031de1ce983f753 radius=4
+wait 1s
+state variables var.g11ef13080ffc034a62555c7d2c496ec8b360bc7f927daf87d2ed83a84cbd2a44 as=noted
+expect $noted.var.g11ef13080ffc034a62555c7d2c496ec8b360bc7f927daf87d2ed83a84cbd2a44 == 1
+
+# start the reactor at its terminal
+teleport room=room:f647838df0fed5c9ecd600fd75fb -22 0 0
+interact name=Terminal radius=30
+terminal type "REACTOR_STARTUP" as=startup
+terminal exit
+wait until state variables var.g88171064df443a6717c773616db13df3145bf592f4a862de59bd4e80dcccb47c var.g88171064df443a6717c773616db13df3145bf592f4a862de59bd4e80dcccb47c >= 1 timeout=60s
+
+# the first round needs its code: the station button passes it once it waits to verify
+wait until state hud objective contains "REACTOR_VERIFY" timeout=300s
+teleport room=room:f647838df0fed5c9ecd600fd75fb -8.5 0 24
+interact name=v1-button-a19f9c354eef0558dc43688eba7a radius=4
+wait until state variables var.g88171064df443a6717c773616db13df3145bf592f4a862de59bd4e80dcccb47c var.g88171064df443a6717c773616db13df3145bf592f4a862de59bd4e80dcccb47c >= 2 timeout=60s
+
+# the second round passes by itself when it waits to verify: the third round starts with no button and no code
+wait until state variables var.g88171064df443a6717c773616db13df3145bf592f4a862de59bd4e80dcccb47c var.g88171064df443a6717c773616db13df3145bf592f4a862de59bd4e80dcccb47c >= 3 timeout=360s
+state hud as=third
+expect log --all !contains "Exception"

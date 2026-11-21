@@ -1,0 +1,32 @@
+[
+  {
+    "id": "configure-native-bot-slot",
+    "title": "开局前配置原版机器人槽位",
+    "host": "host",
+    "target": "static:ForgeEngine.Authoring.AuthorReads",
+    "steps": [
+      {"call": "BotSlot", "args": [{"slot": 2, "bot": false}]},
+      {"wait": {"path": "ReadyReceipt", "timeout": 1200}, "target": "result"},
+      {"call": "Apply", "target": "result"},
+      {"wait": {"path": "AppliedReceipt", "timeout": 1200}, "target": "result"},
+      {"read": ["Readback"], "target": "result"},
+      {"call": "BotSlot", "args": [{"slot": 3, "bot": false}]},
+      {"wait": {"path": "ReadyReceipt", "timeout": 1200}, "target": "result"},
+      {"call": "Apply", "target": "result"},
+      {"wait": {"path": "AppliedReceipt", "timeout": 1200}, "target": "result"},
+      {"read": ["Readback"], "target": "result"},
+      {"call": "BotSlot", "args": [{"slot": 1, "bot": true, "character": 1}]},
+      {"wait": {"path": "ReadyReceipt", "timeout": 1200}, "target": "result"},
+      {"call": "Apply", "target": "result"},
+      {"wait": {"path": "AppliedReceipt", "timeout": 1200}, "target": "result"},
+      {"read": ["Readback"], "target": "result"}
+    ],
+    "notes": [
+      "可在任意已选关卡的大厅运行这个作者实验，槽位从 0 开始。示例只保留槽位 1 的机器人，关闭 2、3；0 不改。遇到真人明确拒绝，不踢人。D2 的正式流程由地图保存的设置自动配置。",
+      "角色也是原版 0–3 索引；已占用角色拒绝，不交换他人的角色。运行后等待 Applied 才降落。",
+      "可在 bot:true 的请求里加 loadout，键为 GearStandard、GearSpecial、GearClass、GearMelee，值为原版 GearManager 已加载目录的 itemInstanceKey（TryGetGear 的入参）；不能把物品块编号或 PlayfabItemId 当成这个键。未填的槽保留原版配装。",
+      "这个实验命令自身不写地图；正式关卡设置由地图编辑器的整关设置面板保存。命令经 Forge Engine 的作者读取（需 Authoring 模式）把原生操作委托给 Map 的共享实现，原版负责自动补位与移除，不实例化玩家、伪造 AI 或合成机器人事件。",
+      "权限提交不是机器人就绪，换装提交不是装备完成；等待超时或读回失败按现有实验引擎记录失败。已提交权限可能保留，读回与错误记录实际状态。命令通过不是游戏行为验收。"
+    ]
+  }
+]

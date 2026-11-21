@@ -1,0 +1,28 @@
+# V1 A3 checkpoint door: the security door from 作者起始房 into 入口廊 is a checkpoint door (zone field IsCheckpointDoor). Opening it saves
+# the expedition; after the whole team is down, loading the checkpoint puts the player back in a walkable area of the level.
+# Start a session on a freshly loaded A3 of the V1 package, then run:
+#   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package NAinfini-Forge_V1_Rundown --level A3 --work-dir artifacts/work/drivesession/<name>
+#   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name> run Mods/ForgeDevelopment/scripts/a3-checkpoint.test
+#
+# Room 入口廊 room:2e3b020234e22d35dc9bf5c9196b; its landing in front of the checkpoint door is (0, 0, -28.5) room-local.
+# Opening the door by name depends on the console interact fix of the devconsole-interact lane.
+stop-on-fail
+god on
+
+# open the checkpoint door: the game saves
+teleport room=room:2e3b020234e22d35dc9bf5c9196b 0 0 -28.5
+interact name=@LG_SecurityDoor radius=8
+wait 3s
+door read near:8 as=opened
+checkpoint confirm as=saved
+expect $saved.result contains "save"
+player as=at_save
+
+# whole team down, load the checkpoint
+checkpoint wipe
+checkpoint restore
+checkpoint confirm as=restored
+expect $restored.result contains "restore"
+player as=after
+expect $after.Alive == "True"
+expect log --all !contains "Exception"

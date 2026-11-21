@@ -1,0 +1,217 @@
+[
+  {
+    "id": "dimension-ground-y",
+    "title": "维度真实 GroundY：已生成区域逐行读取",
+    "host": "any",
+    "target": "allOfType:LevelGeneration.LG_Zone",
+    "steps": [
+      {
+        "read": [
+          "Pointer",
+          "name",
+          "DimensionIndex",
+          "LocalIndex",
+          "Dimension.Pointer",
+          "Dimension.CreationOrderIndex",
+          "Dimension.GroundY",
+          "Dimension.DimensionLevel.name"
+        ]
+      }
+    ],
+    "requires": [
+      "FactoryDone 后玩家落地，独立 Authoring 会话且实验对象为空。"
+    ],
+    "notes": [
+      "Dimension.GroundY 来自当前 IL2CPP dump 的真实 getter；不按维度编号计算高度。每关按 DimensionIndex、CreationOrderIndex、Pointer 分组，同一维度读数必须一致。",
+      "allOfType 不覆盖 inactive 或没有 Zone 的维度，摘要会受现有预算限制；完整维度覆盖仍须与同次 floor.m_dimensions 及地形清单对账。截断、读取错误、无样本均未证。"
+    ]
+  },
+  {
+    "id": "floor-dimension-inventory",
+    "title": "维度清单：核对生成 floor 的维度数量",
+    "host": "any",
+    "target": "static:LevelGeneration.Builder",
+    "steps": [
+      {
+        "call": "CurrentFloor"
+      },
+      {
+        "target": "result",
+        "read": [
+          "m_dimensions.Count",
+          "m_dimensions"
+        ]
+      }
+    ],
+    "notes": [
+      "已核 CurrentFloor 与 m_dimensions 真源；清单是覆盖分母，不从关卡定义猜高度。"
+    ]
+  },
+  {
+    "id": "enemy-marker-association",
+    "target": "allOfType:Enemies.EnemyAgent",
+    "steps": [
+      {
+        "read": [
+          "Pointer",
+          "GlobalID",
+          "Alive",
+          "EnemyData.persistentID",
+          "IsTagged",
+          "WasTagged",
+          "EnemyTaggedTimer",
+          "m_tagMarker.Pointer",
+          "m_tagMarker.m_trackingObj.Pointer",
+          "gameObject.Pointer"
+        ]
+      }
+    ],
+    "title": "H9 原生状态观察：enemy-marker-association",
+    "host": "any",
+    "requires": [
+      "独立 Authoring 会话，实验对象为空且无 running 命令；主客机逐阶段分别运行。"
+    ],
+    "notes": [
+      "来源为当前 IL2CPP dump 的成员声明。Pointer/GlobalID/UID/EventID 只用于同端当次关联，不是跨生命身份证明。",
+      "每端按基线、单项贡献、重叠贡献、撤销单层、原生 recall/迟加入/检查点/迁移、恢复后阶段采样，并保留完整 rec 会话与 Forge 因果日志。未知、无对象、缺字段、截断、身份无法唯一配对均为未证；不能因此解锁接管。",
+      "玩家 IsEnabled 不是控制锁开关；武器当前值不是原始基线或贡献归属。此命令不产生控制锁/标记/波次/修改，不改变现有迁移拒绝。"
+    ]
+  },
+  {
+    "id": "marker-baseline",
+    "target": "allOfType:NavMarker",
+    "steps": [
+      {
+        "read": [
+          "Pointer",
+          "name",
+          "m_trackingObj.Pointer",
+          "m_trackingObj.name",
+          "TrackingDimension.DimensionIndex",
+          "m_enemySubObj.Pointer",
+          "gameObject.activeSelf",
+          "gameObject.activeInHierarchy"
+        ]
+      }
+    ],
+    "title": "H9 原生状态观察：marker-baseline",
+    "host": "any",
+    "requires": [
+      "独立 Authoring 会话，实验对象为空且无 running 命令；主客机逐阶段分别运行。"
+    ],
+    "notes": [
+      "来源为当前 IL2CPP dump 的成员声明。Pointer/GlobalID/UID/EventID 只用于同端当次关联，不是跨生命身份证明。",
+      "每端按基线、单项贡献、重叠贡献、撤销单层、原生 recall/迟加入/检查点/迁移、恢复后阶段采样，并保留完整 rec 会话与 Forge 因果日志。未知、无对象、缺字段、截断、身份无法唯一配对均为未证；不能因此解锁接管。",
+      "玩家 IsEnabled 不是控制锁开关；武器当前值不是原始基线或贡献归属。此命令不产生控制锁/标记/波次/修改，不改变现有迁移拒绝。"
+    ]
+  },
+  {
+    "id": "puzzle-state",
+    "target": "allOfType:ChainedPuzzles.ChainedPuzzleInstance",
+    "steps": [
+      {
+        "read": [
+          "Pointer",
+          "m_puzzleUID",
+          "Data.persistentID",
+          "m_sourceArea.UID",
+          "m_sourceArea.m_zone.DimensionIndex",
+          "IsActive",
+          "IsSolved",
+          "m_stateReplicator.State"
+        ]
+      }
+    ],
+    "title": "H9 原生状态观察：puzzle-state",
+    "host": "any",
+    "requires": [
+      "独立 Authoring 会话，实验对象为空且无 running 命令；主客机逐阶段分别运行。"
+    ],
+    "notes": [
+      "来源为当前 IL2CPP dump 的成员声明。Pointer/GlobalID/UID/EventID 只用于同端当次关联，不是跨生命身份证明。",
+      "每端按基线、单项贡献、重叠贡献、撤销单层、原生 recall/迟加入/检查点/迁移、恢复后阶段采样，并保留完整 rec 会话与 Forge 因果日志。未知、无对象、缺字段、截断、身份无法唯一配对均为未证；不能因此解锁接管。",
+      "玩家 IsEnabled 不是控制锁开关；武器当前值不是原始基线或贡献归属。此命令不产生控制锁/标记/波次/修改，不改变现有迁移拒绝。"
+    ]
+  },
+  {
+    "id": "wave-state",
+    "target": "static:Mastermind",
+    "steps": [
+      {
+        "read": [
+          "Current.m_events.Count",
+          "Current.m_events",
+          "Current.m_nextEventID"
+        ]
+      }
+    ],
+    "title": "H9 原生状态观察：wave-state",
+    "host": "any",
+    "requires": [
+      "独立 Authoring 会话，实验对象为空且无 running 命令；主客机逐阶段分别运行。"
+    ],
+    "notes": [
+      "来源为当前 IL2CPP dump 的成员声明。Pointer/GlobalID/UID/EventID 只用于同端当次关联，不是跨生命身份证明。",
+      "每端按基线、单项贡献、重叠贡献、撤销单层、原生 recall/迟加入/检查点/迁移、恢复后阶段采样，并保留完整 rec 会话与 Forge 因果日志。未知、无对象、缺字段、截断、身份无法唯一配对均为未证；不能因此解锁接管。",
+      "玩家 IsEnabled 不是控制锁开关；武器当前值不是原始基线或贡献归属。此命令不产生控制锁/标记/波次/修改，不改变现有迁移拒绝。"
+    ]
+  },
+  {
+    "id": "weapon-baseline",
+    "target": "allOfType:Gear.BulletWeapon",
+    "steps": [
+      {
+        "read": [
+          "Pointer",
+          "PublicName",
+          "ArchetypeID",
+          "Owner.Pointer",
+          "m_archeType.Pointer",
+          "ClipSize",
+          "ReloadTime",
+          "CanReload",
+          "RunAllowed",
+          "WeaponSwitchAllowed"
+        ]
+      }
+    ],
+    "title": "H9 原生状态观察：weapon-baseline",
+    "host": "any",
+    "requires": [
+      "独立 Authoring 会话，实验对象为空且无 running 命令；主客机逐阶段分别运行。"
+    ],
+    "notes": [
+      "来源为当前 IL2CPP dump 的成员声明。Pointer/GlobalID/UID/EventID 只用于同端当次关联，不是跨生命身份证明。",
+      "每端按基线、单项贡献、重叠贡献、撤销单层、原生 recall/迟加入/检查点/迁移、恢复后阶段采样，并保留完整 rec 会话与 Forge 因果日志。未知、无对象、缺字段、截断、身份无法唯一配对均为未证；不能因此解锁接管。",
+      "玩家 IsEnabled 不是控制锁开关；武器当前值不是原始基线或贡献归属。此命令不产生控制锁/标记/波次/修改，不改变现有迁移拒绝。"
+    ]
+  },
+  {
+    "id": "player-lock-baseline",
+    "target": "allOfType:Player.PlayerAgent",
+    "steps": [
+      {
+        "read": [
+          "Pointer",
+          "GlobalID",
+          "PlayerSlotIndex",
+          "Alive",
+          "IsEnabled",
+          "Locomotion.Pointer",
+          "PlayerCharacterController.Pointer",
+          "FPItemHolder.Pointer"
+        ]
+      }
+    ],
+    "title": "H9 原生状态观察：player-lock-baseline",
+    "host": "any",
+    "requires": [
+      "独立 Authoring 会话，实验对象为空且无 running 命令；主客机逐阶段分别运行。"
+    ],
+    "notes": [
+      "来源为当前 IL2CPP dump 的成员声明。Pointer/GlobalID/UID/EventID 只用于同端当次关联，不是跨生命身份证明。",
+      "每端按基线、单项贡献、重叠贡献、撤销单层、原生 recall/迟加入/检查点/迁移、恢复后阶段采样，并保留完整 rec 会话与 Forge 因果日志。未知、无对象、缺字段、截断、身份无法唯一配对均为未证；不能因此解锁接管。",
+      "玩家 IsEnabled 不是控制锁开关；武器当前值不是原始基线或贡献归属。此命令不产生控制锁/标记/波次/修改，不改变现有迁移拒绝。"
+    ]
+  }
+]

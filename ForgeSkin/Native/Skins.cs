@@ -326,7 +326,6 @@ static class Skins
 {
     public static readonly Dictionary<string, Skin> ById = new();
     public static readonly Dictionary<string, string> Targets = new(); // SkinTarget.Key() -> skin id
-    public static readonly List<string> Globals = new();
     public static readonly Dictionary<string, List<Skin>> Candidates = new(); // SkinTarget.Key() -> every loaded skin for it, by path
 
     static Dictionary<string, string> _base = new(); // Targets before the player's choices: active.json, then the first by path
@@ -370,9 +369,6 @@ static class Skins
     public static string LookOf(string id) =>
         (ById.TryGetValue(id, out var skin) ? $"{id}@{skin.Stamp.Ticks}" : id)
         + string.Concat((ColoursOf(id) ?? new Dictionary<string, float[]>()).OrderBy(c => c.Key, StringComparer.Ordinal).Select(c => $"|{c.Key}={string.Join(",", c.Value)}"));
-
-    // The global skins' looks together.
-    public static string GlobalsLook() => string.Join(",", Globals.Select(LookOf));
 
     // ForgeSkin.colours.json is written half a second after the last colour or code-effect change (a slider sends one per step
     // while dragged, swatches are clicked through); < 0: nothing waiting.
@@ -586,7 +582,7 @@ static class Skins
         public readonly List<Skin> Read = new();
         public readonly List<(string File, DateTime Stamp, Exception Error)> Bad = new();
         public readonly Dictionary<string, string> Targets = new();
-        public readonly List<string> Globals = new();
+        public string[] Globals = []; // active.json's `global`: no longer worn, only reported
         public List<(string File, string Target, string Skin)> Picks = new();
         public readonly List<(string Code, string Message)> Fails = new();
     }
@@ -631,7 +627,7 @@ static class Skins
             }
             s.Read.Add(s.ByFile[file]);
         }
-        ReadActive(s.Targets, s.Globals);
+        s.Globals = ReadActive(s.Targets);
         s.Picks = ReadPicks(s.Fails);
         return s;
     }
@@ -657,10 +653,17 @@ static class Skins
         foreach (var skin in read)
         {
             ForgeSkinPlugin.Note($"found {Path.GetFileName(skin.File)}: id {skin.Doc.Id}, {skin.Doc.Materials.Count} materials, {skin.Doc.Attachments.Count} attachments, {skin.Doc.Sounds.Count} sounds, {skin.Inspect?.Motions.Count() ?? 0} inspect motions (loaded when first worn)");
+            // A pack for no gear (older editors made sight, magazine, light and ammo skins for every gear) is never worn.
+            if (skin.Doc.Target.Key() == null)
+                ForgeSkinPlugin.Fail("skin-global-unsupported", $"{Path.GetFileName(skin.File)}: skin {skin.Doc.Id} names no gear (a skin for every gear); those are no longer supported, so it is not worn. Open it in the editor and make it a gun's skin");
             Inspect.Learn(skin);
         }
+        // Said again only when active.json's `global` changes, not at every reload.
+        var listed = string.Join(", ", globals);
+        if (listed != _globalsReported && (_globalsReported = listed).Length > 0)
+            ForgeSkinPlugin.Fail("skin-global-unsupported", $"active.json lists skins for every gear ({listed}); those are no longer supported and are not worn. Open them in the editor and make each a gun's skin");
         var before = _activeTargets;
-        (_activeTargets, _activeGlobals) = (targets, globals);
+        _activeTargets = targets;
         Index();
         // The editor's 应用到游戏 goes before the player's choice for that one target, oldest first; later picks in the picker
         // work as before. Each one-shot file is deleted once its choice is saved.
@@ -714,7 +717,7 @@ static class Skins
 
     static bool _readOnce; // the skins folder was read once since launch
     static Dictionary<string, string> _activeTargets = new(); // active.json's targets
-    static List<string> _activeGlobals = new(); // active.json's global skins
+    static string _globalsReported = ""; // active.json's `global` as last reported
 
     static void Reject(string file, DateTime stamp, Exception e)
     {
@@ -760,7 +763,7 @@ static class Skins
         Candidates.Clear();
         foreach (var (file, skin) in ByFile.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
         {
-            if (skin.Doc.Target.Key() is not { } key) continue;
+            if (skin.Doc.Target.Key() is not { } key) continue; // a pack for no gear: skin-global-unsupported when it was read (Apply)
             if (ById[skin.Doc.Id] == skin)
             {
                 if (!Candidates.TryGetValue(key, out var list)) Candidates[key] = list = new();
@@ -771,7 +774,7 @@ static class Skins
             else if (_base[key] != skin.Doc.Id) ForgeSkinPlugin.Info($"{key}: {skin.Doc.Id} from {Path.GetFileName(Path.GetDirectoryName(file))} not used, {_base[key]} is active");
         }
         Resolve();
-        ForgeSkinPlugin.Info($"active: {Targets.Count} target skins, {Globals.Count} global skins");
+        ForgeSkinPlugin.Info($"active: {Targets.Count} target skins");
     }
 
     // Targets = _base with the player's choices on top; a choice whose skin is not loaded for that target is ignored, and so
@@ -781,10 +784,7 @@ static class Skins
     {
         Version++;
         Targets.Clear();
-        Globals.Clear();
         if (!Enabled) return;
-        // A character skin is never a global one (it has no gear to go on).
-        Globals.AddRange(_activeGlobals.Where(id => !(ById.TryGetValue(id, out var g) && g.Doc.Character != null)));
         foreach (var (key, id) in _base) if (ById.ContainsKey(id)) Targets[key] = id;
         foreach (var (key, id) in Choices)
             if (id == "") Targets.Remove(key);
@@ -824,18 +824,8 @@ static class Skins
     static readonly List<Skin> Resident = new(); // loading or loaded
     static bool _arrived;
 
-    // The skins a gear of this target wears now: the global ones and its own.
-    public static List<Skin> Wanted(string key) => Wanted(Own(key));
-
-    // The skins a gear wears in `weapon` (null: no skin of its own): the global ones and that one.
-    public static List<Skin> Wanted(Skin? weapon)
-    {
-        var wanted = new List<Skin>();
-        foreach (var id in Globals)
-            if (ById.TryGetValue(id, out var global)) wanted.Add(global);
-        if (weapon != null) wanted.Add(weapon);
-        return wanted;
-    }
+    // The skins a gear of this target wears now: its own, or none.
+    public static List<Skin> Wanted(string key) => Own(key) is { } own ? new List<Skin> { own } : new List<Skin>();
 
     // The skin of its own a gear of this target wears (null: none).
     public static Skin? Own(string key) => Targets.TryGetValue(key, out var own) ? ById.GetValueOrDefault(own) : null;
@@ -848,14 +838,8 @@ static class Skins
         return ready;
     }
 
-    // Ready for Wanted(weapon) without making its list: for waits checked every frame.
-    public static bool Ready(Skin? weapon, float now)
-    {
-        bool ready = true;
-        foreach (var id in Globals)
-            if (ById.TryGetValue(id, out var global)) ready &= Loaded(global, now);
-        return weapon == null ? ready : Loaded(weapon, now) & ready;
-    }
+    // Ready for a gear wearing `weapon` (null: nothing) without making a list: for waits checked every frame.
+    public static bool Ready(Skin? weapon, float now) => weapon == null || Loaded(weapon, now);
 
     // True when the skin is loaded; asks for it otherwise.
     static bool Loaded(Skin skin, float now)
@@ -928,23 +912,29 @@ static class Skins
             if (problem != null) fails.Add(("skin-marker-entry-invalid", problem));
             else files.Add(pack);
         lock (Registered)
+        {
             foreach (var pack in Registered)
                 if (File.Exists(pack)) files.Add(pack);
                 else fails.Add(("skin-registered-pack-missing", $"registered pack {pack} not found"));
+            // A pack another plugin registers lies in that plugin's own folder, with no marker.
+            foreach (var (file, problem) in SkinFolders.Misplaced(_plugins))
+                if (!files.Contains(file)) fails.Add(("skin-pack-misplaced", problem));
+        }
         return files.ToArray();
     }
 
-    static void ReadActive(Dictionary<string, string> targets, List<string> globals)
+    // active.json's targets into `targets`; returns what its `global` (skins for every gear, no longer worn) still lists, to report.
+    static string[] ReadActive(Dictionary<string, string> targets)
     {
         var active = Path.Combine(_dir, "active.json");
-        if (!File.Exists(active)) return;
+        if (!File.Exists(active)) return [];
         using var json = JsonDocument.Parse(File.ReadAllText(active));
         if (json.RootElement.TryGetProperty("targets", out var entries))
             foreach (var entry in entries.EnumerateObject())
                 if (entry.Value.ValueKind == JsonValueKind.String) targets[entry.Name] = entry.Value.GetString()!;
                 else ForgeSkinPlugin.Fail("skin-active-entry-invalid", $"active.json: bad target entry {entry.Name}");
-        if (json.RootElement.TryGetProperty("global", out var global))
-            foreach (var id in global.EnumerateArray())
-                if (id.ValueKind == JsonValueKind.String) globals.Add(id.GetString()!);
+        return json.RootElement.TryGetProperty("global", out var global) && global.ValueKind == JsonValueKind.Array
+            ? global.EnumerateArray().Select(id => id.ValueKind == JsonValueKind.String ? id.GetString()! : id.GetRawText()).ToArray()
+            : [];
     }
 }

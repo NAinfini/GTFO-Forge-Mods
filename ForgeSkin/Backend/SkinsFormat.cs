@@ -319,9 +319,8 @@ public static class SkinsFormat
     public static bool Write(ZipArchive zip, string folder, string name, string description, string guid, IReadOnlyList<string> packPaths,
         List<CatalogItem> catalog, Func<CatalogItem, Dictionary<string, GameMaterial>> materials, List<SkinsNote> dropped)
     {
-        // One entry per gear skin and material: the gear (null for a skin of every gear with these materials) and the
-        // override the plugin would use (the last one of that material in the skin).
-        var entries = new List<(CatalogItem? Gear, SkinPack Pack, MaterialOverride O)>();
+        // One entry per gear skin and material: the gear and the override the plugin would use (the last one of that material in the skin).
+        var entries = new List<(CatalogItem Gear, SkinPack Pack, MaterialOverride O)>();
         var gears = new List<CatalogItem>();
         var packs = new List<SkinPack>();
         string? author = null;
@@ -332,22 +331,12 @@ public static class SkinsFormat
                 var pack = SkinPack.Open(path);
                 packs.Add(pack);
                 var doc = pack.Manifest;
-                List<CatalogItem> on;
-                CatalogItem? gear = null;
                 if (doc.Target.ItemId != null) { dropped.Add(new("itemSkin", doc.Name)); continue; }
-                if (doc.Target.GearId is { } id)
-                {
-                    gear = catalog.FirstOrDefault(c => c.GearId == id) ?? throw new BackendException("not-found", $"{doc.Name}: gear {id} is not in the game");
-                    if (packs.Take(packs.Count - 1).Any(p => p.Manifest.Target.GearId == id)) throw new BackendException("bad-request", $"{doc.Name}: a gun pack takes one skin per gear, and {gear.Name} has two");
-                    on = [gear];
-                }
-                else
-                {
-                    on = catalog.Where(c => c.GearId != null && c.Parts.Any(p => p.Materials.Any(m => doc.Materials.Any(o => o.Material == m)))).ToList();
-                    if (on.Count == 0) { dropped.Add(new("unusedMaterials", doc.Name)); continue; }
-                    dropped.Add(new("global", doc.Name, null, on.Count));
-                }
-                gears.AddRange(on.Where(g => !gears.Contains(g)));
+                // A pack for no gear (older editors made those for every gear) is no longer supported.
+                if (doc.Target.GearId is not { } id) { dropped.Add(new("global", doc.Name)); continue; }
+                var gear = catalog.FirstOrDefault(c => c.GearId == id) ?? throw new BackendException("not-found", $"{doc.Name}: gear {id} is not in the game");
+                if (packs.Take(packs.Count - 1).Any(p => p.Manifest.Target.GearId == id)) throw new BackendException("bad-request", $"{doc.Name}: a gun pack takes one skin per gear, and {gear.Name} has two");
+                if (!gears.Contains(gear)) gears.Add(gear);
                 author ??= string.IsNullOrWhiteSpace(doc.Author) ? null : doc.Author;
                 foreach (var group in doc.Materials.GroupBy(m => m.Material))
                 {
@@ -373,26 +362,22 @@ public static class SkinsFormat
             if (description != "") group2["desc"] = description;
             Json(zip, $"{folder}/{Manifest}", group2);
 
-            var overridden = entries.Where(e => e.Gear != null).Select(e => (e.Gear!, e.O.Material)).ToHashSet();
+            var overridden = entries.Select(e => (e.Gear, e.O.Material)).ToHashSet();
             var written = new HashSet<string>();
             var files = new HashSet<string>();
             int index = 0;
-            // Targets that name textures first, so Skins (first match wins) reaches them before a target for every variant.
-            foreach (var (gear, pack, o) in entries.OrderBy(e => e.Gear == null))
+            foreach (var (gear, pack, o) in entries)
             {
                 var doc = pack.Manifest;
-                var game = gear != null ? materials(gear).GetValueOrDefault(o.Material) : gears.Select(g => materials(g).GetValueOrDefault(o.Material)).FirstOrDefault(m => m != null);
-                var sig = gear != null ? game?.Textures ?? new() : new Dictionary<string, string>();
+                var game = materials(gear).GetValueOrDefault(o.Material);
+                var sig = game?.Textures ?? new();
                 var others = gears.Where(g => g != gear && materials(g).ContainsKey(o.Material)).ToList();
-                bool conditions = gear != null && others.Count > 0 && sig.Count > 0;
+                bool conditions = others.Count > 0 && sig.Count > 0;
                 var key = o.Material + "|" + (conditions ? string.Join("|", sig.OrderBy(s => s.Key, StringComparer.Ordinal).Select(s => $"{s.Key}={s.Value}")) : "*");
-                if (!written.Add(key)) { dropped.Add(new("conflict", doc.Name, $"{o.Material} ({gear?.Name})")); continue; }
+                if (!written.Add(key)) { dropped.Add(new("conflict", doc.Name, $"{o.Material} ({gear.Name})")); continue; }
                 // Gears of the group whose material of this name the target cannot tell apart, and that set none of their own.
-                if (gear != null)
-                {
-                    var shared = others.Where(g => !overridden.Contains((g, o.Material)) && (!conditions || Same(materials(g)[o.Material].Textures, sig))).Select(g => g.Name).ToList();
-                    if (shared.Count > 0) dropped.Add(new("sharedMaterial", doc.Name, $"{o.Material}: {string.Join(", ", shared)}", shared.Count));
-                }
+                var shared = others.Where(g => !overridden.Contains((g, o.Material)) && (!conditions || Same(materials(g)[o.Material].Textures, sig))).Select(g => g.Name).ToList();
+                if (shared.Count > 0) dropped.Add(new("sharedMaterial", doc.Name, $"{o.Material}: {string.Join(", ", shared)}", shared.Count));
 
                 var properties = new JsonObject();
                 foreach (var (channel, entry) in o.Textures)

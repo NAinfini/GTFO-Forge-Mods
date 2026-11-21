@@ -1,0 +1,11 @@
+[
+  {
+    "id": "exit-scan-observe",
+    "title": "记录退出前扫描对象",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.ExitScanSettle",
+    "steps": [{"call": "ObserveCurrent"}],
+    "requires": ["Authoring 模式，已经落地，准备从原版菜单返回大厅。"],
+    "notes": ["只记录当前扫描实例、核心、协程和回调身份；原版楼层清理前后自动补记录。不会停止扫描、删除回调、完成目标或退出关卡。命令成功只表示读回已记录，不表示退场无异常。"]
+  }
+]

@@ -105,6 +105,9 @@ const MESSAGES: Record<string, string> = {
   get 'work-in-use'() {
     return t('errors.workInUse');
   },
+  get 'no-gear-target'() {
+    return t('errors.noGearTarget');
+  },
 };
 
 export function friendly(e: unknown, fallback = t('errors.k25')): string {

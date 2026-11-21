@@ -1,0 +1,536 @@
+{
+  "profile": "objects",
+  "enabledByDefault": true,
+  "entries": [
+    {
+      "type": "LevelGeneration.LG_PowerGenerator_Core",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*",
+        "SNetwork_*",
+        "_Setup*",
+        "iWardenObjectiveItem_*",
+        "Setup"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_stateReplicator.State",
+        "m_stateReplicator.State.status",
+        "m_stateReplicator.State.playerThatChangedTheState",
+        "transform.position",
+        "transform.rotation",
+        "SpawnNode.m_zone.LocalIndex",
+        "m_isWardenObjective",
+        "LinkedSecurityDoor.m_serialNumber",
+        "WardenObjectiveChainIndex"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_PowerGenerator_Graphics",
+      "methods": [
+        "OnStatusChanged",
+        "SetPowerCellSlotOpen",
+        "SetSerial",
+        "SetVisible"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LG_PowerGeneratorCluster",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "SNetwork_*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_stateReplicator.State",
+        "m_generators",
+        "m_chainedPuzzleMidObjective"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_PickupItem",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.ItemInLevel",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "GetCustomData",
+        "get_*",
+        "set_*",
+        "Method_*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "internalSync.m_stateReplicator.State"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "CarryItemPickup_Core",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "SNetwork_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_ResourceContainer_Storage",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*",
+        "MoveNext"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ArtifactPickup_Core",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "CommodityPickup_Core",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ConsumablePickup_Core",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "KeyItemPickup_Core",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_keyItem.DataBlockID",
+        "m_keyItem.SpawnZone.LocalIndex"
+      ],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "GenericSmallPickupItem_Core",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Gear.ResourcePackPickup",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Gear.HeavyFogRepellerPickup",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_Base",
+      "methods": [
+        "PlayerDoInteract",
+        "PlayerCanInteract",
+        "PlayerSetSelected",
+        "OnSelectedChange",
+        "PlayerCheckInput",
+        "LocalPickup",
+        "SyncedPickup",
+        "SetActive",
+        "SetBlocked",
+        "OnProximityEnter",
+        "OnProximityExit",
+        "SetupFromItem"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_Timed",
+      "methods": [
+        "EvaluateTimedInteraction",
+        "OnInteractorCompleted",
+        "OnInteractorStateChanged",
+        "OnTimerUpdate",
+        "PlayerDoInteract",
+        "PlayerCanInteract",
+        "TriggerInteractionAction",
+        "SetTimerActive",
+        "SetUIState",
+        "ApplySpeedModifier",
+        "GetAdditionalInteractionInfo"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_Generic",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_Pickup_PickupItem",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_PickupLoot",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_RefillAir",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_DisinfectionStation",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_Hack",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "MoveNext"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_ManualTimedWithCallback",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_MessageOnScreen",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_Elevator",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_EnterElevator",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_PickupMapperDrone",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_SimpleButton",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_StartMPGame",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LG_GenericCarryItemInteractionTarget",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PlayerInteraction",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Player.PlayerBackpack",
+      "methods": [
+        "SetDeployed",
+        "IsDeployed",
+        "TryClearSlot"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "EnemyRespawnerVisual",
+      "methods": [
+        "Start",
+        "OnDestroy"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_playSmallSound",
+        "m_sound"
+      ],
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ElevatorCargoCage",
+      "methods": [
+        "SpawnObjectiveItemsInLandingArea"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "record": "args+result",
+      "instance": [
+        "m_itemsToMoveToCargo",
+        "m_placementSlots"
+      ],
+      "phases": "before+after"
+    },
+    {
+      "type": "ElevatorCargoCage",
+      "methods": [
+        "MoveObjectiveToCargo"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "record": "args+result",
+      "instance": [
+        "m_itemsToMoveToCargo",
+        "m_placementSlots"
+      ],
+      "phases": "before+after"
+    }
+  ]
+}

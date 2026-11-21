@@ -324,6 +324,12 @@ interface State {
   openWork(weaponId: string, skinId: string): Promise<void>;
   /** A new blank skin for an item (an item with no skins yet gets its first one). */
   newWork(weaponId: string): Promise<void>;
+  /** The open work targets a sight, magazine, light, lens or ammo, which no longer take a skin of their own: the item it targets
+   * while the author is asked to pick a gun (ui/WeaponGallery RetargetGallery); null otherwise. */
+  retarget: string | null;
+  /** Moves the open work onto gun `gunId`: the material changes whose material the gun has stay, so do attachments and part
+   * changes on a part it has; what does not fit is listed in the log and a toast. The old work goes to the Recycle Bin. */
+  moveToGun(gunId: string): Promise<void>;
   /** Skins installed in the chosen profile. */
   installed: InstalledPack[];
   refreshSkins(): Promise<ProjectEntry[]>;
@@ -444,6 +450,7 @@ export const useStore = create<State>((set, get) => ({
   works: {},
   characters: [],
   editedAt: 0,
+  retarget: null,
   installed: [],
   logs: [],
   progress: null,
@@ -659,6 +666,45 @@ export const useStore = create<State>((set, get) => ({
     await get().selectWeapon(weaponId);
     if (had) await get().newSkin(false);
     else showTab('left', 'parts');
+  },
+  async moveToGun(gunId) {
+    const s = get();
+    const from = s.weaponId;
+    const gun = s.catalog.find((c) => c.id === gunId);
+    if (!from || !gun) return;
+    await persistAutosave();
+    const doc = normalize(structuredClone(s.doc));
+    const parts = new Set(gun.parts.map((p) => p.id));
+    const partOf = (material?: string | null) => gun.parts.find((p) => p.materials.includes(material ?? ''))?.id;
+    const materials = (doc.materials ?? []).filter((m): m is MaterialOverride => !!m);
+    const attachments = (doc.attachments ?? []).filter((a): a is Attachment => !!a);
+    const moved = (doc.parts ?? []).filter((p): p is PartTransform => !!p);
+    const lost = [
+      ...materials.filter((m) => !partOf(m.material)).map((m) => m.material ?? ''),
+      ...attachments.filter((a) => !parts.has(a.part ?? '')).map((a) => attachmentName(doc, a)),
+      ...moved.filter((p) => !parts.has(p.part ?? '')).map((p) => p.part ?? ''),
+    ];
+    doc.materials = materials.filter((m) => partOf(m.material)).map((m) => ({ ...m, part: partOf(m.material) }));
+    doc.attachments = attachments.filter((a) => parts.has(a.part ?? ''));
+    doc.parts = moved.filter((p) => parts.has(p.part ?? ''));
+    doc.target = { weapon: gunId };
+    syncPlayerColors(doc);
+    syncCodeEffects(doc);
+    let copied: SkinDocument;
+    try {
+      copied = await call('project.copy', { project: doc, from: autosavePath(from, s.doc.id), to: autosavePath(gunId, doc.id) });
+      await call('project.save', { path: autosavePath(gunId, doc.id), project: copied });
+      await call('project.delete', { path: autosavePath(from, s.doc.id) });
+    } catch (e) {
+      return get().fail(e, t('store.moveToGunFailed'));
+    }
+    localStorage.setItem(`sf.skin.${gunId}`, copied.id!);
+    set({ weaponId: null, retarget: null });
+    await get().refreshWorks();
+    await get().selectWeapon(gunId);
+    const text = lost.length ? t('store.movedToGunLost', { v0: localName(gun), v1: lost.join('、') }) : t('store.movedToGun', { v0: localName(gun) });
+    get().log(text);
+    get().toast(lost.length ? 'info' : 'ok', text);
   },
   async refreshInstalled() {
     const s = get();
@@ -1217,6 +1263,10 @@ export function hangAsCharm(a: Attachment) {
   showTab('attachment', 'place'); // the tab with the charm settings
 }
 
+/** A gear or item a skin can be made for: one with a gear or item id. Sights, magazines, lights, lenses and ammo are edited as part
+ * of a gun's skin, on that gun alone. */
+export const isSkinTarget = (c: CatalogItem): boolean => c.gearId != null || c.itemId != null;
+
 /** Folder of one item's skins. */
 const skinDir = (weaponId: string): string => `${autosaveRoot()}\\${weaponId}`;
 
@@ -1279,7 +1329,9 @@ function openSkin(loaded: SkinDocument, id: string, ticket: number): boolean {
   for (const p of item?.parts ?? []) if (ed.enabled[p.id] === undefined) ed.enabled[p.id] = p.defaultEnabled;
   doc.editor = ed as unknown as SkinDocument['editor'];
   localStorage.setItem(`sf.skin.${id}`, doc.id!);
-  useStore.setState({ doc, projectPath: null, selection: null, undo: [], redo: [], unmatched: [], lastEditKey: null, editedAt: 0 });
+  // A work an older editor made for a sight, magazine, light, lens or ammo alone: the author is asked for the gun it belongs on.
+  const retarget = item && !isSkinTarget(item) ? id : null;
+  useStore.setState({ doc, projectPath: null, selection: null, undo: [], redo: [], unmatched: [], lastEditKey: null, editedAt: 0, retarget });
   void restorePreviews(doc);
   return true;
 }

@@ -13,6 +13,12 @@ Source code and release notes for NAinfini's GTFO mods, published on Thunderstor
 | [ForgeSkin](ForgeSkin/README.md) | 1.0.2 | Applies ForgeSkin packs (textures, attachments, live ammo screens, animated layers) to your own weapons; includes the desktop skin editor. | [NAinfini/ForgeSkin](https://thunderstore.io/c/gtfo/p/NAinfini/ForgeSkin/) |
 | [ForgeFrameGen](ForgeFrameGen/README.md) | 1.0.0 | DLSS / FSR upscaling and frame generation: DLSS on RTX cards, FSR 4 or 3.1 on others; experimental DLSS Frame Generation with Reflex (RTX 40/50) and AMD FSR Frame Generation. Unofficial; not an NVIDIA or AMD product. | [NAinfini/ForgeFrameGen](https://thunderstore.io/c/gtfo/p/NAinfini/ForgeFrameGen/) |
 
+Development tool (not on Thunderstore, never part of a player modpack):
+
+| Package | Version | What it is |
+|---|---|---|
+| [ForgeDevelopment](ForgeDevelopment/README.md) | 1.0.0 | Development and verification tooling: an out-of-game console and test scripts that drive the game and read its state back, a recorder (traces, snapshots, reports) and performance diagnostics. Depends only on ForgeCore; works on vanilla and MTFO levels. |
+
 ## Layout
 
 - One folder per package: the plugin source (C#, BepInEx 6 IL2CPP), tests, build tools, README, CHANGELOG and, in each folder's DEVELOPERS.md, how to build against and extend it. Sibling packages reference each other as ../<Package>, so keep the folders side by side.

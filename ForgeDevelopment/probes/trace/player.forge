@@ -1,0 +1,494 @@
+{
+  "profile": "player",
+  "enabledByDefault": true,
+  "entries": [
+    {
+      "type": "Player.PlayerAgent",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "Gear_iResourcePackReceiver_*",
+        "_*",
+        "RequestWarpToSync",
+        "TeleportTo",
+        "TryWarpTo",
+        "WarpBack",
+        "WarpTo"
+      ],
+      "record": "args+result",
+      "instance": [
+        "Damage.Health",
+        "m_alive",
+        "Locomotion.Downed",
+        "Damage.Infection",
+        "PlayerSlotIndex"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Player.PlayerAgent",
+      "methods": [
+        "set_Alive"
+      ],
+      "record": "args",
+      "instance": [
+        "m_alive",
+        "PlayerSlotIndex"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Player.LocalPlayerAgent",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "LateUpdate",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Dam_PlayerDamageBase",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "ModifyInfection",
+        "ReceiveAddHealth",
+        "ReceiveFallDamage",
+        "ReceiveNoAirDamage",
+        "ReceiveParasiteDamage",
+        "ReceiveParasiteTrapDamage",
+        "ReceivePushDamage",
+        "ReceiveSetHealth",
+        "ReceiveShooterProjectileDamage",
+        "ReceiveStickyDamage",
+        "ReceiveTentacleAttackDamage",
+        "ReceiveTentacleGrabStop",
+        "ReceiveTentacleTankGrabDamage",
+        "ReceiveTentacleTrapGrabDamage",
+        "ReceiveBulletDamage",
+        "ReceiveMeleeDamage",
+        "OnIncomingDamage"
+      ],
+      "record": "args+result",
+      "instance": [
+        "Owner",
+        "Owner.PlayerSlotIndex",
+        "Health",
+        "HealthMax",
+        "DamageMax"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Dam_PlayerDamageBase",
+      "methods": [
+        "OnIncomingDamage"
+      ],
+      "record": "args+result",
+      "instance": [
+        "Owner.GlobalID",
+        "Owner.PlayerSlotIndex",
+        "Health",
+        "HealthMax"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count",
+      "phases": "before+after"
+    },
+    {
+      "type": "Dam_PlayerDamageBase",
+      "methods": [
+        "ReceiveMeleeDamage"
+      ],
+      "record": "args+result",
+      "instance": [
+        "Owner.GlobalID",
+        "Owner.PlayerSlotIndex",
+        "Health",
+        "HealthMax"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count",
+      "phases": "before+after"
+    },
+    {
+      "type": "Dam_PlayerDamageBase",
+      "methods": [
+        "ReceiveBulletDamage"
+      ],
+      "record": "args+result",
+      "instance": [
+        "Owner.GlobalID",
+        "Owner.PlayerSlotIndex",
+        "Health",
+        "HealthMax"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count",
+      "phases": "before+after"
+    },
+    {
+      "type": "Dam_PlayerDamageLocal",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Dam_PlayerDamageLimb",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Player.PlayerBackpackManager",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Player.PlayerAmmoStorage",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PlayerInventoryBase",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "ReceiveSimpleItemStatus",
+        "SendSimpleItemStatus"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PlayerInventoryLocal",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "CheckAndWield",
+        "DoWieldItem"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PlayerInventorySynced",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "GetSync",
+        "Setup"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Player.PlayerLocomotion",
+      "methods": [
+        "ChangeState",
+        "SetState",
+        "OnStateChange",
+        "Setup",
+        "Enable",
+        "Disable",
+        "AddExternalPushForce"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_currentState",
+        "m_currentStateEnum"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Player.PlayerSync",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "IncomingDimensionChange",
+        "IncomingSyncWarp",
+        "SendDimensionChange",
+        "SendSyncWarp"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Player.PlayerSyncIK",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "LateUpdate",
+        "get_*",
+        "set_*"
+      ],
+      "record": "count",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PlayerChatManager",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Player.PlayerVoiceManager",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "AgentModifierManager",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "AddSyncedModifierValue",
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_Revive",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Player.AgentInteractionInfoCommunicator",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "GameEvent.GameEventManager",
+      "methods": [
+        "PostEvent"
+      ],
+      "record": "args",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PLOC_GrabbedByTank",
+      "methods": [
+        "IncomingTankTentacleGrab"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "record": "args+result",
+      "instance": [
+        "m_owner.PlayerSlotIndex",
+        "m_owner.Damage.GrabbedByTank",
+        "m_inState"
+      ],
+      "phases": "before+after"
+    },
+    {
+      "type": "PlayerVoice",
+      "methods": [
+        "SayLine"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "record": "args+result",
+      "instance": [
+        "m_owner.PlayerSlotIndex",
+        "m_playerID",
+        "m_currentDialogID"
+      ],
+      "phases": "before+after"
+    },
+    {
+      "type": "PlayerInventoryBase",
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "methods": [
+        "ReceiveSimpleItemStatus"
+      ],
+      "instance": [
+        "Owner.PlayerSlotIndex",
+        "Owner.Noise",
+        "lastSentStatus",
+        "WieldedSlot"
+      ],
+      "phases": "before+after",
+      "acoustic": {
+        "layer": "player-detection",
+        "source": {
+          "actor": "instance.Owner",
+          "role": "player"
+        },
+        "fields": {
+          "noise": "instance.Owner.Noise",
+          "playerSlot": "instance.Owner.PlayerSlotIndex"
+        }
+      }
+    },
+    {
+      "type": "PlayerInventoryBase",
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "methods": [
+        "SendSimpleItemStatus"
+      ],
+      "instance": [
+        "Owner.PlayerSlotIndex",
+        "Owner.Noise",
+        "lastSentStatus",
+        "WieldedSlot"
+      ],
+      "phases": "before+after",
+      "acoustic": {
+        "layer": "player-detection",
+        "source": {
+          "actor": "instance.Owner",
+          "role": "player"
+        },
+        "fields": {
+          "noise": "instance.Owner.Noise",
+          "playerSlot": "instance.Owner.PlayerSlotIndex"
+        }
+      }
+    }
+  ]
+}

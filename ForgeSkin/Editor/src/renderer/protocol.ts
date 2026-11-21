@@ -450,7 +450,6 @@ export type SkinsNoteKind =
   | 'property'
   // export
   | 'itemSkin'
-  | 'unusedMaterials'
   | 'global'
   | 'sameMaterial'
   | 'sharedMaterial'

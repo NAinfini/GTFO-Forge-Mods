@@ -1,0 +1,9 @@
+# Board layer order: every text standing on a backdrop (a sign, a world label, a model label with a background) draws
+# all its materials, the main font's and each fallback-font sub-mesh's (CJK glyphs come from separate fonts), in the queue
+# over the backdrop with the scene depth test, and the backdrop in its own queue below. Run on a level with at least one
+# sign with a background shown (the V1 button wall); no room ids, so any such level works. Run as in combat-basics.test.
+stop-on-fail
+call static:ForgeDevelopment.Native.SignLayers Read as=layers
+expect $layers.result !contains "boards=0;"
+expect $layers.result !contains "subMeshes=0;"
+expect $layers.result contains "wrong=0;"

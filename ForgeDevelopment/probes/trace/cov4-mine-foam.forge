@@ -1,0 +1,24 @@
+{
+  "profile": "cov4-mine-foam",
+  "enabledByDefault": true,
+  "entries": [
+    {
+      "type": "MineDeployerInstance_Detonate_Glue+_ExplosionSequence_d__25",
+      "methods": ["MoveNext"],
+      "record": "args+result",
+      "instance": [],
+      "phases": "before+after",
+      "maxPerSecond": 1000,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ProjectileManager",
+      "methods": ["WantToFireGlue", "GetNextSyncID", "DoFireGlue", "SpawnGlueGunProjectileIfNeeded", "DoMergeGlue", "DoDestroyGlue"],
+      "record": "args+result",
+      "instance": [],
+      "phases": "before+after",
+      "maxPerSecond": 1000,
+      "onOverflow": "count"
+    }
+  ]
+}

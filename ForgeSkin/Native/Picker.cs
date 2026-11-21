@@ -312,17 +312,13 @@ sealed class Picker : PickerSource
                 : new PickerInfo { Title = Title(skin), Subtitle = skin.Doc.Author.Length > 0 ? Author(skin) : name, Icon = picture, Body = WithNotes(body) };
         }
         if (skin == null)
-        {
-            // Skins for every gear (not chosen here) stay on under the original look.
-            var globals = _bot >= 0 ? 0 : Skins.Globals.Count(Skins.ById.ContainsKey); // a bot wears none of them
             return new PickerInfo
             {
                 Title = T("picker.original"),
                 Subtitle = Name(key),
                 Icon = picture,
-                Body = WithNotes(string.Join("\n", new[] { T(key == CharacterSkin.Target ? "picker.originalPerson" : "picker.originalBody"), globals > 0 ? T("picker.globalsStay", globals) : "", waiting }.Where(l => l.Length > 0))),
+                Body = WithNotes(string.Join("\n", new[] { T(key == CharacterSkin.Target ? "picker.originalPerson" : "picker.originalBody"), waiting }.Where(l => l.Length > 0))),
             };
-        }
         return new PickerInfo { Title = Title(skin), Subtitle = skin.Doc.Author.Length > 0 ? Author(skin) : Name(key), Icon = picture, Body = WithNotes(waiting) };
     }
 

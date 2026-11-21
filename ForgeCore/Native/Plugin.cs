@@ -12,7 +12,7 @@ namespace ForgeCore;
 [BepInDependency("dev.gtfomodding.gtfo-api", ">=0.6.1")]
 internal sealed class Plugin : BasePlugin
 {
-    internal const string Id = "NAinfini.ForgeCore", Version = "1.0.3"; // package-version: NAinfini-ForgeCore
+    internal const string Id = "NAinfini.ForgeCore", Version = "1.0.4"; // package-version: NAinfini-ForgeCore
 
     internal static ModLog Logger { get; private set; } = null!;
 

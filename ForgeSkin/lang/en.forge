@@ -31,7 +31,6 @@
   "picker.previewLoading": "Preparing the preview…",
   "picker.previewOld": "This pack has no preview. Export it again with the latest ForgeSkin editor to get one.",
   "picker.coloursInLobby": "The colours you pick show on your own gear in the lobby.",
-  "picker.globalsStay": "{0} skin(s) made for every gear still apply.",
   "picker.off": "Skins are off: all gear shows its original look. Turn on Show skins behind the gear at the top right.",
   "settings.all": "Skin settings · all gear",
   "settings.enabled": "Show skins",

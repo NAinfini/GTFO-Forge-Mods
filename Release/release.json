@@ -2,7 +2,7 @@
   "kind": "forge-base-release-identity",
   "schemaVersion": "1.0.0",
   "author": "NAinfini",
-  "websiteUrl": "https://github.com/NAinfini/GTFO-Forge",
+  "websiteUrl": "https://github.com/NAinfini/GTFO-Forge-Mods",
   "baseDependencies": [
     {
       "dependency": "BepInEx-BepInExPack_GTFO-3.2.4",
@@ -76,7 +76,7 @@
         "BepInEx-BepInExPack_GTFO-3.2.4",
         "GTFOModding-GTFO_API-0.6.1",
         "dakkhuza-MTFO-4.6.3",
-        "NAinfini-ForgeCore-1.0.3"
+        "NAinfini-ForgeCore-1.0.4"
       ],
       "identity": {
         "csprojs": [
@@ -106,7 +106,7 @@
       "audience": "author",
       "dependencies": [
         "GTFOModding-GTFO_API-0.6.1",
-        "NAinfini-ForgeEngine-1.0.0"
+        "NAinfini-ForgeCore-1.0.4"
       ],
       "identity": {
         "csprojs": [
@@ -177,7 +177,7 @@
       "pluginGuid": "NAinfini.ForgeCore",
       "providerId": null,
       "providerIds": [],
-      "version": "1.0.3",
+      "version": "1.0.4",
       "audience": "player",
       "dependencies": [
         "BepInEx-BepInExPack_GTFO-3.2.4",
@@ -207,7 +207,7 @@
         "packager": "tools/package_release.py",
       "dependencies": [
         "BepInEx-BepInExPack_GTFO-3.2.4",
-        "NAinfini-ForgeCore-1.0.3"
+        "NAinfini-ForgeCore-1.0.4"
       ],
       "identity": {
         "csprojs": [
@@ -227,7 +227,7 @@
       "packager": "tools/package_release.py",
       "dependencies": [
         "BepInEx-BepInExPack_GTFO-3.2.4",
-        "NAinfini-ForgeCore-1.0.3"
+        "NAinfini-ForgeCore-1.0.4"
       ],
       "identity": {
         "csprojs": [
@@ -242,12 +242,12 @@
       "pluginGuid": "NAinfini.ForgeFrameGen",
       "providerId": null,
       "providerIds": [],
-      "version": "1.0.0",
+      "version": "1.0.1",
       "audience": "player",
       "packager": "tools/package_release.py",
       "dependencies": [
         "BepInEx-BepInExPack_GTFO-3.2.4",
-        "NAinfini-ForgeCore-1.0.3"
+        "NAinfini-ForgeCore-1.0.4"
       ],
       "identity": {
         "csprojs": [
@@ -270,7 +270,7 @@
         "BepInEx-BepInExPack_GTFO-3.2.4",
         "GTFOModding-GTFO_API-0.6.1",
         "dakkhuza-MTFO-4.6.3",
-        "NAinfini-ForgeCore-1.0.3"
+        "NAinfini-ForgeCore-1.0.4"
       ],
       "identity": {
         "csprojs": [
@@ -311,7 +311,7 @@
       "dependencies": [
         "BepInEx-BepInExPack_GTFO-3.2.4",
         "GTFOModding-GTFO_API-0.6.1",
-        "NAinfini-ForgeCore-1.0.3"
+        "NAinfini-ForgeCore-1.0.4"
       ],
       "identity": {
         "csprojs": [
@@ -333,7 +333,7 @@
         "BepInEx-BepInExPack_GTFO-3.2.4",
         "GTFOModding-GTFO_API-0.6.1",
         "dakkhuza-MTFO-4.6.3",
-        "NAinfini-ForgeCore-1.0.3"
+        "NAinfini-ForgeCore-1.0.4"
       ],
       "identity": {
         "csprojs": [

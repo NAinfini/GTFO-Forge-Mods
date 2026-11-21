@@ -12,7 +12,7 @@ namespace ForgeFrameGen;
 [BepInDependency("NAinfini.ForgeCore", ">=1.0.3")]
 internal sealed class Plugin : BasePlugin
 {
-    internal const string Id = PackageFiles.PluginId, DisplayName = "Forge FrameGen", Version = "1.0.0"; // package-version: NAinfini-ForgeFrameGen
+    internal const string Id = PackageFiles.PluginId, DisplayName = "Forge FrameGen", Version = "1.0.1"; // package-version: NAinfini-ForgeFrameGen
     internal const string NativeFile = PackageFiles.NativeFile, DlssLibrary = "nvngx_dlss.dll", FsrLoader = "amd_fidelityfx_loader_dx12.dll";
     private const string InSettings = " Also in the game's settings (Video, Advanced Graphics), where a change applies at once.";
 

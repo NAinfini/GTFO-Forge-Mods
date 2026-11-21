@@ -38,9 +38,6 @@ public static class OldSkinMove
                     if (older?["targets"] is JsonObject targets)
                         foreach (var (key, id) in targets)
                             if (!json["targets"]!.AsObject().ContainsKey(key)) json["targets"]![key] = id?.DeepClone();
-                    if (older?["global"] is JsonArray global)
-                        foreach (var id in global.Select(n => (string?)n).Where(id => id != null && !json["global"]!.AsArray().Any(n => (string?)n == id)).ToList())
-                            json["global"]!.AsArray().Add(id);
                     Install.WriteActive(profile, json);
                     File.Delete(file);
                 }

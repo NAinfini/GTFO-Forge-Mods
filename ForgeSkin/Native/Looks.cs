@@ -113,7 +113,7 @@ static class Looks
             if (p.ByKey.TryGetValue(key, out var worn)) used.Add(worn.Skin);
     }
 
-    // The skins a teammate's gear wears: their own skin for it, never this player's global skins.
+    // The skins a teammate's gear wears: their own skin for it, never this player's choice.
     public static List<Skin> Wanted(ulong owner, string key) => WornBy(owner, key) is { } worn ? new List<Skin> { worn.Skin } : new List<Skin>();
 
     // The picker's lines: teammates' gear this player sees in its original look because the skin is missing or another version

@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+The plugin's next version; its number is set when it is released.
+
+- Changed: there are no skins for every gear any more. A sight, magazine, light, lens or ammo change belongs to one gun's skin and shows on that gun alone; the same sight on another gun keeps its own look. A pack an older editor made for no gear, and an `active.json` that still lists `global` skins, are not worn and say so once in the log (`skin-global-unsupported`): open the work in the editor and make it a gun's skin. Nothing changes in what teammates exchange: such skins were never shared, so players on this version and on 1.0.2 still see each other's skins as before.
+- Logs: a `forgeskin.forge` placed in `BepInEx/plugins` itself or deeper than the mod's own folder (a mod zip unpacked with its top folder), and a skin pack lying in the plugins folder without a marker that lists it, are now named in the log with where they belong (`skin-pack-misplaced`) instead of being skipped without a word.
+
+## Editor, unreleased
+
+Not a plugin version: the editor's version is set when it is released on GitHub.
+
+- Changed: sights, magazines, lights, lenses and ammo are no longer offered as targets of their own; change them in the skin of the gun that carries them. Building a skin that names no gun, tool or item is refused with a message saying so.
+- New: opening a work an older editor made for a sight, magazine, light, lens or ammo alone asks for the gun it goes on. The material changes that gun has are kept, attachments and part changes on a part it has too, and everything that does not fit is listed; the work moves to that gun and the old file goes to the Recycle Bin.
+- Changed: a Skins export leaves out a pack that names no gun and says so in its report.
+
 ## Editor 1.1.6
 
 Not a plugin version: the editor's own release on GitHub. Comes with the ForgeSkin plugin 1.0.2 and ForgeCore 1.0.3 and installs them into your profile.

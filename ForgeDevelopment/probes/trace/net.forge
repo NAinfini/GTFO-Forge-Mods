@@ -1,0 +1,106 @@
+{
+  "profile": "net",
+  "enabledByDefault": false,
+  "entries": [
+    {
+      "type": "SNetwork.SNet_Replicator",
+      "methods": ["CreatePacketBytes", "AddPacket", "GetPackets", "RevieveBytes", "GetPacketType", "Despawn"],
+      "record": "args",
+      "firstStack": true,
+      "maxPerSecond": 100,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SNetwork.SNet_Packet",
+      "methods": ["ReceiveBytes", "Setup", "InjectIDPacketIndex"],
+      "record": "args",
+      "firstStack": true,
+      "maxPerSecond": 150,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SNetwork.SNet_PacketBufferBytes",
+      "methods": ["Send", "ReceiveBytes", "Create", "Setup", "CaptureToBuffer"],
+      "record": "args",
+      "firstStack": true,
+      "maxPerSecond": 100,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SNetwork.SNet_PacketDataWrappers",
+      "methods": ["CaptureToBuffer", "ReceiveBytes", "Create", "AddWrapper"],
+      "record": "args",
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "M_*",
+      "methods": ["MarshalToBytes"],
+      "record": "count",
+      "firstStack": true,
+      "maxPerSecond": 200,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SNetwork.SNet_ReplicationManager",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*"],
+      "record": "args",
+      "firstStack": true,
+      "maxPerSecond": 80,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SNetwork.SNet_Replicator_Manager",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*"],
+      "record": "args",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SNetwork.SNet_Replicator_SelfManaged",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*"],
+      "record": "args",
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SNetwork.SNet_SyncManager",
+      "methods": ["*"],
+      "exclude": ["SNetUpdate", "Update", "get_*", "set_*"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SNetwork.SNet_Capture",
+      "methods": ["*"],
+      "exclude": ["Update", "DevUpdate", "get_*", "set_*", "SNetwork_*", "TryGetInterface"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SNetwork.SNet_Player",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*", "UpdateVisibleName"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SNetwork.SNet_PlayerSlotManager",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*"],
+      "record": "args",
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    }
+  ]
+}

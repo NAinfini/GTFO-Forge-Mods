@@ -1,0 +1,47 @@
+{
+  "profile": "author-y15-layer-fields",
+  "enabledByDefault": false,
+  "entries": [
+    {
+      "type": "LevelGeneration.LG_Layer",
+      "methods": ["CreateZone"],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "m_type",
+        "m_buildData.m_layerGameData.ZonesWithBulkheadEntrance",
+        "m_buildData.m_layerGameData.BulkheadDoorControllerPlacements",
+        "m_buildData.m_layerGameData.ArtifactData.ArtifactAmountMulti",
+        "m_buildData.m_layerGameData.ArtifactData.ArtifactLayerDistributionDataID",
+        "m_buildData.m_layerGameData.ArtifactData.ArtifactZoneDistributions"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_BuildBulkheadDoorControllerLogicJob",
+      "methods": ["Build"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_BulkheadDoorController_Core",
+      "methods": ["BuildBulkheadLogic"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_PickupItem",
+      "methods": ["SetupAsArtifact"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    }
+  ]
+}

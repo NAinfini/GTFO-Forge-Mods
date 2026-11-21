@@ -1,0 +1,514 @@
+{
+  "profile": "door-terminal",
+  "enabledByDefault": true,
+  "entries": [
+    {
+      "type": "LevelGeneration.LG_SecurityDoor",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*",
+        "_Setup*",
+        "Setup"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_lastState",
+        "Gate.m_linksTo",
+        "m_checkpointPuzzle.Data.TriggerAlarmOnActivate",
+        "Gate.HasBeenOpenedDuringPlay",
+        "m_securityDoorType",
+        "Gate.ForceSecurityGate",
+        "Gate.ForceApexGate",
+        "Gate.ForceBulkheadGate",
+        "Gate.ForceBulkheadGateMainPath"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 50,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_WeakDoor",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*",
+        "_Setup*",
+        "Setup"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_sync.m_stateReplicator.State",
+        "m_destruction.m_health",
+        "Gate.HasBeenOpenedDuringPlay",
+        "Gate.Type",
+        "Gate.CoursePortal.m_nodeA.NodeID",
+        "Gate.CoursePortal.m_nodeB.NodeID",
+        "Gate.CoursePortal.m_nodeA.m_zone.LocalIndex",
+        "Gate.CoursePortal.m_nodeB.m_zone.LocalIndex"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 50,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_WeakDoor_Destruction",
+      "methods": [
+        "HandleIncomingDamage",
+        "OnDoorState",
+        "FindCollider",
+        "SetTraversable",
+        "AddGlue",
+        "ClearGlue",
+        "TriggerExplosionEffect",
+        "TriggerPunchEffect"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_WeakLock",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*",
+        "_Setup*",
+        "Setup",
+        "SNetwork_*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_stateReplicator.State",
+        "Status",
+        "m_lockType",
+        "transform.parent.name",
+        "transform.parent.parent.name",
+        "transform.parent.parent.parent.name"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_WeakLock",
+      "methods": [
+        "Setup"
+      ],
+      "record": "count",
+      "instance": [
+        "m_lockType",
+        "transform.parent.name",
+        "transform.parent.parent.name"
+      ],
+      "maxPerSecond": 200,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_SecurityDoor_Locks",
+      "methods": [
+        "SetupAsLockedNoKey",
+        "OnDoorState",
+        "SetActiveEnemyWaveEnabled",
+        "UpdateText"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_lockedWithNoKey",
+        "m_lockedWithNoKeyInteractionText",
+        "m_hasActiveEnemyWave",
+        "m_gateKeyItemNeeded.DataBlockID"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_SecurityDoor_Locks",
+      "methods": [
+        "SetupForGateKey",
+        "SetupForChainedPuzzle",
+        "SetupForPowerGenerator",
+        "SetupForBulkheadDC"
+      ],
+      "record": "count",
+      "instance": [
+        "m_lockedWithNoKey",
+        "m_hasActiveEnemyWave",
+        "m_gateKeyItemNeeded.DataBlockID"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LG_DoorBladeCuller",
+      "methods": [
+        "SetNeedsUpdate",
+        "ForceUpdate",
+        "StartAnimation",
+        "EndAnimation",
+        "SwitchToDestroyedRenderLists",
+        "SwitchToOriginalRendererList"
+      ],
+      "record": "args+result",
+      "instance": [
+        "transform.parent.name",
+        "transform.parent.parent.name"
+      ],
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_DoorButton",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*",
+        "Setup",
+        "DelayDisableAnimator"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_ComputerTerminal",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "_Setup*",
+        "SNetwork_*",
+        "iWardenObjectiveItem_*",
+        "DebugDraw"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_stateReplicator.State",
+        "m_currentState",
+        "IsPasswordProtected",
+        "m_localLogs",
+        "m_syncedInteractionSource.PlayerSlotIndex",
+        "transform.position",
+        "transform.rotation",
+        "SpawnNode.m_zone.LocalIndex",
+        "WardenObjectiveType",
+        "WardenObjectiveChainIndex",
+        "CorruptedUplinkReceiver.transform.position"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_ComputerTerminalManager",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_TERM_Base",
+      "methods": [
+        "Enter",
+        "Exit",
+        "OnInteract",
+        "CanInteract",
+        "SetData",
+        "SyncEnter",
+        "SyncExit",
+        "SyncUpdate",
+        "DebugPrefix"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_TERM_PlayerInteracting",
+      "methods": [
+        "ParseInput",
+        "OnRegularInput",
+        "OnReturn",
+        "OnBack",
+        "OnDELCharacter",
+        "StepBufferNext",
+        "StepBufferPrevious",
+        "MoveCaretLeft",
+        "MoveCaretRight",
+        "MoveToEnd",
+        "MoveToStart",
+        "CheckRepeatStop",
+        "Enter",
+        "Exit"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_TERM_EnterPassword",
+      "methods": [
+        "EnableInput",
+        "OnReturn",
+        "OnExitFPSViewDone"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_TERM_PasswordProtected",
+      "methods": [
+        "CanInteract",
+        "Enter",
+        "OnInteract",
+        "OnEnterFPSViewDone",
+        "OnProximityExit"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_TERM_Ping",
+      "methods": [
+        "Ping",
+        "Enter",
+        "Exit",
+        "CanInteract",
+        "GetAnswersBasedOnDistance"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_TERM_Awake",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_TERM_DataMining",
+      "methods": [
+        "Enter",
+        "Exit"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LG_HSU",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "SNetwork_*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "PickupItemStatus",
+        "m_subjectIsFemale",
+        "m_age",
+        "transform.position",
+        "transform.rotation",
+        "SpawnNode.m_zone.LocalIndex",
+        "WardenObjectiveChainIndex"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_HSUActivator_Core",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "SNetwork_*",
+        "_Trigger*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_stateReplicator.State",
+        "m_stateReplicator.State.status"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_BulkheadDoorController_Core",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*",
+        "SNetwork_*",
+        "_Setup*",
+        "_Build*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_stateReplicator.State",
+        "m_serialNumber",
+        "m_thisLayer.m_type",
+        "transform.position",
+        "transform.parent.name",
+        "m_terminalItem.SpawnNode.m_zone.LocalIndex",
+        "m_connectedBulkheadDoors.Count",
+        "m_connectedBulkheadDoors.Keys",
+        "m_bulkheadScans.Count",
+        "m_bulkheadDoorSplines.Count",
+        "m_mainLayerScanHolder.position",
+        "m_secondaryLayerScanHolder.position",
+        "m_thirdLayerScanHolder.position"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_ResourceContainer_Sync",
+      "methods": [
+        "AttemptInteract",
+        "AttemptInteraction",
+        "OnStateChange",
+        "Setup"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_WeakResourceContainer",
+      "methods": [
+        "AttemptInteract",
+        "TriggerOpen",
+        "OnSyncStateChanged",
+        "OnWeakLockLocked",
+        "OnWeakLockUnlocked",
+        "OnLockUnlocked",
+        "SpawnContent"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_ComputerTerminal",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_SecurityDoorUseKeyItem",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_SimpleDoorButton",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Interact_RequireKeyItem",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_keyItemDatablockId"
+      ],
+      "maxPerSecond": 30,
+      "onOverflow": "count",
+      "firstStack": false
+    },
+    {
+      "type": "LevelGeneration.LG_ComputerTerminalCommandInterpreter",
+      "methods": [
+        "EvaluateInput",
+        "ReceiveCommand",
+        "AddOutput",
+        "ReadLog"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    }
+  ]
+}

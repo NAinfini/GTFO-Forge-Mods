@@ -1,0 +1,10 @@
+{
+  "name": "ForgeDevelopment",
+  "version_number": "1.0.0",
+  "website_url": "https://github.com/NAinfini/GTFO-Forge-Mods",
+  "description": "Forge Development: console, recorder, world capture and performance diagnostics for any GTFO level (vanilla, MTFO or Forge) on ForgeCore alone; Forge map reads join in under Forge Engine Authoring mode. Author-only, not a player dependency.",
+  "dependencies": [
+    "GTFOModding-GTFO_API-0.6.1",
+    "NAinfini-ForgeCore-1.0.4"
+  ]
+}

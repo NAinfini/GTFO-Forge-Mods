@@ -9,7 +9,7 @@ import { useItem, useStore } from '../store';
 import { simulate } from '../viewport/refs';
 import { wholeGun } from './Library';
 import { LiveryBar } from './LiveryPanel';
-import { GearGallery, WeaponTitle } from './WeaponGallery';
+import { GearGallery, RetargetGallery, WeaponTitle } from './WeaponGallery';
 import { focusSelection, useModal, useViewStore, Viewport } from '../viewport/Viewport';
 import { t } from '../i18n';
 
@@ -301,6 +301,7 @@ export function Stage() {
         </div>
       )}
       <FirstRun />
+      <RetargetGallery />
       {preview && (
         <>
           <ViewBar />

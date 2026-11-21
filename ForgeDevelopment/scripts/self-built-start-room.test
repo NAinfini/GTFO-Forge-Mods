@@ -1,0 +1,25 @@
+# A level whose start room is a self-built room (the map's entry room, any number of doorways, none connected): the room takes the
+# elevator's place, the team spawns straight into it, there is no elevator shaft, and the room build is not refused.
+# Export a level from the website whose start room is a self-built room (for example a blank 24×24 room with no other room attached),
+# install it, start a session on that freshly loaded level, then run:
+#   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package <team>-<package> --level A1 --work-dir artifacts/work/drivesession/<name>
+#   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name> run Mods/ForgeDevelopment/scripts/self-built-start-room.test
+#
+# The start room is zone 0 of the main layer in reality. The landing check reads where the team spawned before anything moves the player.
+stop-on-fail
+
+# in the level, alive, standing in the start room's first area
+status as=state
+expect $state.gameState == "InLevel"
+player Alive Position DimensionIndex CourseNode.m_zone.LocalIndex CourseNode.m_zone.DimensionIndex as=landed
+expect $landed.Alive == "True"
+expect $landed.CourseNode.m_zone.LocalIndex == "0"
+expect log --all !contains "room.build-refused"
+expect log --all !contains "entry-shaft"
+
+# the start room's own area is reachable through the game's course nodes: teleport onto it and read back
+teleport zone=0/MainLayer/0 area=0 as=start
+expect $start.Alive == "True"
+player Position CourseNode.m_zone.LocalIndex as=after
+expect $after.CourseNode.m_zone.LocalIndex == "0"
+expect log --all !contains "Exception"

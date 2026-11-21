@@ -1,0 +1,413 @@
+{
+  "profile": "gui",
+  "enabledByDefault": true,
+  "entries": [
+    {
+      "type": "GuiManager",
+      "methods": [
+        "UpdatePlayerInfo",
+        "OnFocusStateChanged",
+        "RegisterLocalPlayerAgent",
+        "AttemptSetLocatorBeacon",
+        "AttemptSetPlayerPingStatus",
+        "AttemptSetTerminalPing",
+        "RemoveLocatorBeaconIfActive",
+        "PostSetup",
+        "Setup",
+        "OnLevelCleanup",
+        "MakeAllTextMeshesStatic",
+        "OnResolutionChange"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "Awake",
+        "CalcSafeArea",
+        "CalcLayerOffsets",
+        "CalcOffsetAndMoveLayer"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "NavMarkerLayer",
+      "methods": [
+        "PlaceCustomMarker",
+        "PrepareMarker",
+        "PlaceSelectionMarker",
+        "PlacePlayerMarker",
+        "PlaceLocatorMarker",
+        "PlaceWaypointMarker",
+        "PlaceTitleMarker",
+        "PlaceGuidanceMarker",
+        "PlaceBulkheadMarker",
+        "PrepareGenericMarker",
+        "RemoveMarker",
+        "RemoveMarkerForGO",
+        "RemoveLocatorMarker",
+        "OnLevelCleanup"
+      ],
+      "exclude": null,
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 50,
+      "onOverflow": "count"
+    },
+    {
+      "type": "NavMarker",
+      "methods": [
+        "SetColor",
+        "SetStyle",
+        "SetOptions",
+        "SetState",
+        "SetTitle",
+        "SetVisualStates",
+        "SetPlayerName",
+        "SetSignInfo",
+        "SetTrackingObject",
+        "SetVisible",
+        "SetCanBeSelected",
+        "SetPinEnabled",
+        "UpdateEnabledPerDimensionState",
+        "UpdateTrackingDimension"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "CoroutineManager",
+      "methods": [
+        "BlinkIn"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PlaceNavMarkerOnGO",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*",
+        "OnDestroy"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SyncedNavMarkerWrapper",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_WorldEventNavMarker",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PlayerGuiLayer",
+      "methods": [
+        "UpdateShield",
+        "UpdateCustomSubObjective",
+        "ShowWardenIntel",
+        "ShowSingleLineSubtitle",
+        "ShowMultiLineSubtitle",
+        "UpdateHealth",
+        "UpdateInfection",
+        "UpdateObjectives",
+        "UpdateObjectiveHeader",
+        "UpdateObjectiveItems",
+        "UpdateAir",
+        "OnLevelCleanup",
+        "OnTeammateHealthChange",
+        "OnTeammateSpawned",
+        "OnTeammateRemoved",
+        "OnTeammateNameChange",
+        "DoShowIntelText"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 50,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PUI_LocalPlayerStatus",
+      "methods": [
+        "UpdateShield",
+        "SetShieldbar",
+        "UpdateHealth",
+        "SetHealthbar",
+        "UpdateInfection",
+        "SetInfectionbar",
+        "UpdateAir",
+        "SetAirVisible",
+        "UpdateText",
+        "UpdateBPM",
+        "StartHealthWarning",
+        "StartStaminaWarning",
+        "StopWarning",
+        "ResetDamageAnimation"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 50,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PUI_GameObjectives",
+      "methods": [
+        "SetCustomSubText",
+        "SetSubObjective",
+        "SetMainObjective",
+        "SetMainSubObjective",
+        "SetHeader",
+        "SetProgressiveObjective",
+        "SetProgressionObjective",
+        "AddCurrentObj",
+        "AddCurrentObjHelp",
+        "AddPreviousObj",
+        "UpdateText",
+        "UpdateMainObjectiveText",
+        "UpdateObjectivesLayout",
+        "ClearTexts",
+        "SetVisible",
+        "OnLevelCleanup"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 50,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PUI_WardenIntel",
+      "methods": [
+        "SetIntelText",
+        "SetWardenObjectiveText",
+        "ShowSubObjectiveMessage",
+        "ShowPrioritySubObjectiveMessage",
+        "NewObjectiveSequence",
+        "PlayIntro",
+        "SetVisible",
+        "UpdateTexts",
+        "ResetSubObjectiveMesssagQueue"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 50,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PUI_Inventory",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*",
+        "LoadItemIcon"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PUI_InventoryItem",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": null,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PUI_InteractionPrompt",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PUI_GameEventLog",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "_Setup*",
+        "ShowAndUpdateItemPositions",
+        "UpdateHeightOffset"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PUI_GameEventLog_Item",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": null,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PUI_TeammateStatusItem",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": null,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PUI_ObjectiveTimer",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "UpdateCountdownPitch"
+      ],
+      "record": "args+result",
+      "firstStack": null,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PUI_Message",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": null,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "InteractionGuiLayer",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PUI_CommunicationMenu",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "MoveNext",
+        "CreateButtons",
+        "CreatePlacementIndicators",
+        "CheckHighlightInput",
+        "CheckSelectionInput",
+        "CheckToggleInput",
+        "UpdateHighlightedButton"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    }
+  ]
+}

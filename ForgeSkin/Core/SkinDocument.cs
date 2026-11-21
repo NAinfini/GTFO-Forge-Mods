@@ -16,8 +16,8 @@ public sealed class SkinDocument
     public string Author { get; set; } = "";
     public string Version { get; set; } = "1.0.0";
 
-    // Which gear (gun, melee weapon or tool) this skin is for. Null weapon = applies to every gear that uses the listed materials
-    // (attachment skins: mags, sights, lights, ammo).
+    // Which gear (gun, melee weapon, tool or item) this skin is for. Its sight, magazine, light and ammo materials are part of it and dress
+    // that gear alone; a skin for no gear (older editors made those for every gear) is no longer worn.
     public SkinTarget Target { get; set; } = new();
 
     public List<MaterialOverride> Materials { get; set; } = new();
@@ -132,7 +132,7 @@ public sealed class ColorSlot
 
 public sealed class SkinTarget
 {
-    // Catalog gear id (e.g. "auto_pistol", "sledgehammer", "bio_tracker"); null for attachment skins; CharacterSkin.Target for a
+    // Catalog gear id (e.g. "auto_pistol", "sledgehammer", "bio_tracker"); CharacterSkin.Target for a
     // character skin (no gear or item id).
     public string? Weapon { get; set; }
     // What the plugin matches on, filled from the catalog when packing; exactly one is set for a gear skin. GearId: the
@@ -141,7 +141,7 @@ public sealed class SkinTarget
     public uint? GearId { get; set; }
     public uint? ItemId { get; set; }
 
-    // The key in active.json: "gear:<GearId>", "item:<ItemId>" or "character"; null for attachment skins.
+    // The key in active.json: "gear:<GearId>", "item:<ItemId>" or "character"; null for a pack an older editor made for no gear.
     public string? Key() => Weapon == CharacterSkin.Target ? CharacterSkin.Target : GearId is { } gear ? GearKey(gear) : ItemId is { } item ? ItemKey(item) : null;
     public static string GearKey(uint id) => "gear:" + id;
     public static string ItemKey(uint id) => "item:" + id;

@@ -1,0 +1,40 @@
+# V1 E2 wave test hall, cell 顺序装置 (official mechanism m-sequence-devices: devices 1, 2, 3 in order; a wrong one spawns the penalty wave
+# and counts a miss, all three open the wing's entrance door; no step alarm is chosen). Run on a freshly loaded E2 of the V1
+# package, as in e2-fog-rise.test.
+#
+# Room 波次测试大厅 room:fa3983cd8074ae4861619b63d2c5; teleport points are room-local Unity metres (the editor's x mirrored).
+# Devices (interaction points; in game the objects ForgeInteractionPoint:<id>):
+#   装置 1 b1-held-point-bbb855dc70b74b78f8e957f66d03, 装置 2 b1-held-point-537a963203aace9e048d4682ca3f,
+#   装置 3 b1-held-point-d973507fdfdd518708727524076a
+# Level variables (var.g + sha256 of [NAinfini-Forge_V1_Rundown, E2 expedition:c0f79f1c282f415a05ea618b73db, row id]):
+#   顺序装置 · 错次 level.v1.t_d13bee175af81768aa52d56e8fb0  var.g576b4f1ad222ec96b6da6c5e27e9e564a7442715c77e41d2e77964cb79afd140
+#   顺序装置 · 完成 level.v1.t_3102e77eee588642b14f9650ab03  var.gd67467c8096081fc1d378cc85475897e4ac2eb627b9da1dd3b2e60e68278e6e3
+# Holding a device by name depends on the console interact fix of the devconsole-interact lane.
+stop-on-fail
+god on
+
+# wrong first: device 2
+teleport room=room:fa3983cd8074ae4861619b63d2c5 -11.5 0 -48
+interact name=b1-held-point-537a963203aace9e048d4682ca3f radius=4
+wait 2s
+state variables var.g576b4f1ad222ec96b6da6c5e27e9e564a7442715c77e41d2e77964cb79afd140 as=wrong
+expect $wrong.var.g576b4f1ad222ec96b6da6c5e27e9e564a7442715c77e41d2e77964cb79afd140 == 1
+alarms all as=after_wrong
+clear enemies
+
+# right order: 1, 2, 3
+teleport room=room:fa3983cd8074ae4861619b63d2c5 -11.5 0 -53
+interact name=b1-held-point-bbb855dc70b74b78f8e957f66d03 radius=4
+wait 1s
+teleport room=room:fa3983cd8074ae4861619b63d2c5 -11.5 0 -48
+interact name=b1-held-point-537a963203aace9e048d4682ca3f radius=4
+wait 1s
+teleport room=room:fa3983cd8074ae4861619b63d2c5 -11.5 0 -43
+interact name=b1-held-point-d973507fdfdd518708727524076a radius=4
+wait 2s
+state variables var.gd67467c8096081fc1d378cc85475897e4ac2eb627b9da1dd3b2e60e68278e6e3 as=done
+expect $done.var.gd67467c8096081fc1d378cc85475897e4ac2eb627b9da1dd3b2e60e68278e6e3 == "True"
+state variables var.g576b4f1ad222ec96b6da6c5e27e9e564a7442715c77e41d2e77964cb79afd140 as=misses
+expect $misses.var.g576b4f1ad222ec96b6da6c5e27e9e564a7442715c77e41d2e77964cb79afd140 == 1
+clear enemies
+expect log --all !contains "Exception"

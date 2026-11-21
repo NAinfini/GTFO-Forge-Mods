@@ -1,0 +1,60 @@
+# The alarm downgrade door of V1 A2 (the room behind the written-lock room): a vanilla Class X Alarm door (ten scans). The button
+# 降到 5 级 runs "更换门的警报", which puts the Class V scan (five scans) waiting beside it on the door; 换回 10 级 puts the door's own
+# scan back. Pulling the door starts whichever scan the door holds; a finished scan unlocks it. The ids below are the ones `pnpm build:v1` gives A2.
+# Start a session on a freshly loaded A2 of the V1 package (or shoot the room's reset button first), then run:
+#   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package NAinfini-Forge_V1_Rundown --level A2 --work-dir artifacts/work/drivesession/<name>
+#   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name> run Mods/ForgeDevelopment/scripts/a2-alarm-downgrade.test
+#
+# Passes when every expect below holds: the door is locked before; lowering logs map.door-alarm-changed (the door text read back after
+# the change) and sets the flag; restoring and lowering again log no failure; pulling the door then starts the Class V scan, and the door
+# is no longer locked once that scan is finished. The room's watcher behavior "降级警报门观察" keeps which scan started in two level
+# variables, read back by their runtime identities: var.g + sha256 of the JSON array [package, expedition, variable row id]
+# (runtimeLevelVariableIdentity), here package NAinfini-Forge_V1_Rundown, A2's expedition expedition:7b7d00db895328965b09fda1587c and
+# the rows 降级门启动的扫描 level.v1.t_f44a65fc067082de4da982c84017 (未启动 / 10 级 / 5 级) and 降级门已降级
+# level.v1.t_6acdf378b679ae25eb73a24549ea. Another package name, expedition or row id gives other identities: recompute them from the
+# current author library after `pnpm build:v1` changes either.
+stop-on-fail
+god on
+wield primary
+ammo fill
+
+# in front of the door: locked, not lowered (nothing has written the flag, so the store holds no entry for it)
+teleport room=room:cdcf2c3b2898d6f811995862093a 0 0 13
+door read near:6 as=before
+expect $before.result contains "Locked"
+state variables var.ga8e19723a6065d0b15b9a14f674452b5615d36dcdc1988253b245293835b2518 as=lowered_before
+expect $lowered_before.matched == 0
+
+# lower to Class V: the door takes the Class V scan and its text is read back
+model-shot {"schemaVersion":"1.0.0","model":"v1-mx-4c0f2e308ad256bdff63f690692f"}
+wait 2s
+expect log --all contains "map.door-alarm-changed"
+expect log --all !contains "map.door-alarm-failed"
+state variables var.ga8e19723a6065d0b15b9a14f674452b5615d36dcdc1988253b245293835b2518 as=lowered_vars
+expect $lowered_vars.var.ga8e19723a6065d0b15b9a14f674452b5615d36dcdc1988253b245293835b2518 == "True"
+
+# back to Class X and down again: the swap repeats without a failure
+model-shot {"schemaVersion":"1.0.0","model":"v1-mx-2f0460fb60243a2e00f7d27c1c93"}
+wait 2s
+state variables var.ga8e19723a6065d0b15b9a14f674452b5615d36dcdc1988253b245293835b2518 as=restored_vars
+expect $restored_vars.var.ga8e19723a6065d0b15b9a14f674452b5615d36dcdc1988253b245293835b2518 == "False"
+model-shot {"schemaVersion":"1.0.0","model":"v1-mx-4c0f2e308ad256bdff63f690692f"}
+wait 2s
+expect log --all !contains "map.door-alarm-failed"
+
+# pull the door: the Class V scan starts, the door stays locked
+teleport room=room:cdcf2c3b2898d6f811995862093a 0 0 13
+interact name=@LG_SecurityDoor radius=8
+wait 3s
+door read near:6 as=pulled
+expect $pulled.result contains "Locked"
+state variables var.gdc12b45e3b45cedc280695aacbd31a05da5b239115132ce28b57405821884075 as=started
+expect $started.var.gdc12b45e3b45cedc280695aacbd31a05da5b239115132ce28b57405821884075 == "5 级"
+
+# the Class V scan finishes: the door unlocks
+model-shot {"schemaVersion":"1.0.0","model":"v1-mx-2e2eb68caafc621cdda6baa589ad"}
+wait 3s
+teleport room=room:cdcf2c3b2898d6f811995862093a 0 0 13
+door read near:6 as=after
+expect $after.result !contains "Locked"
+expect log --all !contains "Exception"

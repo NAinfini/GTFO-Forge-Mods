@@ -3,7 +3,7 @@ import { Chip, Group, Loader, Modal, ScrollArea, Text, TextInput, UnstyledButton
 import { IconSearch } from '@tabler/icons-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CatalogItem } from '../protocol';
-import { useItem, useStore } from '../store';
+import { isSkinTarget, useItem, useStore } from '../store';
 import { requestItemThumbs, THUMB_EVENT, thumbComing, thumbOf } from '../viewport/thumbnails';
 import { lang, localCategory, localName, t, useLang } from '../i18n';
 
@@ -16,8 +16,6 @@ export const SLOT_LABEL: Record<string, () => string> = {
   pack: () => t('slot.pack'),
   consumable: () => t('slot.consumable'),
   carry: () => t('slot.carry'),
-  attachment: () => t('leftRail.k4'),
-  ammo: () => t('leftRail.k5'),
 };
 
 /** Weapon type in the UI language. */
@@ -74,8 +72,10 @@ function WeaponCard({ item, current, onPick }: { item: CatalogItem; current: boo
   );
 }
 
-function WeaponPicker({ onPick }: { onPick: (id: string) => void }) {
-  const catalog = useStore((s) => s.catalog);
+/** The gear a skin can be made for (only narrows it further). */
+function WeaponPicker({ onPick, only }: { onPick: (id: string) => void; only?: (c: CatalogItem) => boolean }) {
+  const all = useStore((s) => s.catalog);
+  const catalog = useMemo(() => all.filter((c) => isSkinTarget(c) && (!only || only(c))), [all, only]);
   const weaponId = useStore((s) => s.weaponId);
   const [q, setQ] = useState('');
   const [slot, setSlot] = useState<string>('all');
@@ -147,6 +147,23 @@ export function GearGallery({ opened, onClose, onPick }: { opened: boolean; onCl
   return (
     <Modal opened={opened} onClose={onClose} title={t('works.pickGear')} size={760} padding={0} classNames={{ body: 'gallery', header: 'gallery-head' }}>
       <WeaponPicker onPick={(id) => (onClose(), onPick(id))} />
+    </Modal>
+  );
+}
+
+const isGun = (c: CatalogItem) => c.slot === 'main' || c.slot === 'special';
+
+/** A work an older editor made for a sight, magazine, light, lens or ammo alone, which no longer take a skin of their own: the author
+ * picks the gun it goes on (store moveToGun). Closed, the work stays as it is and cannot be applied until a gun is picked. */
+export function RetargetGallery() {
+  const retarget = useStore((s) => s.retarget);
+  const item = useStore((s) => s.catalog.find((c) => c.id === s.retarget));
+  return (
+    <Modal opened={!!retarget} onClose={() => useStore.setState({ retarget: null })} title={t('works.retargetTitle')} size={760} padding={0} classNames={{ body: 'gallery', header: 'gallery-head' }}>
+      <Text size="sm" px="md" pt="sm">
+        {t('works.retargetInfo', { v0: item ? localName(item) : (retarget ?? '') })}
+      </Text>
+      <WeaponPicker only={isGun} onPick={(id) => void useStore.getState().moveToGun(id)} />
     </Modal>
   );
 }

@@ -1,0 +1,2921 @@
+{
+  "profile": "enemy",
+  "enabledByDefault": true,
+  "entries": [
+    {
+      "type": "Enemies.EnemyAgent",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "_*",
+        "ListenerDetectNoise"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_tagMarker",
+        "Damage.Health",
+        "m_alive",
+        "EnemyDataID",
+        "m_dimensionIndex",
+        "EnemyData.persistentID"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EnemyAI",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "SetDetectedAgent",
+        "SetTarget"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_mode",
+        "m_behaviour.m_currentStateName",
+        "Target"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EnemyBehaviour",
+      "methods": [
+        "UpdateState",
+        "FixedUpdateState",
+        "SignalEvent",
+        "SetIncomingExtraStateData",
+        "OnSetupStateMachine",
+        "Setup",
+        "SetAI"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_currentState"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EnemyBehaviour",
+      "methods": [
+        "ChangeState"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_currentStateName",
+        "m_ai.m_enemyAgent.GlobalID",
+        "m_ai.Target.m_detectionType",
+        "m_ai.Target.m_agent.GlobalID"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "phases": "before+after",
+      "acoustic": {
+        "layer": "wakeup-propagation",
+        "source": {
+          "from": "parent.source"
+        },
+        "receiver": {
+          "actor": "instance.m_ai.m_enemyAgent",
+          "role": "enemy"
+        },
+        "fields": {
+          "state": "instance.m_currentStateName"
+        }
+      }
+    },
+    {
+      "type": "ES_DeadBase",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_DeadFlyer",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_Dead",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_DeadSquidBoss",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_FloaterHitreact",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_Hitreact",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_HitreactBase",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_HitreactFlyer",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_JumpDissolve",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_Knockdown",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_KnockdownRecover",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_LiquidSnake",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_PathMove",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_PathMoveBase",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_PathMoveFlyer",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_ScoutDetection",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_Shortcut",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_ShortcutJump",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_StandStill",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_TentacleDragMove",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_Legacy.ES_FloaterFly",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_Legacy.ES_PathMoveBase",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_Base",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_BirtherGiveBirth",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_ClimbLadder",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_EnemyAttackBase",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_Hibernate",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_HibernateWakeUp",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*",
+        "Enter",
+        "DoWakeup",
+        "CommonExit"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_Jump",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_ScoutScream",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*",
+        "ActivateState"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_ShooterAttack",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_ShooterAttackFlyer",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_StrikerAttack",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_StrikerMelee",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_StuckInGlue",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_TankAttack",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_TankMultiTargetAttack",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_TriggerFogSphere",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_Dodge",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_FloaterHitreact",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_HitreactType",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_Legacy.ES_PathMoveBase",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_Shortcut",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_Scream",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_ScreamBase",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_ScreamBase`1",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_ScreamFlyer",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_StateEnum",
+      "methods": [
+        "Enter",
+        "Exit",
+        "ActivateState",
+        "ActivateStateWithData",
+        "CommonEnter",
+        "CommonExit",
+        "OnAttackWindUp",
+        "OnAttackPerform",
+        "DoStartAttack",
+        "DoWakeup",
+        "DoHeartbeat",
+        "Heartbeat",
+        "StartBeat",
+        "EndBeat",
+        "DoStartDetection",
+        "DoEndDetection",
+        "MasterStartDetection",
+        "MasterEndDetection",
+        "DamageShouldTriggerHitreact",
+        "OnHitreactDone",
+        "Stop"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "MoveNext",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_EnemyAttackBase",
+      "methods": [
+        "RecieveAttackStart"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent.GlobalID"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_Hitreact",
+      "methods": [
+        "CanHitreact"
+      ],
+      "record": "args+result",
+      "instance": [
+        "CurrentReactionType",
+        "m_enemyAgent.GlobalID"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_HitreactBase",
+      "methods": [
+        "CanHitreact"
+      ],
+      "record": "args+result",
+      "instance": [
+        "CurrentReactionType",
+        "m_enemyAgent.GlobalID"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_HitreactFlyer",
+      "methods": [
+        "CanHitreact"
+      ],
+      "record": "args+result",
+      "instance": [
+        "CurrentReactionType",
+        "m_enemyAgent.GlobalID"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_HitreactType",
+      "methods": [
+        "CanHitreact"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_Hitreact",
+      "methods": [
+        "SyncUpdate"
+      ],
+      "record": "changes",
+      "instance": [
+        "CurrentReactionType",
+        "m_data",
+        "m_enemyAgent.GlobalID"
+      ],
+      "maxPerSecond": 30,
+      "onOverflow": "count",
+      "firstStack": false
+    },
+    {
+      "type": "ES_HitreactBase",
+      "methods": [
+        "SyncUpdate"
+      ],
+      "record": "changes",
+      "instance": [
+        "CurrentReactionType",
+        "m_enemyAgent.GlobalID"
+      ],
+      "maxPerSecond": 30,
+      "onOverflow": "count",
+      "firstStack": false
+    },
+    {
+      "type": "ES_HitreactFlyer",
+      "methods": [
+        "SyncUpdate"
+      ],
+      "record": "changes",
+      "instance": [
+        "CurrentReactionType",
+        "m_data",
+        "m_enemyAgent.GlobalID"
+      ],
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_HitreactFlyer",
+      "methods": [
+        "SyncUpdate"
+      ],
+      "record": "changes",
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_HitreactType",
+      "methods": [
+        "SyncUpdate"
+      ],
+      "record": "changes",
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ES_ScoutDetection",
+      "methods": [
+        "OnTargetRegistered"
+      ],
+      "record": "count",
+      "instance": [
+        "m_enemyAgent.GlobalID"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_ScoutScream",
+      "methods": [
+        "ActivateState",
+        "RecieveScream",
+        "DoStartScream",
+        "SyncEnter",
+        "SyncExit"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_state",
+        "m_animIndex",
+        "m_enemyAgent.GlobalID",
+        "m_enemyAgent"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EnemyLocomotion",
+      "methods": [
+        "ChangeState"
+      ],
+      "record": "args+result",
+      "instance": [
+        "CurrentStateEnum",
+        "m_agent.GlobalID"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count",
+      "phases": "before+after"
+    },
+    {
+      "type": "Enemies.EnemyLocomotion",
+      "methods": [
+        "ForceState"
+      ],
+      "record": "args+result",
+      "instance": [
+        "CurrentStateEnum",
+        "m_agent.GlobalID"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count",
+      "phases": "before+after"
+    },
+    {
+      "type": "Enemies.EnemyAbilities",
+      "methods": [
+        "UseAbility"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count",
+      "instance": [
+        "m_agent.GlobalID",
+        "m_canTrigger"
+      ],
+      "phases": "before+after"
+    },
+    {
+      "type": "EAB_Birthing",
+      "methods": [
+        "OnGaveBirth"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "EAB_FogSphere",
+      "methods": [
+        "DoTrigger"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "m_owner.GlobalID",
+        "m_owner.Pointer",
+        "m_activeFogSpheres"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EB_Consume_Pouncer",
+      "methods": [
+        "ActivateState"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "instance": [
+        "m_ai.m_enemyAgent.GlobalID",
+        "m_targetPlayer.PlayerSlotIndex"
+      ],
+      "phases": "before+after"
+    },
+    {
+      "type": "Enemies.EB_SpitOut_Pouncer",
+      "methods": [
+        "ActivateState"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "AirNavigation.FlyingAirGraphAgent",
+      "methods": [
+        "IsPositionOnGraph"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.SquidBossBehaviour",
+      "methods": [
+        "get_Phase",
+        "set_Phase",
+        "ActivateWeakspotIfNeeded"
+      ],
+      "record": "args+result",
+      "instance": [
+        "Phase"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "NoiseManager",
+      "methods": [
+        "MakeNoise"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count",
+      "instance": [],
+      "phases": "before+after",
+      "acoustic": {
+        "layer": "noise-manager",
+        "source": {
+          "from": "arg0.sourceLocation"
+        },
+        "fields": {
+          "includeToNeightbourAreas": "arg0.includeToNeightbourAreas",
+          "radiusMin": "arg0.radiusMin",
+          "radiusMax": "arg0.radiusMax",
+          "node": "arg0.courseNode"
+        }
+      }
+    },
+    {
+      "type": "Enemies.EnemyPrefabManager",
+      "methods": [
+        "BuildEnemyPrefab"
+      ],
+      "record": "args",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ScoutAntennaDetection",
+      "methods": [
+        "Setup",
+        "PlayAbilityOutAnimation"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_owner",
+        "m_wantsToHaveTendrils"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ScoutAntenna",
+      "methods": [
+        "Init"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Dam_EnemyDamageBase",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "BulletDamage",
+        "ExplosionDamage",
+        "MeleeDamage",
+        "ProcessReceivedDamage",
+        "ReceiveBulletDamage",
+        "ReceiveDestroyLimb",
+        "ReceiveExplosionDamage",
+        "ReceiveFireDamage",
+        "ReceiveFreezeDamage",
+        "ReceiveMeleeDamage",
+        "SendDestroyLimb"
+      ],
+      "record": "args+result",
+      "instance": [
+        "Owner",
+        "Health",
+        "HealthMax",
+        "DamageMax",
+        "m_attachedGlueVolume",
+        "IsStuckInGlue"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 80,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EnemyAllocator",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EnemyGroup",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "SNetwork_IReplicatorSupplier_*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_groupDataBlock"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SurvivalWave",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "SNetwork_IReplicatorSupplier_*",
+        "Method_Internal_*",
+        "GetScoredSpawnPoint",
+        "RegisterCost",
+        "RegisterGroup",
+        "SetSettings",
+        "SpawnGroup",
+        "StartWave",
+        "StopEvent",
+        "TriggerDirRandomization",
+        "TryEndEvent",
+        "TryPlayWaveDialogSound"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_isNewWave",
+        "m_waveSpawnTimer",
+        "m_populationPointsPerWaveMax",
+        "m_spawnType",
+        "m_courseNode.NodeID",
+        "m_courseNode.m_nodeCluster.ID",
+        "m_settings.persistentID",
+        "m_settings.name",
+        "m_settings.m_overrideWaveSpawnType",
+        "m_settings.m_survivalWaveSpawnType"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EnemySpawnManager",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EnemyDetection",
+      "methods": [
+        "UpdateTargets",
+        "UpdateData",
+        "UpdateDetectionTimer",
+        "UpdateInCombatDetection",
+        "UpdateLineOfSightAndOcclusion",
+        "UpdateLineOfSightAndOcclusion_NoFOV",
+        "IsTargetValid",
+        "IsOccluded",
+        "GetDetectionWaveMod"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EnemySync",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*",
+        "SNetwork_IReplicatorSupplier_*",
+        "TryCollectCaptureData"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Mastermind",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "GameStateUpdate*",
+        "AddEvent",
+        "HasEventOfType",
+        "MaintainGroups",
+        "RegisterGroup",
+        "RemoveEvent",
+        "SpawnGroup",
+        "UnregisterGroup",
+        "UpdateEvents"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "EnemyPopulationManager",
+      "methods": [
+        "GetWeightedRandomType",
+        "GetNextType",
+        "GiveHeat",
+        "ResetHeat",
+        "SetHeat",
+        "SetCooldownFactor",
+        "ResetCooldownSpeed"
+      ],
+      "record": "args+result",
+      "phases": "before+after",
+      "instance": [
+        "m_baseWeightTable",
+        "m_currentBaseWeights",
+        "m_heatTable",
+        "m_maxHeat",
+        "m_cooldownFactor"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "EnemyCostManager",
+      "methods": [
+        "AddCost",
+        "RemoveCost",
+        "GetEnemyCost",
+        "GetTotalCost",
+        "IsAllowed"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EnemyAI",
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent.GlobalID",
+        "m_behaviour.m_currentStateName",
+        "Target.m_detectionType",
+        "Target.m_agent.GlobalID"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "methods": [
+        "SetDetectedAgent"
+      ],
+      "phases": "before+after",
+      "acoustic": {
+        "layer": "player-detection",
+        "source": {
+          "actor": "arg0"
+        },
+        "receiver": {
+          "actor": "instance.m_enemyAgent",
+          "role": "enemy"
+        },
+        "fields": {
+          "sourceNoise": "arg0.Noise",
+          "state": "instance.m_behaviour.m_currentStateName",
+          "detectionType": "instance.Target.m_detectionType"
+        }
+      }
+    },
+    {
+      "type": "Enemies.EnemyAI",
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent.GlobalID",
+        "m_behaviour.m_currentStateName",
+        "Target.m_detectionType",
+        "Target.m_agent.GlobalID"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "methods": [
+        "SetTarget"
+      ],
+      "phases": "before+after",
+      "acoustic": {
+        "layer": "wakeup-propagation",
+        "source": {
+          "from": "parent.source"
+        },
+        "receiver": {
+          "actor": "instance.m_enemyAgent",
+          "role": "enemy"
+        },
+        "fields": {
+          "requestedTarget": "arg0.GlobalID",
+          "state": "instance.m_behaviour.m_currentStateName"
+        }
+      }
+    },
+    {
+      "type": "Enemies.ES_HibernateWakeUp",
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent.GlobalID",
+        "m_ai.Target.m_detectionType",
+        "m_ai.Target.m_agent.GlobalID",
+        "m_isPropagatedWakeup"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "methods": [
+        "Enter"
+      ],
+      "phases": "before+after",
+      "acoustic": {
+        "layer": "wakeup-propagation",
+        "source": {
+          "from": "parent.source"
+        },
+        "receiver": {
+          "actor": "instance.m_enemyAgent",
+          "role": "enemy"
+        },
+        "fields": {
+          "state": "instance.m_ai.m_behaviour.m_currentStateName",
+          "propagated": "instance.m_isPropagatedWakeup"
+        }
+      }
+    },
+    {
+      "type": "Enemies.ES_HibernateWakeUp",
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent.GlobalID",
+        "m_ai.Target.m_detectionType",
+        "m_ai.Target.m_agent.GlobalID",
+        "m_isPropagatedWakeup"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "methods": [
+        "DoWakeup"
+      ],
+      "phases": "before+after",
+      "acoustic": {
+        "layer": "wakeup-propagation",
+        "source": {
+          "from": "parent.source"
+        },
+        "receiver": {
+          "actor": "instance.m_enemyAgent",
+          "role": "enemy"
+        },
+        "fields": {
+          "state": "instance.m_ai.m_behaviour.m_currentStateName",
+          "propagated": "instance.m_isPropagatedWakeup"
+        }
+      }
+    },
+    {
+      "type": "Enemies.ES_HibernateWakeUp",
+      "record": "args+result",
+      "instance": [
+        "m_enemyAgent.GlobalID",
+        "m_ai.Target.m_detectionType",
+        "m_ai.Target.m_agent.GlobalID",
+        "m_isPropagatedWakeup"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "methods": [
+        "CommonExit"
+      ],
+      "phases": "before+after",
+      "acoustic": {
+        "layer": "wakeup-propagation",
+        "source": {
+          "from": "parent.source"
+        },
+        "receiver": {
+          "actor": "instance.m_enemyAgent",
+          "role": "enemy"
+        },
+        "fields": {
+          "state": "instance.m_ai.m_behaviour.m_currentStateName",
+          "propagated": "instance.m_isPropagatedWakeup"
+        }
+      }
+    },
+    {
+      "type": "EAB_Alarm",
+      "methods": [
+        "StartChargeUp"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "record": "args+result",
+      "instance": [
+        "m_alarmTriggered",
+        "m_chargingUp",
+        "m_alarmStartTime",
+        "m_owner.GlobalID"
+      ],
+      "phases": "before+after"
+    },
+    {
+      "type": "EAB_Alarm",
+      "methods": [
+        "StartAlarm"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "record": "args+result",
+      "instance": [
+        "m_alarmTriggered",
+        "m_chargingUp",
+        "m_alarmStartTime",
+        "m_owner.GlobalID"
+      ],
+      "phases": "before+after"
+    },
+    {
+      "type": "Enemies.EB_Hibernating",
+      "methods": [
+        "OnNoiseDetected"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_ai.m_enemyAgent.GlobalID",
+        "m_ai.m_behaviour.m_currentStateName"
+      ],
+      "phases": "before+after",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "acoustic": {
+        "layer": "noise-manager",
+        "source": {
+          "from": "arg0.sourceLocation"
+        },
+        "receiver": {
+          "actor": "instance.m_ai.m_enemyAgent",
+          "role": "enemy"
+        },
+        "fields": {
+          "distance01": "arg1",
+          "state": "instance.m_ai.m_behaviour.m_currentStateName",
+          "includeToNeightbourAreas": "arg0.includeToNeightbourAreas"
+        }
+      }
+    },
+    {
+      "type": "Enemies.EB_Patrolling",
+      "methods": [
+        "OnNoiseDetected"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_ai.m_enemyAgent.GlobalID",
+        "m_ai.m_behaviour.m_currentStateName"
+      ],
+      "phases": "before+after",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "acoustic": {
+        "layer": "noise-manager",
+        "source": {
+          "from": "arg0.sourceLocation"
+        },
+        "receiver": {
+          "actor": "instance.m_ai.m_enemyAgent",
+          "role": "enemy"
+        },
+        "fields": {
+          "distance01": "arg1",
+          "state": "instance.m_ai.m_behaviour.m_currentStateName",
+          "includeToNeightbourAreas": "arg0.includeToNeightbourAreas"
+        }
+      }
+    },
+    {
+      "type": "Enemies.EnemyAbilities",
+      "methods": [
+        "IsAbilityReady"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_agent.GlobalID",
+        "m_canTrigger"
+      ],
+      "phases": "before+after",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ForgeEnemy.Native.EnemyActionHooks",
+      "methods": [
+        "Noise"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_ai.m_enemyAgent.GlobalID",
+        "m_ai.m_behaviour.m_currentStateName"
+      ],
+      "phases": "before+after",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "NoiseManager",
+      "methods": [
+        "ProcessNoise"
+      ],
+      "record": "args+result",
+      "instance": [],
+      "phases": "before+after",
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "acoustic": {
+        "layer": "noise-manager",
+        "source": {
+          "position": "arg0.position",
+          "role": "noise-origin"
+        },
+        "fields": {
+          "type": "arg0.type",
+          "radiusMin": "arg0.radiusMin",
+          "radiusMax": "arg0.radiusMax",
+          "yScale": "arg0.yScale",
+          "includeToNeightbourAreas": "arg0.includeToNeightbourAreas",
+          "raycastFirstNode": "arg0.raycastFirstNode"
+        }
+      }
+    },
+    {
+      "type": "NoiseManager",
+      "methods": [
+        "ProcessNode"
+      ],
+      "record": "args+result",
+      "instance": [],
+      "phases": "before+after",
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "acoustic": {
+        "layer": "noise-manager",
+        "source": {
+          "position": "arg1.position",
+          "role": "noise-origin"
+        },
+        "fields": {
+          "type": "arg1.type",
+          "radiusMin": "arg1.radiusMin",
+          "radiusMax": "arg1.radiusMax",
+          "yScale": "arg1.yScale",
+          "includeToNeightbourAreas": "arg1.includeToNeightbourAreas",
+          "raycastFirstNode": "arg1.raycastFirstNode",
+          "raycast": "arg2",
+          "maxRays": "arg3",
+          "processedNodePointer": "arg0.pointer"
+        }
+      }
+    },
+    {
+      "type": "Enemies.EnemyAgent",
+      "methods": [
+        "ListenerDetectNoise"
+      ],
+      "record": "args+result",
+      "instance": [
+        "GlobalID"
+      ],
+      "phases": "before+after",
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "acoustic": {
+        "layer": "noise-manager",
+        "source": {
+          "position": "arg0.position",
+          "role": "noise-origin"
+        },
+        "receiver": {
+          "actor": "instance",
+          "role": "enemy"
+        },
+        "fields": {
+          "distance01": "arg1",
+          "type": "arg0.type",
+          "radiusMin": "arg0.radiusMin",
+          "radiusMax": "arg0.radiusMax",
+          "yScale": "arg0.yScale",
+          "includeToNeightbourAreas": "arg0.includeToNeightbourAreas",
+          "raycastFirstNode": "arg0.raycastFirstNode"
+        }
+      }
+    }
+  ]
+}

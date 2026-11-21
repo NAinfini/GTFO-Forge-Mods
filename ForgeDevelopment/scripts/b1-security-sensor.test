@@ -1,0 +1,53 @@
+# V1 B1 mechanism hall, cell 安全传感器 (official mechanism m-security-sensor: one red sensor circle, 5 s cooldown, not once). Start a
+# session on a freshly loaded B1 of the V1 package, then run:
+#   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package NAinfini-Forge_V1_Rundown --level B1 --work-dir artifacts/work/drivesession/<name>
+#   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name>/session.forge run Mods/ForgeDevelopment/scripts/b1-security-sensor.test
+#
+# Room 机关样例区 room:c96b1d7b3466988a0d5e1f48fc58. Teleport points are room-local Unity metres: Unity (x, y, z) = editor (-x, y, z), the
+# V1 builder's room frame with x mirrored (v1-test-kit cellSpot). The circle is a 5 m wide, 3 m tall cylinder centred at (11.678, 1.52, -21)
+# whose floor face is the room floor, judged on the player's body (`bodyHit`: a 0.35 m capsule from the feet up), so a body that reaches the
+# drawn circle counts and a body 0.35 m or more outside it does not. Points on the x line through the centre:
+#   centre 11.678 · edge 9.378 · just outside 8.4 · far outside 5. A teleport lands on the nearest walkable point, so the landed feet
+#   sit 0.25, 2.68, 3.68 and 6.68 m from the centre (11-15 run): the edge stand overlaps the rim with the body (the feet 0.18 m out),
+#   the just-outside stand clears it by 0.83 m. The landed feet are at y 0.0097, below the circle's floor face at 0.0212.
+# Level variable (var.g + sha256 of [package NAinfini-Forge_V1_Rundown, B1 expedition expedition:876af89dc8833731cdd9a1dbeea5, row id];
+# recompute after `pnpm build:v1` changes a row):
+#   传感器踩到次数 level.v1.t_b5c882e5f10e2907110068f8b2ef  var.g59187e4d6c24dc31335e687c65db4e95fb0e9408de95dcbf9e772e17798066a1
+# A variable nothing has written yet has no entry in the store (a read answers its declared initial value): it reads back as matched 0.
+# Switching the group off with SENSOR_OFF at the cell's terminal is a hand test (terminal input is not scripted).
+stop-on-fail
+god on
+
+# far outside: nothing tripped yet
+teleport room=room:c96b1d7b3466988a0d5e1f48fc58 5 0 -21 as=far
+state variables var.g59187e4d6c24dc31335e687c65db4e95fb0e9408de95dcbf9e772e17798066a1 as=none
+expect $none.matched == 0
+
+# just outside the drawn rim: still nothing
+teleport room=room:c96b1d7b3466988a0d5e1f48fc58 8.4 0 -21 as=near
+wait 1s
+state variables var.g59187e4d6c24dc31335e687c65db4e95fb0e9408de95dcbf9e772e17798066a1 as=near_count
+expect $near_count.matched == 0
+
+# step in at the edge: one trip
+teleport room=room:c96b1d7b3466988a0d5e1f48fc58 9.378 0 -21 as=edge
+wait 1s
+state variables var.g59187e4d6c24dc31335e687c65db4e95fb0e9408de95dcbf9e772e17798066a1 as=one
+expect $one.var.g59187e4d6c24dc31335e687c65db4e95fb0e9408de95dcbf9e772e17798066a1 == 1
+
+# out, past the 5 s cooldown, in again at the centre: two
+teleport room=room:c96b1d7b3466988a0d5e1f48fc58 5 0 -21
+wait 6s
+teleport room=room:c96b1d7b3466988a0d5e1f48fc58 11.678 0 -21 as=centre
+wait 1s
+state variables var.g59187e4d6c24dc31335e687c65db4e95fb0e9408de95dcbf9e772e17798066a1 as=two
+expect $two.var.g59187e4d6c24dc31335e687c65db4e95fb0e9408de95dcbf9e772e17798066a1 == 2
+
+# out and back in at the edge once more: three
+teleport room=room:c96b1d7b3466988a0d5e1f48fc58 5 0 -21
+wait 6s
+teleport room=room:c96b1d7b3466988a0d5e1f48fc58 9.378 0 -21
+wait 1s
+state variables var.g59187e4d6c24dc31335e687c65db4e95fb0e9408de95dcbf9e772e17798066a1 as=three
+expect $three.var.g59187e4d6c24dc31335e687c65db4e95fb0e9408de95dcbf9e772e17798066a1 == 3
+expect log --all !contains "Exception"

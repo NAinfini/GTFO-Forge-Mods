@@ -1,0 +1,38 @@
+# Fire, reload, melee, throw and jump, driven as a player (game key input).
+# Start a session first, then run:
+#   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package NAinfini-Forge_V1_Rundown --level A1 --work-dir artifacts/work/drivesession/<name>
+#   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name> run Mods/ForgeDevelopment/scripts/combat-basics.test
+# A `--direct` flag on fire, melee, reload, throw, jump calls the game method instead of pressing keys.
+stop-on-fail
+god on
+player as=start
+wield primary
+ammo fill as=full
+
+# two sleeping Strikers in front: one far (to shoot), one close (to hit)
+spawn Striker 1 at=front:8 mode=hibernate as=s1
+spawn Striker 1 at=front:1.5 mode=hibernate as=s2
+
+# fire: six presses spend ammo and hurt the far one
+fire 6 at=s1 as=shots
+expect $shots.fires >= 1
+expect $shots.clipAfter < $shots.clipBefore
+expect enemy $s1.id health < $s1.health
+
+# reload: the clip comes back to full
+reload as=reloaded
+wait until state ammo clip == $full.maxClip timeout=5s
+
+# melee: a charged hit on the close one
+melee charge=0.3 at=s2 as=swing
+expect $swing.meleeHits >= 1
+
+# throw: the consumable is used and nothing broke
+throw as=thrown
+expect log !contains "Exception"
+
+# jump: leaves the ground and comes back
+jump
+wait 1.5s
+expect log !contains "Exception"
+clear enemies

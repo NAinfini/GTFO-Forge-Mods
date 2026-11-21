@@ -1,0 +1,40 @@
+# Two map-generator cases that used to refuse the level:
+# - a self-built room with generator-cluster points (or another placement kind its own vanilla rooms lack) builds each point from the
+#   marker producer class and datablock the website names for it, and the point is staged;
+# - rooms with no doorway: a start room without any doorway, a second room in the start zone with no doorway attached, and a zone
+#   whose only room has no doorway attached, all build.
+# Build the level in the map editor first: a self-built start room with no doorway and two generator-cluster points (the objective
+# "Power generators" uses them), plus a second self-built room in the same zone, placed apart, with no doorway connected; then a
+# vanilla room joined to the start zone by a door (its free doorways are what zone 1 grows from), and zone 1: one self-built room
+# with no doorway connected, placed apart.
+# Export, install, start a session on that freshly loaded level, then run:
+#   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package <team>-<package> --level A1 --work-dir artifacts/work/drivesession/<name>
+#   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name> run Mods/ForgeDevelopment/scripts/door-less-rooms-and-borrowed-markers.test
+stop-on-fail
+
+# the level loaded: no generation stage refusal, no refused room
+status as=state
+expect $state.gameState == "InLevel"
+expect log --all !contains "gen-stage-invalid"
+expect log --all !contains "room.build-refused"
+
+# the generator-cluster points were staged before native marker collection
+expect log --all contains "generator-cluster"
+
+# the team stands in the start zone, in the door-less start room
+player Alive CourseNode.m_zone.LocalIndex as=landed
+expect $landed.Alive == "True"
+expect $landed.CourseNode.m_zone.LocalIndex == "0"
+
+# the door-less second room is a real area of the start zone: teleport onto it and read back
+teleport zone=0/MainLayer/0 area=1 as=second
+expect $second.Alive == "True"
+player CourseNode.m_zone.LocalIndex as=after
+expect $after.CourseNode.m_zone.LocalIndex == "0"
+
+# zone 1 has no door in, but it is built: teleport into it and read back
+teleport zone=0/MainLayer/1 area=0 as=closed
+expect $closed.Alive == "True"
+player CourseNode.m_zone.LocalIndex as=inside
+expect $inside.CourseNode.m_zone.LocalIndex == "1"
+expect log --all !contains "Exception"

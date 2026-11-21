@@ -1,0 +1,26 @@
+[
+  {
+    "id": "v1-enemy-ability-inventory",
+    "title": "F3同路：导出已加载敌人能力/预制件参数/活实例冷却（只读）",
+    "points": [
+      "enemy.ability-index-layout",
+      "v1.primitive.b1.enemy-attack",
+      "v1.eec.model.scanner",
+      "v1.primitive.b1.boss-native-facts",
+      "v1.primitive.b1.scout-grab"
+    ],
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.EnemyAbilityInventory",
+    "steps": [
+      {
+        "call": "ExportCurrent"
+      }
+    ],
+    "notes": [
+      "优先直接F3，只读取真实已加载EnemyDataBlock、已加载能力预制件组件和现有活实例冷却表，不创建/激活预制件、不触发能力、不调用IsAbilityReady。",
+      "若从F5运行此命令，只在没有running命令且experiment objects alive: 0时运行；实验runner结束会清理已跟踪对象，非零即停止，不按R。提示不是自动门禁。",
+      "每次输出独立<session>-<captureSequence:D6>.json，核source.captureId/generationId/worldEpoch；prefabObservations逐component/field状态与liveCooldownObservations真实enemy/ability槽/component身份分别取证。",
+      "检查observationCoverage、每字段status、error和truncated；缺加载实例/不支持字段/读失败仍未证。单位保留pending-game。命令done或文件存在不是原生技能效果通过；必须让能力自然出手，结合真实游戏UseAbility/IsAbilityReady观察、时间与效果核冷却。"
+    ]
+  }
+]

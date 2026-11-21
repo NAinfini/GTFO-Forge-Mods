@@ -1,0 +1,23 @@
+[
+  {
+    "id": "enemy-population-keys",
+    "title": "原生敌人种群键：独立实例边界观察（待游戏执行）",
+    "points": ["map.enemy-population-key-bounds"],
+    "host": "host",
+    "target": "static:ForgeDevelopment.Native.EnemyPopulationKeyProbe",
+    "steps": [
+      { "call": "Begin" },
+      {
+        "repeat": {
+          "times": 177,
+          "steps": [
+            { "call": "Step" },
+            { "wait": { "frames": 1 } }
+          ]
+        }
+      },
+      { "call": "Finish" }
+    ],
+    "cleanup": [{ "call": "Cleanup" }]
+  }
+]

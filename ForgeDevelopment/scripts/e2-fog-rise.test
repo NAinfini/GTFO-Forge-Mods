@@ -1,0 +1,37 @@
+# V1 E2 wave test hall, cell 雾变浓 (template t-fog-rise: from the expedition start the fog of the dimension turns one step thicker a minute,
+# up to three; the default fogs barely move the fog surface, they only get denser; 降雾 takes a step off, 停止变浓 stops it). Start a session on a freshly loaded E2 of the V1 package, then run:
+#   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package NAinfini-Forge_V1_Rundown --level E2 --work-dir artifacts/work/drivesession/<name>
+#   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name> run Mods/ForgeDevelopment/scripts/e2-fog-rise.test
+#
+# Room 波次测试大厅 room:fa3983cd8074ae4861619b63d2c5; teleport points are room-local Unity metres. Buttons: 降雾
+# v1-mx-3151869bedebbafc452c9cdbe9f2, 停止变浓 v1-mx-64cdb457b285182f300fd453c840.
+# Level variables (var.g + sha256 of [NAinfini-Forge_V1_Rundown, E2 expedition:c0f79f1c282f415a05ea618b73db, row id]):
+#   雾变浓档位 level.v1.e2_fog_tier     var.g31eb750cba7713a10c2d7814bcc09d4a7d631188e39b027789319c89c4a7ecd5
+#   雾变浓已停 level.v1.e2_fog_stopped  var.g96585bd1324a6c460751e18d1ac98d72c644afe7f05083e8c1e007ea0f40031e
+# `state fog` reads Unity's scene fog only, not the game's fog settings, so it is recorded and not judged.
+stop-on-fail
+god on
+
+teleport room=room:fa3983cd8074ae4861619b63d2c5 0 0 -48
+
+# the first step comes within a minute of the start
+wait until state variables var.g31eb750cba7713a10c2d7814bcc09d4a7d631188e39b027789319c89c4a7ecd5 var.g31eb750cba7713a10c2d7814bcc09d4a7d631188e39b027789319c89c4a7ecd5 >= 1 timeout=75s
+state variables var.g31eb750cba7713a10c2d7814bcc09d4a7d631188e39b027789319c89c4a7ecd5 as=risen
+state fog as=fog_risen
+
+# lower: one step off
+model-shot {"schemaVersion":"1.0.0","model":"v1-mx-3151869bedebbafc452c9cdbe9f2"}
+wait 1s
+state variables var.g31eb750cba7713a10c2d7814bcc09d4a7d631188e39b027789319c89c4a7ecd5 as=lowered
+expect $lowered.var.g31eb750cba7713a10c2d7814bcc09d4a7d631188e39b027789319c89c4a7ecd5 < $risen.var.g31eb750cba7713a10c2d7814bcc09d4a7d631188e39b027789319c89c4a7ecd5
+
+# stop: no further step after another minute
+model-shot {"schemaVersion":"1.0.0","model":"v1-mx-64cdb457b285182f300fd453c840"}
+wait 1s
+state variables var.g96585bd1324a6c460751e18d1ac98d72c644afe7f05083e8c1e007ea0f40031e as=stopped
+expect $stopped.var.g96585bd1324a6c460751e18d1ac98d72c644afe7f05083e8c1e007ea0f40031e == "True"
+wait 65s
+state variables var.g31eb750cba7713a10c2d7814bcc09d4a7d631188e39b027789319c89c4a7ecd5 as=held
+expect $held.var.g31eb750cba7713a10c2d7814bcc09d4a7d631188e39b027789319c89c4a7ecd5 == $lowered.var.g31eb750cba7713a10c2d7814bcc09d4a7d631188e39b027789319c89c4a7ecd5
+state fog as=fog_held
+expect log --all !contains "Exception"

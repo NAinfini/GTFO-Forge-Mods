@@ -1,0 +1,110 @@
+[
+  {
+    "id": "reload-drive-checkpoint-save",
+    "title": "检查点：在本地玩家位置请求原生保存并独立确认",
+    "host": "host",
+    "target": "static:ForgeDevelopment.Native.AuthoringGameDrive",
+    "timeoutSeconds": 45,
+    "steps": [
+      {"call": "drive.checkpoint.save"},
+      {"wait": {"path": "CheckpointCompletion", "timeoutFrames": 1800}},
+      {"call": "drive.checkpoint.confirm"}
+    ],
+    "notes": ["这是自有夹具的原生检查点保存，不证明目标链已正常触发关卡检查点。完成事件与原生状态缺任一项即不能确认。"]
+  },
+  {
+    "id": "reload-drive-checkpoint-wipe",
+    "title": "检查点：经原生同步伤害入口让在场玩家各自倒下（团灭）",
+    "host": "host",
+    "target": "static:ForgeDevelopment.Native.AuthoringGameDrive",
+    "timeoutSeconds": 20,
+    "steps": [
+      {"call": "drive.checkpoint.wipe"}
+    ],
+    "notes": ["对每个存活玩家调用原生 NoAirDamage，伤害恰为其当前血量，让原版自己走到失败并重载检查点；不改写队伍生死、ready 或游戏状态。没有存活玩家时失败。只证明请求已发出，团灭与恢复要靠下一条恢复命令与位置、血量读回确认。"]
+  },
+  {
+    "id": "reload-drive-checkpoint-restore",
+    "title": "检查点：请求原生恢复并独立确认",
+    "host": "host",
+    "target": "static:ForgeDevelopment.Native.AuthoringGameDrive",
+    "timeoutSeconds": 60,
+    "steps": [
+      {"call": "drive.checkpoint.restore"},
+      {"wait": {"path": "CheckpointCompletion", "timeoutFrames": 2400}},
+      {"call": "drive.checkpoint.confirm"}
+    ],
+    "notes": ["需要真实已保存检查点，且只在团灭后的失败界面可用：走失败界面「从检查点重来」按钮的同一条原生路径（会话指令 ReloadCheckpoint、CheckpointManager.ReloadCheckpoint、StartRecallCheckpointWithAllSyncedPlayers）。原版没有不团灭就读档的入口，关内调用直接以 drive.checkpoint-restore-needs-wipe 拒绝。原生不接受当前游戏状态时本命令超时失败；本命令本身不改写队伍生死、ready 或游戏状态，团灭用 reload-drive-checkpoint-wipe 另行请求。读档不换世界；确认时世界号变了直接以 drive.checkpoint-world-changed 失败。恢复事件、递增的重载计数、使用计数与 Checkpoint 召回计数、重载结束须同时匹配（恢复会把交互类型放回保存时的 StoreCheckpoint，不以它判定）。"]
+  },
+  {
+    "id": "reload-drive-return-lobby",
+    "title": "按原生菜单回大厅，保留关卡身份供重进",
+    "host": "host",
+    "target": "static:ForgeDevelopment.Native.AuthoringGameDrive",
+    "timeoutSeconds": 30,
+    "steps": [
+      {"call": "drive.return.prepare"},
+      {"call": "drive.return.issue"}
+    ],
+    "notes": ["复用 Runtime 的退出扫描门禁和 CM_PageLoadout.EXT_QuitToMain；扫描未收尾时继续等原生门禁，退出调用只发一次。命令保留待确认读回直到恰好一次世界更替、关卡清理回调、state=Lobby 且 floorPresent=False 全部满足后才完成；额外世界更替拒绝，重进后另开观察命令。在关内和结算页（ExpeditionSuccess / ExpeditionFail）都可用。"]
+  },
+  {
+    "id": "reload-lifecycle-counts",
+    "title": "Y11 重读清理：读取世界、队列与诊断订阅规模",
+    "host": "any",
+    "target": "static:ForgeEngine.GameBindings.GameRuntimeBridge",
+    "steps": [
+      { "call": "Kernel" },
+      { "target": "result", "read": ["WorldEpoch", "LoadedPlans", "QueuedEvents", "LiveEffects", "kernelFlow.schedules.Count", "kernelVariables.waits.Count", "kernelEffects.handleSlots.Count", "lifecycleObservers.Count", "LifecycleFaultCount"] },
+      { "target": "static:ForgeDevelopment.Native.ExperimentObjects", "call": "Count" },
+      { "target": "static:ForgeDevelopment.Native.RecSession", "call": "Dropped" }
+    ],
+    "requires": ["同一隔离进程、相同关卡 / 计划 / 玩家配置；两端在首次大厅、每次效果清理后的大厅、再进关稳定后、检查点恢复稳定后分别采样；至少三轮，不在战斗中比较。"],
+    "notes": [
+      "来源：RuntimeKernel.BeginWorld 撤销 schedules / states / owned handles / effects、清 queue / handleSlots / variables，再通知 WorldChanged；检查点恢复使用已准入计划快照并按保存状态恢复计划，不扫描磁盘。只有显式 Authoring reload 重读计划并更新订阅。ExperimentRunner.Finish / FailRun 收尾只 DestroyAll 自己跟踪的对象。",
+      "通过：大厅的队列、效果、定时、等待与 handle 槽归到隔离夹具预期，实验对象为 0；同阶段的订阅规模稳定、真实起因只执行一次、丢记录不增长，无旧世界结果、残留模型 / 标签 / 材质。失败：完整证据显示单调增长、重复回调、未撤销效果或旧实例残留。",
+      "waits.Count 是等待键数量，handleSlots.Count 是槽表容量而非活动 handle 数；Count 相等不证明对象全部释放。须同时保留世界结束 / 清理记录、场景快照、资源目标与实例清点。计划表、CLR 字段计数不能替代 Unity 原生对象 / 材质释放证据。",
+      "无完整对象清点、延迟 Destroy 未结束、采样阶段不一致、Dropped 增长或数据截断均为证据不足，不能给『无泄漏』结论。配方自身不创建对象。"
+    ]
+  },
+  {
+    "id": "reload-drive-leave-lobby",
+    "title": "离开已清理的大厅回到无大厅状态，以便换 Rundown 重建大厅",
+    "host": "host",
+    "target": "static:ForgeDevelopment.Native.AuthoringGameDrive",
+    "timeoutSeconds": 60,
+    "steps": [
+      {"call": "drive.lobby.leave"}
+    ],
+    "notes": ["大厅建立时固定 Global.RundownIdToLoad，同一大厅里选别的 Rundown 的关卡不会生效；换 Rundown 先关机器人槽位再 SNet.SessionHub.LeaveHub，与自动测试换关同一条路。命令声明恰好一次世界更替，读回 state=NoLobby、无楼层、已离开大厅与会话中心后才完成，并切到 Rundown 页供重建大厅。"]
+  },
+  {
+    "id": "reload-drive-reenter-select",
+    "title": "在已清理大厅重选刚才的同一关卡",
+    "host": "host",
+    "target": "static:ForgeDevelopment.Native.AuthoringGameDrive",
+    "steps": [{"call": "drive.reenter.select"}]
+  },
+  {
+    "id": "reload-drive-reenter-ready",
+    "title": "调用已启用的原生准备按钮",
+    "host": "host",
+    "target": "static:ForgeDevelopment.Native.AuthoringGameDrive",
+    "steps": [{"call": "drive.reenter.ready"}]
+  },
+  {
+    "id": "reload-drive-reenter-drop",
+    "title": "通过原生准备门禁重新下降",
+    "host": "host",
+    "target": "static:ForgeDevelopment.Native.AuthoringGameDrive",
+    "steps": [{"call": "drive.reenter.drop"}],
+    "notes": ["仅适用退出前记录的 Local 关卡；不另建大厅、不强写 ready、不绕过原生下降按钮。须另等生成和真实落地，再运行新世界观察命令。"]
+  },
+  {
+    "id": "devdrive-lifecycle-read",
+    "title": "读取关卡、大厅与退出身份状态",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.AuthoringGameDrive",
+    "steps": [{"call": "drive.lifecycle.read"}]
+  }
+]

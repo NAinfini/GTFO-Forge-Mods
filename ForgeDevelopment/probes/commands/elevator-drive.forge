@@ -1,0 +1,55 @@
+[
+  {
+    "id": "elevator-unseat",
+    "title": "从原版电梯座位离开并读取实际状态",
+    "host": "host",
+    "target": "static:ForgeDevelopment.Native.AuthoringGameDrive",
+    "steps": [{"call": "drive.player.unseat"}],
+    "requires": ["隔离 Authoring，已进入关卡且电梯停止。"],
+    "notes": ["通过原版状态机执行完整离座，确认状态已离开 InElevator 且控制器启用。已离座返回明确的无操作原因码；四槽落点仍须逐槽实测。"]
+  },
+  {
+    "id": "elevator-radius-9m",
+    "title": "撤离扫描：在中心外 9 米读取五秒进度",
+    "host": "host",
+    "target": "static:ForgeDevelopment.Native.AuthoringGameDrive",
+    "steps": [
+      {"call": "drive.player.unseat"},
+      {"call": "drive.player.teleport", "args": ["{\"schemaVersion\":\"1.0.0\",\"exit\":\"custom\",\"offset\":[9,0,0]}"]},
+      {"call": "drive.scan.read", "args": ["{\"schemaVersion\":\"1.0.0\",\"exit\":\"custom\",\"radius\":20}"]},
+      {"wait": {"seconds": 5}},
+      {"call": "drive.scan.read", "args": ["{\"schemaVersion\":\"1.0.0\",\"exit\":\"custom\",\"radius\":20}"]}
+    ],
+    "requires": ["隔离单机主机，真实主目标已完成，唯一 custom 撤离扫描已激活、半径为 8 m；世界 +X 的 9 m 点有可定位地面。先运行本项，再运行 7 m 项。其他队员留在扫描外。"],
+    "notes": ["偏移是相对原版扫描中心的世界坐标，不旋转、不吸附地面。点不属于可解析区域则拒绝；场地不适合 +X 时在冻结的 QA 配方副本中同时改两项偏移方向并保留 hash。比较两次同一原生 scan 身份和 progress，不能将命令完成当作半径验收。"]
+  },
+  {
+    "id": "elevator-radius-7m",
+    "title": "撤离扫描：在中心内 7 米读取五秒进度",
+    "host": "host",
+    "target": "static:ForgeDevelopment.Native.AuthoringGameDrive",
+    "steps": [
+      {"call": "drive.player.unseat"},
+      {"call": "drive.player.teleport", "args": ["{\"schemaVersion\":\"1.0.0\",\"exit\":\"custom\",\"offset\":[7,0,0]}"]},
+      {"call": "drive.scan.read", "args": ["{\"schemaVersion\":\"1.0.0\",\"exit\":\"custom\",\"radius\":20}"]},
+      {"wait": {"seconds": 5}},
+      {"call": "drive.scan.read", "args": ["{\"schemaVersion\":\"1.0.0\",\"exit\":\"custom\",\"radius\":20}"]}
+    ],
+    "requires": ["沿用 9 m 项的同一激活扫描、世界与偏移方向；本轮原版扫描尚未完成。确保原版人数与物品条件满足。"],
+    "notes": ["两次记录保留原版半径、进度、成员身份、完成状态和世界身份；实际是否增长由游戏车道比较。扫描可能在五秒内真正完成并触发撤离，应使用独立轮次完成专门的撤离驱动验收。"]
+  },
+  {
+    "id": "elevator-extract",
+    "title": "进入原版撤离扫描并等待实际成功结算",
+    "host": "host",
+    "target": "static:ForgeDevelopment.Native.AuthoringGameDrive",
+    "timeoutSeconds": 210,
+    "steps": [
+      {"call": "drive.player.unseat"},
+      {"call": "drive.player.teleport", "args": ["{\"schemaVersion\":\"1.0.0\",\"exit\":\"custom\",\"offset\":[9,0,0]}"]},
+      {"call": "drive.extraction.complete", "args": ["{\"schemaVersion\":\"1.0.0\",\"exit\":\"custom\",\"timeoutSeconds\":180}"]}
+    ],
+    "requires": ["真实目标链已完成、原版 custom 撤离扫描已激活且未完成、半径为 8 m。+X 的 9 m 点和到扫描中心的直线路径均在撤离 Area 的可走地面；其他队员正常加入扫描。"],
+    "notes": ["传送只准备扫描外起点，随后用原版碰撞移动进入。驱动不激活扫描、不改任务、不写进度或胜利状态；缺少本次玩家成员身份、原版扫描完成或 ExpeditionSuccess 任一读回均失败。保留每秒过程样本；碰撞三秒无进展明确失败，交给游戏车道检查路径。主客机、扫描激活时退图、检查点和重降仍须分别调用既有 start-exit-rooms、exit-scan-observe 与 y11 配方取证。"]
+  }
+]

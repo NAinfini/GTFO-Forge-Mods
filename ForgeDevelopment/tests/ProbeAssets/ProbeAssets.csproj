@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../ForgeCore/Once/ForgeCore.Once.csproj" />
+    <Compile Include="../../Native/Experiments/ExperimentCatalog.cs" Link="ExperimentCatalog.cs" />
+    <Compile Include="../../Native/Experiments/TransportRetention.cs" Link="TransportRetention.cs" />
+    <Compile Include="../../Native/Recorder/RecTraceProfiles.cs" Link="RecTraceProfiles.cs" />
+    <Compile Include="../../Native/Experiments/ExperimentModel.cs" Link="ExperimentModel.cs" />
+    <Compile Include="../../Native/Experiments/ExperimentParser.cs" Link="ExperimentParser.cs" />
+    <Compile Include="../../Native/Experiments/ExperimentPath.cs" Link="ExperimentPath.cs" />
+    <Compile Include="../../Native/Experiments/ExperimentTargetSpec.cs" Link="ExperimentTargetSpec.cs" />
+    <Compile Include="../../Native/Experiments/ExperimentTrace.cs" Link="ExperimentTrace.cs" />
+    <Compile Include="../../Native/Experiments/ExperimentEngine.cs" Link="ExperimentEngine.cs" />
+    <Compile Include="../../Native/Experiments/ExperimentEnvironment.cs" Link="ExperimentEnvironment.cs" />
+    <Compile Include="../../Native/Experiments/ExperimentWorldReadback.cs" Link="ExperimentWorldReadback.cs" />
+    <Compile Include="../../Native/Recorder/RecAcousticObservation.Config.cs" Link="RecAcousticObservation.Config.cs" />
+    <Compile Include="../../Native/Recorder/RecGate.cs" Link="RecGate.cs" />
+    <Compile Include="../../Native/Recorder/RecTracer.cs" Link="RecTracer.cs" />
+    <Compile Include="../../Native/Experiments/ExperimentTargeting.Loaded.cs" Link="ExperimentTargeting.Loaded.cs" />
+    <Compile Include="../../Native/Experiments/ExperimentObservationRead.cs" Link="ExperimentObservationRead.cs" />
+    <Compile Include="../../Native/Capture/VanillaValueReading.cs" Link="VanillaValueReading.cs" />
+    <Compile Include="../../Native/Recorder/RecReflect.cs" Link="RecReflect.cs" />
+    <Compile Include="../../Native/Recorder/RecObservation.cs" Link="RecObservation.cs" />
+  </ItemGroup>
+</Project>

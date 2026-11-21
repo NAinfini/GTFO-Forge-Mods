@@ -1,0 +1,21 @@
+# 开局每人落点：单人进关后本机玩家（1 号玩家，原版 PlayerSlotIndex 0）离座后站在作者给 1 号放的开局落点上，
+# 并读回离座到站定这段时间镜头怎么动。V1 E1 的电梯房给「玩家 1」放了每人落点（电梯井旁的地面上，离座位水平十几米）。
+# 单人新进 E1 后先跑这份（离座读回只在刚进关时有），再跑别的：
+#   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package NAinfini-Forge_V1_Rundown --level E1 --work-dir artifacts/work/drivesession/<名>
+#   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<名> run Mods/ForgeDevelopment/scripts/start-player-landing.test
+#
+# 读回是离座后 3 秒的结算（ForgeMap.Native.EntryLandingApplier.LandingReadback，同一份也写在 map.elevator-landing 的
+# phase=camera-settle 记录里）：pointError／heightError 是放人后第一次读到的脚离点水平／竖直米数（玩家还没走动），walked 是 3 秒后离点的水平米数；glide 是离座时镜头离点的水平米数，
+# 也就是原版站起过渡要带着镜头滑过去的距离；maxStep 是两次读之间镜头的最大位移、maxStepAt 是它出现在离座后第几秒；
+# cameraFlat 是站定后镜头离脚的水平米数（过渡走完应接近 0）。maxStep 远小于 glide 是一路滑过去，接近 glide 是一下跳过去，
+# 这两个数记在 run.json 里交给看结果的人判断。
+stop-on-fail
+
+# 结算在离座后 3 秒写出，留出余量
+wait 5s
+call static:ForgeMap.Native.EntryLandingApplier LandingReadback as=landing
+expect $landing.result contains "slot=0;source=player-point"
+expect $landing.result contains "onPoint=true"
+player as=here
+expect $here.Alive == "True"
+expect log --all !contains "Exception"

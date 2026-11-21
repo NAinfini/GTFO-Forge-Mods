@@ -70,7 +70,7 @@ A teammate's gear wears their skin when the same pack is installed here (same nu
 gear) with their changes (`Look.Fit`); otherwise it shows its original look and logs one line per player and skin
 (`skin-look-missing`, `skin-look-mismatch`, `skin-look-bad-value`), and the picker's details list it with the player's name, the
 gear and the Thunderstore mod to install. A replay stand-in's gear the look has no skin for is one log line naming its key and the
-look's keys; one whose gear id cannot be worked out here (its range matches no gear) is `skin-look-gear-unknown`. The local player's global skins are not put on a teammate's gear. On it, the ammo
+look's keys; one whose gear id cannot be worked out here (its range matches no gear) is `skin-look-gear-unknown`. Nothing of the local player's own choices is put on a teammate's gear. On it, the ammo
 screen, low-ammo, empty, ammo pickup and aim end are drawn as the menu preview draws them (no reads of this player's backpack or
 hands); code effects draw while it is in its owner's hands; its sounds play at the gear (3D) for what this machine sees: the shot
 (`GameHooks.Fire.BulletWeaponSynced` / `ShotgunSynced`), wield and unwield, going down and getting up (the player's health
@@ -146,9 +146,12 @@ wins: the picker's choice (ignored while that skin is not installed for the targ
 `targets`, then the first pack by path among skin mods and registered packs. The editor's 应用 alone goes before the
 picker's choice: the backend (`pack.install` with `pick`) leaves a one-shot `<ticks>.pick` (`{"target", "skin"}`) in the skins
 folder, and the plugin's next reload writes it into its own choices and deletes it; a pack put in by hand or another change to
-`active.json` does not, and a skin it names that a choice keeps off is reported in `forgeskin.log`. Global skins (`active.json` `global`) are on every
-gear under its own skin (the gear's skin wins on a material both cover); the picker neither lists nor removes them, so the
-original look removes only the gear's own skin, and its details say how many global skins stay. Choices, colours and changes
+`active.json` does not, and a skin it names that a choice keeps off is reported in `forgeskin.log`. A gear wears its own skin and
+nothing else: its sight, magazine, light, lens and ammo materials are part of that skin and change on that gear instance alone
+(`SkinnedGear.ApplyMaterials` copies the material per renderer of the item; casings and dropped magazines use the gun's own pools).
+There is no skin for every gear: a pack whose target names no gear or item (older editors made those) is not worn and logs
+`skin-global-unsupported` once when it is read, and so does an `active.json` that still has a `global` list (once per change of
+that list); the editor drops that list at its next write of `active.json`. Choices, colours and changes
 of the gear's own skin reach teammates through the look (above); a skin may have any number of player colours, and the first 65536 travel.
 
 `Native/Previews.cs` shows each skin card the picture its pack carries, drawn by the editor when it packed the skin (a gear
@@ -824,8 +827,7 @@ own motions that move their model's named nodes. A faulty file is not used at al
 
 A skin pack can carry its own motions: `inspect.json` at the root of the `.forgeskin` zip, beside `manifest.json` (the editor's build
 copies an `inspect.json` that sits beside the project file). It has the table's shape without `fallback` and `default`: `motions`, `kinds` and
-`gear`, whose lists name only the pack's own motions and kinds. It adds and never replaces: while a gun shows the skin (its own skin or
-a global one), the pack's `gear` list for that gun's offline gear id and its `kinds` of the names the gun's list in the table uses
+`gear`, whose lists name only the pack's own motions and kinds. It adds and never replaces: while a gun shows the skin, the pack's `gear` list for that gun's offline gear id and its `kinds` of the names the gun's list in the table uses
 (`"rifle": [...]` joins every gun whose list has `@rifle`, the fallback's included) come after the gun's own motions in its pool
 (`InspectTable.For` with the packs' tables). Its motions are named `<skin id>/<motion id>`, so they never take the place of the
 plugin's or another pack's, and teammates with the same pack see them by that name's number. `SkinPack.Open` reads and checks it with
@@ -847,7 +849,7 @@ only and the motion number and start time already rebuild the rest each machine 
 - A gun whose model a package mounts with ForgeCore `GunMount` (EnergyLab's guns, Workshop gun models) is not skinned:
   `GunMount.Of(holder)` names it, and `GunMount.Mounting` puts a skinned gun back to its own look before the mount reads
   its poses and hides its parts. Part mounts (`GunPartMount`) are not excluded; a skin and a mounted part share the gun.
-- Gear icons: ForgeSkin redraws only the icons of gear whose skin or colours changed (every gear when a global skin did); a
+- Gear icons: ForgeSkin redraws only the icons of gear whose skin or colours changed; a
   package that supplies its own icons (`GearIcons.Supply`) draws them again itself.
 - Ejected casings: ForgeSkin appends its own pools after the game's in `WeaponShellManager.SetupPools` and points a skinned
   gun's casing type at its pool while it ejects; ForgePerformance's casing limit counts and drops those casings like the
@@ -917,7 +919,10 @@ an export carries the copy it found. `pnpm make` and `pnpm package` need the fol
   finds there (`Backend/OldSkinMove.cs`), the plugin only reads the new folder and, while skins are left
   in the old one, says so in the picker (a player's state, not an error).
 - Or ship a mod folder directly under `BepInEx/plugins` with a `forgeskin.forge` marker (`SkinPacks.Marker`) listing its packs,
-  one path per line relative to that folder; blank lines and `#` comments are skipped.
+  one path per line relative to that folder; blank lines and `#` comments are skipped. Only the marker directly inside a mod
+  folder is read: a marker in `plugins` itself or a folder deeper (a zip with a top folder unpacked as it is), and a pack in
+  `plugins` itself or in a mod folder without a marker (and not registered by code), log `skin-pack-misplaced` with the path,
+  at each full scan.
 - Or call `ForgeSkin.Plugin.SkinPacks.Register(path)` from your plugin's `Load`.
 
 A pack the reader refuses is not loaded and logs `skin-pack-rejected` with the reason code of `SkinFormatException`

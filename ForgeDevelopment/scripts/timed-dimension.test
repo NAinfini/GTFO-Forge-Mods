@@ -1,0 +1,50 @@
+# Timed dimension (official mechanism m-timed-dimension): a terminal command flashes the whole team into a dimension for a few
+# seconds, the game sends everyone back to where they stood when time is up, and the top countdown shows meanwhile.
+# V1 E1 carries it: the 闪入终端 in the assembly hall (zone 1), command WARP, into the self-built 闪入小屋 dimension for 20 seconds,
+# top countdown shown. Start a session on a freshly loaded E1 of the V1 package, then run:
+#   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package NAinfini-Forge_V1_Rundown --level E1 --work-dir artifacts/work/drivesession/<name>
+#   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name> run Mods/ForgeDevelopment/scripts/timed-dimension.test
+# One drive session checks the local player; that the other players flash and return with it is the owner's multiplayer run.
+# DimensionIndex reads `<number>/<name>` (0/Reality), so dimensions are judged by the name.
+# Walking to the terminal and typing at it is the owner's hand test (scripted standing and aiming at a terminal is not reliable):
+# these lines are the checklist; the same flash without the terminal is in self-built-dimension-room.test.
+stop-on-fail
+god on
+
+# start in reality, at the assembly hall's terminal
+# the terminal stands on the assembly hall's lower floor, out of a straight walk from the zone's first area: go to the floor point in front of its screen
+teleport 3.6 -1.9 56.5
+interact name=Terminal radius=6 as=term
+player as=start
+expect $start.DimensionIndex contains "Reality"
+
+# the command flashes the team into the dimension and the countdown appears, losing a second each second
+terminal type "WARP" as=warp
+terminal exit
+wait 2s
+player as=inside
+expect $inside.DimensionIndex !contains "Reality"
+state hud as=t1
+expect $t1.timerVisible == "True"
+wait 1s
+state hud as=t2
+wait 1s
+state hud as=t3
+expect $t2.timer != $t1.timer
+expect $t3.timer != $t2.timer
+
+# just before the seconds run out the countdown still shows; when they run out the game sends the team back where it stood
+# and the countdown is gone with it
+wait 9s
+state hud as=t_late
+player as=late
+expect $late.DimensionIndex !contains "Reality"
+wait 6s
+player as=back
+state hud as=t_back
+expect $back.DimensionIndex contains "Reality"
+expect $back.Alive == "True"
+expect $back.Position.x ~1.5 $start.Position.x
+expect $back.Position.z ~1.5 $start.Position.z
+expect $t_back.timerVisible == "False"
+expect log --all !contains "Exception"

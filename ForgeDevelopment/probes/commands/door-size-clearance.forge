@@ -1,0 +1,152 @@
+[
+  {
+    "id": "door-size-enable-observation",
+    "title": "门尺寸与净空：开启原生观察（进关前）",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.RecTracerRuntime",
+    "requires": [
+      "隔离 Authoring 会话，Recorder.Enabled 与 TraceEnabled 开启，TraceAllProfiles 关闭；退出游戏后安装发行配方再冷启动。保留 level、dimension-landings、environment 现有观察。",
+      "F5 无 running 命令且 experiment objects alive: 0；runner 收尾会 DestroyAll，非零停止，不按 R 清理。requires 只是提示，不是自动门禁。"
+    ],
+    "steps": [
+      { "call": "SetProfileEnabled", "args": ["author-door-size-clearance", true] },
+      { "call": "SetProfileEnabled", "args": ["door-terminal", true] },
+      { "call": "SetProfileEnabled", "args": ["player", true] },
+      { "call": "SetProfileEnabled", "args": ["enemy", true] }
+    ],
+    "notes": [
+      "完整步骤、逐尺寸表与本地结论格式见 probes/door-size-clearance.md。目的：逐项采集原版 4×4、8×4、8×8 门口的真实资产、原生 LG_Gate.Type、GetAlignRef、门框与门体完整层级、Mesh、Collider、NavMeshObstacle 和实测净空。尺寸标签不是实测；不能把 enum、GetBoundingSize、renderer/collider 的轴对齐 bounds 或外墙尺寸当可通行净空。每种尺寸、门型、模板分别留样，不从 Small / Medium 推定 8×8 存在；找不到真实原版样本就记缺样。",
+      "流程：官方关卡基线，记录游戏构建、依赖、关卡种子、原版资源完整名、geomorph 路径、房间位姿、门序号、门框/门体路径、两侧 Zone/Area/course node。生成后且门静止、开门前、正常开门动画结束、正常关门动画结束、正常攻击破门前后，逐端 F6 书签并运行下列只读摘要；安全门不支持关闭或破坏时记不适用，不强写状态。",
+      "完整层级是额外必需证据：现有 runner 没有 hierarchy 指令；allOfType 用 FindObjectsOfType，只枚举活动场景 Component，不能按门子树过滤，不能穷举 inactive 子级或已销毁对象。用既有 UnityExplorer / 场景检视入口逐级导出选定门框、门体及所属连接件的完整树（包括 inactive），保存每级完整路径、父子关系、局部/世界 TRS、activeSelf/activeInHierarchy、逐组件类型、enabled、isTrigger（Collider）、局部形状及世界 bounds（适用时）。现有摘要不能替代这份完整树；缺检视工具或任一子级数据即未证。NavMeshObstacle 没有 bounds 成员，不虚构它，记录 shape/center/size/height/radius 与 TRS。",
+      "净空测量：在门口局部坐标系中按完整非 trigger 实体碰撞几何，分别记录门框内宽/高、各阶段门体实际占位、最窄净宽/净高与测量方法；mesh bounds 只是包围盒，不描述开口或几何形状。失活或 disabled collider 单列，trigger 不能当实体阻挡；零尺寸、null mesh、组件消失与门体破坏残留分别记录。",
+      "实际通行待游戏验证：同一玩家正常站立/蹲伏从两侧实走；同种敌人由原生 AI 从两侧追击穿门，记录位置、节点、行为状态和录像。只用正常交互与攻击，不传送、刷怪、写门/玩家/敌人字段或调用构建/导航方法。NavMesh 路径、AIGraph/portal 通行、敌人 AI、剔除遮挡与灯影各自验收，门 IsTraversable、位置跨边、存在 NavMeshObstacle 或可见截图不能合成通过；F7 既有检查中的 NavMesh 样本/连接路径仅作辅助，不证明该门两侧实际路线。",
+      "主机与客户端用运行编号、种子、原版模板、作者实例（适用时）、门路径/位姿与两侧区域配对；Pointer、InstanceID、UID、NodeID、callId 和数组序号仅作同端本次关联。重新进关、迟加入、检查点恢复与主机迁移单列复跑。身份不唯一时停止，不换最近门或相邻门。",
+      "保留两端 rec-* 全部分段、index.json / patches、LogOutput.log、命令结果、输入/配置/DLL hash、层级检视输出、时间线、实测表和录像。核对 profile 的 installed/skip/error、签名、observationScope、before/after/exception、observationComplete 与丢行/overflow。新 trace 默认关闭且不抢默认 profile 的门状态方法；GetAlignRef/GetBoundingSize 由本配方主动查询的调用与游戏原生构建调用分开报告。",
+      "无目标、null-before-leaf、$nativeRead、$error、unknown/opaque、截断、省略、字段预算、缺阶段或无法配对都是未证。结果摘要 2048、单步 4096 字符、集合格式 32 项上限可能丢证据；只在隔离小场景的人工阶段边界采样，不逐帧全场遍历。命令 Passed 只证明诊断操作完成，不表示完整树、净空、碰撞、导航、AI、遮挡或多人通过。"
+    ]
+  },
+  {
+    "id": "door-size-selected-alignment",
+    "title": "门尺寸与净空：读取明确瞄准门与原生对齐点",
+    "host": "any",
+    "target": "lookedAtDoor:maxDistance=8",
+    "requires": [
+      "沿用 door-size-enable-observation 的完整流程；无 running 命令且 experiment objects alive: 0，runner 收尾会 DestroyAll。",
+      "先由原版资源、完整路径、门序号和两侧区域唯一确定目标，再瞄准它；破门后不能命中原门时使用下面的 typed 状态摘要与完整层级检视，不改读邻门。"
+    ],
+    "steps": [
+      { "read": ["name", "m_serialNumber", "DoorType", "LastStatus", "InAnimation", "Gate.Type", "Gate.DimensionIndex", "Gate.IsTraversable", "Gate.transform.position", "Gate.transform.rotation", "Gate.transform.lossyScale"] },
+      { "call": "Gate" },
+      { "target": "result", "read": ["name", "Type", "IsTraversable", "CoursePortal.IsTraversable", "CoursePortal.m_nodeA.NodeID", "CoursePortal.m_nodeB.NodeID"] },
+      { "target": "result", "call": "GetBoundingSize" },
+      { "call": "Gate" },
+      { "target": "result", "call": "GetAlignRef" },
+      { "target": "result", "read": ["name", "localPosition", "localRotation", "localScale", "position", "rotation", "lossyScale", "gameObject.activeSelf", "gameObject.activeInHierarchy"] }
+    ],
+    "notes": [
+      "Gate 是只读属性；runner 将每次 call 的返回值作为 result，GetBoundingSize() 返回 Vector3，GetAlignRef() 返回 Transform，均为已核原生无参查询。call 不支持 Gate.GetAlignRef 这种链式方法名，必须先取 Gate 再对 result 查询；不调用 ColliderMode、SetInternalTraversable、BakeNavigationObstacles 或 SetGraphColliderData。",
+      "原生接口签名来自 Forge-MapEditor-QA IL2CPP Modules-ASM；catalog/native/native-runtime.json 只证明成员名，实际 getter 错误或空对齐点仍未证。对齐点读回不是门框内宽高或净空测量。"
+    ]
+  },
+  {
+    "id": "door-size-gate-state",
+    "title": "门尺寸与净空：活动 Gate 与两侧区域摘要",
+    "host": "any",
+    "target": "allOfType:LevelGeneration.LG_Gate",
+    "requires": ["沿用完整流程；无 running 命令且 experiment objects alive: 0，runner 收尾会 DestroyAll。保留全场记录，按已选门和两侧区域匹配，不取数组第一项。"],
+    "steps": [
+      { "read": ["Pointer", "name", "Type", "DimensionIndex", "IsTraversable", "HasBeenOpenedDuringPlay", "transform.position", "transform.rotation", "transform.lossyScale", "CoursePortal.IsTraversable", "CoursePortal.m_nodeA.NodeID", "CoursePortal.m_nodeB.NodeID", "CoursePortal.m_nodeA.m_area.UID", "CoursePortal.m_nodeB.m_area.UID", "CoursePortal.m_nodeA.m_zone.LocalIndex", "CoursePortal.m_nodeB.m_zone.LocalIndex"] }
+    ],
+    "notes": ["此命令不读取 SpawnedDoor 接口背后的实现字段。活动 Gate 或 portal 数值只代表观察点，不能证明实体碰撞、NavMesh 或敌人通行；缺门、空 portal、输出省略均未证。"]
+  },
+  {
+    "id": "door-size-weak-state",
+    "title": "门尺寸与净空：弱门开闭与破坏回读",
+    "host": "any",
+    "target": "allOfType:LevelGeneration.LG_WeakDoor",
+    "requires": ["沿用完整流程；无 running 命令且 experiment objects alive: 0，runner 收尾会 DestroyAll。"],
+    "steps": [
+      { "read": ["Pointer", "name", "m_serialNumber", "DoorType", "LastStatus", "InAnimation", "Gate.Type", "Gate.IsTraversable", "transform.position", "m_syncComp.Pointer", "m_destructionComp.Pointer"] },
+      { "target": "allOfType:LevelGeneration.LG_Door_Sync", "read": ["Pointer", "name", "transform.position", "m_stateReplicator.State.status"] },
+      { "target": "allOfType:LevelGeneration.LG_WeakDoor_Destruction", "read": ["Pointer", "name", "transform.position", "m_health", "m_healthMax", "m_currentStatus", "m_isDestroyed", "m_gate.IsTraversable", "m_gate.CoursePortal.IsTraversable"] }
+    ],
+    "notes": ["m_syncComp/m_destructionComp 的 Pointer 与明确类型组件仅作当次配对；不开闭、攻击或修复门。Destroyed 后原组件失活/销毁不能由 allOfType 缺行推定，需完整层级与正常破门时间线。"]
+  },
+  {
+    "id": "door-size-security-state",
+    "title": "门尺寸与净空：安全门状态回读",
+    "host": "any",
+    "target": "allOfType:LevelGeneration.LG_SecurityDoor",
+    "requires": ["沿用完整流程；无 running 命令且 experiment objects alive: 0，runner 收尾会 DestroyAll。安全门样本与弱门样本分开。"],
+    "steps": [
+      { "read": ["Pointer", "name", "m_serialNumber", "DoorType", "LastStatus", "InAnimation", "m_securityDoorType", "Gate.Type", "Gate.IsTraversable", "transform.position", "m_syncComp.Pointer"] },
+      { "target": "allOfType:LevelGeneration.LG_Door_Sync", "read": ["Pointer", "name", "transform.position", "m_stateReplicator.State.status"] }
+    ],
+    "notes": ["不通过 ForceOpenSecurityDoor 改状态，不把安全门不可逆开门当作可正常关门/破门。按原版真实可用阶段采样。"]
+  },
+  {
+    "id": "door-size-mesh-summary",
+    "title": "门尺寸与净空：活动网格局部 bounds 摘要",
+    "host": "any",
+    "target": "allOfType:UnityEngine.MeshFilter",
+    "requires": ["沿用完整流程；无 running 命令且 experiment objects alive: 0，runner 收尾会 DestroyAll。"],
+    "steps": [
+      { "read": ["Pointer", "name", "gameObject.activeSelf", "gameObject.activeInHierarchy", "gameObject.layer", "transform.localPosition", "transform.localRotation", "transform.localScale", "transform.position", "transform.rotation", "transform.lossyScale", "sharedMesh.name", "sharedMesh.vertexCount", "sharedMesh.subMeshCount", "sharedMesh.bounds.center", "sharedMesh.bounds.size"] }
+    ],
+    "notes": ["不读取 mesh 属性以免实例化；共享网格名与局部 bounds 不等于完整几何或净空。MeshFilter 不覆盖 SkinnedMeshRenderer，完整层级中存在蒙皮门体时另由检视工具记录 sharedMesh 与形变。"]
+  },
+  {
+    "id": "door-size-renderer-summary",
+    "title": "门尺寸与净空：活动 Renderer 世界 bounds 摘要",
+    "host": "any",
+    "target": "allOfType:UnityEngine.Renderer",
+    "requires": ["沿用完整流程；无 running 命令且 experiment objects alive: 0，runner 收尾会 DestroyAll。"],
+    "steps": [
+      { "read": ["Pointer", "name", "enabled", "gameObject.activeSelf", "gameObject.activeInHierarchy", "gameObject.layer", "transform.localPosition", "transform.localRotation", "transform.localScale", "transform.position", "transform.rotation", "transform.lossyScale", "bounds.center", "bounds.size"] }
+    ],
+    "notes": ["活动 Renderer 的 enabled 可以为 false；组件名称与相近位姿不足以证明属于目标门子树。世界 AABB 随旋转变化，不能当作门框内尺寸，也不证明剔除、遮挡或灯影正确。"]
+  },
+  {
+    "id": "door-size-collider-summary",
+    "title": "门尺寸与净空：活动 Collider 阻挡与世界 bounds 摘要",
+    "host": "any",
+    "target": "allOfType:UnityEngine.Collider",
+    "requires": ["沿用完整流程；无 running 命令且 experiment objects alive: 0，runner 收尾会 DestroyAll。"],
+    "steps": [
+      { "read": ["Pointer", "name", "enabled", "isTrigger", "gameObject.activeSelf", "gameObject.activeInHierarchy", "gameObject.layer", "transform.localPosition", "transform.localRotation", "transform.localScale", "transform.position", "transform.rotation", "transform.lossyScale", "bounds.center", "bounds.size"] }
+    ],
+    "notes": ["覆盖活动对象上的 Collider 基类，不只 BoxCollider；inactive 子级仍缺失。disabled collider 的 bounds 可能为空，不据此写零碰撞或足够净空。完整树必须另核 Box/Capsule/Sphere 的局部形状、MeshCollider.sharedMesh/convex 及其他实际组件。"]
+  },
+  {
+    "id": "door-size-nav-obstacle-summary",
+    "title": "门尺寸与净空：活动 NavMeshObstacle 形状与 carving 摘要",
+    "host": "any",
+    "target": "allOfType:UnityEngine.AI.NavMeshObstacle",
+    "requires": ["沿用完整流程；无 running 命令且 experiment objects alive: 0，runner 收尾会 DestroyAll。"],
+    "steps": [
+      { "read": ["Pointer", "name", "enabled", "gameObject.activeSelf", "gameObject.activeInHierarchy", "transform.localPosition", "transform.localRotation", "transform.localScale", "transform.position", "transform.rotation", "transform.lossyScale", "shape", "center", "size", "height", "radius", "carving", "carveOnlyStationary", "carvingMoveThreshold", "carvingTimeToStationary"] }
+    ],
+    "notes": ["没有 NavMeshObstacle.bounds；box 用 center/size，capsule 用 center/height/radius，均结合实际 TRS。carving 或 enabled 回读不证明导航重建完成、门两侧路径连通或敌人能走；未找到活动 obstacle 不证明门没有导航阻挡。"]
+  },
+  {
+    "id": "door-size-crossing-state",
+    "title": "门尺寸与净空：人工过门前后玩家与敌人状态摘要",
+    "host": "any",
+    "target": "allOfType:Player.PlayerAgent",
+    "requires": ["沿用完整流程；无 running 命令且 experiment objects alive: 0，runner 收尾会 DestroyAll。单人先跑，再分别主机/客户端两端复跑；敌人 AI 结论使用主机记录。"],
+    "steps": [
+      { "read": ["GlobalID", "PlayerSlotIndex", "IsLocallyOwned", "Position", "CourseNode.NodeID", "CourseNode.m_area.UID", "CourseNode.m_zone.DimensionIndex", "CourseNode.m_zone.LocalIndex"] },
+      { "target": "allOfType:Enemies.EnemyAgent", "read": ["GlobalID", "EnemyDataID", "Position", "Alive", "Damage.Health", "CourseNode.NodeID", "CourseNode.m_area.UID", "CourseNode.m_zone.DimensionIndex", "CourseNode.m_zone.LocalIndex", "AI.m_behaviour.m_currentStateName", "AI.Target"] }
+    ],
+    "notes": ["命令不驱动过门；在已选角色实际过门前后分别运行，结合连续录像与原生 trace 判定正常通行。不能用位置跨边排除传送、穿模或绕行；敌人 Target 缺失不推定导航失败。"]
+  },
+  {
+    "id": "door-size-disable-observation",
+    "title": "门尺寸与净空：关闭专项观察",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.RecTracerRuntime",
+    "requires": ["无 running 命令且 experiment objects alive: 0，runner 收尾会 DestroyAll。非零停止；共用 profile 开关按本次采集前的配置恢复。"],
+    "steps": [{ "call": "SetProfileEnabled", "args": ["author-door-size-clearance", false] }],
+    "notes": ["只关闭本专项诊断，不清理原版门、导航、敌人或玩家，不改变门状态；未运行游戏时所有实际通行项仍待验。"]
+  }
+]

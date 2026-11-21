@@ -8,7 +8,7 @@ import { importWholeGun, removeWholeGun, reseatWholeGun, wholeGunOf } from './gu
 import { loadImage } from './frames';
 import { addLivery, isProjected, liveryLayer, moveLivery, removeLivery, setFinish, updateLivery } from './livery';
 import { attachedOf, call, type DynamicLayer, type Methods, type LiveryKind, type SkinDocument, type TextureChannel } from './protocol';
-import { allFinite, currentItem, materialOf, uid, useStore, type Selection } from './store';
+import { allFinite, currentItem, isSkinTarget, materialOf, uid, useStore, type Selection } from './store';
 import { wake } from './viewport/DrawLoop';
 import { decalPose, meshesOf } from './viewport/liveryGpu';
 import { drawnMeshes, gearSurfaceAt, viewRefs } from './viewport/refs';
@@ -328,10 +328,10 @@ const COMMANDS: Record<string, { args: string; run: Handler }> = {
     run: (a) => (st().select(a.clear ? null : selectionOf(a)), { selection: st().selection }),
   },
   listWeapons: {
-    args: '{query?}: id, name, slot of the catalog',
+    args: '{query?}: id, name, slot of what a skin can be made for (sights, magazines, lights and ammo are part of a gun skin)',
     run: (a) => ({
       weapons: st()
-        .catalog.filter((c) => !a.query || `${c.id} ${c.name} ${c.nameZh}`.toLowerCase().includes(String(a.query).toLowerCase()))
+        .catalog.filter((c) => isSkinTarget(c) && (!a.query || `${c.id} ${c.name} ${c.nameZh}`.toLowerCase().includes(String(a.query).toLowerCase())))
         .map((c) => ({ id: c.id, name: c.name, slot: c.slot })),
     }),
   },

@@ -1,0 +1,884 @@
+{
+  "profile": "level",
+  "enabledByDefault": true,
+  "entries": [
+    {
+      "type": "GameStateManager",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "get_*",
+        "set_*",
+        "add_*",
+        "remove_*",
+        "ChangeState",
+        "DoChangeState"
+      ],
+      "record": "args+result",
+      "instance": [
+        "CurrentState",
+        "CurrentStateName"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 25,
+      "onOverflow": "count"
+    },
+    {
+      "type": "RundownManager",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "MasterSelectActiveExpedition",
+        "MainLayerCompleted",
+        "Update",
+        "get_*",
+        "set_*",
+        "Awake"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_activeExpedition",
+        "ActiveExpedition",
+        "m_parsedRundownDatas"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 25,
+      "onOverflow": "count"
+    },
+    {
+      "type": "WardenObjectiveManager",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "UpdateFromInLevel",
+        "get_*",
+        "set_*",
+        "add_*",
+        "remove_*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_stateReplicator.State.extraTime"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "WorldEventManager",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "DoExcecuteEvent",
+        "ExecuteEvent",
+        "ExecuteEvent_Internal"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_stateReplicator.State",
+        "m_stateReplicator"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "GameData.WardenObjectiveEventData",
+      "methods": [
+        "ToString"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.ChainedPuzzleManager",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.ChainedPuzzleInstance",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*",
+        "SNetwork_*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_stateReplicator.State",
+        "m_stateReplicator.State.status",
+        "m_puzzleUID",
+        "Data.persistentID",
+        "Data.PublicAlarmName",
+        "m_sourceArea.UID",
+        "m_sourceArea.m_zone.LocalIndex",
+        "m_sourceArea.m_zone.m_layer.m_type",
+        "m_sourceArea.m_zone.DimensionIndex"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.CP_BasicMovable",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "MoveNext",
+        "SNetwork_*",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_stateReplicator.State",
+        "IsMoveConfigured",
+        "m_useStaticBioscanPoints",
+        "m_amountOfPositions",
+        "ScanPositions"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.CP_Bioscan_Core",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "MoveNext",
+        "SNetwork_*",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "State",
+        "m_courseNode.NodeID",
+        "m_courseNode.m_zone.LocalIndex",
+        "m_courseNode.m_zone.m_layer.m_type",
+        "m_courseNode.m_zone.DimensionIndex",
+        "IsMovable",
+        "m_isMovable",
+        "m_movingComp.IsMoveConfigured",
+        "m_onlyShowHUDWhenPlayerIsClose"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.CP_Bioscan_Graphics",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "MoveNext",
+        "SNetwork_*",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_radius",
+        "m_startScale",
+        "m_gfxScannerZone.activeInHierarchy",
+        "m_gfxScannerZone.transform.localScale"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.CP_Bioscan_Sync",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "MoveNext",
+        "SNetwork_*",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_stateReplicator.State"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.CP_Cluster_Core",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "MoveNext",
+        "SNetwork_*",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "IsMovable",
+        "m_amountOfPuzzles",
+        "m_childCores.Length"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.CP_Cluster_Sync",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "MoveNext",
+        "SNetwork_*",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_stateReplicator.State"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.CP_Hack_Core",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "MoveNext",
+        "SNetwork_*",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "IsMovable"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.CP_PlayerScanner",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "MoveNext",
+        "SNetwork_*",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_scanRadius"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.CP_SimpleStateSync",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "MoveNext",
+        "SNetwork_*",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_stateReplicator.State"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.CP_Bioscan_Hud",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "MoveNext",
+        "SNetwork_*",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.CP_Cluster_Hud",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "MoveNext",
+        "SNetwork_*",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.CP_Hack_Hud",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "MoveNext",
+        "SNetwork_*",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.CP_Holopath_Spline",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "LateUpdate",
+        "get_*",
+        "set_*",
+        "MoveNext",
+        "SNetwork_*",
+        "System_*",
+        "__c*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "CheckpointManager",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*",
+        "SNetwork_*",
+        "Awake"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_stateReplicator.State"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 15,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PauseManager",
+      "methods": [
+        "SetPaused",
+        "SetUnpaused"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 15,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.Dimension",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*",
+        "ToString",
+        "RegisterAgent",
+        "UnregisterAgent",
+        "GetValidDimensionWarpPoint",
+        "GetValidWarpPointFromWorldEventObject",
+        "OnLevelCleanup",
+        "SpawnDimensionRoot"
+      ],
+      "record": "args+result",
+      "instance": [
+        "DimensionLevel.m_playerSpawnType",
+        "DimensionLevel.m_spawnPoints.Count"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_DimensionPortal",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*",
+        "SNetwork_*",
+        "_Setup*",
+        "iWardenObjectiveItem_*",
+        "OnWarp"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_stateReplicator.State"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ElevatorRide",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 15,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_Factory",
+      "methods": [
+        "FactoryDone",
+        "OnStart",
+        "NextBatch",
+        "GetNewJob",
+        "ForceBatch",
+        "InjectJob",
+        "ReportArea",
+        "ReportGeomorph",
+        "SetZoneIndexAlias",
+        "WriteJobLogToDisk",
+        "SaveFactoryReport",
+        "Setup",
+        "SetupFactoryReport",
+        "UpdateCost",
+        "RestLastBuildCounters",
+        "BatchHasJobs"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 15,
+      "onOverflow": "count",
+      "exclude": [
+        "FactoryDone"
+      ]
+    },
+    {
+      "type": "LevelGeneration.LG_Floor",
+      "methods": [
+        "BuildFloor",
+        "CleanupFloor",
+        "PlaceRoot",
+        "AddZoneToLayer",
+        "Setup"
+      ],
+      "record": "args+result",
+      "instance": [
+        "allZones.Count",
+        "m_zoneCount",
+        "m_availableBulkheadKeys.Count"
+      ],
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_Floor",
+      "methods": [
+        "GetBulkheadKey"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_availableBulkheadKeys.Count"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_LevelBuilder",
+      "methods": [
+        "CleanupFloor"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_ZoneJob_CreateExpandFromData",
+      "methods": [
+        "Build",
+        "ChangeStatus",
+        "CleanupFailedZoneBuilds"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_mainStatus",
+        "m_subStatus",
+        "m_inFailFallbackPass",
+        "m_scoredZones.Count",
+        "m_scoredAreas.Count",
+        "m_zone.LocalIndex"
+      ],
+      "maxPerSecond": 200,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_ZoneJob_CreateExpandFromData",
+      "methods": [
+        "CoverageStatus"
+      ],
+      "record": "count",
+      "instance": [
+        "m_mainStatus",
+        "m_subStatus",
+        "m_inFailFallbackPass",
+        "m_zone.LocalIndex",
+        "m_zone.m_coverage"
+      ],
+      "maxPerSecond": 200,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_BuildGateJob",
+      "methods": [
+        "Build",
+        "SetupCappedGate",
+        "CalcOpenAtStart"
+      ],
+      "record": "args+result",
+      "instance": [
+        "s_keyLockChance",
+        "m_plugWasFlipped",
+        "m_gate.Type",
+        "m_gate.ExpanderType",
+        "m_gate.ForceSecurityGate",
+        "m_gate.ForceApexGate",
+        "m_gate.ForceBulkheadGate",
+        "m_gate.ForceBulkheadGateMainPath",
+        "m_gate.ForceOpenFromStart",
+        "m_gate.m_linksFrom.UID",
+        "m_gate.m_linksTo.UID",
+        "m_plug.m_dir",
+        "m_plug.name"
+      ],
+      "maxPerSecond": 200,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_FunctionMarkerBuilder",
+      "methods": [
+        "SetupFunctionAsBulkheadDoorController"
+      ],
+      "record": "count",
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_BuildBulkheadDoorControllerLogicJob",
+      "methods": [
+        "Build"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_bulkheadDC.m_serialNumber",
+        "m_bulkheadDC.m_thisLayer.m_type",
+        "m_bulkheadDC.transform.position",
+        "m_bulkheadDC.transform.parent.name",
+        "m_bulkheadDC.m_connectedBulkheadDoors.Count"
+      ],
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ProgressionObjective_BulkheadKey",
+      "methods": [
+        "OnLevelGenDone",
+        "OnSetState",
+        "OnLevelCleanup"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_allBulkheadKeysInLevel.Count",
+        "m_allBulkheadControllers.Count",
+        "LayerType",
+        "TargetZone.LocalIndex",
+        "EntranceZone.LocalIndex"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ProgressionObjective_BulkheadKey",
+      "methods": [
+        "RegisterBulkheadKey",
+        "RegisterBulkheadController"
+      ],
+      "record": "count",
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_WardenObjective_Reactor",
+      "methods": [
+        "OnStateChange",
+        "OnStateCountUpdate",
+        "AttemptInteract",
+        "OnBuildDone",
+        "SetupAsWardenObjective_ReactorStartup",
+        "SetupAsWardenObjective_ReactorShutdown",
+        "OnTerminalStartupSequenceVerify"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_currentState",
+        "m_currentWaveCount",
+        "m_waveCountMax",
+        "m_currentEnemyWaveIndex",
+        "m_enemyWaveID",
+        "m_waveActive"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ElevatorShaftLanding",
+      "methods": [
+        "StopAmbientAlarm",
+        "ActivateWinCondition",
+        "DeactivateWinCondition"
+      ],
+      "record": "args+result",
+      "instance": [
+        "SpawnNode.m_zone.m_dimensionIndex",
+        "SpawnNode.m_zone.m_layer.m_type",
+        "SpawnNode.m_zone.LocalIndex"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_Layer",
+      "methods": [
+        "CreateZone",
+        "AddZoneToLayer",
+        "GetUniqueTempAlias"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 15,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_LevelExitGeo",
+      "methods": [
+        "ActivateWinCondition",
+        "DeactivateWinCondition",
+        "OnBuildDone",
+        "AddRequiredScanItems",
+        "RemoveRequiredScanItems"
+      ],
+      "record": "args+result",
+      "instance": [
+        "SpawnNode.m_zone.m_dimensionIndex",
+        "SpawnNode.m_zone.m_layer.m_type",
+        "SpawnNode.m_zone.LocalIndex"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_Zone",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "LocalIndex",
+        "Alias",
+        "AliasName",
+        "DimensionIndex",
+        "m_layer.m_type",
+        "m_layer.m_buildData.ZoneAliasStart",
+        "m_coverage",
+        "TerminalsSpawnedInZone.Count",
+        "m_sourceGate.Type",
+        "m_sourceGate.ExpanderType",
+        "m_sourceGate.CoursePortal.m_nodeA.NodeID",
+        "m_sourceGate.CoursePortal.m_nodeB.NodeID",
+        "m_sourceGate.m_linksFrom.UID",
+        "m_sourceGate.m_linksTo.UID"
+      ],
+      "maxPerSecond": 25,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_WorldEventObject",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "maxPerSecond": 15,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_LevelInteractionManager",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*",
+        "Update"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "WorldEventTrigger_Sync",
+      "methods": [
+        "SetupWorldEventTrigger",
+        "OnInternalStateChange"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_DimensionPortal",
+      "record": "args+result",
+      "instance": [
+        "m_stateReplicator.State",
+        "m_serialNumber",
+        "m_targetDimension",
+        "m_targetZone",
+        "SpawnNode.m_zone.LocalIndex"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count",
+      "methods": [
+        "OnWarp"
+      ],
+      "phases": "before+after"
+    }
+  ]
+}

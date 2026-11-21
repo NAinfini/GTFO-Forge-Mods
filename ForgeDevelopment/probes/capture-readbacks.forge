@@ -1,0 +1,990 @@
+{
+  "format": "forge-capture-readbacks.v1",
+  "observations": {
+    "model-structure": {
+      "schemaVersion": "1.0.0",
+      "observationId": "model-structure",
+      "trigger": {
+        "kind": "manual"
+      },
+      "selector": {
+        "kind": "entity"
+      },
+      "projection": {
+        "adapter": "unity-model",
+        "fields": [
+          "name",
+          "activeSelf",
+          "layer"
+        ],
+        "hierarchy": true,
+        "materials": true,
+        "shaderProperties": true
+      },
+      "limits": {
+        "rows": 4096,
+        "depth": 64,
+        "steps": 16384,
+        "outputBytes": 1048576
+      }
+    }
+  },
+  "nativeReadbacks": [
+    {
+      "id": "web.enemy.field.EnemyBalancing.Health.WeakspotDamageMulti.12",
+      "source": "blocks",
+      "type": "GameData.EnemyBalancingDataBlock",
+      "identity": [
+        "persistentID"
+      ],
+      "paths": [
+        "Health.WeakspotDamageMulti"
+      ]
+    },
+    {
+      "id": "web.enemy.field.EnemyBalancing.Health.WeakspotDamageMulti.13",
+      "source": "components",
+      "type": "Enemies.EnemyAgent",
+      "identity": [
+        "GlobalID",
+        "Pointer"
+      ],
+      "paths": [
+        "EnemyBalancingData.persistentID",
+        "EnemyBalancingData.Health.WeakspotDamageMulti"
+      ]
+    },
+    {
+      "id": "web.map.field.Dimension.DimensionData.ForbidCarryItemWarps.33",
+      "source": "blocks",
+      "type": "GameData.DimensionDataBlock",
+      "identity": [
+        "persistentID"
+      ],
+      "paths": [
+        "DimensionData.ForbidCarryItemWarps"
+      ]
+    },
+    {
+      "id": "web.map.field.Dimension.DimensionData.LeaveDeployablesOnWarp.34",
+      "source": "blocks",
+      "type": "GameData.DimensionDataBlock",
+      "identity": [
+        "persistentID"
+      ],
+      "paths": [
+        "DimensionData.LeaveDeployablesOnWarp"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.ActivateHSU_ItemAfterActivation.45",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].ActivateHSU_ItemAfterActivation",
+        "m_activeWardenObjectives[].Value.ActivateHSU_ItemAfterActivation"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.ActivateHSU_ItemFromStart.46",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].ActivateHSU_ItemFromStart",
+        "m_activeWardenObjectives[].Value.ActivateHSU_ItemFromStart"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.ActivateHSU_RequireItemAfterActivationInExitScan.47",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].ActivateHSU_RequireItemAfterActivationInExitScan",
+        "m_activeWardenObjectives[].Value.ActivateHSU_RequireItemAfterActivationInExitScan"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.CentralPowerGenClustser_NumberOfGenerators.48",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].CentralPowerGenClustser_NumberOfGenerators",
+        "m_activeWardenObjectives[].Value.CentralPowerGenClustser_NumberOfGenerators"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.GatherTerminal_Command.49",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].GatherTerminal_Command",
+        "m_activeWardenObjectives[].Value.GatherTerminal_Command"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.GatherTerminal_CommandHelp.50",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].GatherTerminal_CommandHelp.Id",
+        "m_chainedWardenObjectives[].Value[].GatherTerminal_CommandHelp.UntranslatedText",
+        "m_chainedWardenObjectives[].Value[].GatherTerminal_CommandHelp.ShouldLocalize",
+        "m_activeWardenObjectives[].Value.GatherTerminal_CommandHelp.Id",
+        "m_activeWardenObjectives[].Value.GatherTerminal_CommandHelp.UntranslatedText",
+        "m_activeWardenObjectives[].Value.GatherTerminal_CommandHelp.ShouldLocalize"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.GatherTerminal_RequiredCount.51",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].GatherTerminal_RequiredCount",
+        "m_activeWardenObjectives[].Value.GatherTerminal_RequiredCount"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.GatherTerminal_SpawnCount.52",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].GatherTerminal_SpawnCount",
+        "m_activeWardenObjectives[].Value.GatherTerminal_SpawnCount"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.Gather_ItemId.53",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].Gather_ItemId",
+        "m_activeWardenObjectives[].Value.Gather_ItemId"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.Gather_MaxPerZone.54",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].Gather_MaxPerZone",
+        "m_activeWardenObjectives[].Value.Gather_MaxPerZone"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.Gather_RequiredCount.55",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].Gather_RequiredCount",
+        "m_activeWardenObjectives[].Value.Gather_RequiredCount"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.Gather_SpawnCount.56",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].Gather_SpawnCount",
+        "m_activeWardenObjectives[].Value.Gather_SpawnCount"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.SpecialCommandRule.57",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].SpecialCommandRule",
+        "m_activeWardenObjectives[].Value.SpecialCommandRule"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.SpecialTerminalCommand.58",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].SpecialTerminalCommand",
+        "m_activeWardenObjectives[].Value.SpecialTerminalCommand"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.SpecialTerminalCommandDesc.59",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].SpecialTerminalCommandDesc.Id",
+        "m_chainedWardenObjectives[].Value[].SpecialTerminalCommandDesc.UntranslatedText",
+        "m_chainedWardenObjectives[].Value[].SpecialTerminalCommandDesc.ShouldLocalize",
+        "m_activeWardenObjectives[].Value.SpecialTerminalCommandDesc.Id",
+        "m_activeWardenObjectives[].Value.SpecialTerminalCommandDesc.UntranslatedText",
+        "m_activeWardenObjectives[].Value.SpecialTerminalCommandDesc.ShouldLocalize"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.Survival_TimeToSurvive.60",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].Survival_TimeToSurvive",
+        "m_activeWardenObjectives[].Value.Survival_TimeToSurvive"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.Uplink_NumberOfTerminals.61",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].Uplink_NumberOfTerminals",
+        "m_activeWardenObjectives[].Value.Uplink_NumberOfTerminals"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.Uplink_NumberOfVerificationRounds.62",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].Uplink_NumberOfVerificationRounds",
+        "m_activeWardenObjectives[].Value.Uplink_NumberOfVerificationRounds"
+      ]
+    },
+    {
+      "id": "web.map.field.WardenObjective.Uplink_WaveSpawnType.63",
+      "source": "singleton",
+      "type": "WardenObjectiveManager",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_chainedWardenObjectives[].Key",
+        "m_chainedWardenObjectives[].Value[].persistentID",
+        "m_activeWardenObjectives[].Key",
+        "m_activeWardenObjectives[].Value.persistentID",
+        "m_chainedWardenObjectives[].Value[].Uplink_WaveSpawnType",
+        "m_activeWardenObjectives[].Value.Uplink_WaveSpawnType"
+      ]
+    },
+    {
+      "id": "web.weapon.field.GearSightPartProperties.WorldFovZoom.64",
+      "source": "components",
+      "type": "ItemEquippable",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "GearPartHolder.SightData.SightProperties.WorldFovZoom"
+      ]
+    },
+    {
+      "id": "web.weapon.field.GearSightPartProperties.ZoomSensitivityModifier.65",
+      "source": "components",
+      "type": "ItemEquippable",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "GearPartHolder.SightData.SightProperties.ZoomSensitivityModifier"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineBeam.Color.66",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_detection.@MineDeployerInstance_Detect_Laser.m_lineRenderer.startColor.r",
+        "m_detection.@MineDeployerInstance_Detect_Laser.m_lineRenderer.startColor.g",
+        "m_detection.@MineDeployerInstance_Detect_Laser.m_lineRenderer.startColor.b",
+        "m_detection.@MineDeployerInstance_Detect_Laser.m_lineRenderer.startColor.a",
+        "m_detection.@MineDeployerInstance_Detect_Laser.m_lineRenderer.endColor.r",
+        "m_detection.@MineDeployerInstance_Detect_Laser.m_lineRenderer.endColor.g",
+        "m_detection.@MineDeployerInstance_Detect_Laser.m_lineRenderer.endColor.b",
+        "m_detection.@MineDeployerInstance_Detect_Laser.m_lineRenderer.endColor.a",
+        "m_detection.@MineDeployerInstance_Detect_Laser.Pointer"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineBeam.Length.67",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_detection.@MineDeployerInstance_Detect_Laser.m_maxLineDistance",
+        "m_detection.@MineDeployerInstance_Detect_Laser.Pointer"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineBeam.Width.68",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_detection.@MineDeployerInstance_Detect_Laser.m_lineRenderer.startWidth",
+        "m_detection.@MineDeployerInstance_Detect_Laser.m_lineRenderer.endWidth",
+        "m_detection.@MineDeployerInstance_Detect_Laser.Pointer"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineDeployer.DamageMax.69",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_detonation.@MineDeployerInstance_Detonate_Explosive.m_damageMax",
+        "m_detonation.@MineDeployerInstance_Detonate_Explosive.Pointer"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineDeployer.DamageMin.70",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_detonation.@MineDeployerInstance_Detonate_Explosive.m_damageMin",
+        "m_detonation.@MineDeployerInstance_Detonate_Explosive.Pointer"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineDeployer.Delay.71",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_detonation.@MineDeployerInstance_Detonate_Explosive.m_delay",
+        "m_detonation.@MineDeployerInstance_Detonate_Explosive.Pointer"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineDeployer.DistanceMax.72",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_detonation.@MineDeployerInstance_Detonate_Explosive.m_distanceMax",
+        "m_detonation.@MineDeployerInstance_Detonate_Explosive.Pointer"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineDeployer.DistanceMin.73",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_detonation.@MineDeployerInstance_Detonate_Explosive.m_distanceMin",
+        "m_detonation.@MineDeployerInstance_Detonate_Explosive.Pointer"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineDeployer.Force.74",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_detonation.@MineDeployerInstance_Detonate_Explosive.m_explosionForce",
+        "m_detonation.@MineDeployerInstance_Detonate_Explosive.Pointer"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineDeployer.PlacementCooldown.76",
+      "source": "components",
+      "type": "MineDeployerFirstPerson",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_timeBetweenPlacements"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineDeployer.PlacementTime.77",
+      "source": "components",
+      "type": "MineDeployerFirstPerson",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_deployPickupInteractionDuration"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineDeployer.Radius.78",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_detonation.@MineDeployerInstance_Detonate_Explosive.m_radius",
+        "m_detonation.@MineDeployerInstance_Detonate_Explosive.Pointer"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineFoam.BatchDelay.79",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_detonation.@MineDeployerInstance_Detonate_Glue.m_explosionDelay",
+        "m_detonation.@MineDeployerInstance_Detonate_Glue.Pointer"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineFoam.BubbleAngle.80",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_detonation.@MineDeployerInstance_Detonate_Glue.m_projAngMinMax.x",
+        "m_detonation.@MineDeployerInstance_Detonate_Glue.m_projAngMinMax.y",
+        "m_detonation.@MineDeployerInstance_Detonate_Glue.Pointer"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineFoam.BubbleCount.81",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_detonation.@MineDeployerInstance_Detonate_Glue.m_projCount",
+        "m_detonation.@MineDeployerInstance_Detonate_Glue.Pointer"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineFoam.BubbleDelay.82",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_detonation.@MineDeployerInstance_Detonate_Glue.m_delay",
+        "m_detonation.@MineDeployerInstance_Detonate_Glue.Pointer"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineFoam.BubbleSpeedMax.83",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_detonation.@MineDeployerInstance_Detonate_Glue.m_projVelMinMax.y",
+        "m_detonation.@MineDeployerInstance_Detonate_Glue.Pointer"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineFoam.BubbleSpeedMin.84",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_detonation.@MineDeployerInstance_Detonate_Glue.m_projVelMinMax.x",
+        "m_detonation.@MineDeployerInstance_Detonate_Glue.Pointer"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineLight.Color.85",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_light.color.r",
+        "m_light.color.g",
+        "m_light.color.b",
+        "m_light.color.a"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.MineLight.Intensity.86",
+      "source": "components",
+      "type": "MineDeployerInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_light.intensity"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.Sentry.PlacementTime.88",
+      "source": "components",
+      "type": "SentryGunFirstPerson",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_deployPickupInteractionDuration"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.Sentry.ScanColor.89",
+      "source": "components",
+      "type": "SentryGunInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_visuals.@SentryGunInstance_ScannerVisuals_Plane.m_scanningColor.r",
+        "m_visuals.@SentryGunInstance_ScannerVisuals_Plane.m_scanningColor.g",
+        "m_visuals.@SentryGunInstance_ScannerVisuals_Plane.m_scanningColor.b",
+        "m_visuals.@SentryGunInstance_ScannerVisuals_Plane.m_scanningColor.a",
+        "m_visuals.@SentryGunInstance_ScannerVisuals_Plane.Pointer"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.Sentry.ScanDelay.90",
+      "source": "components",
+      "type": "SentryGunInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_initialScanDelay"
+      ]
+    },
+    {
+      "id": "web.weapon.field.forge.etc.Sentry.TargetColor.91",
+      "source": "components",
+      "type": "SentryGunInstance",
+      "identity": [
+        "Pointer",
+        "Owner.PlayerSlotIndex",
+        "ItemDataBlock.persistentID",
+        "pItemData.itemID_gearCRC"
+      ],
+      "paths": [
+        "m_visuals.@SentryGunInstance_ScannerVisuals_Plane.m_hasTargetColor.r",
+        "m_visuals.@SentryGunInstance_ScannerVisuals_Plane.m_hasTargetColor.g",
+        "m_visuals.@SentryGunInstance_ScannerVisuals_Plane.m_hasTargetColor.b",
+        "m_visuals.@SentryGunInstance_ScannerVisuals_Plane.m_hasTargetColor.a",
+        "m_visuals.@SentryGunInstance_ScannerVisuals_Plane.Pointer"
+      ]
+    },
+    {
+      "id": "web.map.field.Dimension.DimensionData.ForbidCarryItemWarps.134",
+      "source": "singleton",
+      "type": "LevelGeneration.LG_LevelBuilder",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_currentFloor.m_dimensions[].Pointer",
+        "m_currentFloor.m_dimensions[].DimensionIndex",
+        "m_currentFloor.m_dimensions[].CreationOrderIndex",
+        "m_currentFloor.m_dimensions[].DimensionData.ForbidCarryItemWarps"
+      ]
+    },
+    {
+      "id": "web.map.field.Dimension.DimensionData.LeaveDeployablesOnWarp.135",
+      "source": "singleton",
+      "type": "LevelGeneration.LG_LevelBuilder",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "m_currentFloor.m_dimensions[].Pointer",
+        "m_currentFloor.m_dimensions[].DimensionIndex",
+        "m_currentFloor.m_dimensions[].CreationOrderIndex",
+        "m_currentFloor.m_dimensions[].DimensionData.LeaveDeployablesOnWarp"
+      ]
+    },
+    {
+      "id": "d3-local-ammo",
+      "source": "static",
+      "type": "Player.PlayerBackpackManager",
+      "identity": [
+        "LocalBackpack.Owner.PlayerAgent.Pointer",
+        "LocalBackpack.Owner.IsLocal"
+      ],
+      "paths": [
+        "LocalBackpack.IsLocal",
+        "LocalBackpack.AmmoStorage.StandardAmmo.AmmoInPack",
+        "LocalBackpack.AmmoStorage.StandardAmmo.AmmoMaxCap",
+        "LocalBackpack.AmmoStorage.StandardAmmo.BulletsInPack",
+        "LocalBackpack.AmmoStorage.StandardAmmo.BulletsMaxCap",
+        "LocalBackpack.AmmoStorage.StandardAmmo.CostOfBullet",
+        "LocalBackpack.AmmoStorage.ClassAmmo.AmmoInPack",
+        "LocalBackpack.AmmoStorage.ClassAmmo.AmmoMaxCap",
+        "LocalBackpack.AmmoStorage.ClassAmmo.BulletsInPack",
+        "LocalBackpack.AmmoStorage.ClassAmmo.BulletsMaxCap",
+        "LocalBackpack.AmmoStorage.ClassAmmo.CostOfBullet"
+      ]
+    },
+    {
+      "id": "d3-lights.LG_PointLight",
+      "source": "components",
+      "type": "LevelGeneration.LG_PointLight",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "transform.position.x",
+        "transform.position.y",
+        "transform.position.z",
+        "m_pointLight.Pointer",
+        "m_pointLight.enabled",
+        "m_pointLight.gameObject.activeInHierarchy"
+      ]
+    },
+    {
+      "id": "d3-lights.LG_SpotLight",
+      "source": "components",
+      "type": "LevelGeneration.LG_SpotLight",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "transform.position.x",
+        "transform.position.y",
+        "transform.position.z",
+        "m_spotLight.Pointer",
+        "m_spotLight.enabled",
+        "m_spotLight.gameObject.activeInHierarchy"
+      ]
+    },
+    {
+      "id": "d3-lights.LG_SpotLightAmbient",
+      "source": "components",
+      "type": "LevelGeneration.LG_SpotLightAmbient",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "transform.position.x",
+        "transform.position.y",
+        "transform.position.z",
+        "m_spotLight.Pointer",
+        "m_spotLight.enabled",
+        "m_spotLight.gameObject.activeInHierarchy"
+      ]
+    },
+    {
+      "id": "d3-lights.emitter",
+      "source": "components",
+      "type": "LevelGeneration.LG_LightEmitterMesh",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "transform.position.x",
+        "transform.position.y",
+        "transform.position.z",
+        "m_light.Pointer",
+        "m_isEnabled",
+        "gameObject.activeInHierarchy"
+      ]
+    },
+    {
+      "id": "d3-zone-lights",
+      "source": "components",
+      "type": "LevelGeneration.LG_Zone",
+      "identity": [
+        "Pointer",
+        "DimensionIndex",
+        "Layer.m_type",
+        "LocalIndex"
+      ],
+      "paths": [
+        "m_lightsInZone[].Pointer"
+      ]
+    },
+    {
+      "id": "d3-spawned-pickups",
+      "source": "components",
+      "type": "LevelGeneration.ItemInLevel",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "pItemData.itemID_gearCRC",
+        "ItemDataBlock.persistentID",
+        "transform.position.x",
+        "transform.position.y",
+        "transform.position.z",
+        "gameObject.activeInHierarchy",
+        "internalSync.Pointer"
+      ]
+    },
+    {
+      "id": "d3-pickup-sync",
+      "source": "components",
+      "type": "LevelGeneration.LG_PickupItem_Sync",
+      "identity": [
+        "Pointer"
+      ],
+      "paths": [
+        "item.Pointer",
+        "m_stateReplicator.State.status"
+      ]
+    },
+    {
+      "id": "y4.melee-stamina.selector-inputs",
+      "source": "components",
+      "type": "PlayerStamina",
+      "identity": [
+        "Pointer",
+        "m_owner.Pointer",
+        "m_owner.PlayerSlotIndex"
+      ],
+      "paths": [
+        "m_owner.PlayerData.persistentID",
+        "m_owner.PlayerData.StaminaUsageAffectedByDrama",
+        "m_owner.PlayerData.StaminaMinimumCapWhenNotInCombat",
+        "Stamina",
+        "m_lastExertion"
+      ]
+    },
+    {
+      "id": "y4.melee-stamina.drama-state",
+      "source": "static",
+      "type": "DramaManager",
+      "identity": [],
+      "paths": [
+        "Current.Pointer",
+        "InActionState",
+        "CurrentStateEnum"
+      ]
+    },
+    {
+      "id": "y4.foam.registered-instances",
+      "source": "static",
+      "type": "ProjectileManager",
+      "identity": [],
+      "paths": [
+        "Current.Pointer",
+        "Current.m_glueGunProjectiles.Count",
+        "Current.m_glueGunProjectiles.Values[].Pointer",
+        "Current.m_glueGunProjectiles.Values[].SyncID",
+        "Current.m_glueGunProjectiles.Values[].SpawnMode"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+# V1 E1 echo station (dimension 1): where the player lands on each way in and out, and whether the echo station's dusk sky and heavy
+# sandstorm (written into its dimension data block by the export) are what the game reads. Start a session on a freshly loaded E1 of the
+# V1 package, then run:
+#   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package NAinfini-Forge_V1_Rundown --level E1 --work-dir artifacts/work/drivesession/<name>
+#   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name> run Mods/ForgeDevelopment/scripts/e1-dimensions.test
+#
+# The in-game list of contract 4.5 "维度编辑完整开放", item by item:
+#   four players each on their own landing       step 3, solo: only the host's slot 0 is read; slots 1..3 need a four-player run
+#   "全队闪入若干秒": where the team is when it ends step 5 (fired from the console); the authored one is timed-dimension.test
+#   return to reality into a chosen zone          step 4 (fired from the console: V1 E1 returns only by its behavior station)
+#   echo station dusk sky and heavy sandstorm     step 1, the dimension data the game holds, plus a screenshot
+#   zone event "有人走进区域" (the room 走进来进入回声站 behind the reactor's security door) and the red circle 站进红圈进入回声站
+#     in 归途与结局, each warping the team once   owner hand test: entering a trigger range is walked, not scripted
+#   a self-built dimension's sky once outdoors    self-built-dimension-room.test (the 闪入小屋 has no ceiling)
+#   a vanilla dimension "复制一份来改" shows the changed sky   NOT COVERED: the map workshop cannot make a dimension that references a
+#     vanilla dimension block, so V1 has none
+#
+# Rooms (teleport points are room-local Unity metres, the positions the package writes: editor (x, y, z) is Unity (c.x - x, y, c.z + z)
+# with c the room's centre; most rooms here have c = 0, the echo station's native cave has c = (-60.85, 0, -4.65)):
+#   数据档案 room:168c6a8970c27a13d3388944485e holds the station 维度入口 v1-button-9a7597a338a1b33ecc6c4ca6a732 (behavior teleport into
+#     dimension 1, onto the echo station's trigger zone e1-landing-81fb6749e66466ba621a5fb47d23 at (-58.85, 0.137, 7.35)).
+#   回声站 cab9571d-1ebf-4186-8129-8f405aff002f: dimension landings slot 0..3 at (-59.5, 0.23, 6), (-59.5, 0.01, 12),
+#     (-59.5, -0.06, 16), (-67.5, -0.29, 8); the station 返回现实 v1-button-5c6a41874081f45067e6090c4d33 stands here (behavior
+#     teleport onto the trigger zone e1-landing-c8252988b26a625fee4ec7681b31 of 归途与结局 at (0, 0.134, -27)).
+#   归途与结局 room:6c374e24d931dfaa3d749895e574: opening its door warps the team into dimension 1 (the dimension journey, one-way).
+# Authored echo station sky (dimension data block): IsOutside true, Sandstorm true, Exposure 3.37, AmbientIntensity 1,
+# LightAzimuth -34, LightElevation 14.3, LightIntensity 0.3048.
+# A reference point is read by teleporting to it inside the dimension the player is already in (no extra crossing): its `landed` is
+# where the game puts a body at that point. Landings compare within 1.5 m on the floor plane.
+god on
+
+# 1. the station 维度入口, and the echo station's sky as the game holds it
+teleport room=room:168c6a8970c27a13d3388944485e 10 0 -7
+interact name=v1-button-9a7597a338a1b33ecc6c4ca6a732 radius=6
+wait 4s
+player Position DimensionIndex CourseNode.m_zone.LocalIndex as=station_in
+expect $station_in.DimensionIndex contains "Dimension_1"
+teleport room=cab9571d-1ebf-4186-8129-8f405aff002f -58.85 0.137 7.35 as=echo_at
+expect $station_in.Position.x ~1.5 $echo_at.landed.x
+expect $station_in.Position.z ~1.5 $echo_at.landed.z
+step {"target":"allOfType:LevelGeneration.LG_Zone","steps":[{"read":["DimensionIndex","LocalIndex","Dimension.DimensionData.IsOutside","Dimension.DimensionData.Sandstorm","Dimension.DimensionData.Exposure","Dimension.DimensionData.AmbientIntensity","Dimension.DimensionData.LightAzimuth","Dimension.DimensionData.LightElevation","Dimension.DimensionData.LightIntensity"]}]} as=sky
+state fog as=fog_echo
+screenshot as=shot_echo
+
+# 2. the station 返回现实 (behavior teleport back onto the return room's trigger zone)
+interact name=v1-button-5c6a41874081f45067e6090c4d33 radius=8
+wait 4s
+player Position DimensionIndex CourseNode.m_zone.LocalIndex as=station_back
+expect $station_back.DimensionIndex contains "Reality"
+teleport room=room:6c374e24d931dfaa3d749895e574 0 0.134 -27 as=return_at
+expect $station_back.Position.x ~1.5 $return_at.landed.x
+expect $station_back.Position.z ~1.5 $return_at.landed.z
+
+# 3. the door of 归途与结局: opening it warps the team in (the dimension journey); the host lands on slot 0
+door read near:12 as=doors
+door open near:12 as=opened
+wait 8s
+player Position DimensionIndex CourseNode.m_zone.LocalIndex as=door_in
+expect $door_in.DimensionIndex contains "Dimension_1"
+teleport room=cab9571d-1ebf-4186-8129-8f405aff002f -59.5 0.23 6 as=slot0_at
+expect $door_in.Position.x ~1.5 $slot0_at.landed.x
+expect $door_in.Position.z ~1.5 $slot0_at.landed.z
+
+# 4. back to reality into a chosen zone, as the website exports it: the game's warp (type 8) never reads LocalIndex, it lands on the
+# world event object WorldEventObjectFilter names; the export writes forge-zone-landing:<dimension>/<layer>/<zone>; and the engine puts that
+# object in the zone's first area before the event reads it. Zone 1, then from there zone 3.
+event {"Type":8,"DimensionIndex":0,"Layer":0,"LocalIndex":1,"WorldEventObjectFilter":"forge-zone-landing:0/0/1;"}
+wait 5s
+player Position DimensionIndex CourseNode.m_zone.LocalIndex as=back_zone1
+expect $back_zone1.DimensionIndex contains "Reality"
+expect $back_zone1.CourseNode.m_zone.LocalIndex contains "Zone_1"
+teleport zone=0/0/1 area=0
+event {"Type":8,"DimensionIndex":0,"Layer":0,"LocalIndex":3,"WorldEventObjectFilter":"forge-zone-landing:0/0/3;"}
+wait 5s
+player Position DimensionIndex CourseNode.m_zone.LocalIndex as=back_zone3
+expect $back_zone3.DimensionIndex contains "Reality"
+expect $back_zone3.CourseNode.m_zone.LocalIndex contains "Zone_3"
+
+# 5. the whole team flashed in for 12 seconds: where it lands, and where it is after the time runs out (read, not judged: the contract
+# asks where that is)
+teleport room=room:6c374e24d931dfaa3d749895e574 0 0 -27
+player Position DimensionIndex CourseNode.m_zone.LocalIndex as=flash_from
+event {"Type":7,"DimensionIndex":1,"Layer":0,"LocalIndex":0,"Duration":12}
+wait 4s
+player Position DimensionIndex CourseNode.m_zone.LocalIndex as=flash_in
+expect $flash_in.DimensionIndex contains "Dimension_1"
+wait 14s
+player Position DimensionIndex CourseNode.m_zone.LocalIndex as=flash_out
+expect $flash_out.DimensionIndex contains "Reality"
+expect log --all !contains "Exception"

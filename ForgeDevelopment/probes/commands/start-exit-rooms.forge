@@ -1,0 +1,614 @@
+[
+  {
+    "id": "start-exit-enable-observation",
+    "title": "A3 起始房与撤离房：开启原生阶段观察（进关前）",
+    "host": "any",
+    "target": "static:ForgeDevelopment.Native.RecTracerRuntime",
+    "requires": [
+      "隔离 A3 Authoring 会话；Recorder.Enabled 与 TraceEnabled 开启，TraceAllProfiles 关闭，保留 level 与 dimension-landings。F5 确认无 running 命令且 experiment objects alive: 0；非零停止。requires 只是提示，不是自动门禁。",
+      "记录作者起始/撤离 room id 与 revision、包 SHA-256、游戏 build、DataBlock revision、Forge 发行集指纹。起始 donor 为 geo_32x32_elevator_shaft_mining_03_tutorial，撤离 donor 为 geo_64x64_mining_exit_01_tutorial；作者撤离配方 key 不含 _exit_。",
+      "ForgeMap 构造并接入，本配方只读原生对象。除本命令切换诊断 profile 外，不创建、移动、登记、激活、销毁或清理游戏对象。"
+    ],
+    "steps": [
+      {
+        "call": "SetProfileEnabled",
+        "args": [
+          "author-room-wall",
+          true
+        ]
+      },
+      {
+        "call": "SetProfileEnabled",
+        "args": [
+          "author-start-exit-rooms",
+          true
+        ]
+      }
+    ],
+    "notes": [
+      "P3（B3/B4）：生成前开启。核 GetElevatorTile、LG_SetupFloor.Build、CreateFloorTransition、SetPlaced；ReadyToStartLevel 与 InLevel 各运行四个 m10-start-* 读取。作者模板必须成为 floor.Root、仍是 LG_FloorTransition；Landing.SpawnArea 与主维度主层 Zone 0 Area 0 同一；Cage 四组引用完整，并实际全队离座可操作。模型出现、Build 返回或命令 Passed 均不够。",
+      "P6（B5/B6）：FactoryDone 后、主目标完成前、完成后扫描激活时分别运行全部 m10-exit-* 读取。ExitGeo 的 Area、scan anchor、puzzle source Area 回指作者房；custom 槽恰好一个且 puzzle 为 IsExitPuzzle。GetExitScanData 返回对应显式 ChainedPuzzleAtExit，并核包内 WinCondition=GoToExitGeo。普通扫描、文件名或静态路线不能代替胜利结算。",
+      "P7（B4/B5/B6）：暂存模板不得触发 Landing/ExitGeo Start 或占槽；已放置 A3 恰好一个 Landing 与一个 ExitGeo。退图核两个 OnDestroy 及 Builder/WardenObjectiveManager/ChainedPuzzleManager 清理，再以同包同 seed 重进；每局仍各一个且计数不累计。第二个 ExitGeo 必须由 ForgeMap 明确拒绝，不能接受最后登记者。",
+      "生产日志关联固定使用 design.function=start|extraction（不得写 exit）、resource、roomDefinition、revision、instanceState。room.build-registered 的 setup-floor-selection 还须带 room(instanceId)/zone/level，完成记录须带作者 room/zone/actualArea；原生 sourceArea/scan/puzzle/slot 再经 geomorph.name 配方键关联。",
+      "判定：完整且相反的原生读数为失败；hook 未安装、managed-wrapper 不能覆盖原生边界、skip/error/overflow/dropped、$error、null-before-leaf、身份不唯一、截断、缺作者回指或缺阶段材料均为未证。缺日志不能解释为零次，未跑游戏不得标通过。",
+      "双端以同一包 hash、作者 room id/revision、world 代次、维度/层/Zone/Area 与原生宿主配对；Pointer、InstanceID、Area UID 只在单端同生命使用。交回两端完整 rec-*、index/patch/trace-coverage、LogOutput、F7/F8 材料与时间线。"
+    ]
+  },
+  {
+    "id": "start-floor",
+    "title": "P3：当前楼层根与主维度首 Area（只读）",
+    "host": "any",
+    "target": "static:LevelGeneration.Builder",
+    "steps": [
+      {
+        "call": "CurrentFloor"
+      },
+      {
+        "target": "result",
+        "read": [
+          "ID",
+          "IsBuilt",
+          "Root.name",
+          "Root.position",
+          "Root.rotation",
+          "MainDimension",
+          "MainDimension.DimensionIndex",
+          "MainDimension.MainLayer",
+          "MainDimension.MainLayer.m_type",
+          "MainDimension.MainLayer.m_zones.Count",
+          "MainDimension.MainLayer.m_zones"
+        ]
+      }
+    ],
+    "requires": [
+      "只在 A3 ReadyToStartLevel 与 InLevel 各读一次；实验对象为空。CurrentFloor 是 Builder 的静态只读取值，返回 null 或后续读取失败均保留未证。"
+    ],
+    "notes": [
+      "将 MainDimension/MainLayer/m_zones 的有序原生身份与 start-landing 的 SpawnArea.m_zone 对齐；目标 Zone 必须是列表首项且 LocalIndex=0，SpawnArea 必须是该 Zone 的 m_areas 首项。",
+      "Root 是 Transform；实际 LG_FloorTransition 的资源、spawn、Area 与同位姿身份由 start-transition 读取。读取成功不证明全队落地、碰撞、导航或下一房连接可用，仍须实际运行。"
+    ]
+  },
+  {
+    "id": "start-transition",
+    "title": "P3：实际 LG_FloorTransition 实例（只读）",
+    "host": "any",
+    "target": "allOfType:LG_FloorTransition",
+    "steps": [
+      {
+        "read": [
+          "name",
+          "m_geoPrefab.name",
+          "m_shapeType",
+          "m_spawnPoints.Length",
+          "m_zone",
+          "m_zone.DimensionIndex",
+          "m_zone.m_layer.m_type",
+          "m_zone.LocalIndex",
+          "m_areas.Length",
+          "m_areas",
+          "transform.position",
+          "transform.rotation"
+        ]
+      }
+    ],
+    "requires": [
+      "A3 已生成；以作者起始房映射唯一定位 floor.Root。多个 FloorTransition 全部保留，不挑第一个。"
+    ],
+    "notes": [
+      "作者实例仍须是 LG_FloorTransition 且资源键与 floor.Root 一致。四个地图 spawn 是结构读数，不代替 Cage 登记或四人实测。"
+    ]
+  },
+  {
+    "id": "start-landing",
+    "title": "P3/P7：落地组件、固定锚点与 SpawnArea（只读）",
+    "host": "any",
+    "target": "allOfType:ElevatorShaftLanding",
+    "steps": [
+      {
+        "read": [
+          "name",
+          "transform.position",
+          "transform.rotation",
+          "m_cargoCageAlign.position",
+          "m_cargoCageAlign.rotation",
+          "m_securityScanAlign.position",
+          "m_securityScanAlign.rotation",
+          "SpawnArea",
+          "SpawnArea.UID",
+          "SpawnArea.m_geomorph.name",
+          "SpawnArea.m_zone",
+          "SpawnArea.m_zone.DimensionIndex",
+          "SpawnArea.m_zone.m_layer.m_type",
+          "SpawnArea.m_zone.LocalIndex",
+          "SpawnArea.m_zone.m_areas.Count",
+          "SpawnArea.m_zone.m_areas",
+          "SpawnNode.Name",
+          "m_puzzle.m_puzzleUID",
+          "m_puzzle.IsExitPuzzle"
+        ]
+      }
+    ],
+    "requires": [
+      "A3 已生成；只读 B4 已核 SpawnArea getter 与缓存。功能组保持 donor 固定姿态，不在本命令中试移位或旋转。"
+    ],
+    "notes": [
+      "SpawnArea 的原生身份必须等于其 Zone.m_areas 有序集合第一项；该 Zone 的身份必须等于 start-floor 主维度主层 m_zones 第一项，且 DimensionIndex/层/LocalIndex 为主维度/MainLayer/0。Landing/cargo/scan 世界姿态须等于冻结输入。",
+      "allOfType 只枚举 active live component；inactive 暂存模板还须结合生成前 Start trace、ForgeMap registered/placed 身份和槽读数，不能只靠未找到对象。"
+    ]
+  },
+  {
+    "id": "start-cage",
+    "title": "P3：玩家电梯 Cage 出生与离座引用（只读）",
+    "host": "any",
+    "target": "allOfType:ElevatorCage",
+    "steps": [
+      {
+        "read": [
+          "name",
+          "transform.position",
+          "transform.rotation",
+          "m_spawnPoints.Length",
+          "m_playerLandingAligns.Length",
+          "m_seatsFromShaft.Length",
+          "m_cargoCage.name",
+          "m_cargoCage.transform.position",
+          "m_seatHolderLandTargetPos.position"
+        ]
+      }
+    ],
+    "requires": [
+      "在 ElevatorCage.RegisterSpawnPoints trace 后读取；玩家电梯属独立场景，不按 floor.Root 子物体关系强行归属。"
+    ],
+    "notes": [
+      "与 RegisterSpawnPoints 及 ReadyToStartLevel/InLevel 配对。未占用槽只算结构核对；单人/双人结果不写成四人落地通过。"
+    ]
+  },
+  {
+    "id": "exit-host",
+    "title": "P6/P7：实际 ExitGeo 宿主、Area、锚点与 puzzle（只读）",
+    "host": "any",
+    "target": "allOfType:LevelGeneration.LG_LevelExitGeo",
+    "steps": [
+      {
+        "read": [
+          "name",
+          "transform.position",
+          "transform.rotation",
+          "m_exitArea.UID",
+          "m_exitArea.m_geomorph.name",
+          "m_exitArea.m_zone.DimensionIndex",
+          "m_exitArea.m_zone.m_layer.m_type",
+          "m_exitArea.m_zone.LocalIndex",
+          "m_securityScanAlign.position",
+          "m_securityScanAlign.rotation",
+          "m_securityScanAlign.parent.name",
+          "m_puzzle.m_puzzleUID",
+          "m_puzzle.Data.persistentID",
+          "m_puzzle.IsExitPuzzle",
+          "m_puzzle.IsActive",
+          "m_puzzle.m_sourceArea.UID",
+          "SpawnNode.Name"
+        ]
+      }
+    ],
+    "requires": [
+      "A3 FactoryDone 后；用作者撤离 room id/revision 与 ForgeMap placed 日志定位，不按资源名含 _exit_ 选择。"
+    ],
+    "notes": [
+      "正式 A3 恰好一个 active ExitGeo；m_exitArea 与 puzzle source Area 等于作者房 Area。目标前后各读 IsActive，并关联 Activate/Deactivate 与胜利回调。",
+      "普通 puzzle、改名资源或最后登记者覆盖均不算成功；多宿主必须明确拒绝。"
+    ]
+  },
+  {
+    "id": "exit-objective-slots",
+    "title": "P6/P7：原生 elevator/custom 两个撤离槽（只读）",
+    "host": "any",
+    "target": "static:WardenObjectiveManager",
+    "steps": [
+      {
+        "call": "Current"
+      },
+      {
+        "target": "result",
+        "read": [
+          "CurrentState",
+          "IsExpeditionStarted",
+          "m_customGeoExitWinConditionItem.name",
+          "m_customGeoExitWinConditionItem.m_exitArea.UID",
+          "m_customGeoExitWinConditionItem.m_puzzle.m_puzzleUID",
+          "m_elevatorExitWinConditionItem.name",
+          "m_elevatorExitWinConditionItem.SpawnArea.UID",
+          "m_elevatorExitWinConditionItem.m_puzzle.m_puzzleUID",
+          "m_chainedWinConditions.Count",
+          "m_allObjectiveItems.Count"
+        ]
+      }
+    ],
+    "requires": [
+      "生成前、FactoryDone 后、目标完成前/后、退图清理后和重进后分别运行；Current 是静态只读取值，null、result 无法解析或字段不可读均按实际阶段记录为未证。"
+    ],
+    "notes": [
+      "B6 证明 custom/elevator 是两个单槽。custom 唯一指向 exit-host；elevator 可同时指向 Landing，不等于两个 custom 宿主。",
+      "退图 null 只有与完整 OnDestroy/OnLevelCleanup 及下一局不累计配对后才支持清理；单次 null 或缺记录仍未证。"
+    ]
+  },
+  {
+    "id": "exit-puzzle-registry",
+    "title": "P6/P7：ChainedPuzzleManager 实例总数（只读）",
+    "host": "any",
+    "target": "static:ChainedPuzzles.ChainedPuzzleManager",
+    "steps": [
+      {
+        "call": "Current"
+      },
+      {
+        "target": "result",
+        "read": [
+          "m_instances.Count"
+        ]
+      }
+    ],
+    "requires": [
+      "与 exit-puzzles 同阶段连续读取；Current 是静态只读取值。总数包含非撤离 puzzle，不能单独当撤离数量。"
+    ],
+    "notes": [
+      "记录进入、退图和重进总数，再按 IsExitPuzzle/UID/source Area 分解；同图输入不一致或截断时不比较。"
+    ]
+  },
+  {
+    "id": "exit-puzzles",
+    "title": "P6/P7：活跃 ChainedPuzzle 实例（只读）",
+    "host": "any",
+    "target": "allOfType:ChainedPuzzles.ChainedPuzzleInstance",
+    "steps": [
+      {
+        "read": [
+          "m_puzzleUID",
+          "Data.persistentID",
+          "Data.PublicAlarmName",
+          "IsExitPuzzle",
+          "IsActive",
+          "m_sourceArea.UID",
+          "m_sourceArea.m_geomorph.name",
+          "m_sourceArea.m_zone.DimensionIndex",
+          "m_sourceArea.m_zone.m_layer.m_type",
+          "m_sourceArea.m_zone.LocalIndex",
+          "m_stateReplicator.State.status"
+        ]
+      }
+    ],
+    "requires": [
+      "A3 已生成；保留全部 live puzzle 后按 IsExitPuzzle 与 ExitGeo 的 UID/Area 关联，不按列表序号或最近对象。"
+    ],
+    "notes": [
+      "目标前 ExitPuzzle 不得完成撤离；目标后由原版激活并结算。截断、UID 复用未排除、复制状态缺失或跨端无法关联时保留未证。"
+    ]
+  },
+  {
+    "id": "plug-source",
+    "title": "连接用途：读取下游区与真实来源（只读）",
+    "host": "any",
+    "target": "zone:0/MainLayer/1",
+    "requires": [
+      "沿用开启观察命令的前提；目标明确为现实维度主层 LocalIndex 1。夹具使用其他地址时，先修改本轮 QA 配方副本并冻结 hash；不能失败后改读其他区。",
+      "在生成完成的阶段边界手动运行；无 running 命令且 experiment objects alive: 0。"
+    ],
+    "steps": [
+      {
+        "read": [
+          "DimensionIndex",
+          "Layer",
+          "LocalIndex",
+          "ID",
+          "m_buildStatus",
+          "m_coverage",
+          "m_sourceExpander.m_isZoneSource",
+          "m_sourceExpander.m_isZoneBuildBlocked",
+          "m_sourceExpander.m_linksFrom.UID",
+          "m_sourceExpander.m_linksTo.UID",
+          "m_sourceExpander.m_originalParentArea.UID"
+        ]
+      }
+    ],
+    "notes": [
+      "只读已生成状态；不调用评分、IsExpanderFree、SetupZoneForExpansion 或 TryFindLinkedArea。UID 只作同端关联，区 ID 与 LocalIndex 分开保存。",
+      "最终来源不能证明原候选分数、过滤原因与排序保持；原生 job 的暂态评分集合尚无绑定及类型化投影，此项证据不足时不能判 P1 通过。缺生成对象或失败区无法解析也不能代替生成失败记录。"
+    ]
+  },
+  {
+    "id": "plug-list",
+    "title": "连接用途：端点缓存与双向配对（只读）",
+    "host": "any",
+    "target": "allOfType:LevelGeneration.LG_Plug",
+    "requires": [
+      "只在最小 QA 图的阶段边界采样一次；沿用开启观察的前提，experiment objects alive: 0。",
+      "按作者房间实例、完整资源键、房间局部端点路径和两侧 Area 唯一定位本次两端。allOfType 不自动按作者目标过滤，不逐帧扫描全关。"
+    ],
+    "steps": [
+      {
+        "read": [
+          "name",
+          "m_dir",
+          "m_position",
+          "m_linkPosition",
+          "m_forward",
+          "m_isZoneSource",
+          "m_isZoneBuildBlocked",
+          "m_originalParentArea.UID",
+          "m_linksFrom.UID",
+          "m_linksTo.UID",
+          "m_pariedWith.name",
+          "m_pariedWith.m_dir",
+          "m_pariedWith.m_linkPosition",
+          "m_pariedWith.m_pariedWith.name"
+        ]
+      }
+    ],
+    "notes": [
+      "保留原生拼写 m_pariedWith；名字和指针不是稳定端点 ID，互指须与同端实际对象证据关联，重名不能判唯一。",
+      "不调用 SetPlaced、Pair、TryPair 或 GetPosition 来制造缓存。水平配对不检查高度和净空；成功配对不能代替通道、玩家和 AI 通行证据。"
+    ]
+  },
+  {
+    "id": "gate-list",
+    "title": "门朝向：读取原生推进缓存（只读）",
+    "host": "any",
+    "target": "allOfType:LevelGeneration.LG_Gate",
+    "requires": [
+      "P1 已取得完整通过证据；最小 QA 图在锁构建后及 FactoryDone 后各采一次，experiment objects alive: 0。",
+      "目标是已唯一定位的跨区连接或独立区内门样本；原版高差、层入口和弱门分别对照，不混成同一结论。"
+    ],
+    "steps": [
+      {
+        "read": [
+          "name",
+          "Type",
+          "m_linksFrom.UID",
+          "m_linksFrom.m_zone.ID",
+          "m_linksTo.UID",
+          "m_linksTo.m_zone.ID",
+          "ExpanderRotation",
+          "ForceSecurityFlip",
+          "m_hasBeenFlipped",
+          "m_hasProgressionSourceArea",
+          "m_progressionSourceArea.UID",
+          "m_hasProgressionSourceDirection",
+          "m_progressionSourceDirection",
+          "SpawnedDoor"
+        ]
+      }
+    ],
+    "notes": [
+      "读取 m_progressionSourceArea / m_progressionSourceDirection 及其有效标志；不调用计算型 ProgressionSourceArea / ProgressionSourceDirection getter。标志未建立时该缓存未证，不将默认向量当方向。",
+      "SpawnedDoor 是 iLG_Door_Core 接口引用；不假设它有 name/transform。实际门姿态由安全门/弱门命令及已有 ForgeMap DoorOrientationObservation 取证；接口到实例关联缺失时未证。拓扑、推进来源、门正面、锁/按钮/扫描操作面分别判断，ForceSecurityFlip 值不证明已被消费。"
+    ]
+  },
+  {
+    "id": "security-door",
+    "title": "门朝向：安全门翻转与操作锚点（只读）",
+    "host": "any",
+    "target": "allOfType:LevelGeneration.LG_SecurityDoor",
+    "requires": [
+      "沿用 gate-list 的前提；experiment objects alive: 0，按 Gate 与作者端点唯一定位目标门。"
+    ],
+    "steps": [
+      {
+        "read": [
+          "name",
+          "Gate.name",
+          "transform.position",
+          "transform.forward",
+          "FlippedForProgresion",
+          "m_keypadAlign.position",
+          "m_bioScanAlign.position",
+          "LastStatus",
+          "InteractionAllowed"
+        ]
+      }
+    ],
+    "notes": [
+      "原生拼写 FlippedForProgresion 不修正。须两侧实际操作门和扫描，并留画面；有翻转字段或锚点坐标不等于操作面正确。"
+    ]
+  },
+  {
+    "id": "weak-door",
+    "title": "门朝向：弱门独立对照（只读）",
+    "host": "any",
+    "target": "allOfType:LevelGeneration.LG_WeakDoor",
+    "requires": [
+      "沿用 gate-list 的前提；夹具本轮确实选择弱门，experiment objects alive: 0。零目标不能判弱门没有翻转。"
+    ],
+    "steps": [
+      {
+        "read": [
+          "name",
+          "Gate.name",
+          "transform.position",
+          "transform.forward",
+          "m_buttonAligns.Length",
+          "m_buttons.Length",
+          "LastStatus",
+          "InteractionAllowed"
+        ]
+      }
+    ],
+    "notes": [
+      "只读数量不是完整按钮投影；按钮/锁的每个实际位置与可操作性仍须另取证。安全门结论不能外推给弱门、区内门或层入口。"
+    ]
+  },
+  {
+    "id": "landing-point",
+    "title": "落地功能组：实例与货物/扫描锚点（只读）",
+    "host": "any",
+    "target": "allOfType:ElevatorShaftLanding",
+    "requires": [
+      "原位基线可独立观察；移位/旋转组必须先有 P3 通过证据。沿用开启观察的前提，experiment objects alive: 0。",
+      "实例必须属于本次实际放置的起始房；allOfType 不枚举完整 inactive 暂存模板，不能用零记录证明它没有登记。"
+    ],
+    "steps": [
+      {
+        "read": [
+          "name",
+          "transform.position",
+          "transform.rotation",
+          "m_cargoCageAlign.position",
+          "m_cargoCageAlign.rotation",
+          "m_securityScanAlign.position",
+          "m_securityScanAlign.rotation",
+          "m_objectsToHideWhenDown.Length",
+          "m_puzzle.m_puzzleUID",
+          "m_puzzle.IsExitPuzzle",
+          "m_puzzle.IsActive",
+          "m_puzzle.IsSolved",
+          "m_puzzle.m_sourceArea.UID"
+        ]
+      }
+    ],
+    "notes": [
+      "复用于 P3、P5 和 P7；不调用 SpawnArea / SpawnNode getter、Show、Hide 或 ActivateWinCondition。完整隐藏对象集合、回调数和 source Area 的作者归属仍需类型化投影。",
+      "只移动货物或扫描锚点不等于玩家电梯整体移动。null-before-leaf 不区分未建/已清理/失效，不能当清理通过。"
+    ]
+  },
+  {
+    "id": "elevator-cage",
+    "title": "玩家电梯：四座登记与落地参照（只读）",
+    "host": "any",
+    "target": "allOfType:ElevatorCage",
+    "requires": [
+      "原位或 P3 已通过的整体移位/旋转夹具；沿用开启观察的前提，experiment objects alive: 0。与同端 Ride、Landing 及玩家槽关联。"
+    ],
+    "steps": [
+      {
+        "read": [
+          "name",
+          "transform.position",
+          "transform.rotation",
+          "m_gameStarted",
+          "m_seatsFromShaft.Length",
+          "m_playerLandingAligns.Length",
+          "m_spawnPoints.Length",
+          "m_spawnPoints.0.m_seat.m_landingPoint.position",
+          "m_spawnPoints.1.m_seat.m_landingPoint.position",
+          "m_spawnPoints.2.m_seat.m_landingPoint.position",
+          "m_spawnPoints.3.m_seat.m_landingPoint.position",
+          "m_cargoCage.name"
+        ]
+      }
+    ],
+    "notes": [
+      "m_spawnPoints 是 PlayerSpawnpoint[]，m_seatsFromShaft 是 ElevatorSeat[]，m_playerLandingAligns 是 Transform[]；与 FloorTransition 的 Transform[] 分开记录。",
+      "数组索引只是同端槽位结构，实际占用须关联 PlayerSlotIndex 和登记记录。未占用槽不能计作四人落地通过；无座椅路径/空引用不得改读另一槽。"
+    ]
+  },
+  {
+    "id": "elevator-seats",
+    "title": "玩家电梯：座椅与离座落点（只读）",
+    "host": "any",
+    "target": "allOfType:ElevatorSeat",
+    "requires": [
+      "沿用 elevator-cage 的前提；experiment objects alive: 0。逐槽唯一关联 Cage 的 m_seatsFromShaft，不把同名椅子按列表顺序跨端配对。"
+    ],
+    "steps": [
+      {
+        "read": [
+          "name",
+          "transform.position",
+          "transform.rotation",
+          "m_landingPoint.position",
+          "m_landingPoint.rotation",
+          "m_playerAlign.position",
+          "localStartPos",
+          "localEndPos",
+          "moveOutActive",
+          "rotateUpActive"
+        ]
+      }
+    ],
+    "notes": [
+      "姿态/离座标志不能证明可控制。必须在真实 ReadyToStartLevel → InLevel 与离座后逐玩家实走，核首次 CourseNode、碰撞和是否回到原点。"
+    ]
+  },
+  {
+    "id": "elevator-ride",
+    "title": "玩家电梯：Ride 当前实例与起止参照（只读）",
+    "host": "any",
+    "target": "static:ElevatorRide",
+    "requires": [
+      "沿用 elevator-cage 的前提；experiment objects alive: 0。Ride.Current 已建立且属本轮；退关后失效引用不继续解引用。"
+    ],
+    "steps": [
+      {
+        "read": [
+          "Current.m_currentState",
+          "Current.m_generatingLevel",
+          "Current.m_elevatorCage.name",
+          "Current.m_elevatorCageStartRef.position",
+          "Current.m_elevatorCageStartRef.rotation",
+          "Current.m_elevatorCageEndRef.position",
+          "Current.m_elevatorCageEndRef.rotation",
+          "Current.m_tunnelEndRef.position",
+          "Current.m_cargoCageInUse"
+        ]
+      }
+    ],
+    "notes": [
+      "不调用 Ride 协程或 MapPosition 计算 getter；MapPosition 与完整 dock 关系尚需受审阅的安全投影。结束/PlayerExit 方法返回不代表协程完成或玩家已经 InLevel。"
+    ]
+  },
+  {
+    "id": "cargo",
+    "title": "开局货物：槽位与待移动物品规模（只读）",
+    "host": "any",
+    "target": "allOfType:ElevatorCargoCage",
+    "requires": [
+      "P3/P4 通过后使用真实有开局物品的原版任务对照；沿用开启观察的前提，experiment objects alive: 0。",
+      "实际任务、chain、物品身份、数量和哈希已冻结；不能用空货物任务判通过。"
+    ],
+    "steps": [
+      {
+        "read": [
+          "name",
+          "transform.position",
+          "transform.rotation",
+          "m_placementSlots.Length",
+          "m_itemsToMoveToCargo.Count"
+        ]
+      }
+    ],
+    "notes": [
+      "复用 objects 的 SpawnObjectiveItemsInLandingArea / MoveObjectiveToCargo 配对边界；同端关联 chain、真实 key 与起始 Area。",
+      "计数不证明物品完整、无重复或可交付。成员集合、donor Area 检测、拾取/交付和携物扫描条件尚须完整证据，不调用 Setup/Spawn/Move 来补日志。"
+    ]
+  },
+  {
+    "id": "players",
+    "title": "双端与恢复：实际玩家位置和所属空间（只读）",
+    "host": "any",
+    "target": "allOfType:Player.PlayerAgent",
+    "requires": [
+      "P1–P7 对应格子已有完整证据，主客机安装同包同 seed；沿用开启观察的前提，experiment objects alive: 0。",
+      "离座后、首次进入相邻房、退出扫描开放/完成以及适用恢复阶段分别手动采样；不把同端数组顺序当玩家身份。"
+    ],
+    "steps": [
+      {
+        "read": [
+          "PlayerSlotIndex",
+          "IsLocallyOwned",
+          "transform.position",
+          "transform.rotation",
+          "m_alive",
+          "m_courseNode.Name",
+          "m_courseNode.m_zone.DimensionIndex",
+          "m_courseNode.m_zone.Layer",
+          "m_courseNode.m_zone.LocalIndex",
+          "m_lastEnteredZone.LocalIndex",
+          "IsInBioscan"
+        ]
+      }
+    ],
+    "notes": [
+      "跨端配对用共同运行编号、输入/包 hash、阶段/变体、关卡、作者房/端点/功能宿主和玩家槽；pointer、InstanceID、callId、Area UID 和 worldEpoch 数值只作同端信息。",
+      "双人、四人、迟加入、重连、检查点和主机迁移各自判定；仅双人首次生成不能宣称全部恢复通过。任何候选歧义、截断、失效引用或缺终态保留证据不足。"
+    ]
+  }
+]
