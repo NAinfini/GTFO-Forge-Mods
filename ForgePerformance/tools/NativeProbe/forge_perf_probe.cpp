@@ -2,7 +2,8 @@
 // and put next to ForgePerformance.dll as ForgePerformance.NativeProbe.dll only for a measurement run. Without the file the probe
 // writes its lines without the columns that come from here.
 //
-// 1. Sampler: a native thread suspends the main and the render thread about a thousand times a second, walks each stack with
+// 1. Sampler: a native thread suspends the main and the render thread about a thousand times a second (and Unity's job worker
+//    threads WorkersPerTick at a time in turn, so each of N workers is sampled at hz * WorkersPerTick / N), walks each stack with
 //    RtlVirtualUnwind and writes the return addresses to samples.bin. A thread is suspended only while its registers and the top of
 //    its stack are copied; the walk runs over the copy, so no lock is ever taken while a thread is suspended.
 // 2. Direct3D 11: the draw, dispatch, render-target, map and create-shader entries of the device context and the device are counted
@@ -17,6 +18,8 @@
 #include <windows.h>
 #include <winternl.h>
 #include <psapi.h>
+#include <tlhelp32.h>
+#include <string>
 #include <d3d11_4.h>
 #include <intrin.h>
 #include <atomic>
@@ -33,7 +36,8 @@ namespace {
 
 // ---------------------------------------------------------------------------------------------------------------- sampler
 struct Module { uint64_t base, end; const RUNTIME_FUNCTION* functions; uint32_t count; };
-constexpr int MaxModules = 1024, MaxFrames = 96, MaxThreads = 4;
+// Targets 0 and 1 are the main and render thread and are sampled every tick; the rest are job workers, WorkersPerTick of them per tick in turn.
+constexpr int MaxModules = 1024, MaxFrames = 96, MaxThreads = 64, FixedTargets = 2, WorkersPerTick = 3;
 Module g_modules[MaxModules];
 int g_moduleCount;
 wchar_t g_folder[MAX_PATH];
@@ -172,12 +176,17 @@ DWORD WINAPI Sampler(void*)
     HANDLE timer = CreateWaitableTimerExW(nullptr, nullptr, 0x00000002 /* CREATE_WAITABLE_TIMER_HIGH_RESOLUTION */, TIMER_ALL_ACCESS);
     uint64_t nextModules = 0, nextFlush = 0;
     uint64_t frames[MaxFrames];
+    uint64_t rotation = 0;
     while (g_run.load(std::memory_order_relaxed))
     {
         LARGE_INTEGER now; QueryPerformanceCounter(&now);
         if ((uint64_t)now.QuadPart >= nextModules) { RefreshModules(); nextModules = now.QuadPart + 5 * frequency.QuadPart; }
-        for (int t = 0; t < g_targetCount; t++)
+        // The two fixed targets every tick, then the next WorkersPerTick workers of the rotation.
+        int workers = g_targetCount > FixedTargets ? g_targetCount - FixedTargets : 0;
+        int tick = std::min(g_targetCount, FixedTargets) + std::min(workers, WorkersPerTick);
+        for (int k = 0; k < tick; k++)
         {
+            int t = k < FixedTargets ? k : FixedTargets + (int)((rotation + (uint64_t)(k - FixedTargets)) % (uint64_t)workers);
             if (SuspendThread(g_targets[t]) == (DWORD)-1) continue;
             size_t copied = Snapshot(t);
             ResumeThread(g_targets[t]);
@@ -190,6 +199,7 @@ DWORD WINAPI Sampler(void*)
             used += 12 + (size_t)n * 8;
             g_samples.fetch_add(1, std::memory_order_relaxed);
         }
+        rotation += (uint64_t)std::min(workers, WorkersPerTick);
         if (used > sizeof buffer - 2 * MaxThreads * (12 + MaxFrames * 8) || (uint64_t)now.QuadPart >= nextFlush)
         {
             fwrite(buffer, 1, used, file); fflush(file); used = 0;
@@ -216,6 +226,78 @@ uint64_t TebOf(HANDLE thread)
     typedef NTSTATUS(NTAPI* Query)(HANDLE, int, void*, ULONG, ULONG*);
     auto query = (Query)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationThread");
     return query && query(thread, 0, &info, sizeof info, nullptr) >= 0 ? (uint64_t)info.teb : 0;
+}
+
+// Unity's job worker threads: those whose description starts with "Worker" or contains "Job.Worker" (Unity names them through
+// SetThreadDescription); if none carries such a name, the largest group of at least 6 other threads that started at the same
+// address inside UnityPlayer.dll. The choice, each thread's description and its start address are written to workers.tsv.
+uint64_t StartAddressOf(HANDLE thread)
+{
+    typedef NTSTATUS(NTAPI* Query)(HANDLE, int, void*, ULONG, ULONG*);
+    auto query = (Query)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationThread");
+    uint64_t start = 0;
+    return query && query(thread, 9 /* ThreadQuerySetWin32StartAddress */, &start, sizeof start, nullptr) >= 0 ? start : 0;
+}
+
+void AddWorkers(const uint32_t* known, int knownCount)
+{
+    struct Row { uint32_t id; uint64_t start; std::wstring name; };
+    std::vector<Row> rows;
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) return;
+    THREADENTRY32 entry{sizeof entry};
+    for (BOOL more = Thread32First(snapshot, &entry); more; more = Thread32Next(snapshot, &entry))
+    {
+        if (entry.th32OwnerProcessID != GetCurrentProcessId()) continue;
+        bool skip = false;
+        for (int i = 0; i < knownCount; i++) skip |= known[i] == entry.th32ThreadID;
+        if (skip || entry.th32ThreadID == GetThreadId(GetCurrentThread())) continue;
+        HANDLE thread = OpenThread(THREAD_QUERY_INFORMATION | THREAD_QUERY_LIMITED_INFORMATION, FALSE, entry.th32ThreadID);
+        if (!thread) continue;
+        PWSTR text = nullptr;
+        std::wstring name;
+        if (SUCCEEDED(GetThreadDescription(thread, &text)) && text) { name = text; LocalFree(text); }
+        rows.push_back({entry.th32ThreadID, StartAddressOf(thread), name});
+        CloseHandle(thread);
+    }
+    CloseHandle(snapshot);
+    std::vector<bool> picked(rows.size(), false);
+    const char* method = "description";
+    size_t count = 0;
+    for (size_t i = 0; i < rows.size(); i++)
+        if (rows[i].name.rfind(L"Worker", 0) == 0 || rows[i].name.find(L"Job.Worker") != std::wstring::npos) { picked[i] = true; count++; }
+    if (!count)
+    {
+        method = "start-address";
+        uint64_t unity = (uint64_t)GetModuleHandleW(L"UnityPlayer.dll");
+        MODULEINFO info{};
+        if (unity && GetModuleInformation(GetCurrentProcess(), (HMODULE)unity, &info, sizeof info))
+        {
+            uint64_t bestStart = 0; size_t best = 0;
+            for (auto& a : rows)
+            {
+                if (a.start < unity || a.start >= unity + info.SizeOfImage) continue;
+                size_t same = 0;
+                for (auto& b : rows) same += b.start == a.start;
+                if (same > best) { best = same; bestStart = a.start; }
+            }
+            if (best >= 6) for (size_t i = 0; i < rows.size(); i++) if (rows[i].start == bestStart) { picked[i] = true; count++; }
+        }
+    }
+    wchar_t path[MAX_PATH];
+    wcscpy_s(path, g_folder); wcscat_s(path, L"\\workers.tsv");
+    FILE* list = _wfsopen(path, L"wb", _SH_DENYNO);
+    for (size_t i = 0; i < rows.size(); i++)
+    {
+        if (list) fprintf(list, "%u\t%llx\t%d\t%ls\n", rows[i].id, rows[i].start, picked[i] ? 1 : 0, rows[i].name.c_str());
+        if (!picked[i] || g_targetCount >= MaxThreads) continue;
+        HANDLE thread = OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, rows[i].id);
+        if (!thread) continue;
+        uint64_t teb = TebOf(thread);
+        if (!teb) { CloseHandle(thread); continue; }
+        g_targets[g_targetCount] = thread; g_tebs[g_targetCount++] = teb;
+    }
+    if (list) { fprintf(list, "# method=%s picked=%zu\n", method, count); fclose(list); }
 }
 
 // ---------------------------------------------------------------------------------------------------------------- Direct3D 11
@@ -588,6 +670,7 @@ FPP_API int fpp_start(const wchar_t* folder, const uint32_t* threads, int count,
         g_targets[g_targetCount] = thread; g_tebs[g_targetCount++] = teb;
     }
     if (!g_targetCount) return 0;
+    AddWorkers(threads, count);
     if (!g_context) g_context = (CONTEXT*)_aligned_malloc(sizeof(CONTEXT), 16);
     g_hz.store(hz);
     LARGE_INTEGER a, b, f; QueryPerformanceFrequency(&f); QueryPerformanceCounter(&a);

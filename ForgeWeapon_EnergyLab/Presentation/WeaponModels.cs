@@ -72,8 +72,8 @@ internal static class WeaponModels
 
     internal static IEnumerator Preload()
     {
-        _gearShader = Shader.Find(GearShader) ?? throw new InvalidOperationException("Vanilla gear shader is unavailable: " + GearShader);
-        _reticleShader = Shader.Find("FX/FX_MuzzleFlash") ?? throw new InvalidOperationException("Vanilla FPS reticle shader is unavailable.");
+        _gearShader = ForgeVisual.Shaders.Find(GearShader) ?? throw new InvalidOperationException("Vanilla gear shader is unavailable: " + GearShader);
+        _reticleShader = ForgeVisual.Shaders.Find("FX/FX_MuzzleFlash") ?? throw new InvalidOperationException("Vanilla FPS reticle shader is unavailable.");
         _ready = true;
         yield break;
     }

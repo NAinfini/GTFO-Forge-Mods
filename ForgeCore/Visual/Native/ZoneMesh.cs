@@ -20,7 +20,7 @@ internal sealed class ZoneMesh : IDisposable
         _shape = shape; _unit = unit; _spine = spine; _disc = disc;
         _vertices = new Il2CppStructArray<Vector3>(unit.Length);
         var colors = new Color[unit.Length];
-        Array.Fill(colors, new Color(1, 1, 1, 1));
+        Array.Fill(colors, new Color { r = 1, g = 1, b = 1, a = 1 });
         Mesh = new Mesh
         {
             name = "ForgeVisual zone volume",
@@ -34,7 +34,7 @@ internal sealed class ZoneMesh : IDisposable
     {
         const int sides = 48, rings = 16;
         var points = new List<Vector3>(); var spine = new List<float>(); var triangles = new List<int>();
-        void Add(float x, float y, float z, float s = 0) { points.Add(new Vector3(x, y, z)); spine.Add(s); }
+        void Add(float x, float y, float z, float s = 0) { points.Add(new Vector3 { x = x, y = y, z = z }); spine.Add(s); }
         void Face(int a, int b, int c)
         { triangles.Add(a); triangles.Add(b); triangles.Add(c); triangles.Add(c); triangles.Add(b); triangles.Add(a); }
         if (disc || shape == ZoneShape.Cylinder)
@@ -87,7 +87,7 @@ internal sealed class ZoneMesh : IDisposable
         for (var i = 0; i < _unit.Length; i++)
         {
             var p = _unit[i];
-            _vertices[i] = new Vector3(p.x * x, _disc ? 0 : (float)(p.y * y + _spine[i] * spine), p.z * z);
+            _vertices[i] = new Vector3 { x = p.x * x, y = _disc ? 0 : (float)(p.y * y + _spine[i] * spine), z = p.z * z }; // field stores: the interop constructor is an IL2CPP call (MeshArrays)
         }
         Mesh.vertices = _vertices;
         Mesh.RecalculateBounds();

@@ -1,0 +1,64 @@
+# ForgePerformance fixes measured in R7D1 (Rundown 31, D1 "Mother"): VoiceFrameSkipFilter A/B. One session, Probe = true (ProbeSeconds 1),
+# KEEP THE GAME WINDOW FOCUSED. A = filter off (the game restarts the microphone after a slow frame), B = filter on. Each segment spawns
+# four sleeping Strikers (a spawn is a hitch the voice chat's frame skip test can see), waits, clears them. Compare per label with
+# tools/analyze_probe.py: VoiceRestart calls (ran, with time), VoiceFrameSkipIgnored, and the frame-time maxima. The level summary line
+# voice-restart-guard carries frame_skips_ignored and the restart reasons. A restart only happens while a microphone is running.
+# The map page item (CM_PageMap.UpdatePlayerData) is not in this script: ForgeEngine hooks that method, so no switch was added.
+# Start: run-drive-session.py start --rundown 31 --level D1.
+god on
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+call static:ForgePerformance.Crowd.PerformanceControl Read as=before
+teleport zone=0/MainLayer/1 area=0
+wait 3s
+call static:ForgePerformance.Crowd.PerformanceControl Set "VoiceFrameSkipFilter" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "voice-A-1"
+spawn Striker 4 at=front:3 mode=hibernate
+wait 8s
+clear enemies
+wait 2s
+call static:ForgePerformance.Crowd.PerformanceControl Set "VoiceFrameSkipFilter" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "voice-B-1"
+spawn Striker 4 at=front:3 mode=hibernate
+wait 8s
+clear enemies
+wait 2s
+call static:ForgePerformance.Crowd.PerformanceControl Set "VoiceFrameSkipFilter" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "voice-A-2"
+spawn Striker 4 at=front:3 mode=hibernate
+wait 8s
+clear enemies
+wait 2s
+call static:ForgePerformance.Crowd.PerformanceControl Set "VoiceFrameSkipFilter" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "voice-B-2"
+spawn Striker 4 at=front:3 mode=hibernate
+wait 8s
+clear enemies
+wait 2s
+call static:ForgePerformance.Crowd.PerformanceControl Set "VoiceFrameSkipFilter" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "voice-A-3"
+spawn Striker 4 at=front:3 mode=hibernate
+wait 8s
+clear enemies
+wait 2s
+call static:ForgePerformance.Crowd.PerformanceControl Set "VoiceFrameSkipFilter" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "voice-B-3"
+spawn Striker 4 at=front:3 mode=hibernate
+wait 8s
+clear enemies
+wait 2s
+call static:ForgePerformance.Crowd.PerformanceControl Set "VoiceFrameSkipFilter" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "voice-A-4"
+spawn Striker 4 at=front:3 mode=hibernate
+wait 8s
+clear enemies
+wait 2s
+call static:ForgePerformance.Crowd.PerformanceControl Set "VoiceFrameSkipFilter" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "voice-B-4"
+spawn Striker 4 at=front:3 mode=hibernate
+wait 8s
+clear enemies
+wait 2s
+call static:ForgePerformance.Crowd.PerformanceControl Set "VoiceFrameSkipFilter" true
+call static:ForgePerformance.Crowd.PerformanceControl Read as=end
+call static:ForgePerformance.Crowd.PerformanceControl Mark "end"
+expect log --all !contains "Exception"

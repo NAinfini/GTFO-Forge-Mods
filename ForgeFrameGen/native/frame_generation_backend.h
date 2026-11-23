@@ -2,8 +2,9 @@
 // inputs drawn into textures shared with D3D12 (one set per back buffer slot), why a present is left out, the counters and the log
 // lines. A backend hands those inputs to one vendor's frame generation: NVIDIA DLSS Frame Generation with Reflex and PCL through
 // Streamline (dlss_frame_generation.cpp), or AMD FSR Frame Generation through the AMD FSR SDK's frame generation swap chain
-// (fsr_frame_generation.cpp). One backend runs at a time; the player's upscaler picks it, and the bridge moves the display swap chain from
-// one to the other while the game runs (present_bridge.cpp, Switch).
+// (fsr_frame_generation.cpp). One backend runs at a time; the player's frame generation setting picks it (Auto: DLSS Frame Generation
+// where it can start, else AMD's), independent of the upscaler, and the bridge moves the display swap chain from one to the other while
+// the game runs (present_bridge.cpp, Switch).
 #pragma once
 #include "frame_generation.h"
 #include "bridge_common.h"
@@ -97,4 +98,6 @@ public:
 
 Backend &DlssBackend();
 Backend &FsrBackend();
+// After DlssBackend().Start: why it could not start (DlssMissing, bridge_common.h; DlssRuns when it did).
+int DlssStartMissing();
 } // namespace fg

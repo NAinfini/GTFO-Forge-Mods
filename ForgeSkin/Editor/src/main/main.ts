@@ -1,13 +1,16 @@
-import { app, autoUpdater, BrowserWindow, dialog, ipcMain, net, protocol, shell, type OpenDialogOptions } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { execFile } from 'node:child_process';
-import { appendFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync, type FSWatcher } from 'node:fs';
+import { cpSync, existsSync, readdirSync, rmSync, watch, type FSWatcher } from 'node:fs';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, normalize, resolve, sep } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import squirrelStartup from 'electron-squirrel-startup';
-import { Backend } from './backend';
-import { dataDir, edition, moveData, moveInstallData } from './dataDir';
+import { createShell, detectEdition } from '../../../../Desktop/shell/index';
 
+// The shell (Desktop/shell) holds what any desktop app of ours shares: the backend process, the data folder, updates, dialogs,
+// the debugging port, the log and the window's recovery. This file passes it ForgeSkin's settings and keeps what is the skin
+// editor's own: the write whitelist, the file and profile watches, the card window, the sf:// file types and the plugin staging.
+
+const edition = detectEdition();
 // The installer runs the app once per install, update and uninstall to make or remove its shortcuts; it quits then. The
 // portable copy has no installer.
 const squirrelRun = edition === 'installed' && squirrelStartup;
@@ -25,184 +28,34 @@ function movePreRenameUserData(): void {
 }
 movePreRenameUserData();
 
-// `--ai-control[=<port>]` (default 9333) opens the Chromium DevTools protocol on 127.0.0.1 so an AI agent can drive the
-// window, and the renderer then offers window.forgeAI (renderer/aiControl.ts); without it no debugging port is open. The
-// environment variable FORGESKIN_AI_CONTROL (a port, or 1 for the default) does the same, for launches that cannot pass
-// arguments (the Start-menu shortcut). It has to be appended before the app is ready.
-// File dialogs stay the system's; an agent answers them beforehand (see pickPaths).
-const aiControl =
-  process.argv.find((a) => a === '--ai-control' || a.startsWith('--ai-control=')) ??
-  (process.env.FORGESKIN_AI_CONTROL ? `--ai-control=${process.env.FORGESKIN_AI_CONTROL === '1' ? 9333 : process.env.FORGESKIN_AI_CONTROL}` : undefined);
-let aiControlOn = false;
-if (aiControl) {
-  const port = aiControl === '--ai-control' ? 9333 : Number(aiControl.slice('--ai-control='.length));
-  if (Number.isInteger(port) && port >= 1024 && port <= 65535) {
-    app.commandLine.appendSwitch('remote-debugging-address', '127.0.0.1');
-    app.commandLine.appendSwitch('remote-debugging-port', String(port));
-    // A window behind others counts as hidden and Chromium then stops animation frames, so menus never open: keep it live.
-    app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
-    app.commandLine.appendSwitch('disable-renderer-backgrounding');
-    aiControlOn = true;
-  } else appLog('ai-control', `ignored ${aiControl}: the port must be an integer from 1024 to 65535`);
-}
+// sf:// serves what the editor shows (textures, models, videos, sounds, fonts, and a character work's converted model: its
+// descriptor and mesh, drawn when the work came from a pack) wherever the user keeps them, and no other kind of file.
+const SERVED = /\.(png|jpe?g|tga|tiff?|bmp|webp|gif|exr|mp4|webm|mov|m4v|wav|mp3|ogg|flac|m4a|aac|opus|ttf|otf|woff2?|glb|gltf|vrm|bin|forgemesh)$|[\\/]character[\\/]model\.json$/i;
 
-// Chromium's HTTP disk cache only ever holds what comes over http (a development run's modules): the app's own files are
-// file:// and sf:// and never cached. Kept small.
-app.commandLine.appendSwitch('disk-cache-size', String(32 << 20));
-
-/**
- * V8's code cache keeps the compiled scripts of every app version (and development build): deleted when the version
- * changes or it passes 128 MB, before Chromium opens it (the session starts when the app is ready).
- */
-function trimCodeCache(): void {
-  const mark = join(app.getPath('userData'), 'code-cache-version');
-  const dir = join(app.getPath('userData'), 'Code Cache');
-  const files = existsSync(dir) ? readdirSync(dir, { recursive: true, withFileTypes: true }).filter((e) => e.isFile()) : [];
-  const size = files.reduce((sum, e) => sum + statSync(join(e.parentPath, e.name)).size, 0);
-  if (existsSync(mark) && readFileSync(mark, 'utf8') === app.getVersion() && size <= 128 << 20) return;
-  rmSync(dir, { recursive: true, force: true });
-  writeFileSync(mark, app.getVersion());
-}
-try {
-  trimCodeCache();
-} catch (e) {
-  appLog('code cache', e);
-}
-
-// Local files (preview GLB, textures, videos) are served to the renderer as sf://local/<abs path>, never kept in the HTTP
-// cache (the backend's own cache already holds them).
-protocol.registerSchemesAsPrivileged([{ scheme: 'sf', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } }]);
-
-let win: BrowserWindow | null = null;
-let quitting = false;
-// The backend is stopped on purpose while the data folder moves.
-let moving = false;
-let startedAt = 0;
-let crashes = 0;
-// The window can be gone while the app shuts down (the backend exits after it).
-const send = (channel: string, ...args: unknown[]) => {
-  if (win && !win.isDestroyed()) win.webContents.send(channel, ...args);
-};
-
-/** Crash and error evidence: one line per event in GTFO_UserData/logs/app.log, written synchronously so it survives the crash. */
-function appLog(kind: string, detail: unknown) {
-  const text =
-    detail instanceof Error
-      ? `${detail.message}
-${detail.stack}`
-      : typeof detail === 'string'
-        ? detail
-        : JSON.stringify(detail);
-  try {
-    const dir = join(dataDir(), 'logs');
-    mkdirSync(dir, { recursive: true });
-    // Past 2 MB the log moves to app.1.log (the older ones to .2 and .3, the oldest dropped), as the backend's backend.log.
-    const file = join(dir, 'app.log');
-    if ((statSync(file, { throwIfNoEntry: false })?.size ?? 0) > 2 << 20)
-      for (let i = 3; i >= 1; i--) {
-        const from = i === 1 ? file : join(dir, `app.${i - 1}.log`);
-        if (existsSync(from)) renameSync(from, join(dir, `app.${i}.log`));
-      }
-    appendFileSync(
-      file,
-      `${new Date().toISOString()} [${kind}] ${text}
-`,
-    );
-  } catch {
-    // nowhere left to report it
-  }
-}
-
-process.on('uncaughtException', (e) => appLog('main uncaughtException', e));
-process.on('unhandledRejection', (e) => appLog('main unhandledRejection', e));
-app.on('child-process-gone', (_e, d) => appLog('child-process-gone', d));
-
-const backend = new Backend(
-  (event, data) => send('backend:event', event, data),
-  (line) => send('backend:log', line),
-  (code) => {
-    send('backend:log', `backend exited (${code})`);
-    if (quitting || moving) return;
-    // Restart, but give up after repeated crashes right after start (shown to the user as "down").
-    crashes = Date.now() - startedAt < 10_000 ? crashes + 1 : 0;
-    if (crashes >= 3) return send('backend:status', 'down');
-    send('backend:status', 'restarting');
-    setTimeout(startBackend, 1000);
-  },
-);
-
-function startBackend() {
-  startedAt = Date.now();
-  // Ready only once the process exists; an exe that is missing never reports ready.
-  backend.start(() => send('backend:status', 'ready'));
-}
-
-function createWindow() {
-  win = new BrowserWindow({
-    width: 1600,
-    height: 960,
-    minWidth: 1180,
-    minHeight: 720,
-    backgroundColor: '#15171a',
-    title: 'ForgeSkin',
-    // The packaged exe carries the icon (packagerConfig.icon); from source the window takes it from assets/.
-    icon: app.isPackaged ? undefined : join(app.getAppPath(), 'assets', 'icon.ico'),
-    // Frameless; the top bar draws its own minimize / maximize / close (see `win:*` below).
-    titleBarStyle: 'hidden',
-    show: false,
-    webPreferences: {
-      preload: join(__dirname, 'preload.cjs'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      // A minimized or covered window keeps running its frames and timers for an agent that drives it.
-      backgroundThrottling: !aiControlOn,
+const shell = createShell({
+  dataDir: { installedFolder: 'ForgeSkin', localFolder: 'GTFO_UserData', dataMarkers: ['settings.json', 'autosave', join('logs', 'backend.log')], legacyInstallFolder: 'GTFO_UserData' },
+  backend: {
+    args: ({ dataDir, formerDirs }) => ['--data-dir', dataDir, ...formerDirs.flatMap((d) => ['--former-data-dir', d])],
+    packagedFile: () => join(process.resourcesPath, 'publish', 'ForgeSkin.Backend.exe'),
+    // The backend installs the plugin from artifacts/forge-skin-release/publish/plugin (Install.PluginSource), which
+    // build-editor-release.ps1 -PluginOnly -ForgeCore <release-set ForgeCore zip> stages; without it the backend says so (no-plugin).
+    dev: () => {
+      const project = join(app.getAppPath(), '..', 'Backend');
+      return { project, file: join(project, 'bin', 'Debug', 'net10.0', 'win-x64', 'ForgeSkin.Backend.exe') };
     },
-  });
-  win.once('ready-to-show', () => win?.show());
-  // The hidden card window goes with the editor's (it would keep the app running).
-  win.on(
-    'closed',
-    () =>
-      void cards?.then(
-        (w) => w.destroy(),
-        () => undefined,
-      ),
-  );
-  win.on('maximize', () => send('win:maximized', true));
-  win.on('unmaximize', () => send('win:maximized', false));
-  // A dead renderer is reloaded; the store then reopens the last weapon from its autosave.
-  win.webContents.on('render-process-gone', (_e, d) => {
-    appLog('render-process-gone', d);
-    if (d.reason !== 'clean-exit' && !quitting) setTimeout(() => win?.webContents.reload(), 500);
-  });
-  win.webContents.on('unresponsive', () => appLog('renderer unresponsive', ''));
-  // A first load can fail (a cold dev server, a crashed network service) and would leave the window blank: retry a few times.
-  let loadTries = 0;
-  let loaded = false;
-  const load = () =>
-    (MAIN_WINDOW_VITE_DEV_SERVER_URL ? win?.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL) : win?.loadFile(join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`)))?.catch(() => {});
-  const retry = (why: unknown) => {
-    if (quitting) return;
-    appLog('did-fail-load', { why, try: loadTries + 1 });
-    if (++loadTries > 5) return appLog('did-fail-load', 'gave up after 5 retries');
-    setTimeout(load, 1000);
-  };
-  win.webContents.on('did-finish-load', () => (loaded = true));
-  win.webContents.on('did-fail-load', (_e, code, _desc, url, isMainFrame) => {
-    // -3 (aborted) is skipped only while a newer navigation goes on; one aborted by a crashed network service leaves nothing loading.
-    if (isMainFrame && (code !== -3 || !win?.webContents.isLoading())) retry({ code, url });
-  });
-  // A network service that crashes before the first page is up can end that load without any did-fail-load.
-  app.on('child-process-gone', (_e, d) => {
-    if (!loaded && d.serviceName === 'network.mojom.NetworkService') retry('network service crashed');
-  });
-  load();
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://')) shell.openExternal(url);
-    return { action: 'deny' };
-  });
-}
+  },
+  // `--ai-control[=<port>]` (default 9333); the renderer then offers window.forgeAI (renderer/aiControl.ts).
+  aiControl: { envVar: 'FORGESKIN_AI_CONTROL', defaultPort: 9333 },
+  // Updates come from the GTFO-Forge-Mods repository: its release `ForgeSkin-update` always holds the newest installer's
+  // RELEASES and .nupkg (the repository has other packages' releases, so its "latest" is not ours).
+  updateFeed: 'https://github.com/NAinfini/GTFO-Forge-Mods/releases/download/ForgeSkin-update',
+  // Local files (preview GLB, textures, videos) are served to the renderer as sf://local/<abs path>.
+  protocol: { scheme: 'sf', allow: SERVED },
+  installerRun: squirrelRun,
+  beforeDataMove: () => watchFiles([]), // a watched folder cannot be deleted
+});
+const { send } = shell;
+const appLog = shell.log;
 
 // Card pictures (the work list's and the gallery's) are drawn in a hidden second window of the same renderer (renderer/viewport/
 // CardWindow.tsx, the page's `#card`), with the 3D view's own stage, so drawing them never holds up the editor window. It opens
@@ -256,7 +109,7 @@ async function drawCard(job: unknown): Promise<unknown> {
 function writable(path: string): boolean {
   if (!isAbsolute(path)) return false;
   const p = normalize(path);
-  if (p.startsWith(resolve(dataDir()) + sep)) return true;
+  if (p.startsWith(resolve(shell.dataDir()) + sep)) return true;
   const dirs = p.split(sep);
   const frames = dirs.indexOf('.frames');
   const project = frames > 0 && /\.(png|json)$/i.test(p) ? dirs.slice(0, frames) : dirs.at(-2) === 'sounds' && p.endsWith('.ogg') ? dirs.slice(0, -2) : null;
@@ -266,10 +119,6 @@ function writable(path: string): boolean {
     return false;
   }
 }
-
-// sf:// serves what the editor shows (textures, models, videos, sounds, fonts, and a character work's converted model: its
-// descriptor and mesh, drawn when the work came from a pack) wherever the user keeps them, and no other kind of file.
-const SERVED = /\.(png|jpe?g|tga|tiff?|bmp|webp|gif|exr|mp4|webm|mov|m4v|wav|mp3|ogg|flac|m4a|aac|opus|ttf|otf|woff2?|glb|gltf|vrm|bin|forgemesh)$|[\\/]character[\\/]model\.json$/i;
 
 // The development editor installs the plugin built from this checkout: before an install the user asked for, it runs
 // build-editor-release.ps1 -PluginOnly, which builds ForgeSkin and ForgeCore from source and stages
@@ -294,54 +143,7 @@ async function stageDevPlugin(): Promise<{ ok: true } | { ok: false; reason: 'no
 }
 
 function registerIpc() {
-  // IPC turns a rejected plain object into "[object Object]", so backend errors travel as a value and preload rethrows them.
-  ipcMain.handle('backend:call', (_e, method: string, params: unknown) =>
-    backend.call(method, params).then(
-      (result) => ({ result }),
-      (error: unknown) => ({ error }),
-    ),
-  );
-  ipcMain.handle('app:dataDir', () => dataDir());
-  ipcMain.handle('app:edition', () => edition);
-  ipcMain.handle('app:aiControl', () => aiControlOn);
   ipcMain.handle('plugin:stage', () => stageDevPlugin());
-  // The window saves first and reloads after a move (its open skin and paths name the old folder).
-  ipcMain.handle('data:move', async (_e, to: string) => {
-    if (edition === 'dev') return { ok: false, reason: 'dev' };
-    moving = true;
-    try {
-      await backend.stop();
-      watchFiles([]); // a watched folder cannot be deleted
-      const r = await moveData(to, true).catch((e: Error) => ({ ok: false as const, reason: 'failed' as const, detail: e.message }));
-      appLog('data folder', { to, ...r });
-      dialogDirs = null;
-      return r;
-    } finally {
-      moving = false;
-      startBackend();
-    }
-  });
-  ipcMain.handle('dialog:open', async (_e, kind: 'folder' | 'files' | 'file', filters?: OpenDialogOptions['filters'], purpose?: string) => {
-    const key = dialogKey(purpose ?? kind, filters);
-    const paths = await pickPaths(kind, filters, lastDir(key));
-    if (!paths.length) return [];
-    remember(key, kind === 'folder' ? paths[0] : dirname(paths[0]));
-    return paths;
-  });
-  ipcMain.handle('dialog:save', async (_e, defaultPath: string, filters: OpenDialogOptions['filters']) => {
-    const key = dialogKey('save', filters);
-    // A bare file name opens in the folder this kind of file was last saved to.
-    const last = basename(defaultPath) === defaultPath ? lastDir(key) : undefined;
-    const [path] = await pickPaths('save', filters, last ? join(last, defaultPath) : defaultPath);
-    if (!path) return null;
-    remember(key, dirname(path));
-    return path;
-  });
-  ipcMain.handle('dialog:preset', (_e, paths: string[]) => {
-    if (!aiControlOn) throw new Error('dialog:preset needs --ai-control');
-    if (!paths.length || paths.some((p) => !isAbsolute(p))) throw new Error('dialog:preset takes absolute paths');
-    presetPaths.push(paths.map((p) => normalize(p)));
-  });
   ipcMain.handle('files:write', async (_e, path: string, data: Uint8Array) => {
     if (!writable(path)) throw new Error(`refused write outside frames/data dir: ${path}`);
     await mkdir(dirname(path), { recursive: true });
@@ -360,155 +162,14 @@ function registerIpc() {
     const s = await stat(path).catch(() => null);
     return s?.isFile() ? [s.size, s.mtimeMs] : null;
   });
-  ipcMain.on('app:log', (_e, kind: string, detail: string) => appLog(kind, detail));
   ipcMain.handle('files:exists', (_e, path: string) => existsSync(path));
   ipcMain.handle('files:watch', (_e, paths: string[]) => watchFiles(paths));
   ipcMain.handle('profile:watch', (_e, profile: string | null) => watchProfile(profile));
-  // A folder opens in Explorer; a file is only shown in its folder, never launched.
-  ipcMain.handle('shell:open', async (_e, path: string) => {
-    if (isAbsolute(path) && (await stat(path).catch(() => null))?.isDirectory()) return shell.openPath(path);
-    shell.showItemInFolder(path);
-    return '';
-  });
-  ipcMain.handle('shell:show', (_e, path: string) => shell.showItemInFolder(path));
-  ipcMain.on('win:minimize', () => win?.minimize());
-  ipcMain.on('win:toggleMaximize', () => (win?.isMaximized() ? win.unmaximize() : win?.maximize()));
-  ipcMain.on('win:close', () => win?.close());
-  ipcMain.handle('win:isMaximized', () => !!win?.isMaximized());
-  // 检查更新: only reads the feed and says which version it holds; nothing is downloaded until the user asks for it
-  // (update:download). A development run has no update feed.
-  ipcMain.handle('update:check', async (): Promise<UpdateCheck> => {
-    if (edition === 'dev') return { state: 'dev' };
-    try {
-      const { version } = await feedPackage();
-      return newer(version, app.getVersion()) ? { state: edition === 'portable' ? 'portable' : 'available', version } : { state: 'latest' };
-    } catch (e) {
-      updateLog(`check failed: ${String(e)}`);
-      return { state: 'error' };
-    }
-  });
-  // The user chose to update: Squirrel checks the same feed, downloads the package and stages it for the next start.
-  ipcMain.handle('update:download', () => {
-    if (edition !== 'installed') return;
-    autoUpdater.setFeedURL({ url: FEED });
-    autoUpdater.checkForUpdates();
-  });
-  ipcMain.handle('app:version', () => app.getVersion());
   ipcMain.handle('card:draw', (_e, job: unknown) => drawCard(job).catch(() => null));
   ipcMain.on('card:done', (_e, id: number, result: unknown) => {
     cardJobs.get(id)?.(result);
     cardJobs.delete(id);
   });
-}
-
-const updateLog = (message: string) => appLog('update', message);
-// Updates come from the GTFO-Forge-Mods repository: its release `ForgeSkin-update` always holds the newest installer's
-// RELEASES and .nupkg (the repository has other packages' releases, so its "latest" is not ours).
-const FEED = 'https://github.com/NAinfini/GTFO-Forge-Mods/releases/download/ForgeSkin-update';
-
-/** What a check found: `available` (an installed copy can download `version`) and `portable` (a newer `version` exists,
- *  fetched by hand) carry the version. */
-type UpdateCheck = { state: 'dev' | 'latest' | 'error' } | { state: 'available' | 'portable'; version: string };
-
-/** The newest package in the feed: its file name, version and size, from the last line of RELEASES. */
-async function feedPackage(): Promise<{ name: string; version: string; size: number }> {
-  const r = await net.fetch(`${FEED}/RELEASES`);
-  if (!r.ok) throw new Error(`RELEASES: HTTP ${r.status}`);
-  const [, url, size] = (await r.text())
-    .replace(/^\uFEFF/, '')
-    .trim()
-    .split(/\r?\n/)
-    .pop()!
-    .split(' ');
-  const name = decodeURIComponent(url.split('/').pop()!);
-  const version = /-(\d+(?:\.\d+)*)-full\.nupkg$/i.exec(name)?.[1];
-  if (!version) throw new Error(`RELEASES: no version in ${name}`);
-  return { name, version, size: Number(size) || 0 };
-}
-/** True when version `a` is above `b`, part by part. */
-function newer(a: string, b: string): boolean {
-  const [x, y] = [a, b].map((v) => v.split('.').map(Number));
-  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0);
-  return false;
-}
-
-// The download takes minutes and Squirrel reports no progress: the window shows a bar from the package's size in the
-// feed's RELEASES and the size of the file Update.exe is writing into <install>/packages/. Unknown sizes show a moving bar.
-let watching = false;
-async function watchDownload() {
-  if (watching) return;
-  watching = true;
-  let file: string | null = null;
-  let total = 0;
-  try {
-    const found = await feedPackage();
-    file = join(dirname(process.execPath), '..', 'packages', found.name);
-    total = found.size;
-  } catch (e) {
-    updateLog(`progress: no package size: ${String(e)}`);
-  }
-  const tick = () => {
-    let received = 0;
-    try {
-      if (file) received = statSync(file).size;
-    } catch {
-      // not started yet
-    }
-    send('update:progress', received, total);
-  };
-  tick();
-  const timer = setInterval(tick, 1000);
-  const stop = (done: boolean) => () => {
-    clearInterval(timer);
-    watching = false;
-    send('update:progress', done ? total || 1 : -1, total || 1);
-  };
-  autoUpdater.once('update-downloaded', stop(true));
-  autoUpdater.once('error', stop(false));
-}
-
-// Every file the editor asks for comes through pickPaths: the system's dialog, with the file types and, for 'files', several
-// at once. An empty answer is a cancel. With --ai-control an agent may answer the next dialog beforehand (forgeAI pickNext),
-// since a protocol client cannot drive the system's dialog; nothing is shown in the window for it.
-type PathKind = 'folder' | 'files' | 'file' | 'save';
-type FileFilters = OpenDialogOptions['filters'];
-const presetPaths: string[][] = [];
-
-async function pickPaths(kind: PathKind, filters: FileFilters, start: string | undefined): Promise<string[]> {
-  const preset = presetPaths.shift();
-  if (preset) return preset;
-  if (kind === 'save') {
-    const r = await dialog.showSaveDialog(win!, { defaultPath: start, filters });
-    return r.canceled || !r.filePath ? [] : [r.filePath];
-  }
-  const properties: OpenDialogOptions['properties'] = kind === 'folder' ? ['openDirectory'] : kind === 'files' ? ['openFile', 'multiSelections'] : ['openFile'];
-  const r = await dialog.showOpenDialog(win!, { properties, filters, defaultPath: start });
-  return r.canceled ? [] : r.filePaths;
-}
-// Every file dialog opens where the last one of its kind was confirmed (a purpose, else the kind and file types), kept
-// across runs in <dataDir>/dialogs.json.
-const dialogsFile = () => join(dataDir(), 'dialogs.json');
-let dialogDirs: Record<string, string> | null = null;
-const dialogKey = (purpose: string, filters?: OpenDialogOptions['filters']) => [purpose, ...(filters ?? []).flatMap((f) => f.extensions)].join(':');
-function lastDir(key: string): string | undefined {
-  if (!dialogDirs) {
-    try {
-      dialogDirs = JSON.parse(readFileSync(dialogsFile(), 'utf8')) as Record<string, string>;
-    } catch {
-      dialogDirs = {};
-    }
-  }
-  const dir = dialogDirs[key];
-  return dir && existsSync(dir) ? dir : undefined;
-}
-function remember(key: string, dir: string) {
-  lastDir(key);
-  dialogDirs![key] = dir;
-  try {
-    writeFileSync(dialogsFile(), JSON.stringify(dialogDirs, null, 2));
-  } catch (e) {
-    appLog('dialogs', e);
-  }
 }
 
 // The files the open skin uses, watched through their folders (an editor saving a file often replaces it, which a watch on
@@ -582,31 +243,28 @@ function watchProfile(profile: string | null) {
   }
 }
 
-app.whenReady().then(async () => {
-  // Before anything writes into the data folder.
-  if (!squirrelRun) await moveInstallData((line) => appLog('data folder', line));
-  protocol.handle('sf', async (req) => {
-    const path = decodeURIComponent(new URL(req.url).pathname.slice(1));
-    if (!isAbsolute(path) || !SERVED.test(path)) return new Response(null, { status: 403 });
-    const r = await net.fetch(pathToFileURL(path).toString(), { headers: req.headers });
-    const headers = new Headers(r.headers);
-    headers.set('Cache-Control', 'no-store');
-    return new Response(r.body, { status: r.status, statusText: r.statusText, headers });
-  });
-  registerIpc();
-  startBackend();
-  createWindow();
-  // Nothing updates on its own: the window asks which version the feed holds when it starts (update:check) and offers it;
-  // only the user's click downloads it (update:download), and the window then offers the restart (update:ready,
-  // update:restart). The bundled plugin updates with it.
-  ipcMain.handle('update:restart', () => autoUpdater.quitAndInstall());
-  autoUpdater.on('update-available', () => void watchDownload());
-  autoUpdater.on('update-downloaded', () => send('update:ready'));
-  autoUpdater.on('error', (e) => updateLog(`update failed: ${e.message}`));
+shell.run({
+  registerIpc,
+  window: {
+    browserWindow: {
+      width: 1600,
+      height: 960,
+      minWidth: 1180,
+      minHeight: 720,
+      backgroundColor: '#15171a',
+      title: 'ForgeSkin',
+      // The packaged exe carries the icon (packagerConfig.icon); from source the window takes it from assets/.
+      icon: app.isPackaged ? undefined : join(app.getAppPath(), 'assets', 'icon.ico'),
+      webPreferences: { preload: join(__dirname, 'preload.cjs') },
+    },
+    // The shell's title bar; the editor's own controls go into its slot (renderer/ui/TopBar.tsx).
+    titleBar: { title: 'ForgeSkin', icon: app.isPackaged ? undefined : join(app.getAppPath(), 'assets', 'icon.png'), accent: '#ff7a2f', background: '#141619' },
+    load: (page) => (MAIN_WINDOW_VITE_DEV_SERVER_URL ? page.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL) : page.loadFile(join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`))),
+    // The hidden card window goes with the editor's (it would keep the app running).
+    onClosed: () =>
+      void cards?.then(
+        (w) => w.destroy(),
+        () => undefined,
+      ),
+  },
 });
-
-app.on('before-quit', () => {
-  quitting = true;
-  backend.stop();
-});
-app.on('window-all-closed', () => app.quit());

@@ -20,6 +20,8 @@ internal sealed class RenderCuts
         internal Func<int> Read = () => 0;
         internal Action<int> Write = _ => { };
         internal Func<bool>? Allowed;
+        // The setting is a native value no player edits in a level, so what was written is always put back (the native code may clamp it).
+        internal bool AlwaysRestore;
         internal int Target, Original;
         internal bool Enabled, Captured, Changed, Restored;
     }
@@ -38,6 +40,9 @@ internal sealed class RenderCuts
             value => IL2CPP.ResolveICall<SetBoolCall>("UnityEngine.QualitySettings::set_streamingMipmapsActive")(value != 0),
             // The manager only earns its per-frame renderer walk when a level has textures it can stream.
             () => IL2CPP.ResolveICall<GetCountCall>("UnityEngine.Texture::get_streamingTextureCount")() == 0);
+        // The job queue's active worker count (0 = leave the game's). Target is the configured limit; PerformanceControl.Workers changes it live.
+        Add("job-workers", settings.JobWorkerLimit > 0, settings.JobWorkerLimit, JobWorkers.Get, JobWorkers.Set);
+        _cuts[^1].AlwaysRestore = true;
         Current = this;
     }
 
@@ -73,6 +78,28 @@ internal sealed class RenderCuts
         return false;
     }
 
+    // Developer control: a value above 0 limits the cut's setting at once, 0 puts the game's value back. Returns what was read back.
+    internal string SetValue(string name, int value)
+    {
+        foreach (var cut in _cuts)
+        {
+            if (cut.Name != name) continue;
+            if (value > 0) cut.Target = value;
+            if (!Write(cut, value > 0)) return "refused: " + name + " could not be written";
+            return name + "=" + cut.Read() + ";original=" + cut.Original;
+        }
+        return "refused: unknown value " + name;
+    }
+
+    internal string Describe(string name)
+    {
+        foreach (var cut in _cuts)
+            if (cut.Name == name)
+                try { return cut.Read() + ";original=" + (cut.Captured ? cut.Original.ToString(CultureInfo.InvariantCulture) : "unread"); }
+                catch (Exception error) { return "unavailable:" + error.GetType().Name; }
+        return "unknown";
+    }
+
     private bool Write(Cut cut, bool on)
     {
         try
@@ -96,7 +123,7 @@ internal sealed class RenderCuts
         {
             if (!cut.Captured) continue;
             // A value the player changed in the level is the player's: only a setting still holding what this cut wrote goes back.
-            if (cut.Changed && StillWritten(cut) && Write(cut, false)) cut.Restored = true;
+            if (cut.Changed && (cut.AlwaysRestore || StillWritten(cut)) && Write(cut, false)) cut.Restored = true;
             if (!cut.Enabled) continue;
             _owner.LogItem(cut.Name, 1, cut.Changed ? 1 : 0, cut.Restored ? 1 : 0,
                 "original=" + cut.Original.ToString(CultureInfo.InvariantCulture) + "\twritten=" + cut.Target.ToString(CultureInfo.InvariantCulture));

@@ -22,7 +22,7 @@ PHASES = (
     ("动画开始阶段", "animation_begin_ms"), ("动画完成阶段", "animation_end_ms"),
     ("渲染器更新", "renderers_ms"), ("渲染提交阶段", "render_submission_ms"),
     ("脚本更新", "behaviour_update_ms"), ("脚本固定更新", "behaviour_fixed_ms"),
-    ("脚本后期更新", "behaviour_late_ms"), ("刷怪组生成", "spawn_group_ms"), ("显式 GC", "gc_explicit_ms"),
+    ("脚本后期更新", "behaviour_late_ms"), ("显式 GC", "gc_explicit_ms"),
     ("初始化叶工作合计", "initialization_ms"), ("早期更新叶工作合计", "early_update_ms"),
     ("预更新其余叶工作合计", "pre_update_other_ms"), ("后期更新其余叶工作合计", "post_late_update_other_ms"),
 )

@@ -1,0 +1,67 @@
+# Hot reload, tier D (contract I-RELOAD): enemy and weapon content through three generations of one test Rundown.
+# Packages: ReloadD-Rundown (the Map Rundown's Enemy rows), ReloadD-Enemies (an enemy content entry), ReloadD-Weapons (a weapon content entry).
+#   v1: Rundown rows Keep, Swap, Drop.
+#   v2: + enemy entry A, + weapon entry.
+#   v3: Rundown row Drop withdrawn, row Swap replaced in place, enemy entry A withdrawn (entry B new), weapon entry replaced in place.
+# Build the packages once (they go to artifacts, not to Git), start a session on any level, then run from the repository root:
+#   pnpm ts Mods/ForgeDevelopment/tests/ReloadPacks/build-reload-packs.ts
+#   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --rundown <大关 id> --level A1 --work-dir artifacts/work/drivesession/<name>
+#   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name> run Mods/ForgeDevelopment/scripts/reload-d-entries.test
+# The profile must hold ForgeEngine and have its [Runtime] Mode on Authoring (the session start does that). The three packages stay installed in
+# the profile afterwards (the hand-off has no way to take a package away): delete the ReloadD-* folders under BepInEx/plugins when done.
+# The game goes to its lobby first, so each change is a plain lobby reload (no level to leave and re-enter).
+stop-on-fail
+leave
+
+# ---- v1: Rundown rows only ------------------------------------------------------------------------------------------------
+install artifacts/work/reload-packs/v1/ReloadD-Rundown-1.0.0.zip as=i1
+expect $i1.status == committed
+expect $i1.rejections == 0
+expect $i1.recordMatches == true
+entries ReloadD as=t1
+expect $t1.generation == $i1.generation
+expect $t1.rundownEnemies contains "ReloadD Row Keep_"
+expect $t1.rundownEnemies contains "ReloadD Row Swap_"
+expect $t1.rundownEnemies contains "ReloadD Row Drop_"
+expect $t1.entryEnemies !contains "ReloadD Entry Enemy"
+expect $t1.weaponEntries !contains "ReloadD Entry Weapon"
+expect $t1.ownOrder == RRR
+expect $t1.enemyRowsIncomplete == 0
+expect $t1.weaponRowsIncomplete == 0
+
+# ---- v2: an enemy entry and a weapon entry appear; the Rundown rows stay where they were ----------------------------------------
+install artifacts/work/reload-packs/v2/ReloadD-Enemies-2.0.0.zip artifacts/work/reload-packs/v2/ReloadD-Weapons-2.0.0.zip as=i2
+expect $i2.status == committed
+expect $i2.rejections == 0
+expect $i2.recordMatches == true
+entries ReloadD as=t2
+expect $t2.entryEnemies contains "ReloadD Entry Enemy A_"
+expect $t2.weaponEntries contains "ReloadD Entry Weapon_"
+expect $t2.rundownEnemies contains "ReloadD Row Drop_"
+# the cold-start order: content entries first, then the Rundown rows; the original rows keep their places
+expect $t2.ownOrder == ERRR
+expect $t2.vanillaCount == $t1.vanillaCount
+expect $t2.replicationCount > $t1.replicationCount
+expect $t2.enemyRowsIncomplete == 0
+expect $t2.weaponRowsIncomplete == 0
+
+# ---- v3: one Rundown row and the enemy entry withdrawn, a Rundown row and the weapon entry replaced in place ---------------------
+install artifacts/work/reload-packs/v3/ReloadD-Rundown-3.0.0.zip artifacts/work/reload-packs/v3/ReloadD-Enemies-3.0.0.zip artifacts/work/reload-packs/v3/ReloadD-Weapons-3.0.0.zip as=i3
+expect $i3.status == committed
+expect $i3.rejections == 0
+expect $i3.recordMatches == true
+entries ReloadD as=t3
+expect $t3.rundownEnemies !contains "ReloadD Row Drop_"
+expect $t3.rundownEnemies contains "ReloadD Row Keep_"
+expect $t3.rundownEnemies contains "ReloadD Row Swap Replaced_"
+expect $t3.rundownEnemies !contains "ReloadD Row Swap_"
+expect $t3.entryEnemies !contains "ReloadD Entry Enemy A_"
+expect $t3.entryEnemies contains "ReloadD Entry Enemy B_"
+expect $t3.weaponEntries contains "ReloadD Entry Weapon Replaced_"
+expect $t3.weaponEntries !contains "ReloadD Entry Weapon_"
+expect $t3.ownOrder == ERR
+expect $t3.vanillaCount == $t1.vanillaCount
+# no index points at a withdrawn prefab: A and Drop left, B joined
+expect $t3.replicationCount == $t1.replicationCount
+expect $t3.enemyRowsIncomplete == 0
+expect $t3.weaponRowsIncomplete == 0

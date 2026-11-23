@@ -56,6 +56,17 @@ public static partial class Players
         }
     }
 
+    /// <summary>Whether the lobby holds a person other than this machine's player (bots do not count); false outside a lobby.</summary>
+    public static bool OtherHumanInLobby()
+    {
+        if (!SNetwork.SNet.IsInLobby) return false;
+        var players = SNetwork.SNet.LobbyPlayers;
+        if (players == null) return false;
+        for (var i = 0; i < players.Count; i++)
+            if (players[i] != null && !players[i].IsLocal && !players[i].IsBot) return true;
+        return false;
+    }
+
     /// <summary>The camera the player's picture comes from: the game's current camera when it is active (dead and watching a teammate,
     /// a scripted shot), else the local player's first-person camera, else <c>Camera.main</c>; null when none is usable. Effects,
     /// sound and HUD placement read the view from this, not from the local player's body.</summary>

@@ -54,7 +54,7 @@ def summarise(windows):
         head = OrderedDict(label=label, windows=len(rows), seconds=round(seconds, 1),
                            switches=rows[-1].get('switches', ''), host=rows[-1].get('host', ''))
         for key in ('frame_ms_avg', 'frame_ms_p95', 'frame_ms_max', 'main_cpu_ms', 'render_cpu_ms', 'enemies',
-                    'far_skins', 'throttled_animators', 'throttled_syncs', 'gc0'):
+                    'far_skins', 'throttled_syncs', 'gc0'):
             value = mean(number(r.get(key)) for r in rows)
             head[key] = None if value is None else round(value, 3)
         points = defaultdict(lambda: {'n': 0.0, 'ms': 0.0, 'max': 0.0, 'peak': 0.0, 'timed': False})

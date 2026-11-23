@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <IsPackable>false</IsPackable><TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <Target Name="ValidateProfile" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(GTFOBepInExPath)/core/Mono.Cecil.dll')"
+           Text="Set GTFO_BEPINEX_PATH or pass -p:GTFOBepInExPath pointing to an existing BepInEx profile." />
+  </Target>
+  <ItemGroup>
+    <Reference Include="Mono.Cecil" HintPath="$(GTFOBepInExPath)/core/Mono.Cecil.dll" />
+  </ItemGroup>
+  <ItemGroup><Compile Include="../../../../Testing/SourceTools/InteropSignature.cs" /></ItemGroup>
+</Project>

@@ -2,7 +2,15 @@
 
 ## 1.0.1
 
-- No source change. Rebuilt with Forge Core 1.0.4 (now depends on Forge Core 1.0.4).
+Needs Forge Core 1.0.4.
+
+- Off moved from the upscaling mode to the upscaler setting: Upscaler Off turns upscaling and Frame Generation off and dims every other row. A config saved with Mode = Off is read as Upscaler = Off once.
+- When the frame generation bridge can't go on (a graphics call fails or stalls, the graphics driver resets), or you pick exclusive fullscreen, the game now switches back to its own rendering and keeps running, without frame generation until it restarts; the log says why once. Before, the game could stop showing frames.
+- On graphics cards that are not NVIDIA's, NVIDIA's frame generation library is no longer started at all.
+- If no frame reaches the screen for ten seconds, the BepInEx log says where the bridge was, so a frozen game can be traced.
+- Fixed: the picture could freeze when the game's maximum queued render frames setting (最大渲染队列帧数) was 0 or 1. Every value now works.
+- Logs: the ten-second no-frame warning is only given once the first frame has reached the screen, so it no longer shows up while the game is still loading.
+- When Auto can't use DLSS (upscaling or Frame Generation) on a PC with an NVIDIA card and takes AMD FSR, the log says so once with the reason and the card, and the setting's tooltip names the reason: driver too old, card not supported, hardware-accelerated GPU scheduling off, or the game running on another graphics card than the NVIDIA one.
 
 ## 1.0.0
 

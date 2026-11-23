@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <Target Name="ValidateEvidenceReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(GTFOBepInExPath)/core/Mono.Cecil.dll')"
+      Text="Set GTFOBepInExPath to existing BepInEx metadata references." />
+  </Target>
+  <ItemGroup>
+    <Reference Include="Mono.Cecil" HintPath="$(GTFOBepInExPath)/core/Mono.Cecil.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup><Compile Include="../../../../Testing/LocalInputs.cs" Link="LocalInputs.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../../../Testing/SourceTools/InteropSignature.cs;../../../../Testing/SourceTools/DomainTypes.cs" /></ItemGroup>
+  <ItemGroup>
+    <Compile Include="../MapNativeLayout/*.cs;../../../tools/RegenerateHookEvidence/Map/EvidenceRegenerator.cs;../../../tools/RegenerateHookEvidence/HookRows.cs" />
+    <Compile Include="../../../GameBindings/NativeHookRegistration.cs;../../../GameBindings/NativeHookRegistration.Shared.cs;../../../GameBindings/HookDeclarations.cs;../../../GameBindings/NativeHookObservations.cs;../../../GameBindings/NativeHookObservers.cs;../../../../Testing/SourceDoubles/Host/ForgeCoreHooks.cs;../../../../ForgeCore/Core/HookOwners.cs" />
+    <Compile Include="../../../../ForgeCore/Core/StartupTiming.cs" Link="StartupTiming.cs" />
+    <Reference Include="ForgeEngine.Framework" HintPath="$(ForgeFrameworkAssembly)" Condition="'$(ForgeFrameworkAssembly)' != ''" />
+    <ProjectReference Include="../../../Framework/ForgeEngine.Framework.csproj" Condition="'$(ForgeFrameworkAssembly)' == ''" />
+    <ProjectReference Include="../../../../ForgeCore/Once/ForgeCore.Once.csproj" />
+    <Reference Include="0Harmony" HintPath="$(GTFOBepInExPath)/core/0Harmony.dll" />
+  </ItemGroup>
+</Project>

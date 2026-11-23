@@ -39,6 +39,7 @@
     <Reference Include="Il2CppSystem.Core" HintPath="$(GTFOBepInExPath)/interop/Il2CppSystem.Core.dll" Private="false" />
     <Reference Include="UnityEngine.PhysicsModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.PhysicsModule.dll" Private="false" />
     <Reference Include="Unity.Postprocessing.Runtime" HintPath="$(GTFOBepInExPath)/interop/Unity.Postprocessing.Runtime.dll" Private="false" />
+    <Reference Include="DissonanceVoip" HintPath="$(GTFOBepInExPath)/interop/DissonanceVoip.dll" Private="false" />
     <Reference Include="Modules-ASM" HintPath="$(GTFOBepInExPath)/interop/Modules-ASM.dll" Private="false" />
     <Reference Include="GTFO-API" HintPath="$(GTFOApiPath)" Private="false" />
     <Reference Include="GameData-ASM" HintPath="$(GTFOBepInExPath)/interop/GameData-ASM.dll" Private="false" />

@@ -33,18 +33,47 @@ def session_files(session: str) -> list[str]:
         return [session]
     files = [str(path) for path in rec_segments.segments(session)]
     if not files:
-        raise SystemExit(f"no JSONL segments under {session}")
+        raise SystemExit(f"no JSONL segments under {session} (a session the game is still starting has none yet: retry once it has written its first segment)")
     return files
+
+
+def live_state(path: str) -> str:
+    """Why a plain (unpacked) segment may still be growing: "" for a packed or finished one, else what to expect of its tail. The recorder
+    holds the one open segment as plain JSONL and packs it when it closes, so a plain segment can be mid-write; its last line then has no
+    newline yet, and a segment created a moment ago may not hold even its header line."""
+    plain = rec_segments.physical(path)
+    if plain.name.endswith(".gz") or not plain.exists():
+        return ""
+    with plain.open("rb") as stream:
+        head = stream.read(64 * 1024)
+        stream.seek(0, 2)
+        size = stream.tell()
+        stream.seek(max(0, size - 1))
+        last = stream.read(1)
+    if not head:
+        return "empty"
+    if b"\n" not in head and size <= len(head):
+        return "header-pending"
+    return "" if last == b"\n" else "partial-tail"
 
 
 def records(files: Iterable[str]) -> Iterator[dict[str, Any]]:
     """Yields every record of every segment. A line that is not an object is reported and skipped: a truncated
-    session is exactly the case this tool exists for, and refusing to read the rest of it would hide the answer."""
+    session is exactly the case this tool exists for, and refusing to read the rest of it would hide the answer. A segment the game is still
+    writing (plain, last line unfinished) is read up to its last complete line and says so: that is the state of a recording in progress,
+    not damage."""
     for path in files:
+        live = live_state(path)
+        if live in ("empty", "header-pending"):
+            print(f"{os.path.basename(path)}: recording in progress, the segment header is not written yet; no records in it so far", file=sys.stderr)
+            continue
         for number, line, shared in rec_segments.lines(path):
             if shared is None:
                 print(f"{os.path.basename(path)}: unreadable segment header", file=sys.stderr)
                 break
+            if live == "partial-tail" and not line.endswith(b"\n"):
+                print(f"{os.path.basename(path)}:{number}: recording in progress, last line is still being written; read up to the line before it", file=sys.stderr)
+                continue
             if not line.strip():
                 continue
             try:
@@ -431,7 +460,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.index:
         index = read_index(args.session)
         if index is None:
-            print(f"no index.forge under {args.session}", file=sys.stderr)
+            print(f"no index.forge under {args.session} (a recording in progress may not have written its index yet; the records themselves are readable without it)", file=sys.stderr)
             return 2
         print(json.dumps(index, indent=2, ensure_ascii=False))
         return 0

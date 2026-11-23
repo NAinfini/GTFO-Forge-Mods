@@ -118,21 +118,26 @@ export function paintMaterial(
     ...Object.fromEntries(Object.entries(override?.params ?? {}).filter(([, v]) => v != null)),
   };
   const params = { ...info, ...own };
+  // The game's gear shader has no metallic or smoothness number (the plugin ignores them there): a value the author sets there is written
+  // over the whole channel of the MetallicSmoothness picture when the skin is packed (actions bakeSurface), and shown the same way here.
+  const lacks = (v: number | null | undefined) => !!info && v == null;
+  const surface = { metallic: lacks(info?.metallic) ? (override?.params?.metallic ?? null) : null, smoothness: lacks(info?.smoothness) ? (override?.params?.smoothness ?? null) : null };
+  const put = (ch: TextureChannel, t: Texture | null) => setSlot(mat, ch, t, surface);
   const layers = (override?.layers ?? []).filter((l): l is DynamicLayer => !!l && l.visible !== false);
   for (const ch of CHANNELS) {
     const path = baseTexturePath(doc, preview, name, ch);
     const chLayers = layers.filter((l) => (l.channel ?? 'albedo') === ch);
     if (chLayers.length && layered) {
-      setSlot(mat, ch, layered(ch, path, chLayers));
+      put(ch, layered(ch, path, chLayers));
       continue;
     }
     const painted = livery?.(ch);
     if (painted) {
-      setSlot(mat, ch, painted);
+      put(ch, painted);
       continue;
     }
     if (!path) {
-      setSlot(mat, ch, null);
+      put(ch, null);
       continue;
     }
     // The skin's own texture at the size it has in game; a game texture stays as the game has it.
@@ -142,13 +147,13 @@ export function paintMaterial(
     const vanilla = preview.textures[name]?.[ch];
     loads.push(
       loadTexture(path, ch, size).then(
-        (t) => !cancelled() && setSlot(mat, ch, t),
+        (t) => !cancelled() && put(ch, t),
         () => {
           onError(path);
           if (!vanilla || vanilla === path) return;
           keep.add(textureKey(vanilla, ch));
           return loadTexture(vanilla, ch).then(
-            (t) => !cancelled() && setSlot(mat, ch, t),
+            (t) => !cancelled() && put(ch, t),
             () => undefined,
           );
         },
@@ -157,10 +162,12 @@ export function paintMaterial(
   }
   const tint = params.tint ?? [1, 1, 1, 1];
   mat.color.setRGB(tint[0], tint[1], tint[2], SRGBColorSpace); // a skin's colours are sRGB (ForgeCore ColourSpace)
-  // With a MetallicSmoothness map the scalars multiply it; without one, fall back to a neutral finish.
+  // The game's own numbers count where the game material has them; a surface value replaces the map's channel (above); else the map decides, or a neutral finish without one.
   const hasMs = !!baseTexturePath(doc, preview, name, 'metallicSmoothness') || !!livery?.('metallicSmoothness');
-  mat.metalness = params.metallic ?? (hasMs ? 1 : 0.4);
-  mat.roughness = params.smoothness != null ? 1 - params.smoothness : hasMs ? 1 : 0.55;
+  const metallic = surface.metallic ?? (!info || info.metallic != null ? params.metallic : null);
+  const smoothness = surface.smoothness ?? (!info || info.smoothness != null ? params.smoothness : null);
+  mat.metalness = metallic ?? (hasMs ? 1 : 0.4);
+  mat.roughness = smoothness != null ? 1 - smoothness : hasMs ? 1 : 0.55;
   const on = params.emissiveEnabled ?? !!mat.emissiveMap;
   const glow = glowOf(info, own);
   mat.emissive = new Color().setRGB(glow.color[0], glow.color[1], glow.color[2], SRGBColorSpace);
@@ -276,9 +283,15 @@ function showReticle(
 }
 
 /** Only a map coming or going changes the shader; another texture in the same slot needs no rebuild. */
-function setSlot(mat: MeshStandardMaterial, ch: TextureChannel, t: Texture | null) {
+function setSlot(mat: MeshStandardMaterial, ch: TextureChannel, t: Texture | null, surface: { metallic: number | null; smoothness: number | null }) {
   const slot = SLOT[ch]!;
   if (!mat[slot] !== !t) mat.needsUpdate = true;
   mat[slot] = t;
-  if (ch === 'metallicSmoothness') mat.roughnessMap = t;
+  if (ch === 'metallicSmoothness') {
+    mat.roughnessMap = t;
+    // A channel the author sets uniformly reads no picture (the number below is the surface).
+    if (surface.metallic != null) mat.metalnessMap = null;
+    if (surface.smoothness != null) mat.roughnessMap = null;
+    if (surface.metallic != null || surface.smoothness != null) mat.needsUpdate = true;
+  }
 }

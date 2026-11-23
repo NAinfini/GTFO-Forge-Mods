@@ -15,6 +15,7 @@ import collections
 import ctypes
 import ctypes.wintypes as wt
 import os
+import re
 from pathlib import Path
 import struct
 
@@ -150,7 +151,7 @@ def main():
         samples.append((stamp, thread, struct.unpack_from("<%dQ" % count, data, offset)))
         offset += 8 * count
     stamps = [s[0] for s in samples]
-    out = ["# Stack samples", "", "{} samples, {:.0f} s, {} threads (0 = main, 1 = render). One sample = 1 ms of the thread's wall time at the sampling rate actually reached.".format(
+    out = ["# Stack samples", "", "{} samples, {:.0f} s, {} threads (0 = main, 1 = render, 2 and up = job workers, sampled in turn). One sample = 1 ms of the thread's wall time at the sampling rate actually reached.".format(
         len(samples), (stamps[-1] - stamps[0]) / frequency if samples else 0, threads), ""]
     wanted = [w for w in args.labels.split(",") if w]
 
@@ -222,14 +223,58 @@ def main():
                     out.append("    - {:.1f} ms/s via {}".format(count * 1000 / total, chain))
                 out.append("")
 
+    idle_pattern = re.compile(r"Wait|Sleep|Delay|Semaphore|Park|Futex|AlertByThreadId", re.I)
+
+    def is_idle(texts):
+        # A worker with nothing to run sits in an ntdll/KERNELBASE wait; one running a job has game or Unity code innermost.
+        return any(t.split("!")[0].lower() in ("ntdll", "kernelbase", "kernel32", "win32u") and idle_pattern.search(t) for t in texts[:6])
+
+    def worker_table(rows, label, seconds):
+        """The job worker threads as a group: busy and idle share, per worker, and what the busy samples are doing.
+        Each worker is sampled in turn (a few workers per millisecond), so a worker's share is its busy samples over its own samples."""
+        if not rows:
+            return
+        per = collections.defaultdict(lambda: [0, 0])
+        exclusive, inclusive = collections.Counter(), collections.Counter()
+        busy_total = 0
+        for _, thread, frames in rows:
+            texts = [resolve(a) for a in frames]
+            idle = is_idle(texts)
+            per[thread][0 if idle else 1] += 1
+            if idle:
+                continue
+            busy_total += 1
+            exclusive[texts[0]] += 1
+            for text in set(texts):
+                inclusive[text] += 1
+        workers = len(per)
+        busy_share = busy_total / len(rows)
+        out.append("## {} / job workers ({} threads seen, {} samples)".format(label, workers, len(rows)))
+        out.append("")
+        out.append("Busy {:.1f}% of the time on average per worker: {:.0f} ms/s of worker CPU summed over {} workers ({:.0f} ms/s idle). Samples per worker per second about {:.0f}.".format(
+            busy_share * 100, busy_share * workers * 1000, workers, (1 - busy_share) * workers * 1000, len(rows) / max(seconds, 1e-9) / max(workers, 1)))
+        out.append("")
+        out.append("Per worker busy %: " + ", ".join("{}={:.0f}".format(t - 1, 100 * v[1] / max(1, v[0] + v[1])) for t, v in sorted(per.items())))
+        out.append("")
+        out.append("| busy exclusive ms/s (summed) | function | | busy inclusive ms/s (summed) | function |")
+        out.append("|---|---|---|---|---|")
+        a, b = exclusive.most_common(args.top), inclusive.most_common(args.top)
+        scale = workers * 1000 / len(rows)
+        for i in range(max(len(a), len(b))):
+            left = "{:.1f} | {}".format(a[i][1] * scale, a[i][0][:110]) if i < len(a) else " | "
+            right = "{:.1f} | {}".format(b[i][1] * scale, b[i][0][:110]) if i < len(b) else " | "
+            out.append("| " + left + " | | " + right + " |")
+        out.append("")
+
     for index, (start, label) in enumerate(marks):
         if wanted and label not in wanted:
             continue
         end = marks[index + 1][0] if index + 1 < len(marks) else (stamps[-1] if stamps else start)
         lo, hi = bisect.bisect_left(stamps, start), bisect.bisect_left(stamps, end)
         window = samples[lo:hi]
-        for thread in range(threads):
+        for thread in range(min(threads, 2)):
             table([s for s in window if s[1] == thread], "{} ({:.1f} s)".format(label, (end - start) / frequency), thread)
+        worker_table([s for s in window if s[1] >= 2], "{} ({:.1f} s)".format(label, (end - start) / frequency), (end - start) / frequency)
     if args.hitches:
         out.append("## Long frames")
         out.append("")

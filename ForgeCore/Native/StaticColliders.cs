@@ -65,7 +65,7 @@ public static class StaticColliders
         {
             float x = positions[i * 3], y = positions[i * 3 + 1], z = positions[i * 3 + 2];
             if (!float.IsFinite(x) || !float.IsFinite(y) || !float.IsFinite(z)) throw new InvalidOperationException("static-collider-mesh-invalid: " + name);
-            vertices[i] = new Vector3(x, y, z);
+            vertices[i] = new Vector3 { x = x, y = y, z = z }; // field stores: the interop constructor is a call into IL2CPP (MeshArrays)
         }
         foreach (var index in indices) if ((uint)index >= (uint)count) throw new InvalidOperationException("static-collider-mesh-invalid: " + name);
         var mesh = new Mesh { name = name, indexFormat = count > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16 };

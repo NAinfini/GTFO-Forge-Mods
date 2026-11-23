@@ -3,7 +3,7 @@
   "schemaVersion": "1.0.0",
   "library": "ForgeCore",
   "packageName": "NAinfini-ForgeCore",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "parts": [
     {
       "id": "core",

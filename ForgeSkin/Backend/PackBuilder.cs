@@ -41,8 +41,9 @@ public static class PackBuilder
     }
 
     // `baseline`: the game's texture per material and channel (preview.weapon), for layer targets on game textures.
+    // `lenses`: the gear's materials that are a sight's lens (MaterialOverride.IsLensShader).
     public static object Build(SkinDocument project, string projectPath, string outPath, List<CatalogItem> catalog,
-        Dictionary<string, Dictionary<TextureChannel, string>> baseline, long requestId)
+        Dictionary<string, Dictionary<TextureChannel, string>> baseline, long requestId, IReadOnlySet<string>? lenses = null)
     {
         using var cacheUse = new CacheUse();
         var laps = new Laps();
@@ -64,6 +65,15 @@ public static class PackBuilder
         if (string.IsNullOrWhiteSpace(doc.Id)) doc.Id = "skin-" + Guid.NewGuid().ToString("N")[..12];
         // A pack's player colours hold their defaults, so the plugin shows the skin as built until the player picks.
         foreach (var c in doc.PlayerColors ?? []) c.Paint(doc, c.Default);
+        // A sight's lens takes only its reticles in game (Core MaterialOverride.OnLens): the rest is not carried.
+        for (int i = 0; i < doc.Materials.Count; i++)
+        {
+            var m = doc.Materials[i];
+            if (lenses?.Contains(m.Material) != true) continue;
+            doc.Materials[i] = m.OnLens(out var left);
+            doc.Materials[i].TextureSize = m.TextureSize;
+            if (left.Count > 0) warnings.Add($"{m.Material}: a sight lens; its {string.Join(", ", left)} left out, the lens keeps the game's glass");
+        }
 
         if (!outPath.EndsWith(SkinPack.Extension, StringComparison.OrdinalIgnoreCase)) outPath = Path.Combine(outPath, Preview.Safe(doc.Id) + SkinPack.Extension);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outPath))!);
@@ -81,8 +91,12 @@ public static class PackBuilder
                 throw new BackendException("bad-request", $"{m.Material}: textureSize {m.TextureSize} is outside 4–{Dds.MaxSide}");
         // Every texture is resized and compressed on several threads first (that is most of a first build's time); the zip
         // below then takes them from the cache in its own order.
+        // A texture of one colour goes in at 4 x 4: it looks the same at any size, and a full-size one costs its whole size in the pack, in
+        // video memory and in the upload. Not where something draws on it at its size (a layer, a code effect).
+        bool MayShrink(MaterialOverride m, TextureChannel c) =>
+            !c.IsReticle() && !m.Layers.Any(l => l.Channel == c) && !(doc.CodeEffects ?? []).Any(e => e.Material == m.Material && e.Channel == c);
         var jobs = doc.Materials.SelectMany(m => new[] { m.Textures }.Concat((m.Wear ?? []).Select(w => w.Textures))
-                .SelectMany(t => t.Select(c => MaterialTexture(c.Value, m.TextureSize, c.Key))))
+                .SelectMany(t => t.Select(c => MaterialTexture(c.Value, m.TextureSize, c.Key, MayShrink(m, c.Key)))))
             .Concat(doc.Attachments.Where(a => a.Material != null).SelectMany(a => a.Material!.Textures.Select(c => AttachmentTexture(c.Value, c.Key))))
             .DistinctBy(j => (j.Key, j.Channel)).ToList();
         var made = new System.Collections.Concurrent.ConcurrentDictionary<(string, TextureChannel), (string Png, string Dds)>();
@@ -107,16 +121,25 @@ public static class PackBuilder
             // instead of decoding and compressing a PNG in the game; compressed once per PNG content, channel kind and
             // encoder version. A size the plugin would leave uncompressed goes in as the PNG (`<stem>.png`). The entry name.
             // The textures were made before the zip was opened.
-            string Texture(string stem, TextureJob job)
+            // The same content goes in once: a second texture or mesh of the same bytes names the entry the first one made (the plugin
+            // then loads it once).
+            var stored = new Dictionary<string, string>(StringComparer.Ordinal);
+            string Texture(string stem, TextureJob job, out bool again)
             {
                 var (png, dds) = made[(job.Key, job.Channel)];
-                if (new FileInfo(dds).Length == 0)
-                {
-                    laps.Time("zip", () => zip.CreateEntryFromFile(png, Name(stem + ".png"), CompressionLevel.NoCompression));
-                    return stem + ".png";
-                }
-                laps.Time("zip", () => zip.CreateEntryFromFile(dds, Name(stem + ".dds"), CompressionLevel.Optimal));
-                return stem + ".dds";
+                bool raw = new FileInfo(dds).Length == 0;
+                var file = raw ? png : dds;
+                if (again = stored.TryGetValue(file, out var first)) return first!;
+                var name = stem + (raw ? ".png" : ".dds");
+                laps.Time("zip", () => zip.CreateEntryFromFile(file, Name(name), raw ? CompressionLevel.NoCompression : CompressionLevel.Optimal));
+                return stored[file] = name;
+            }
+            string Bytes(string name, byte[] bytes)
+            {
+                var key = "bytes|" + Convert.ToHexString(SHA256.HashData(bytes));
+                if (stored.TryGetValue(key, out var first)) return first;
+                using (var s = zip.CreateEntry(Name(name)).Open()) s.Write(bytes);
+                return stored[key] = name;
             }
             void Copy(string name, string file)
             {
@@ -125,15 +148,11 @@ public static class PackBuilder
                 var level = Path.GetExtension(file).ToLowerInvariant() is ".png" or ".jpg" or ".jpeg" or ".ogg" ? CompressionLevel.NoCompression : CompressionLevel.Optimal;
                 laps.Time("copy", () => zip.CreateEntryFromFile(file, Name(name), level));
             }
-            // A .forgeskinmesh is copied; a GLB is converted.
-            void Mesh(string name, string file)
+            // A .forgeskinmesh is copied; a GLB is converted. The entry name.
+            string Mesh(string name, string file)
             {
-                if (file.EndsWith(".forgeskinmesh", StringComparison.OrdinalIgnoreCase)) Copy(name, file);
-                else
-                {
-                    using var s = zip.CreateEntry(Name(name)).Open();
-                    s.Write(MeshImport.ToForgeSkinMesh(GlbReader.Read(file)).Write());
-                }
+                if (!File.Exists(file)) throw new SkinFormatException("missing-file", $"{file} missing");
+                return Bytes(name, file.EndsWith(".forgeskinmesh", StringComparison.OrdinalIgnoreCase) ? File.ReadAllBytes(file) : MeshImport.ToForgeSkinMesh(GlbReader.Read(file)).Write());
             }
 
             // The author's own inspect motions (no editor page): an inspect.json beside the project goes in as it is.
@@ -181,10 +200,11 @@ public static class PackBuilder
                     foreach (var channel in textures.Keys.ToList())
                     {
                         Program.Progress(requestId, done++, total, $"{m.Material} {stage}{channel}");
-                        var job = MaterialTexture(textures[channel], longest, channel);
-                        textures[channel] = Texture($"textures/{Preview.Safe(m.Material)}_{stage}{channel}", job);
-                        sizes[channel] = job.Size;
-                        memory += Dxt(job.Size.W, job.Size.H);
+                        var job = MaterialTexture(textures[channel], longest, channel, MayShrink(m, channel));
+                        textures[channel] = Texture($"textures/{Preview.Safe(m.Material)}_{stage}{channel}", job, out var again);
+                        var size = Images.Size(made[(job.Key, job.Channel)].Png); // one of a single colour is 4 x 4
+                        sizes[channel] = size;
+                        if (!again) memory += Dxt(size.Width, size.Height);
                     }
                 }
                 Textures(m.Textures, "");
@@ -244,9 +264,7 @@ public static class PackBuilder
 
             foreach (var t in doc.Parts.Where(t => t.Mesh != null))
             {
-                var name = $"meshes/part_{Preview.Safe(t.Part + "_" + (t.Path ?? ""))}.forgeskinmesh";
-                Mesh(name, t.Mesh!);
-                t.Mesh = name;
+                t.Mesh = Mesh($"meshes/part_{Preview.Safe(t.Part + "_" + (t.Path ?? ""))}.forgeskinmesh", t.Mesh!);
             }
 
             foreach (var a in doc.Attachments)
@@ -254,16 +272,14 @@ public static class PackBuilder
                 Program.Progress(requestId, done++, total, a.Name);
                 if (a.Mesh != null)
                 {
-                    var name = $"meshes/{Preview.Safe(a.Id)}.forgeskinmesh";
-                    Mesh(name, a.Mesh);
-                    a.Mesh = name;
+                    a.Mesh = Mesh($"meshes/{Preview.Safe(a.Id)}.forgeskinmesh", a.Mesh);
                 }
                 if (a.Material != null)
                     foreach (var channel in a.Material.Textures.Keys.ToList())
                     {
                         var job = AttachmentTexture(a.Material.Textures[channel], channel);
-                        a.Material.Textures[channel] = Texture($"textures/{Preview.Safe(a.Id)}_{channel}", job);
-                        memory += Dxt(job.Size.W, job.Size.H);
+                        a.Material.Textures[channel] = Texture($"textures/{Preview.Safe(a.Id)}_{channel}", job, out var again);
+                        if (!again) memory += Dxt(job.Size.W, job.Size.H);
                     }
                 if (a.Screen != null)
                 {
@@ -282,9 +298,7 @@ public static class PackBuilder
                         });
                         if (mesh == null) return null;
                         aspect = traced;
-                        using var s = zip.CreateEntry(Name(entry)).Open();
-                        s.Write(mesh.Write());
-                        return entry;
+                        return Bytes(entry, mesh.Write());
                     }
                     var frames = Path.Combine(projectDir, ".frames", a.Id);
                     if (a.Screen.Source == ScreenSource.Static)
@@ -305,11 +319,7 @@ public static class PackBuilder
                         a.Screen.GlyphAspect = aspect;
                         a.Screen.GlyphMeshes = glyphs.Select((g, i) =>
                         {
-                            if (g == null) return null;
-                            var name = $"glyphs/{Preview.Safe(a.Id)}_{i}.forgeskinmesh";
-                            using var s = zip.CreateEntry(Name(name)).Open();
-                            s.Write(g.Write());
-                            return name;
+                            return g == null ? null : Bytes($"glyphs/{Preview.Safe(a.Id)}_{i}.forgeskinmesh", g.Write());
                         }).ToArray();
                     }
                 }
@@ -421,15 +431,22 @@ public static class PackBuilder
 
     // A reticle is added onto the view by colour, so it goes in with its colour multiplied by its alpha: a picture drawn on
     // a transparent background shows only its lines, whether the shader reads the alpha or not (the editor previews it so).
-    static TextureJob MaterialTexture(string file, int? longest, TextureChannel channel)
+    // `shrink`: one of a single colour comes out 4 x 4.
+    static TextureJob MaterialTexture(string file, int? longest, TextureChannel channel, bool shrink)
     {
         var (sw, sh) = Images.Size(file);
         var size = TargetSize(longest, sw, sh);
         bool reticle = channel.IsReticle();
-        return new($"texture|{Stamp(file)}|{size}{(reticle ? "|premultiplied" : "")}", () =>
+        return new($"texture|{Stamp(file)}|{size}{(reticle ? "|premultiplied" : "")}{(shrink ? "|one-colour-4" : "")}", () =>
         {
             using var src = Images.Load(file);
             var bmp = Images.Resize(src, size.W, size.H);
+            if (shrink && OneColour(bmp) is { } colour)
+            {
+                bmp.Dispose();
+                bmp = new SKBitmap(new SKImageInfo(4, 4, SKColorType.Rgba8888, SKAlphaType.Unpremul));
+                bmp.Erase(colour);
+            }
             if (!reticle) return bmp;
             using (bmp)
             {
@@ -444,6 +461,14 @@ public static class PackBuilder
             }
             static byte Times(byte v, byte a) => (byte)((v * a + 127) / 255);
         }, channel, size, file);
+    }
+
+    // The colour of every pixel of `bmp`, or null when they differ.
+    static SKColor? OneColour(SKBitmap bmp)
+    {
+        var px = bmp.Pixels;
+        for (int i = 1; i < px.Length; i++) if (px[i] != px[0]) return null;
+        return px.Length > 0 ? px[0] : null;
     }
 
     static TextureJob AttachmentTexture(string file, TextureChannel channel) =>

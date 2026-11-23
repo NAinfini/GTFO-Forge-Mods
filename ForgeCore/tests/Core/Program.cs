@@ -23,6 +23,7 @@ internal static class Program
         ProceduralChecks.Run(Check);
         ChainChecks.Run(Check);
         LookChecks(Check);
+        DataBlockChecks.Run(Check, errors);
         Console.WriteLine(passed + " passed, " + failed + " failed");
         return failed == 0 ? 0 : 1;
     }

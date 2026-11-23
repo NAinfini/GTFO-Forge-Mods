@@ -7,9 +7,16 @@ using LevelGeneration;
 namespace ForgeDiagnostics;
 
 // Development only, never in a player's install: ForgeDevelopment (DropTimingHost) installs the drop-request hook. The one attempt clock of a drop; this observer changes no native result,
-// budget, seed or wait threshold and emits no per-frame line.
+// budget, seed or wait threshold and emits no per-frame line: between two boundaries it writes only a `drop.wait` line after each
+// QuietSeconds without one (what the game state and frame rate are while nothing is marked) and a `drop.stall` line for each frame
+// that took StallSeconds or more (a blocked main thread shows as one long frame, not as a silence), both read from the frame
+// callback with no native call beyond the game state name.
 internal static class DropTiming
 {
+    private const double QuietSeconds = 5, StallSeconds = 1;
+    private static long _lastQuietAt, _lastTickAt;
+    private static int _quietFrame;
+
     private static readonly ForgeCore.DropTimingMetrics Metrics = new(Stopwatch.Frequency);
     private static IDisposable? _hooks;
     private static Func<string>? _worldEpoch;
@@ -59,7 +66,7 @@ internal static class DropTiming
         Metrics.Reset();
         _active = _selectionPending = _selectionConfirmed = false;
         _requested = _requestReturned = _generating = _started = _done = _factoryDone = _landed = _entered = false;
-        _requestedAt = _previousAt = _dropRequestedAt = 0; _previousPhase = "attempt-start";
+        _requestedAt = _previousAt = _dropRequestedAt = _lastQuietAt = _lastTickAt = 0; _previousPhase = "attempt-start";
         var hooks = _hooks; _hooks = null;
         hooks?.Dispose();
     }
@@ -143,6 +150,7 @@ internal static class DropTiming
         Metrics.Reset();
         _requestedAt = _previousAt = startedAt; _dropRequestedAt = 0;
         _previousPhase = "attempt-start";
+        _lastQuietAt = 0; _quietFrame = UnityEngine.Time.frameCount;
     }
 
     private static void State(eGameStateName previous, eGameStateName next)
@@ -186,7 +194,28 @@ internal static class DropTiming
         MarkBoundary(_attempt, "generation-start", origin);
     }
 
-    internal static void Tick() { if (Metrics.Active) Metrics.Frame(Stopwatch.GetTimestamp()); }
+    internal static void Tick()
+    {
+        var now = Stopwatch.GetTimestamp();
+        if (Metrics.Active) Metrics.Frame(now);
+        var frameGap = _lastTickAt == 0 ? 0 : (now - _lastTickAt) * 1000.0 / Stopwatch.Frequency;
+        _lastTickAt = now;
+        if (_write == null || !_active || !_requested || _entered) return;  // an idle lobby between a selection and the drop button is not a wait
+        try
+        {
+            if (frameGap >= StallSeconds * 1000)
+                _write("drop.stall phase=" + _previousPhase + " generation=" + _attempt.ToString(CultureInfo.InvariantCulture) + " frameGapMs=" + Number(frameGap)
+                    + " sincePhaseMs=" + Number((now - _previousAt) * 1000.0 / Stopwatch.Frequency) + " gameState=" + GameStateManager.CurrentStateName);
+            var since = Math.Max(_previousAt, _lastQuietAt);
+            if (now - since < QuietSeconds * Stopwatch.Frequency) return;
+            var frames = UnityEngine.Time.frameCount - _quietFrame;
+            _lastQuietAt = now; _quietFrame = UnityEngine.Time.frameCount;
+            _write("drop.wait phase=" + _previousPhase + " generation=" + _attempt.ToString(CultureInfo.InvariantCulture)
+                + " sincePhaseMs=" + Number((now - _previousAt) * 1000.0 / Stopwatch.Frequency) + " frames=" + frames.ToString(CultureInfo.InvariantCulture)
+                + " gameState=" + GameStateManager.CurrentStateName + " elapsedMs=" + Number((now - _requestedAt) * 1000.0 / Stopwatch.Frequency));
+        }
+        catch (Exception error) { TimingFailed("wait", error); }
+    }
 
     private static void BuildDone()
     {

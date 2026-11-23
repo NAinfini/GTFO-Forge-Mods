@@ -35,7 +35,7 @@ long as it exists) until its item's `Owner` (`PlayerAgent`, then its `SNet_Playe
 third person) wears their own choices; a teammate's (third person, and the sentry they placed) wears their synced look (below);
 a bot's the look the host picked for it; an icon or lobby preview, which never gets an owner, is skinned only on the icon and menu paths. The key is
 (owner, gear id): two players with the same gun each show their own skin, colours and changes. Every look goes through
-`SkinnedGear` (apply, revert, wait for the skin to load, release after 30 s unused).
+`SkinnedGear` (apply, revert, wait for the skin to load, keep every loaded skin while a level runs, release after 30 s unused outside one).
 
 - **Placed sentry.** `SentryGunInstance` is spawned from the gear's `GearIDRange` and builds its own parts: it is skinned where
   its parts spawn like any gear, by its `Owner` (set in its `OnSpawn`). Picking it up destroys it.
@@ -87,7 +87,7 @@ without an arm or with unlike sides is a character too. `CharacterRig.Links` and
 `HumanRig.ArmWear` on the map and the model's rest positions) are the one rule of what each joint does, for the plugin and the
 editor's preview. A character pack is its own Thunderstore mod depending on ForgeSkin, found as gun packs are. `Native/Characters.cs`
 wears it, all through ForgeCore: the model is built once by `ImportedModels` (format 2, `Skin.BuildCharacter`, its pictures decoded
-over earlier frames with `ImportedModels.Prepare`), hung on the body's animator with `PlayerLooks.Hang`, scaled to the body's height
+and its meshes built over earlier frames with `ImportedModels.Prepare(model, mesh, pictures)`, so its first frame makes only the materials), hung on the body's animator with `PlayerLooks.Hang`, scaled to the body's height
 times the author's `height` (`Characters.Fit`: `CharacterRig.Stature` against the body's bind-pose head and feet; spring radii,
 capsule radii and gravity scale with it), drawn on the layer of the body's first active mesh (the lobby figure keeps inactive spares
 on a layer its camera does not draw), posed by `Models.CopyPose` over `CharacterRig.Links` and `HumanRig.ArmReach` with `Follow`, its spring
@@ -213,6 +213,14 @@ keeps the reticle. Teammates get it through the pack and its hash like every oth
 see it only through the sight, which in practice is the player aiming it. `assets.apply` writes the same values into the game
 files (a layer the material has no picture slot for is reported), and the Skins export writes them as properties (an
 intensity without a colour is reported, `reticleIntensity`). Folder matching never assigns a reticle channel.
+
+A game lens (any `HolographicSight` shader, the floating holograms Sight_20, 21 and 24 included) takes only its reticles: the
+plugin (`SkinnedGear.Look`) and `assets.apply` put an override on it through `MaterialOverride.OnLens`, which keeps the reticle
+pictures and `params.reticles` on a copy of the game's lens material (its shader, blending and dirt picture stay) and leaves out
+every picture of another channel, glow, tint, metal, paint layer and wear stage, named once (`skin-sight-skipped` in game, a
+patch warning in `assets.apply`): on the lens shader the albedo slot is the lens dirt, so a part's whole import or bake there
+covered the view with an opaque picture. A lens is never reached by the mesh-name fallback, only by its own material name. The
+editor's "every channel of every part" check skips lens materials.
 
 ## Sight on an imported model
 
@@ -413,7 +421,7 @@ frame for its gun models, so the look does not read the holder again).
   the grip to the back of the bounds, at the grip's height; a gun with no stock behind the grip keeps the grip). Between two keys
   that hold it at different places the hand goes straight while its place slides along the gun. A key next to the game's pose holds
   the grip.
-- `hand`: the off hand's keys `{ "t", "on", "along", "node", "face", "at", "offset", "spin", "tips", "clasp", "fingers", "cue", "regrip" }`, first and last `grip`. `on` is `grip` (the game's own grip), `away`
+- `hand`: the off hand's keys `{ "t", "on", "along", "node", "face", "at", "offset", "spin", "tips", "clasp", "fingers", "scale", "cue", "regrip" }`, first and last `grip`. `on` is `grip` (the game's own grip), `away`
   (lowered out of the view, the hand hanging straight on its forearm), `under` (turned as the game holds it, its palm's middle 1.5 cm
   under the meshes over the hand there, whatever gap the game's own hold leaves; without `along` at the hold's own place along the
   gun), `side` (the gun's left side),
@@ -502,9 +510,12 @@ bakes its clip at 120 a second (`InspectLook.ClipRate`), so the speed a finger s
   within 0.6 cm of it and the palm within 1.5 cm. Where no place clasps the size, or the solved look fails any of these, the
   look keeps the pinch and `MagNote` says why, logged once a gun and motion. A magazine still in a long gun is taken by its base
   (`face` `bottom`) and held so only once it is clear (a `regrip`): round its middle the hand would sit in the gun.
-  With `face` `bottom`, or where the magazine is wider than 4.3 cm (`MagSpan`: sniper and marksman magazines, drums, boxes), the
+  With no `face` and wider than 4.3 cm (`MagSpan`: sniper and marksman magazines, drums, boxes) it is cradled (`InspectLook.MagCradle`):
+  its length (its longest side) across the palm, along the palm's crease and square to the fingers, the palm on the thinner of its
+  other two sides (the left face unless the other is under 1/1.25 of it, `MagLeftFirst`), the fingers curling over the far edge
+  of the third and the palm's middle 4 cm in from that edge; `spin` turns the hand about the palm's way. With `face` `bottom` the
   palm takes the base: the fingers point to its front and 30 degrees across (`MagYaw`, the left arm comes from
-  the left), the palm's middle 4 cm behind its front edge (`MagKnuckles`) and the knuckles just past that edge, so the fingers close up its front, and the hand's middle
+  the left; a magazine longest front to back or across has the fingers square to that length, so it still lies across the palm), the palm's middle 4 cm behind its front edge (`MagKnuckles`) and the knuckles just past that edge, so the fingers close up its front, and the hand's middle
   line lies 2 cm in from its left face (`MagThumb`), so the thumb goes up that face; its top, the feed lips and the first round,
   stays clear. `side` and `top` put the palm's middle 1.5 cm off the
   left side or top of the gun's body (the meshes no part moves) where it is at `along`, the same way. Where the wrist's limits turn
@@ -522,7 +533,10 @@ bakes its clip at 120 a second (`InspectLook.ClipRate`), so the speed a finger s
   oppose]), shapes the off hand at that key (ForgeCore `ClipFingers` on the first-person arms through
   `Models.BindArms`, masked to the left fingers); a key without one holds the gun's shape (0.5, 0.7, 0.75, 0.8, 0.85) on the gun and
   rests relaxed (0.2) at `away`; between a key with a shape and a `grip` key the shape fades from or to the game's own grip, so the
-  first and last keys have none. Where the palm and fingertips are more than 2 cm farther from every mesh of the gun than in the game's
+  first and last keys have none. `scale` (above 0, default 1) draws the off hand that much of its size at that key (its hand bone
+  scaled, the palm's middle kept where the place puts it, `InspectLook.OffScale`), eased between keys as the place is; the first and
+  last keys keep the game's size. A hand working a part close to the eye (the slide racked, 0.8) is drawn smaller so the part shows.
+  Where the palm and fingertips are more than 2 cm farther from every mesh of the gun than in the game's
   hold, the shape relaxes toward 0.2, so the hand never grips air (`InspectLook.OffFingers`, baked at 30 a second when the look is
   solved). Each finger then closes only until it meets a mesh box of the gun (`InspectLook.FingerStop`, along the finger's line from
   `InspectHand`: a nominal hand's knuckles and bones, bent as ForgeCore `ClipFingers` bends them), so the fingers stop on what the
@@ -534,9 +548,10 @@ bakes its clip at 120 a second (`InspectLook.ClipRate`), so the speed a finger s
   the box: `InspectLook.Round`), so a fingertip stops on a cylinder's own radius all the way round. A
   hand `under` the gun with no `fingers` keeps the game's own fingers, the support hold that already lies on this gun. The stop is
   on the meshes' boxes and a nominal hand: neither the game nor the offline data gives the look a mesh's surface or the arms' finger
-  bones, so a finger stops within about a finger's width of a boxy part and stands off a raked or rounded one. First person only. A place on the gun (`under`, `open`, `side`, `top`, `muzzle`) the off arm cannot
-  reach in the poses the gun takes about that key (a shotgun's pump or a long gun's fore-end turned away from the body) slides back
-  toward the grip a centimetre at a time until it can, on the followed pose, so the look keeps its frame rules on every gun. Between keys the hand moves on a smooth step, following the gun
+  bones, so a finger stops within about a finger's width of a boxy part and stands off a raked or rounded one. First person only. A place on the gun (`under`, `open`, `side`, `top`, `muzzle`) keeps its place on the gun as the gun turns:
+  the gun is brought near enough for the off arm to reach it (each metre out of reach weighs in the solve, `InspectLook.OutOfReach`;
+  as far past the arm as the game's own hold at rest counts as in reach), and a place the arm still cannot reach falls short of it
+  rather than sliding along the gun. Between keys the hand moves on a smooth step, following the gun
   (to or from `away` the wrist turns evenly in the forearm's frame);
   a way whose straight line passes through the gun's bounds from outside them to outside them (from the grip or from out of view onto the top, a part or the magazine)
   goes round under the gun on the off-hand side, through a point 6 cm out from its left side and half its half height below its
@@ -551,7 +566,7 @@ bakes its clip at 120 a second (`InspectLook.ClipRate`), so the speed a finger s
   another part, or one that keeps the hold (the same face with `at` moved by under a quarter of the face in u and v,
   `InspectMotion.RegripShift`: the hand's own give in a hold is half a centimetre, and a quarter of the game's magazine faces, 4 to
   30 cm, is 1 to 7 cm) is refused. Only there may the part move in the hand (frame rule R3).
-- `parts`: the parts of the gun the motion moves, `{ "node", "about", "follow", "optional", "symmetry", "keys": [{ "t", "move", "out", "clear", "turn", "show", "carry", "ease", "bounce", "cue" }] }`.
+- `parts`: the parts of the gun the motion moves, `{ "node", "about", "follow", "optional", "symmetry", "carrier", "keys": [{ "t", "move", "out", "clear", "turn", "show", "carry", "ease", "bounce", "cue" }] }`.
   `node` names every node of that name under the gun (a rig some guns carry twice, in two parts, moves as one; names are the ones the
   editor backend's `preview.weapon` lists), or an array of names, the first present that draws taken (the first name is the part's
   identity), `@mag` the magazine's mount (the part holder's `m_aMag`, so the magazine part), `@round` a
@@ -573,7 +588,9 @@ bakes its clip at 120 a second (`InspectLook.ClipRate`), so the speed a finger s
   slam home together (within 0.02 s) knock it once. `symmetry` (degrees, default 360) is the part's turn
   that looks the same (a six-shot cylinder 60): a rest key winds its turn to the nearest multiple, so a cylinder spun round is not
   wound back. The first and last keys are at rest (only `t`, and a `cue`, `ease` or `bounce`); before the first the part is at rest, and after the last too but for the whole turns its last key is wound to, which it keeps; as the look fades out its weight takes off only the turn past the nearest whole turn of its symmetry, and the plugin puts the node back when the look ends, where the two look the same. A part whose node hangs under another part's node goes with that part (a revolver's cylinder on its crane); `follow` names
-  an earlier part a node not under it goes with too (the rounds of a speed loader with the cylinder). A gun without a part's node, or
+  an earlier part a node not under it goes with too (the rounds of a speed loader with the cylinder). `carrier: true` (not on an
+  `@` node) moves only the parts under the node: a child of it that neither is nor holds another part's node keeps its pose in the
+  gun (`InspectParts`), so a crane node that also holds the barrel and frame (the R-66's `a_RevolverFold`) swings out the cylinder alone. A gun without a part's node, or
   whose node draws nothing (a skin hid it, a mounted model replaced the gun), does not play the motion and the log says so once per
   gun and motion; an `optional` part is moved where it is there. The plugin (`Native/Inspect/InspectParts.cs`) measures each node's
   pose and its parent's, and each part's mesh box (`InspectPartRig.Lo`, `Hi`: the meshes whose nearest part node is that part; an
@@ -682,10 +699,18 @@ S, still fingers: no joint of either hand (the index finger's lift off the trigg
 over the look (`InspectLook.StillFingers`);
 T, a toss turns the item as its keys ask (the flip and spin the toss key adds to the key before it: one turn of a gun, two of a
 knife): summed frame to frame at 240 a second from the throw's lead to the catch's settle, more than 60 degrees off that is reported, and so is every pair of neighbouring frames whose turns lie the long way apart
-(`InspectLook.Tosses`); R1 is also listed at every sample.
-`InspectLook.Audit` lists every W, I, F, R6, P, J, S, T and R1 finding of a look, R6 at every sample an arm sinks past the game's hold (the
+(`InspectLook.Tosses`); R1 is also listed at every sample;
+K, jumps (`InspectLook.Jumps`, at 240 a second from two frames before the look to two after it, the game's hold outside it): either
+hand's target, where the item camera sees it, moving faster than 2.5 m or turning faster than 1200 degrees a second, or a joint of
+either hand's fingers as the game shows it faster than 1500 degrees a second (the grip hand not counted while the gun is free of it);
+D, drift (`InspectLook.Drifts`): over a run of keys holding the gun up, the off palm's middle moves more than 2 cm on the gun;
+G, a magazine in the hand (`InspectLook.MagInHand`): its middle not on the palm's side within the curled fingers' reach (8 cm) and a
+hand's breadth across (6 cm), or its length (where that is 1.3 times its next side) nearer than 45 degrees to the fingers' way;
+V, the off hand working a part (`InspectLook.HandInView`): its palm or fingertips nearer the eye than 0.2 m, or the hand (at its
+`scale`) and forearm covering more than 40% of the middle of the view.
+`InspectLook.Audit` lists every W, I, F, R6, P, J, S, T, R1, K, D, G and V finding of a look, R6 at every sample an arm sinks past the game's hold (the
 frame rules stop at the first); the offline audit counts those.
-Each fault names its rule (`R1:`, `R3:`, `R5:`, `R6:`, `R7:`, `speed:`, `W:`, `I:`, `F:`, `P:`, `J:`, `S:`, `T:`). A fault is a finding, never a reason not to
+Each fault names its rule (`R1:`, `R3:`, `R5:`, `R6:`, `R7:`, `speed:`, `W:`, `I:`, `F:`, `P:`, `J:`, `S:`, `T:`; the audit's own `K:`, `D:`, `G:`, `V:`). A fault is a finding, never a reason not to
 play: the format test reports the shipped table's findings, the game logs each once per gun and motion as a warning and plays the
 look, and the owner decides from the look itself whether a motion stays. The rules only measure; none of them changes a pose.
 
@@ -702,15 +727,16 @@ own; a gun without the part a motion moves does not get that motion (logged once
    plane), upright, the hand going with it (watched from as near as the gun is held: its far end may leave the view as it goes
    round); the last turn runs straight on into the hand going up until the muzzle points up (the key that ends the spin is
    `through`), and the hand brings it back down. Handguns and compact guns drop the off hand out of view; the others keep it under
-   the gun and slide it toward the receiver for the right face (`along` 0.45, 0.3 for machine guns, 0.35 for long guns).
+   the gun at the same place through both faces, the hand going round with the gun.
 2. The magazine check (`handgun-mag`, `rifle-mag` for rifles, compact guns, shotguns and long guns, `heavy-mag`): the off hand takes
    the magazine by its side low down (a `mag` key with no `face`, `spin` 15; the fingers stopped on the magazine's own box),
    draws it out by 1.1 of its own height, lifts it a little out from there, to where the hand has it (low on the left of the view,
    0.47 to 0.50 m from the eye), aslant, its top 50 degrees up from straight at the eye (`carry` with `tip`, the hand riding it,
    its roll picked for the wrist), holds it 0.6 s for a glance, seats it with a push (`spring`, `hit`) and slides back off it
    (`offset` [0.012, 0, -0.03]). A handgun's is inside the grip: it comes out onto the palm (`face: bottom`), the hand takes it by
-   its side as it comes clear (`regrip`) and by its base again to seat it. A magazine wider than 4.3 cm is held by its base
-   throughout: the keys are the same, and which hold a key with no `face` gives follows the magazine's width. Revolvers do it
+   its side as it comes clear (`regrip`) and by its base again to seat it. A magazine wider than 4.3 cm is cradled across
+   the palm where a narrower one is held by its side, the thumb laid along it (0.3): the keys are the same, and which hold a key
+   with no `face` gives follows the magazine's width. Revolvers do it
    in one hand (`revolver-check` on the R-66, `break-check` on the 3RB): a flick of the wrist (a `through` wind-up into a `hit`
    key) throws the cylinder out on its crane, 80 degrees about the bore, or breaks the frame open, 40 about the side; the cylinder
    runs on a third of a turn; a flick back shuts it.
@@ -723,10 +749,11 @@ own; a gun without the part a motion moves does not get that motion (logged once
 Of a kind's own: `slide-rack` (large pistols: the gun turned 25 degrees left and rolled 55 so the top of the slide and the port
 face the eye; the off hand arches over the back of the slide from above, the fingers down one side and the heel of the palm down
 the other (`face: top`, `spin: 90`), clear of the muzzle, draws the slide back 2.6 cm on the round in the chamber, lets it go and
-leaves before it slams home), `revolver-swing` and `revolver-break` (the flick, then the off hand comes up from outside the
+leaves before it slams home; the gun a little smaller in the view, `fill` 0.75, and the hand at 0.8 of its size nearer the
+slide's back, `at` [0.08, 0], so the chamber shows), `revolver-swing` and `revolver-break` (the flick, then the off hand comes up from outside the
 cylinder with the pads of its index and middle fingers on its outer surface (`tips`, the palm clear of the frame and of the
 chamber face), strokes it 24 degrees round over 0.07 s riding its surface and lifts off; the cylinder runs on from about the
-stroke's top speed, some 600 degrees a second, slowing through the rest of one turn, and is pressed shut. The part eases all end
+stroke's top speed, some 600 degrees a second, slowing through the rest of one turn, and is pressed shut by the palm on the cylinder's side, riding it as the crane closes. The part eases all end
 at rest except `spring`, which is a knock, so between the stroke and the run the cylinder's rate dips by about a fifth for two
 frames), `rifle-charge` (rifles, compact guns, long guns and shotguns that have a charging
 handle) and `heavy-charge` (the handle is on the left side of these guns: the gun is turned only a little, the off forearm comes
@@ -951,7 +978,7 @@ a worker thread reads the zip, the SFM1 meshes and checks the precompressed text
 audio library and queues the textures on ForgeCore: a precompressed one on `Images.QueueRaw` (uploaded as it is), any other
 on `Images.Queue` (decoded and compressed in the game). Until every skin a gear wears is loaded the gear keeps its look and waits; a picture,
 mesh or sound that does not decode rejects the pack then (`skin-pack-rejected`), and a pack whose file changed since its
-manifest was read is read again first. A skin no gear shows or waits for is freed after 30 s (`Skins.Release`), except a character the local player picks or a teammate's look names, kept while they do (`Characters.InUse`); a replaced
+manifest was read is read again first. A loaded skin stays while a level runs (`Skins.InLevel`, from `Generating` to `AfterLevel` or the lobby); outside one, a skin no gear shows or waits for is freed after 30 s (`Skins.Release`), except a character the local player picks or a teammate's look names, kept while they do (`Characters.InUse`); a replaced
 or removed one as soon as no gear shows it.
 
 ## Logs
@@ -970,12 +997,12 @@ Started with `--ai-control` (optionally `--ai-control=<port>`, 1024 to 65535, de
 structured interface `window.forgeAI`; without either no port is open and `forgeAI` does not exist. An invalid port is ignored
 with one `ai-control` line in `GTFO_UserData/logs/app.log`. The flag is read before the app is ready and has no effect on the
 Squirrel install, update and uninstall runs. The editor has no single-instance lock, so close an editor that is already open
-first (two copies share one data folder). All three copies run the same compiled code (the flag is read in `main.ts`, the
+first (two copies share one data folder). All three copies run the same compiled code (the flag is read in `Desktop/shell/aiControl.ts`, the
 interface is an ordinary renderer module loaded on demand); an installed copy starts with
 `%LocalAppData%\ForgeSkin\ForgeSkin.exe --ai-control` (Squirrel's launcher forwards arguments), a portable copy with
 `ForgeSkin.exe --ai-control`, a source run with `pnpm start -- -- --ai-control` in `Editor/`. In this mode the window also keeps
 rendering when covered or minimized (`backgroundThrottling` off). Every file dialog is the system's: the main process asks for
-paths through one function (`pickPaths` in `main.ts`), and since a protocol client cannot drive the system's dialog, an agent
+paths through one function (`pickPaths` in `Desktop/shell/dialogs.ts`), and since a protocol client cannot drive the system's dialog, an agent
 answers the next dialog beforehand with `forgeAI` `pickNext {paths}`; that dialog then does not open, and nothing is shown in the
 window for it.
 
@@ -1010,10 +1037,21 @@ git.takina.io/gtfo/skins): `manifest.skingroup.json` plus `*.mattarget.json`.
   texture writes `_EnableEmissive`. `dropped` carries the same notes.
 - `project.listAll { root }` lists every item's skins for the export dialog.
 
+## Editor main process and the desktop shell
+
+`Desktop/shell/` (README there) is the main-process and preload code every desktop app of ours shares: the backend process
+(`Backend`: spawn, one JSON line per message, restart after a crash, `dotnet build` first in a checkout), the data folder and
+its move, the Squirrel update check, system dialogs with `dialog:preset`, `--ai-control`, `app.log`, the window's recovery,
+the frameless window's title bar (name, icon, window buttons) and the local file protocol. `Editor/src/main/main.ts` is a thin entry: it calls `createShell` with ForgeSkin's settings (folder
+names, backend paths and arguments, `FORGESKIN_AI_CONTROL`, the update feed, the `sf` protocol and its file types) and keeps only
+what is the skin editor's: the write whitelist (`writable`), the file and profile watches, the hidden card window, plugin staging
+and the window's title and icon. The preload spreads `shellBridge()` into its own `window.forge` object and calls`nmountWindowChrome()`; the editor's own top-bar controls (help, settings, export) sit in the title bar's slot (`ui/TopBar.tsx`). Vite and tsc reach the
+shell by relative import (tsconfig `paths` maps `electron` for it); `Mods/Release/export-mirror.ps1` exports `Desktop/shell` with
+ForgeSkin and cuts one `../` off those imports.
 ## Editor data folder and editions
 
-`Editor/src/main/dataDir.ts` is the only place that decides the data folder; the backend gets it as `--data-dir`, and the
-app log, dialog memory, write checks and the window (`app:dataDir`) ask `dataDir()`. `scripts/gen-types.mjs` runs the
+`Desktop/shell/dataDir.ts` (the desktop shell shared with other desktop apps; ForgeSkin passes its folder names and data markers in `Editor/src/main/main.ts`) is the only place that decides the data folder; the backend gets it as `--data-dir`, and the
+app log, dialog memory, write checks and the window (`app:dataDir`) ask `shell.dataDir()`. `scripts/gen-types.mjs` runs the
 backend on a throwaway folder. The edition comes from where the app runs:
 
 | Edition | Recognised by | Default data folder | Updates |
@@ -1097,7 +1135,46 @@ belong to the mod manager: the editor neither installs nor checks them. `plugin.
 the profile's `BepInEx/LogOutput.log` when it is newer than the last change under `BepInEx/plugins` (the editor stamps the home
 folders it writes) and turns BepInEx's `Could not load [...]` and `Skipping [...]` lines about ForgeCore or ForgeSkin into notes
 (`load-missing-dependency`, `-any`, `load-incompatible`, `load-duplicate`, `load-dependency-failed`, `load-refused`); the editor runs it
-when it opens, on a profile change and after the game starts or closes. Every note is two layers: `args` make the short toast
+when it opens, on a profile change and after the game starts or closes, through the shell's `loadCheck` (`Desktop/shell/loadCheck.ts`,
+shared with the map workshop: each note once per run, a dependency-failed note left to the note that names its cause).
+`plugin.gameLog` (`LoadLog.Lines`) reads the same log and returns every Fatal, Error and Warning line and every line of a Forge
+source (`level`, `source`, `text` with its continuation lines), with `exists`, `written`, `changed` and `stale` (written before the
+last change under `BepInEx/plugins`). `plugin.mods` (`LoadLog.Mods`) lists the profile's Forge plugins (`guid`, `name`, `version`,
+`path`, `sha256` of the DLL). Both only read. Every note is two layers: `args` make the short toast
 (`install.<code>` in the locales), `detail` (what was checked, paths, versions, the log line, cause and fix) goes to `backend.log`
 and `app.log` (`useStore.report`). Uninstalling removes the home ForgeSkin unless a mod manager owns it (a `manifest.json` in
 `NAinfini-ForgeSkin/`) and what is left in `plugins/ForgeSkin/`; the skins folder and ForgeCore stay.
+
+### The backend as a general profile tool
+
+The install, load-check and profile code names no package: `ProgramManifest` (`Backend/ProgramManifest.cs`) is the program's list, and
+the ForgeSkin editor's is `ProgramManifest.ForgeSkin` (ForgeCore, then ForgeSkin; all methods), used when no argument is given.
+Another program starts the backend with `--manifest <file.json>` and/or `--methods a,b,x.*` (the flag wins over the file):
+
+```json
+{ "packages": [{ "name": "ForgeCore", "dll": "ForgeCore.dll" }, { "name": "ForgeEngine", "dll": "ForgeEngine.dll", "minVersion": "1.0.0" }],
+  "dependencies": [{ "guid": "dev.gtfomodding.gtfo-api", "name": "GTFO-API", "package": "GTFOModding-GTFO_API", "minVersion": "0.6.1" }],
+  "primary": "ForgeEngine", "pluginRoot": "plugin", "skinProfile": false,
+  "methods": ["game.*", "profiles.*", "plugin.*", "content.*"] }
+```
+
+- `packages` in install order; each ships as `<pluginRoot>/<source or name>/<dll>` and ends at `BepInEx/plugins/<team>-<name>/<name>/`
+  (`team` defaults to `NAinfini`). `plugin.install`, `plugin.uninstall` (the primary package), `plugin.loadCheck` and `Install.Plan`
+  work on this list; the rule that a newer store copy stays only while every package decided before it meets its `[BepInDependency]`
+  minimum is the same for any pair. `pluginRoot` is relative to the repository root (the folder holding `.git`) or absolute.
+  `skinProfile: false` leaves out ForgeSkin's skins folder and the files older ForgeSkin editors left.
+- `profiles.list|get|add` report `packages` (`name`, installed `version`, shipped `version`, `current` = one copy at its home with
+  the shipped files' hashes or a store copy that stays, `belowMinimum`) and `dependencies` (`name`, `package`, `version`, `ok` =
+  found by GUID under `BepInEx/plugins` at least at `minVersion`; never installed). `pluginVersion`, `pluginCurrent`,
+  `pluginShipped` and `pluginNewer` keep speaking for the primary package.
+- `methods`: a method outside the set fails with `method-not-allowed` before it runs. A program that must not read the game's assets
+  leaves out `catalog.*`, `preview.*`, `assets.*`, `enemies.*`, `sights.*` and the rest of the weapon tools.
+- `content.install { zip, profile }` installs an exported Rundown or content zip (its `forge/rundown.forge` or
+  `forge/content/pack.forge` names the `package`, `Author-Name`) as r2modman would, with the same routes and refusals as
+  `Tools/Game/game_profile.py` `install_export_pack`: `plugins` entries to `BepInEx/plugins/<package>/`, `GameData` entries to
+  `BepInEx/GameData/<package>/` (MTFO), anything else refused (`unsafe-entry`, `no-identity`). It unpacks into
+  `BepInEx/.forge-staging/<id>/`, moves a package of the same name to the Recycle Bin, renames each folder whole into place and
+  leaves `.forge-installed.json` (`{path: sha256}`, `GameData/` prefix for tables) in the plugin folder. `content.list { profile }`
+  lists the folders that hold that record; `content.remove { profile, package }` sends such a folder (and its tables) to the Recycle
+  Bin and never touches one without the record. Running GTFO blocks only DLLs (`game-running`): a package of `.forge` files and
+  tables installs while the game runs and is hot-loaded.

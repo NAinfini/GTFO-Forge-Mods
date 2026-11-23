@@ -30,7 +30,7 @@ expect $inside.CourseNode.m_zone.DimensionIndex == $inside.DimensionIndex
 expect $inside.CourseNode.m_zone.LocalIndex contains "Zone_0"
 step {"target":"allOfType:LevelGeneration.LG_Zone","steps":[{"read":["DimensionIndex","LocalIndex","Dimension.DimensionData.IsOutside","Dimension.DimensionData.Sandstorm","Dimension.DimensionData.Exposure","Dimension.DimensionData.AmbientIntensity","Dimension.DimensionData.LightAzimuth","Dimension.DimensionData.LightElevation","Dimension.DimensionData.LightIntensity"]}]} as=sky
 screenshot as=shot_room
-teleport room=b3f3a19d-2aa6-49bb-95bb-6281f092c57b 4 0.12 -4 as=slot0_at
+teleport room=闪入小屋 4 0.12 -4 as=slot0_at
 expect $inside.Position.x ~1.5 $slot0_at.landed.x
 expect $inside.Position.z ~1.5 $slot0_at.landed.z
 

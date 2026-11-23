@@ -63,6 +63,7 @@ internal sealed partial class LoadSheddingController
     private long _ambientUpdateCalls, _ambientSkippedUpdates;
 
     private readonly SheddingHookPlan _plan;
+    private bool _lightningLoaded;
 
     internal LoadSheddingController(ManualLogSource log, SheddingHookPlan plan)
     {
@@ -107,6 +108,13 @@ internal sealed partial class LoadSheddingController
         if (Settings.SummaryLog)
             _log.LogInfo("type=performance_state\tfrom=" + oldState + "\tto=" + newState + "\tlevel=" + RundownManager.ActiveExpeditionUniqueKey
                 + "\tutc=" + DateTime.UtcNow.ToString("O") + "\tqpc=" + System.Diagnostics.Stopwatch.GetTimestamp());
+        // The lightning curves load with a blocking Resources.Load on first use (a stall of over a second); load them while the level generates.
+        if (Settings.LightningPreload && !_lightningLoaded && newState == eGameStateName.Generating)
+        {
+            _lightningLoaded = true;
+            try { _ = AnimationCurves.LightningStrikes; }
+            catch (Exception error) { LogExtraFailure("lightning-preload", error.GetType().Name + ": " + error.Message); }
+        }
         // A failing EndLevel must not stop the event's other subscribers or the BeginLevel below.
         if (Active && !LevelBuilt(newState))
             try { EndLevel(); } catch (Exception error) { LogExtraFailure("end-level", error.GetType().Name + ": " + error.Message); }
@@ -498,6 +506,7 @@ internal sealed partial class LoadSheddingController
             + "\trestore_failed=" + _restoreFailures + "\t" + values;
         if (Settings.SummaryLog) _log.LogInfo(line);
     }
+    internal void LogGuard(string line) => _log.LogInfo(line);
     internal void RestorationFailed() => _restoreFailures = 1;
     internal void LogExtraFailure(string item, string reason)
     {

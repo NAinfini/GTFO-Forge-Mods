@@ -180,7 +180,7 @@ public sealed class BundleHandle
     public bool Prepare()
     {
         if (_shaderReady || _profile == null) return true;
-        if (Shader.Find(LitMaterial.ShaderName) != null) return _shaderReady = true;
+        if (Shaders.Find(LitMaterial.ShaderName) != null) return _shaderReady = true;
         ForgeCore.Log.For(ModId).ErrorOnce("visual-pack-games-gear-shader-not-loaded", "ForgeVisual pack " + Pack + ": the game's gear shader is not loaded yet; its models show once a level has been built.");
         return false;
     }

@@ -28,7 +28,7 @@ static class Holograms
         Material? game = null;
         foreach (var o in Resources.FindObjectsOfTypeAll(Il2CppType.Of<Material>()))
             if (o.TryCast<Material>() is { } m && m.shader != null && m.shader.name == ShaderName) { game = m; break; }
-        var shader = game?.shader ?? Shader.Find(ShaderName);
+        var shader = game?.shader ?? ForgeVisual.Shaders.Find(ShaderName);
         if (shader == null)
         {
             ForgeSkinPlugin.Warn($"hologram: no shader {ShaderName}; holograms use the gear shader's unlit glow");

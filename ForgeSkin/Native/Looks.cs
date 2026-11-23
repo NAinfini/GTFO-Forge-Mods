@@ -186,7 +186,7 @@ static class Looks
         foreach (var (key, worn) in player.ByKey) Before[key] = worn;
         player.ByKey.Clear();
         player.Unshown.Clear();
-        if (player.Look != null) Resolve(player.Look, $"player {lookup}", player.ByKey, player.Unshown);
+        if (player.Look != null) Resolve(player.Look, NameOf(lookup), player.ByKey, player.Unshown);
         foreach (var (key, worn) in player.ByKey.ToList())
             if (Before.TryGetValue(key, out var was) && was.Skin == worn.Skin && was.Wear == worn.Wear && SamePicks(was.Picks, worn.Picks)) player.ByKey[key] = was;
         Before.Clear();

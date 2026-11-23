@@ -15,7 +15,7 @@ internal static class ExperimentCatalog
 {
     private const string ConfigFolder = "commands";
     // One drive client writes its command as drivesession-<id>.forge; the folder keeps the newest receipts.
-    private const int KeptDriveSessionFiles = 8;
+    internal const int KeptDriveSessionFiles = 8;
 
     private static readonly List<ExperimentCommand> Commands = new();
     private static readonly List<string> Problems = new();

@@ -366,10 +366,17 @@ public static class SkinsFormat
             var written = new HashSet<string>();
             var files = new HashSet<string>();
             int index = 0;
-            foreach (var (gear, pack, o) in entries)
+            foreach (var (gear, pack, skinned) in entries)
             {
                 var doc = pack.Manifest;
-                var game = materials(gear).GetValueOrDefault(o.Material);
+                var game = materials(gear).GetValueOrDefault(skinned.Material);
+                var o = skinned;
+                // A sight's lens keeps the game's glass with only the skin's reticles on it, as in game (Core MaterialOverride.OnLens).
+                if (MaterialOverride.IsLensShader(game?.Shader))
+                {
+                    o = skinned.OnLens(out var left);
+                    if (left.Count > 0) dropped.Add(new("sightLens", doc.Name, $"{o.Material}: {string.Join(", ", left)}", left.Count));
+                }
                 var sig = game?.Textures ?? new();
                 var others = gears.Where(g => g != gear && materials(g).ContainsKey(o.Material)).ToList();
                 bool conditions = others.Count > 0 && sig.Count > 0;

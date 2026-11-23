@@ -39,11 +39,18 @@ public static class Images
     public static ImageJob QueueRaw(byte[] data, int offset, int width, int height, TextureFormat format, bool mipChain, bool linear, Action<Texture2D?, string> done)
         => Enqueue(new ImageJob(data, done, linear, mipChain, 0, false, false) { Raw = true, Offset = offset, Width = width, Height = height, Format = format });
 
+    /// <summary>Runs <paramref name="step"/> on the main thread on a later frame, in the same queue and frame budget as the pictures: other
+    /// work that must not all land in one frame (one mesh of a model, built after its pictures were queued). A step is not split, so it
+    /// should be one Unity object's worth. <paramref name="done"/> gets an empty failure, or the exception's text when the step threw;
+    /// cancelling the job drops a step that has not run.</summary>
+    public static ImageJob QueueStep(Action step, Action<string> done)
+        => Enqueue(new ImageJob(Array.Empty<byte>(), (_, failure) => done(failure), false, false, 0, false, false) { Step = step });
+
     static ImageJob Enqueue(ImageJob job)
     {
         // A PNG decodes on a worker thread (Png.TryDecode, no Unity call), its mips and normal-map swizzle too, so the main thread only
         // uploads it; one the managed reader does not take (a JPEG, an interlaced PNG) is decoded by the game on the main thread as before.
-        if (!job.Raw) job.Pixels = System.Threading.Tasks.Task.Run(() => Pixels(job));
+        if (!job.Raw && job.Step == null) job.Pixels = System.Threading.Tasks.Task.Run(() => Pixels(job));
         Jobs.Enqueue(job);
         if (!_pumping) { _pumping = true; Frame.OnUpdate("NAinfini.ForgeCore", Pump); }
         return job;
@@ -67,6 +74,15 @@ public static class Images
                 Jobs.Dequeue();
                 job.Texture = Upload(job, out var refused);
                 job.Finish(refused);
+                continue;
+            }
+            if (job.Step != null)
+            {
+                Jobs.Dequeue();
+                var thrown = "";
+                try { job.Step(); }
+                catch (Exception error) { thrown = error.ToString(); }
+                job.Finish(thrown);
                 continue;
             }
             if (job.Texture == null)
@@ -225,6 +241,7 @@ public sealed class ImageJob
     internal readonly int MaxSide;
     internal Texture2D? Texture; // decoded, waiting for its second step
     internal bool Raw; // QueueRaw: Image holds GPU-format data
+    internal Action? Step; // QueueStep: main-thread work, no picture
     internal int Offset, Width, Height;
     internal TextureFormat Format;
     internal System.Threading.Tasks.Task<byte[]?>? Pixels; // the worker's decode (Images.Pixels), null for QueueRaw

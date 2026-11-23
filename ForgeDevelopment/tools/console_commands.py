@@ -8,12 +8,15 @@ the key=value facts the game reported; `as=NAME` keeps them for `$NAME.key` in l
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import datetime as dt
 import json
 from pathlib import Path
 import re
 import time
 
 import drive_session as ds
+import package_names
+import reload_handoff
 import test_script as ts
 
 NATIVE = "static:ForgeDevelopment.Native."
@@ -106,9 +109,9 @@ class LogTail:
         except OSError:
             return 0
 
-    def lines(self, start, end=None):
-        """The lines added since `start`, or None when the log cannot be read or has become shorter than `start` (rewritten, for
-        example by a restart): lines that cannot be read are never reported as no lines."""
+    def entries(self, start, end=None):
+        """(byte offset, line) of the lines added since `start`, or None when the log cannot be read or has become shorter than `start`
+        (rewritten, for example by a restart): lines that cannot be read are never reported as no lines."""
         try:
             with self.path.open("rb") as stream:
                 if self.path.stat().st_size < start:
@@ -117,7 +120,15 @@ class LogTail:
                 data = stream.read() if end is None else stream.read(max(0, end - start))
         except OSError:
             return None
-        return data.decode("utf-8", "replace").splitlines()
+        rows, offset = [], start
+        for raw in data.split(b"\n"):
+            rows.append((offset, raw.decode("utf-8", "replace").rstrip("\r")))
+            offset += len(raw) + 1
+        return rows[:-1] if rows and not rows[-1][1] else rows
+
+    def lines(self, start, end=None):
+        rows = self.entries(start, end)
+        return None if rows is None else [line for _, line in rows]
 
     def before(self, start, count=20):
         try:
@@ -132,9 +143,11 @@ class LogTail:
 class Console:
     """Runs parsed lines against a session. `native` maps a verb to a function (line) -> dict for the verbs drive_cli.py already
     implements (status, call, read, step, log, screenshot, quit)."""
-    def __init__(self, client, state, native=None):
+    def __init__(self, client, state, native=None, session_path=None):
         self.client, self.state = client, state
         self.native = native or {}
+        self.session_path = Path(session_path) if session_path else None
+        self.protected = self.spawned = False  # what a script changed that reset() gives back
         self.level_choice = dict(state.get("selection") or {})
         self.log = LogTail(Path(state["bepinexRoot"]) / "LogOutput.log")
         self.handlers = {
@@ -146,7 +159,7 @@ class Console:
             "hit": self.enemy_probe, "limbs": self.enemy_probe, "follow": self.enemy_probe, "door": self.door, "noise": self.noise,
             "event": self.event, "checkpoint": self.checkpoint, "scan": self.scan, "extract": self.extract, "nav": self.nav,
             "model-shot": self.model_shot, "alarms": self.alarms, "recorder": self.recorder, "player": self.player, "read": self.read,
-            "state": self.read_state, "terminal": self.terminal, "toon": self.toon, "picker": self.picker,
+            "state": self.read_state, "terminal": self.terminal, "toon": self.toon, "picker": self.picker, "install": self.install, "entries": self.entries,
         }
 
     # ---- running a line ----------------------------------------------------------------------------------------------
@@ -155,7 +168,7 @@ class Console:
         handler = self.native.get(line.verb)
         try:
             if handler is not None:
-                return Result(True, {"result": handler(line)})
+                return self.native_result(line, handler(line))
             return self.handlers[line.verb](line)
         except (ds.ExperimentFailed, OSError, ValueError, RuntimeError, TimeoutError, KeyError, IndexError) as error:
             self.client.deadline = None
@@ -165,6 +178,28 @@ class Console:
             # A native verb bounds its own call with an absolute deadline (drive_cli.bounded). Left on the client it would cap every
             # later line of the script and fail them as submit-ready-timeout or 实验超时 half a minute after that call.
             self.client.deadline = None
+
+    @staticmethod
+    def native_result(line, value):
+        """A `call` that answers False did not do what its name says (SnapshotAll answers False when capture is off); only a call written
+        with --allow-false is a question that may be answered no."""
+        answer = value.get("result") if isinstance(value, dict) else None
+        if line.verb == "call" and "--allow-false" not in line.flags and str(answer).strip().lower() == "false":
+            return Result(False, {"result": value}, error="call.returned-false: " + line.args[0] + " " + line.args[1]
+                          + " answered False, so it did not do what it names (a query that may answer no takes --allow-false)")
+        return Result(True, {"result": value})
+
+    def reset(self):
+        """The baseline every script starts from and leaves: no terminal in use, no input held, no player protection, no enemy this console
+        spawned, standing. The runner calls it before the first line and after the last, whatever the script did or failed to do."""
+        if self.client.status()["gameState"] != "InLevel":
+            return None  # no player to give anything back to (the lobby, a loading screen)
+        values = self.run([call(TERMINAL, "Release"), call(INPUT, "LetAll"), drive("drive.player.unprotect"), call(ACTIONS, "Clear")])
+        if self.crouched():
+            self.posture(ts.Line(0, "stand", "command", "stand"))
+        self.protected = self.spawned = False
+        return Result(True, {"terminal": self.find(values, "released=") or self.find(values, "terminal-free"), "protection": self.find(values, "drive-player"),
+                             "cleared": self.find(values, "cleared ")})
 
     def recover(self):
         """A failed command may have left an input held; give every driven input back so the player is not left firing."""
@@ -204,6 +239,7 @@ class Console:
             self.client.call(NATIVE + "SeededDrop", "Start", [line.args[0], line.options["seed"], int(line.options.get("bots", 3))])
             ds.wait_until(self.client, lambda: self.client.status()["gameState"] == "InLevel" and self.client.call(ds.MENU, "LandingReady") == "true",
                           timeout, "带种子落地", lambda: self.client.call(NATIVE + "SeededDrop", "State"))
+            self.publish_session()
             return Result(True, {"world": self.client.status()["worldEpoch"], "level": line.args[0]})
         if len(line.args) == 3:
             self.level_choice = {"rundown": int(line.args[0]), "tier": int(line.args[1]), "ordinal": int(line.args[2]),
@@ -213,11 +249,32 @@ class Console:
         self.client.echo = True
         ds.enter_level(self.client, self.level_choice["rundown"], self.level_choice["tier"], self.level_choice["ordinal"], timeout,
                        self.level_choice.get("botSlots", "[]"))
+        self.publish_session()
         return Result(True, {"world": self.client.status()["worldEpoch"], **{key: self.level_choice[key] for key in ("rundown", "tier", "ordinal")}})
 
     def leave(self, line):
         ds.return_to_lobby(self.client)
+        self.publish_session()
         return Result(True, {"state": self.client.status()["gameState"]})
+
+    def publish_session(self):
+        """Writes what the session now is back into session.forge, which `status` pages and the drive tools read: the level this console
+        entered (selection), the new world and recorder session, and the player (none in the lobby). The file otherwise keeps the values of
+        the level the session landed on first. Identity (id, processId, instance) and everything else in it stay as they were."""
+        if self.session_path is None:
+            return
+        value = json.loads(self.session_path.read_text("utf-8"))
+        status = self.client.status()
+        selection = dict(value.get("selection") or {})
+        if {"rundown", "tier", "ordinal"} <= set(self.level_choice):
+            selection.update({key: self.level_choice[key] for key in ("rundown", "tier", "ordinal", "botSlots") if key in self.level_choice})
+            tier = int(self.level_choice["tier"])
+            selection["level"] = ("ABCDE"[tier - 1] if 1 <= tier <= 5 else "?") + str(int(self.level_choice["ordinal"]) + 1)
+        value.update(selection=selection, worldEpoch=status["worldEpoch"], recorderSession=status["recorderSession"], gameState=status["gameState"],
+                     refreshedUtc=dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"))
+        value["player"] = (self.client.read("localPlayer", ["GlobalID", "Position", "DimensionIndex", "Alive"], status["worldEpoch"])
+                           if status["gameState"] == "InLevel" else "none")
+        ds.host.atomic_json(self.session_path, value)
 
     def reenter(self, line):
         return self.level(ts.Line(line.number, line.text, "command", "level", options=dict(line.options)))
@@ -231,10 +288,17 @@ class Console:
             spec.update(zone=opt["zone"], area=int(opt.get("area", 0)))
         elif "exit" in opt:
             spec.update(exit=opt["exit"], offset=[number(part, 0) for part in opt.get("offset", "0,0,0").split(",")])
+        elif "near" in opt:
+            # Beside an interaction of the level, found by what it says (a button's label, `Terminal`, `@LG_SecurityDoor`): the place a player
+            # stands to use it, in the dimension it is in. Nothing about it (room, id) is written in the script.
+            wanted = opt["near"].strip('"')
+            stand = pairs(self.run([call(ACTIONS, "Interactable", wanted, "", 100000.0)])[0])
+            dimension = self.run([call(ACTIONS, "InteractableDimension", wanted, 100000.0)])[-1]
+            spec.update(dimension=int(dimension), position=[float(part) for part in stand["stand"].split(",")])
         elif "room" in opt:
             if len(args) != 3:
                 raise ValueError("teleport room=<房间 id> 需要房间内局部坐标 x y z")
-            at = self.run([call("RoomLookup", "WorldPoint", opt["room"], *[number(a, 0) for a in args])])[-1]
+            at = self.run([call("RoomLookup", "WorldPoint", self.room_id(opt["room"]), *[number(a, 0) for a in args])])[-1]
             dimension, point = at.split(";", 1)
             spec.update(dimension=int(dimension), position=[float(part) for part in point.split(",")])
         elif len(args) == 3:
@@ -246,6 +310,30 @@ class Console:
             steps.append(call(INPUT, "Look", *[number(part, 0) for part in opt["face"].split(",")]))
         landing = summary(self.run(steps)[0])
         return Result(True, {**self.position(), **{key: ",".join(f"{part:.3f}" for part in value) for key, value in landing.items()}})
+
+    ROOM_ID = re.compile(r"room[:-]|[0-9a-f]{8}-[0-9a-f]{4}-")
+
+    def room_id(self, wanted):
+        """The instance id of the loaded room `wanted` names: an id as written (the game refuses one it does not hold, by code), else the
+        authored name read from the installed package (package_names.py), narrowed to the instance the loaded level has."""
+        wanted = wanted.strip('"')
+        if self.ROOM_ID.match(wanted):
+            return wanted
+        rooms = dict(row.split("|", 1) for row in filter(None, self.run([call("RoomLookup", "Loaded")])[-1].split(",")))
+        if wanted.startswith("@"):
+            # a room by the game's own name of its geomorph prefab (a native room has no authored name)
+            candidates = [room for room, prefab in rooms.items() if wanted[1:].casefold() in prefab.casefold()]
+            if len(candidates) != 1:
+                raise ValueError("console.room-prefab-" + ("missing" if not candidates else "ambiguous") + ": 没有恰好一个已加载的房间，预制件名含“" + wanted[1:]
+                                 + "”（含的有 " + str(len(candidates)) + " 个；已加载的预制件：" + ", ".join(sorted(set(rooms.values()))) + "）")
+            return candidates[0]
+        candidates = package_names.room_ids(self.state, wanted)
+        loaded = set(rooms)
+        here = [candidate for candidate in candidates if candidate in loaded]
+        if len(here) != 1:
+            raise ValueError(("console.room-not-loaded: 房间“" + wanted + "”在已加载的关卡里没有（它在安装包里是 " + ", ".join(candidates) + "）") if not here
+                             else "console.room-ambiguous: 名为“" + wanted + "”的房间在已加载的关卡里有 " + str(len(here)) + " 个：" + ", ".join(here))
+        return here[0]
 
     def look(self, line):
         args = line.args
@@ -280,10 +368,25 @@ class Console:
             if health:
                 out["targetHealthBefore"], out["targetHealthAfter"] = health[0].get("health"), health[-1].get("health")
                 out["targetAlive"] = health[-1].get("alive")
+                before, after = number(out["targetHealthBefore"], None), number(out["targetHealthAfter"], None)
+                if before is not None and after is not None:
+                    out["damage"] = round(before - after, 3)  # what the target lost: hits count the game's hit events, which can land for nothing
         return out
+
+    def fired(self, line, values, spec):
+        """A fire command that read back no shot is a failed command: the clip did not move and no weapon fire was counted."""
+        out = self.combat_values(values, line)
+        if "clipBefore" not in out:
+            return Result(False, out, error="fire.no-readback: 武器读回缺失（没有读到弹匣与开火计数），不能判断开了几枪")
+        out["asked"] = spec
+        if out["fires"] + out["shotgunFires"] == 0 and out["clipBefore"] == out["clipAfter"]:
+            return Result(False, out, error="fire.no-shot: 要求 " + spec + "，游戏读回开了 0 枪（弹匣 " + str(out["clipBefore"]) + " → " + str(out["clipAfter"]) + "）")
+        return Result(True, out)
 
     def fire(self, line):
         spec = line.args[0] if line.args else "1"
+        if number(spec.rstrip("s"), 1) <= 0:
+            raise ValueError("fire 需要至少一枪（fire 1）或一段持续时间（fire 2s），不是 " + spec)
         direct = "--direct" in line.flags
         steps = self.target_health(line) + [call(FIRE, "Arm")] + self.aim(line)
         if direct:
@@ -294,8 +397,7 @@ class Console:
             steps += [{"repeat": {"times": int(number(spec, 1)), "steps": [call(INPUT, "Hold", "Fire"), frames(FRAMES_PRESS),
                                                                        call(INPUT, "Let", "Fire"), frames(FRAMES_GAP)]}},
                       pause(0.3), call(INPUT, "LetAll")]
-        values = self.run(steps + [call(FIRE, "Report")] + self.target_health(line))
-        return Result(True, self.combat_values(values, line))
+        return self.fired(line, self.run(steps + [call(FIRE, "Report")] + self.target_health(line)), spec)
 
     def melee(self, line):
         steps = [call(FIRE, "Wield", SLOTS["melee"]), pause(1.2)] + self.target_health(line) + [call(FIRE, "Arm")] + self.aim(line)
@@ -323,7 +425,10 @@ class Console:
         press = [call(ACTIONS, "Reload")] if "--direct" in line.flags else [call(INPUT, "Hold", "Reload"), pause(0.3), call(INPUT, "Let", "Reload"), call(INPUT, "LetAll")]
         values = self.run(before + press + [pause(0.5), call(STATE, "AmmoRead")])
         first, last = pairs(self.find(values[:1], "clip=")), pairs(self.find(values, "clip="))
-        return Result(True, {"clipBefore": first.get("clip"), "clipAfter": last.get("clip"), "maxClip": last.get("maxClip")})
+        out = {"clipBefore": first.get("clip"), "clipAfter": last.get("clip"), "maxClip": last.get("maxClip")}
+        if out["clipBefore"] == out["clipAfter"] and out["clipBefore"] != out["maxClip"]:
+            return Result(False, out, error="reload.no-change: 弹匣读回 " + str(out["clipBefore"]) + " → " + str(out["clipAfter"]) + "，没有装填（满匣是 " + str(out["maxClip"]) + "）")
+        return Result(True, out)
 
     def throw(self, line):
         charge = duration(line.options.get("charge"), 0.4)
@@ -334,6 +439,8 @@ class Console:
             steps += [call(INPUT, "Hold", "Fire"), pause(charge), call(INPUT, "Let", "Fire"), pause(1.0), call(INPUT, "LetAll")]
         values = self.run(steps + [call(FIRE, "Slots")])
         slots = [value for value in values if value.startswith("wielded ")]
+        if slots[0] == slots[-1]:
+            return Result(False, {"before": slots[0], "after": slots[-1]}, error="throw.nothing-thrown: 投掷前后手持读回相同：" + slots[0])
         return Result(True, {"before": slots[0], "after": slots[-1]})
 
     def posture(self, line):
@@ -497,6 +604,7 @@ class Console:
     def god(self, line):
         if line.args[0] not in ("on", "off"):
             raise ValueError("god 需要 on 或 off")
+        self.protected = line.args[0] == "on"
         return Result(True, {"god": line.args[0], "result": self.run([drive("drive.player." + ("protect" if line.args[0] == "on" else "unprotect"))])[0]})
 
     def give(self, line):
@@ -527,10 +635,33 @@ class Console:
                            picker, {"target": "result", "call": "get_Focus", "args": []}])
         return Result(True, {"focus": values[-1]})
 
+    # ---- installing a package into the running game --------------------------------------------------------------------
+
+    def install(self, line):
+        """`install <zip>…`: exported packages installed into this session's profile (the same files and record the workshop's install
+        writes) and handed to the running game in one request through forge-reload/request.json; waits for the game's answer. Answers `status`
+        (committed / refused / failed), `code`, `generation`, `digest`, `recordMatches`, `rejections` and `rejected`; anything but a
+        committed generation that holds the installed bytes of every package fails the line. Put the game in its lobby first (`leave`): from a
+        level the game goes back to its lobby by itself and, after the change, drops into the same level again."""
+        bep = Path(self.state["bepinexRoot"])
+        packages = [ds.game_profile.install_export_pack(bep, Path(archive))["packageName"] for archive in line.args]
+        identity, records, result = reload_handoff.hand_over(bep, packages)
+        values = reload_handoff.summary(identity, records, result)
+        if values["status"] != "committed" or not values["recordMatches"]:
+            return Result(False, values, error=(values["code"] or "reload-record-mismatch") + ": " + values["detail"] + (" " + values["rejected"] if values["rejected"] else ""))
+        return Result(True, values)
+
+    def entries(self, line):
+        """`entries [match]`: what the enemy and weapon tables hold now (Forge rows, replication order, gear catalogue), read through the author read
+        `AuthorReads.EntryRows`; `reload_handoff.flatten_entries` names the answered fields. Needs ForgeEngine in the profile."""
+        text = self.client.call("static:ForgeEngine.Authoring.AuthorReads", "EntryRows", [])
+        return Result(True, reload_handoff.flatten_entries(json.loads(text), line.args[0] if line.args else ""))
+
     # ---- the world ---------------------------------------------------------------------------------------------------
 
     def spawn(self, line):
         count = int(number(line.args[1], 1)) if len(line.args) > 1 else 1
+        self.spawned = True
         values = self.run([call(ACTIONS, "Spawn", line.args[0], count, line.options.get("at", "front:8"), line.options.get("mode", "aggressive"), line.name)])
         return Result(True, pairs(values[-1]))
 
@@ -582,8 +713,8 @@ class Console:
                                                  timeout=spec["timeoutSeconds"] + 60)[0]})
 
     def nav(self, line):
-        if line.args[0] not in ("near", "path", "sample", "voxel"):
-            raise ValueError("nav 需要 near|path|sample|voxel <JSON>")
+        if line.args[0] not in ("near", "path", "sample", "voxel", "course"):
+            raise ValueError("nav 需要 near|path|sample|voxel|course <JSON>")
         return Result(True, {"result": self.run([drive("drive.nav." + line.args[0], line.args[1])])[0]})
 
     def terminal(self, line):

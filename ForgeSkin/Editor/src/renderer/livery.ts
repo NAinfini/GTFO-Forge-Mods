@@ -28,17 +28,17 @@ import { pickDecalImage, pickTileImage } from './stickers';
 import { materialBounds } from './viewport/liveryGpu';
 
 type FinishPattern = 'brushed' | 'carbon' | 'worn';
-/** MetallicSmoothness of each finish (as the game's gear shader reads it: metallic in R, smoothness in G) and the pattern it adds. */
+/** MetallicSmoothness of each finish (as the game's gear shader reads it: metallic in R, smoothness in G) and the pattern it adds. Smoothness stays inside what the game's own gear has (155 gear materials: median 0.38, 90% of pixels up to 0.75, 99% up to 0.92): GGX's specular peak grows with 1 / (1 - smoothness)^4 and a whole surface smoother than that flares white where a light reflects into the eye. */
 export const FINISHES: Record<Finish, { metal: number; smooth: number; pattern?: FinishPattern; swatch: string }> = {
   matte: { metal: 0, smooth: 0.08, swatch: '#7c7f84' },
-  gloss: { metal: 0, smooth: 0.88, swatch: '#c9ced6' },
-  satin: { metal: 0, smooth: 0.45, swatch: '#a3a7ad' },
-  metal: { metal: 1, smooth: 0.62, swatch: '#b8bcc2' },
-  brushedMetal: { metal: 1, smooth: 0.5, pattern: 'brushed', swatch: '#a9adb3' },
-  chrome: { metal: 1, smooth: 0.97, swatch: '#eef2f8' },
+  gloss: { metal: 0, smooth: 0.75, swatch: '#c9ced6' },
+  satin: { metal: 0, smooth: 0.38, swatch: '#a3a7ad' },
+  metal: { metal: 1, smooth: 0.55, swatch: '#b8bcc2' },
+  brushedMetal: { metal: 1, smooth: 0.4, pattern: 'brushed', swatch: '#a9adb3' },
+  chrome: { metal: 1, smooth: 0.92, swatch: '#eef2f8' },
   rubber: { metal: 0, smooth: 0.04, swatch: '#3b3d40' },
-  plastic: { metal: 0, smooth: 0.6, swatch: '#8e939a' },
-  carbonFibre: { metal: 0, smooth: 0.78, pattern: 'carbon', swatch: '#26282b' },
+  plastic: { metal: 0, smooth: 0.5, swatch: '#8e939a' },
+  carbonFibre: { metal: 0, smooth: 0.7, pattern: 'carbon', swatch: '#26282b' },
   paintedSteel: { metal: 0.35, smooth: 0.55, swatch: '#8a9098' },
   wornMetal: { metal: 0.75, smooth: 0.4, pattern: 'worn', swatch: '#8f877c' },
   glow: { metal: 0, smooth: 0.5, swatch: '#ffd48a' },

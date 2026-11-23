@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Offline package admission: the mod's own game-independent admission code (Map package intake, content pack
+       discovery, plan discovery) and the kernel with all four domains' declarations, compiled from source into one runner,
+       so every plan a package carries is loaded through the kernel's own plan load against the game's registry. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework><LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <IsPackable>false</IsPackable><UseAppHost>false</UseAppHost><Version>1.0.0</Version>
+    <AssemblyName>ForgeEngine.PackageAdmission</AssemblyName>
+    <!-- The four domains' game-independent halves, linked from the one list ForgeEngine.Framework compiles. -->
+    <ForgeDomainSources>link</ForgeDomainSources>
+    <!-- ForgeCore's game-independent sources are linked whole below. -->
+    <ForgeCoreOnceReferenced>true</ForgeCoreOnceReferenced>
+    <!-- Internal fields that only the game-bound half assigns are never assigned in this game-independent build. -->
+    <NoWarn>$(NoWarn);CS0649</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="$(ForgeNativeSchemaSource)" LogicalName="ForgeEngine.NativeSchema" />
+    <EmbeddedResource Include="../../../Release/release.json" LogicalName="ForgeEngine.ReleaseIdentity.json" />
+    <EmbeddedResource Include="../../../../catalog/forge-release/MANIFEST.json" LogicalName="ForgeMap.Generation.Manifest" />
+    <Compile Include="../../../ForgeCore/Once/*.cs" LinkBase="ForgeCore" />
+    <Compile Include="../../GameBindings/FrameworkFiles.cs;../../GameBindings/BehaviorContentRegistration.cs;../../GameBindings/ContentDependencyLocks.cs;../../GameBindings/ContentPackDiscovery.cs;../../GameBindings/PlanDiscovery.cs;../../GameBindings/ContentPlanAdmission.cs;../../GameBindings/ContentPackages.cs;../../GameBindings/SessionFacts.cs" LinkBase="GameBindings" />
+    <Compile Include="../../GameBindings/Presentation/PresentationContract.cs" Link="GameBindings/PresentationContract.cs" />
+    <Compile Include="../../GameBindings/Presentation/CustomSounds.cs" Link="GameBindings/CustomSounds.cs" />
+    <!-- The one offline registration of every provider, shared with the release manifest export. -->
+    <Compile Include="../../GameBindings/OfflineRuntime.cs" Link="GameBindings/OfflineRuntime.cs" />
+    <Compile Include="../../../ForgeCore/Core/Store.cs;../../../ForgeCore/Core/Log.cs" LinkBase="ForgeCore" />
+  </ItemGroup>
+  <Import Project="../../tests/ForgeEngine.Sources.props" />
+  <Import Project="../../Framework/PrimitiveContracts.props" />
+  <Import Project="../../Framework/Domains.props" />
+  <!-- The mod's file-identity check uses Win32 handles; the runner also runs on the Linux website host (OfflineFileIdentity.cs). -->
+  <ItemGroup>
+    <Compile Remove="../../Framework/Content/PublishedFileIdentity.cs" />
+  </ItemGroup>
+</Project>

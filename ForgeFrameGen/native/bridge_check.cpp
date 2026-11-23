@@ -17,6 +17,9 @@
 // every Streamline call the bridge makes to <file>: in order, with its key arguments, where only one thread calls (the start, the
 // byte-for-byte presents, the frame generation scenario), and counted per function for each scenario. Two native bridges driven by
 // the same BridgeCheck must write the same file if their DLSS Frame Generation behaves the same.
+// --fault (repeatable) makes the bridge fail where this PC would not: d3d12, the bridge's D3D12 device cannot be made (the game must get
+// its own swap chain); present, a present of the bridge fails after the other checks (the bridge must hand the window back to a D3D11
+// swap chain of the game's device, Fallback); vendor, the card reads as Intel's (no Streamline, AMD FSR Frame Generation under Auto).
 #include "frame_generation.h"
 #include "upscale_params.h"
 #include <dxgi1_5.h>
@@ -330,8 +333,22 @@ HRESULT PacedPresent(IDXGISwapChain1 *chain)
     }
     return chain->Present(g_interval, g_interval ? 0 : g_presentFlags);
 }
-int g_bridgeFailures = 0, g_leftOutLines = 0, g_lookupLines = 0, g_switches = 0;
+// The maximum frame latency set as Unity 2019.4 sets it from QualitySettings.maxQueuedFrames (UnityPlayer.dll at 0x180469930): the value
+// clamped to 1..16 (GTFO's 最大渲染队列帧数 0 gives 1), the old limit read, the new one set, and on a lower limit one wait on the waitable
+// object (no timeout in Unity; a second here) for every frame of difference, which Unity takes back itself.
+bool SetLatency(IDXGISwapChain2 *chain, UINT value)
+{
+    value = std::max(1u, std::min(value, 16u));
+    UINT old = 0;
+    if (FAILED(chain->GetMaximumFrameLatency(&old)) || FAILED(chain->SetMaximumFrameLatency(value))) return false;
+    for (UINT i = value; i < old; i++)
+        if (WaitForSingleObjectEx(g_waitable, 1000, TRUE) != WAIT_OBJECT_0) return false;
+    return true;
+}
+int g_bridgeFailures = 0, g_leftOutLines = 0, g_lookupLines = 0, g_switches = 0, g_fallbackLines = 0;
 bool g_fsr = false, g_amdChain = false; // --fsr; the bridge said its display swap chain is AMD FSR's
+bool g_streamline = false;              // the bridge said Streamline started
+unsigned g_faults = 0;                  // --fault: TestFault bits (bridge_common.h)
 
 void Drain()
 {
@@ -344,6 +361,8 @@ void Drain()
         if (kind == 2) g_leftOutLines++;
         if (std::strstr(line, "the display swap chain is AMD FSR's frame generation swap chain")) g_amdChain = true;
         if (std::strstr(line, "Frame generation switched from")) g_switches++;
+        if (std::strstr(line, "Streamline started")) g_streamline = true;
+        if (std::strstr(line, "handed the window back to the game's own D3D11 swap chain")) g_fallbackLines++;
         // Streamline's own complaint that a frame's constants or tags are not there (the present's frame and the inputs' frame differ).
         if (std::strstr(line, "Streamline:") && (std::strstr(line, "nable to find") || std::strstr(line, "ailed to find"))) g_lookupLines++;
     }
@@ -948,13 +967,32 @@ void Upscalers(HMODULE native, const std::wstring &folder, ID3D11Device *device,
     ComPtr<IDXGIAdapter> adapter;
     DXGI_ADAPTER_DESC adapterDesc{};
     if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&dxgi))) && SUCCEEDED(dxgi->GetAdapter(&adapter))) adapter->GetDesc(&adapterDesc);
+    if (g_faults & 4) adapterDesc.VendorId = 0x8086; // --fault vendor: the bridge reads the card as Intel's
     std::printf("  adapter: %ls (vendor 0x%04X)\n", adapterDesc.Description, adapterDesc.VendorId);
+
+    auto dlssMissing = (int(__cdecl *)(unsigned *, unsigned *))GetProcAddress(native, "ForgeFrameGen_DlssMissing");
+    auto generationMissing = (int(__cdecl *)(char *, int))GetProcAddress(native, "ForgeFrameGen_DlssFrameGenerationMissing");
+    Check(dlssMissing && generationMissing, "the native bridge says why DLSS and DLSS Frame Generation do not run");
+    if (!dlssMissing || !generationMissing) return;
+    // Frame generation chose its backend when the swap chain was made, on its own: a DLSS Frame Generation that did not start says why.
+    char generationWhy[512];
+    int generationCode = generationMissing(generationWhy, sizeof generationWhy);
+    std::printf("  DLSS Frame Generation: %s\n", generationCode ? generationWhy : "started");
+    Check(generationCode == 0 || *generationWhy, "a DLSS Frame Generation that did not start names the reason and the card");
+    if (adapterDesc.VendorId != 0x10DE)
+        // 1: not NVIDIA's; 7: not NVIDIA's while the PC has an NVIDIA card (under --fault vendor the real card is one, enumerated on its own).
+        Check((generationCode == 1 || generationCode == 7) && !g_streamline, "on a card that is not NVIDIA's, DLSS Frame Generation says so and Streamline was never started");
 
     event(1, &init);
     int running = upscaler(why, sizeof why, &fellBack);
     std::printf("  Auto: upscaler %d, %s\n", running, why);
-    if (adapterDesc.VendorId == 0x10DE && running == 1) Check(status() == 1 && !fellBack, "Auto picks DLSS on this NVIDIA card");
-    else if (adapterDesc.VendorId == 0x10DE) std::printf("NOT RUN Auto on an RTX card: DLSS did not start on this NVIDIA card (%s)\n", why);
+    if (adapterDesc.VendorId == 0x10DE && running == 1)
+        Check(status() == 1 && !fellBack && dlssMissing(nullptr, nullptr) == 0, "Auto picks DLSS on this NVIDIA card, whatever frame generation runs");
+    else if (adapterDesc.VendorId == 0x10DE)
+    {
+        Check(running == 2 && fellBack && dlssMissing(nullptr, nullptr) != 0, "Auto on an NVIDIA card where DLSS cannot start takes FSR as a fallback and says why");
+        std::printf("NOT RUN Auto on an RTX card: DLSS did not start on this NVIDIA card (%s)\n", why);
+    }
     else Check(running == 2, "Auto picks FSR on a card that is not NVIDIA's");
     messages();
     event(3, nullptr);
@@ -1308,7 +1346,7 @@ void Latency(HMODULE native, ID3D11Device *device, ID3D11DeviceContext *context,
     if (!made) return;
     UINT before = 2;
     chain2->GetMaximumFrameLatency(&before);
-    chain2->SetMaximumFrameLatency(4); // GTFO's
+    SetLatency(chain2.Get(), 4); // GTFO's
     // A few frames to settle frame generation and the pacing.
     for (int i = 0; i < 20; i++, g_frame++) driver.Frame(g_frame, g_frame);
 
@@ -1371,7 +1409,7 @@ void Latency(HMODULE native, ID3D11Device *device, ID3D11DeviceContext *context,
     std::printf("  latency, AMD FSR Frame Generation on, the game's maximum frame latency 4, GPU-bound: %.1f ms from a frame's start to the GPU finishing "
                 "it, %.1f ms a frame: %.2f frames\n",
                 latency, interval, latency / interval);
-    chain2->SetMaximumFrameLatency(before);
+    SetLatency(chain2.Get(), before);
     Drain();
     Check(latency / interval <= 2.6, "latency: with AMD FSR Frame Generation on, a frame is done on the GPU within about two frames of its start");
 }
@@ -1411,11 +1449,40 @@ int NoPlugin(HMODULE native, ID3D11Device *device, ID3D11DeviceContext *context,
     return 0;
 }
 
+// Back to the game's own rendering (--fault present): the bridge's next present fails, as a D3D12 call that fails or times out on a card
+// or driver the bridge cannot run on. The bridge must hand the window to a D3D11 swap chain of the game's device in that very present and
+// say so once: that present and the next ones succeed with the game's frames unchanged, resizes work, frame generation stops, and the
+// game's threads run on without a hang or a long wait on the waitable object.
+void Fallback(HMODULE native, ID3D11Device *device, ID3D11DeviceContext *context, IDXGISwapChain1 *chain, HWND window, Readback readback, State state)
+{
+    auto faults = (void(__cdecl *)(unsigned))GetProcAddress(native, "ForgeFrameGen_TestFaults");
+    auto backend = (State)GetProcAddress(native, "ForgeFrameGen_FrameGenerationBackend");
+    if (!faults || !backend) return Check(false, "fallback: the native bridge can be made to fail");
+    DXGI_SWAP_CHAIN_DESC1 desc{};
+    chain->GetDesc1(&desc);
+    const int failuresBefore = g_bridgeFailures, timeoutsBefore = g_waitTimeouts;
+    faults(g_faults | 2);
+    bool exact = true;
+    for (int seed = 40; seed < 45; seed++) exact = PresentAndCompare(device, context, chain, readback, desc.Width, desc.Height, seed) && exact;
+    Drain();
+    std::printf("  fallback: present bridge state %d, frame generation backend %d, %d failure line(s)\n", state(), backend(), g_bridgeFailures - failuresBefore);
+    Check(exact, "fallback: the failing present and the four after it succeed on the game's own swap chain with the game's frames unchanged");
+    Check(state() == -3 && backend() == 0 && g_fallbackLines == 1, "fallback: the bridge says once that it handed the window back, and frame generation stops");
+    Check(SUCCEEDED(chain->ResizeBuffers(0, 640, 360, DXGI_FORMAT_UNKNOWN, g_chainFlags)), "fallback: ResizeBuffers on the game's own swap chain");
+    exact = true;
+    for (int seed = 45; seed < 48; seed++) exact = PresentAndCompare(device, context, chain, readback, 640, 360, seed) && exact;
+    Check(exact, "fallback: after the resize, three frames presented unchanged");
+    Check(chain->SetFullscreenState(FALSE, nullptr) == S_OK, "fallback: windowed mode passes through to the game's own swap chain");
+    GameThreads(native, context, chain, window, 300);
+    Drain();
+    Check(g_waitTimeouts == timeoutsBefore && g_fallbackLines == 1, "fallback: the game's threads run on its own swap chain, every wait returns, still one fallback line");
+}
+
 int wmain(int argc, wchar_t **argv)
 {
     if (argc < 2)
     {
-        std::printf("usage: ForgeFrameGen.BridgeCheck.exe <folder with ForgeFrameGen.Native.dll> [--fsr] [--trace <file>]\n");
+        std::printf("usage: ForgeFrameGen.BridgeCheck.exe <folder with ForgeFrameGen.Native.dll> [--fsr] [--no-plugin] [--trace <file>] [--fault d3d12|present|vendor]...\n");
         return 2;
     }
     std::wstring traceFile;
@@ -1424,6 +1491,14 @@ int wmain(int argc, wchar_t **argv)
         if (!_wcsicmp(argv[i], L"--fsr")) g_fsr = true;
         else if (!_wcsicmp(argv[i], L"--no-plugin")) noPlugin = true;
         else if (!_wcsicmp(argv[i], L"--trace") && i + 1 < argc) traceFile = argv[++i];
+        else if (!_wcsicmp(argv[i], L"--fault") && i + 1 < argc)
+        {
+            const wchar_t *fault = argv[++i];
+            g_faults |= !_wcsicmp(fault, L"d3d12") ? 1u : !_wcsicmp(fault, L"present") ? 2u : !_wcsicmp(fault, L"vendor") ? 4u : 0u;
+        }
+    // The card read as Intel's: frame generation must be AMD FSR's under Auto, without the FSR pick (so the checks for FSR apply).
+    const bool vendorFault = (g_faults & 4) != 0;
+    if (vendorFault) g_fsr = true;
     std::wstring path = std::wstring(argv[1]) + L"\\ForgeFrameGen.Native.dll";
     HMODULE native = LoadLibraryExW(path.c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
     if (!native)
@@ -1444,7 +1519,17 @@ int wmain(int argc, wchar_t **argv)
             return 1;
         }
     }
-    if (g_fsr)
+    if (g_faults)
+    {
+        auto faults = (void(__cdecl *)(unsigned))GetProcAddress(native, "ForgeFrameGen_TestFaults");
+        if (!faults)
+        {
+            std::printf("FAIL --fault: this native bridge cannot be made to fail\n");
+            return 1;
+        }
+        faults(g_faults & ~2u); // the present failure is made to happen later (Fallback)
+    }
+    if (g_fsr && !vendorFault)
     {
         auto prefer = (void(__cdecl *)(int))GetProcAddress(native, "ForgeFrameGen_SetFrameGenerationPreference");
         if (!prefer)
@@ -1505,6 +1590,25 @@ int wmain(int argc, wchar_t **argv)
     ComPtr<IDXGISwapChain1> chain;
     result = factory->CreateSwapChainForHwnd(device.Get(), window, &desc, nullptr, nullptr, &chain);
     Drain();
+    if (g_faults & 1)
+    {
+        // --fault d3d12: the bridge cannot make its D3D12 device, so the game must get its own D3D11 swap chain at once, say why once,
+        // and run as it would without this mod.
+        Check(SUCCEEDED(result) && chain && state() == -1 && g_bridgeFailures == 1, "no D3D12 device: the game gets its own swap chain and the bridge says why once");
+        if (!chain) return 1;
+        ComPtr<IDXGISwapChain2> own;
+        Check(SUCCEEDED(chain.As(&own)) && (g_waitable = own->GetFrameLatencyWaitableObject()) != nullptr && SUCCEEDED(own->SetMaximumFrameLatency(2)),
+              "no D3D12 device: the game's own swap chain gives its waitable object and takes the latency");
+        Check(readback(nullptr, 0) == E_NOINTERFACE, "no D3D12 device: there is no bridge to read back");
+        g_presentFlags = (g_chainFlags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING) ? DXGI_PRESENT_ALLOW_TEARING : 0;
+        GameThreads(native, context.Get(), chain.Get(), window, 300);
+        Drain();
+        Check(g_bridgeFailures == 1, "no D3D12 device: no further failure line while the game runs");
+        chain.Reset();
+        DestroyWindow(window);
+        std::printf(g_failures ? "FAILED %d check(s)\n" : "ALL PASSED\n", g_failures);
+        return g_failures ? 1 : 0;
+    }
     Check(SUCCEEDED(result) && state() == 2, "the game's swap chain is the present bridge");
     if (!chain || state() != 2) return 1;
 
@@ -1539,7 +1643,8 @@ int wmain(int argc, wchar_t **argv)
     for (int seed = 5; seed < 8; seed++) exact = PresentAndCompare(device.Get(), context.Get(), chain.Get(), readback, width2, height2, seed) && exact;
     Check(exact, "after the resize, three frames read back byte for byte");
 
-    Check(chain->SetFullscreenState(TRUE, nullptr) == DXGI_ERROR_NOT_CURRENTLY_AVAILABLE, "exclusive fullscreen is refused");
+    // Exclusive fullscreen hands the window to the game's own swap chain (GoNative) and would take over the screen here: not run.
+    std::printf("NOT RUN exclusive fullscreen: it would take over this PC's screen\n");
     int devices = 0, factories = 0, chains = 0;
     long long presents = 0;
     counts(&devices, &factories, &chains, &presents);
@@ -1572,35 +1677,53 @@ int wmain(int argc, wchar_t **argv)
     GameThreads(native, context.Get(), chain.Get(), window, 600, true);
     g_interval = 0;
     Drain();
+    // GTFO's 最大渲染队列帧数 at 0 (or 1): Unity lowers the latency from 2 to 1 and takes the frame of difference back itself; the game's
+    // threads with frame generation inputs must still run, then the latency goes back to 2.
+    trace::Scenario("game-threads-latency-1", false);
+    Check(SetLatency(chain2.Get(), 0), "the game lowers the maximum frame latency to 1 as Unity does for 0 queued frames");
+    GameThreads(native, context.Get(), chain.Get(), window, 600, true);
+    Check(SetLatency(chain2.Get(), 2), "the game raises the maximum frame latency back to 2");
+    Drain();
     std::printf("  waits on the waitable object: %d, timed out (1 s each): %d\n", g_waits, g_waitTimeouts);
     Check(g_waitTimeouts == offTimeouts, "frame generation on, off and on again: every wait on the game's waitable object returns within a second");
     trace::Scenario("upscalers", true);
     Upscalers(native, argv[1], device.Get(), context.Get());
     // Frame generation switched while the game runs: six picks presented one by one, then picks from the main thread while the render
     // thread presents with inputs, through the resizes, switched off and on.
-    trace::Scenario("switching", true);
-    Switching(native, device.Get(), context.Get(), chain.Get(), window, readback);
-    Drain();
-    trace::Scenario("game-threads-switching", false);
-    auto backend = (State)GetProcAddress(native, "ForgeFrameGen_FrameGenerationBackend");
-    const int kindBefore = backend ? backend() : 0, switchesBefore = g_switches, failuresBefore = g_bridgeFailures;
-    GameThreads(native, context.Get(), chain.Get(), window, 600, true, true);
-    Drain();
-    if (kindBefore)
+    // Switching and the smaller resolution go between the two frame generations: on a card read as Intel's only AMD FSR's runs.
+    if (vendorFault) std::printf("NOT RUN switching and smaller resolution: only AMD FSR Frame Generation runs on a card that is not NVIDIA's\n");
+    else
     {
-        std::printf("  game threads switching: %d switches\n", g_switches - switchesBefore);
-        Check(g_switches - switchesBefore == 8 && backend() == kindBefore && g_bridgeFailures == failuresBefore,
-              "game threads: eight picks from the main thread switch the display eight times without a failure, ending where it began");
+        trace::Scenario("switching", true);
+        Switching(native, device.Get(), context.Get(), chain.Get(), window, readback);
+        Drain();
+        trace::Scenario("game-threads-switching", false);
+        auto backend = (State)GetProcAddress(native, "ForgeFrameGen_FrameGenerationBackend");
+        const int kindBefore = backend ? backend() : 0, switchesBefore = g_switches, failuresBefore = g_bridgeFailures;
+        GameThreads(native, context.Get(), chain.Get(), window, 600, true, true);
+        Drain();
+        if (kindBefore)
+        {
+            std::printf("  game threads switching: %d switches\n", g_switches - switchesBefore);
+            Check(g_switches - switchesBefore == 8 && backend() == kindBefore && g_bridgeFailures == failuresBefore,
+                  "game threads: eight picks from the main thread switch the display eight times without a failure, ending where it began");
+        }
+        // The game's resolution below its window's: inputs smaller than the buffers, of the same shape, with each frame generation.
+        trace::Scenario("smaller-resolution", true);
+        Scaled(native, device.Get(), context.Get(), chain.Get(), window, readback);
+        Drain();
     }
-    // The game's resolution below its window's: inputs smaller than the buffers, of the same shape, with each frame generation.
-    trace::Scenario("smaller-resolution", true);
-    Scaled(native, device.Get(), context.Get(), chain.Get(), window, readback);
-    Drain();
     if (g_fsr)
     {
         // What AMD FSR Frame Generation shows, and how far the game runs ahead of the GPU with it on.
         ShownFrames(native, device.Get(), context.Get(), chain.Get(), window);
         Latency(native, device.Get(), context.Get(), chain.Get(), window);
+    }
+    if (g_faults & 2)
+    {
+        trace::Scenario("fallback", true);
+        Fallback(native, device.Get(), context.Get(), chain.Get(), window, readback, state);
+        Drain();
     }
     trace::Scenario("end", true);
     chain.Reset();

@@ -19,7 +19,7 @@ wield primary
 ammo fill
 
 # in front of the door: locked, not lowered (nothing has written the flag, so the store holds no entry for it)
-teleport room=room:cdcf2c3b2898d6f811995862093a 0 0 13
+teleport room=文字锁门 0 0 13
 door read near:6 as=before
 expect $before.result contains "Locked"
 state variables var.ga8e19723a6065d0b15b9a14f674452b5615d36dcdc1988253b245293835b2518 as=lowered_before
@@ -43,7 +43,7 @@ wait 2s
 expect log --all !contains "map.door-alarm-failed"
 
 # pull the door: the Class V scan starts, the door stays locked
-teleport room=room:cdcf2c3b2898d6f811995862093a 0 0 13
+teleport room=文字锁门 0 0 13
 interact name=@LG_SecurityDoor radius=8
 wait 3s
 door read near:6 as=pulled
@@ -54,7 +54,7 @@ expect $started.var.gdc12b45e3b45cedc280695aacbd31a05da5b239115132ce28b574058218
 # the Class V scan finishes: the door unlocks
 model-shot {"schemaVersion":"1.0.0","model":"v1-mx-2e2eb68caafc621cdda6baa589ad"}
 wait 3s
-teleport room=room:cdcf2c3b2898d6f811995862093a 0 0 13
+teleport room=文字锁门 0 0 13
 door read near:6 as=after
 expect $after.result !contains "Locked"
 expect log --all !contains "Exception"

@@ -1,0 +1,9 @@
+{
+  "carry.sling": "Sling on back",
+  "carry.take": "Take in hands",
+  "level.generation-failed": "This level could not be built, so the game went back to the lobby. Try another level, or send the game log to the level's author.",
+  "suspended": "Forge is paused because of an error and may resume in the next level. The reason is in the game log.",
+  "suspended.content-stopped": "Forge content is off until the game restarts: the game's data tables no longer match what Forge put in. The base game continues; the reason is in the game log.",
+  "suspended.host-mismatch": "Forge is off for this session: the host has different Forge content installed. Install the same packs and rejoin; the base game continues.",
+  "suspended.unsupported": "Forge is off: this game version or Forge install is not supported, so it stays off until the game restarts with a matching version. The reason is in the game log."
+}

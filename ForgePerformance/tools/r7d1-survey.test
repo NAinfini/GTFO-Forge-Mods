@@ -1,0 +1,216 @@
+# ForgePerformance survey of R7D1 (Rundown 31, D1 "Mother"), the level players call the worst-optimised. One session:
+# 1) the level's own enemies in several zones (16 s each, labels r7-z<zone>), 2) a crowd in ZONE 194 (the four-round terminal
+# room): 40 extra Strikers asleep, then awake, 3) over the awake crowd the job-worker A/B (12, 8, 6, 4) and ShadowProxyHold A/B,
+# in equal 8-second segments A B A B ... A so a drift cancels. Needs Probe = true (ProbeSeconds 1) and the native probe beside the plugin.
+# KEEP THE GAME WINDOW FOCUSED for the whole run. Read with tools/analyze_probe.py and tools/analyze_samples.py (see workers-ab.test).
+# Start: run-drive-session.py start --rundown 31 --level D1.
+god on
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+call static:ForgePerformance.Crowd.PerformanceControl Read as=before
+call static:ForgePerformance.Crowd.PerformanceControl HudMask
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7-drop"
+wait 16s
+teleport zone=0/MainLayer/0 area=0
+wait 3s
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+call static:ForgePerformance.Crowd.PerformanceControl Physics as=z191
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7-z191"
+wait 16s
+teleport zone=0/MainLayer/1 area=0
+wait 3s
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+call static:ForgePerformance.Crowd.PerformanceControl Physics as=z192
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7-z192"
+wait 16s
+teleport zone=0/MainLayer/3 area=0
+wait 3s
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+call static:ForgePerformance.Crowd.PerformanceControl Physics as=z194
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7-z194"
+wait 16s
+teleport zone=0/MainLayer/6 area=0
+wait 3s
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+call static:ForgePerformance.Crowd.PerformanceControl Physics as=z197
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7-z197"
+wait 16s
+teleport zone=0/MainLayer/9 area=0
+wait 3s
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+call static:ForgePerformance.Crowd.PerformanceControl Physics as=z200
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7-z200"
+wait 16s
+teleport zone=0/MainLayer/12 area=0
+wait 3s
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+call static:ForgePerformance.Crowd.PerformanceControl Physics as=z203
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7-z203"
+wait 16s
+teleport zone=0/MainLayer/16 area=0
+wait 3s
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+call static:ForgePerformance.Crowd.PerformanceControl Physics as=z207
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7-z207"
+wait 16s
+teleport zone=0/MainLayer/3 area=0
+wait 3s
+spawn Striker 6 at=front:2 mode=hibernate
+spawn Striker 6 at=front:3 mode=hibernate
+spawn Striker 6 at=front:4 mode=hibernate
+spawn Striker 6 at=front:5 mode=hibernate
+spawn Striker 6 at=front:6 mode=hibernate
+spawn Striker 6 at=front:7 mode=hibernate
+wait 5s
+call static:ForgePerformance.Crowd.PerformanceControl Physics as=crowd_sleep
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7-crowd-sleep"
+wait 16s
+noise 40
+wait 15s
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+call static:ForgePerformance.Crowd.PerformanceControl Read as=awake
+call static:ForgePerformance.Crowd.PerformanceControl Physics as=crowd_awake
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7-crowd-awake"
+wait 16s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w12-A-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w12-B-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 12
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w12-A-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w12-B-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 12
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w12-A-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w12-B-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 12
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w12-A-4"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w12-B-4"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 12
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w12-A-5"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w8-A-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w8-B-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 8
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w8-A-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w8-B-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 8
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w8-A-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w8-B-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 8
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w8-A-4"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w8-B-4"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 8
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w8-A-5"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w6-A-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w6-B-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 6
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w6-A-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w6-B-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 6
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w6-A-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w6-B-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 6
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w6-A-4"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w6-B-4"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 6
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w6-A-5"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w4-A-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w4-B-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 4
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w4-A-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w4-B-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 4
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w4-A-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w4-B-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 4
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w4-A-4"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w4-B-4"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 4
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-w4-A-5"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-shadowhold-A-1"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" false
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-shadowhold-B-1"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" true
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-shadowhold-A-2"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" false
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-shadowhold-B-2"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" true
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-shadowhold-A-3"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" false
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-shadowhold-B-3"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" true
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-shadowhold-A-4"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" false
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-shadowhold-B-4"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" true
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "r7awake-shadowhold-A-5"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" false
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" true
+call static:ForgePerformance.Crowd.PerformanceControl Physics as=crowd_end
+call static:ForgePerformance.Crowd.PerformanceControl Read as=end
+clear enemies
+call static:ForgePerformance.Crowd.PerformanceControl Mark "end"
+expect log --all !contains "Exception"

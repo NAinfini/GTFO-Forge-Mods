@@ -116,6 +116,14 @@ internal sealed class IkPause
         if (_heldAim) { _aim = _sync.m_aimWeightTarget; _look = _sync.m_lookWeightTarget; _sync.SetAimWeight(0f); _sync.SetLookWeight(0f); }
     }
 
+    /// <summary>A solver that is on moves joint <paramref name="joint"/>: taking the joint from the IK, or handing it back, changes its pose.</summary>
+    internal bool Moves(int joint)
+    {
+        for (var i = 0; i < _solvers.Length; i++)
+            if (_moves[i][joint] && _solvers[i] != null && !_solvers[i].WasCollected && _solvers[i].enabled) return true;
+        return false;
+    }
+
     private bool SameJoints(float[] covered)
     {
         for (var j = 0; j < _holdJoints.Length; j++) if (_holdJoints[j] != covered[j] > 0f) return false;

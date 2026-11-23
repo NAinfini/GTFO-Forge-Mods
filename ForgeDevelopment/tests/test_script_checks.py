@@ -80,5 +80,77 @@ class ScriptChecks(unittest.TestCase):
             self.assertEqual(json.loads((Path(temp) / "wrong" / "run.json").read_text("utf-8"))["format"], "forge.console-run")
 
 
+class LiveConsole:
+    """A console whose only content is a game log: enough to run the judgements that read it (log expects, the reset around a script)."""
+    class Log:
+        rows = [(0, "[Info   :BepInEx] started"),
+                (30, "[Info   :Forge Development] experiment: failed ds-1: 0/1 steps, Spawn threw ArgumentException: no enemy x"),  # a command that already failed
+                (130, "[Error  :     Unity] NullReferenceException: Object reference not set to an instance of an object.")]
+
+        def mark(self):
+            return 0
+
+        def entries(self, start, end=None):
+            return [row for row in self.rows if row[0] >= start]
+
+        def lines(self, start, end=None):
+            return [text for _, text in self.entries(start)]
+
+        def before(self, start, count=20):
+            return []
+
+    log = Log()
+    resets = 0
+
+    def execute(self, line):
+        return console_run.cc.Result(True, {})
+
+    def value_of(self, reader, variables, log_lines):
+        return console_run.cc.Console.value_of(None, reader, variables, log_lines)
+
+    def reset(self):
+        self.resets += 1
+        return None
+
+    def publish_session(self):
+        return None
+
+
+class RunJudgements(unittest.TestCase):
+    def test_a_log_expect_sees_a_real_exception_and_not_a_failure_the_script_already_had(self):
+        with tempfile.TemporaryDirectory() as temp:
+            def judge(expect):
+                console = LiveConsole()
+                document = console_run.Run(ts.parse("god on\n" + expect), console, Path(temp) / str(abs(hash(expect)))).run()
+                self.assertEqual(console.resets, 2)  # before the first line and after the last
+                return document["rows"][-1]
+            caught = judge('expect log --all !contains "Exception"')
+            self.assertFalse(caught["ok"])
+            self.assertIn("NullReferenceException", caught["detail"])  # names the line that matched, and where it stands in the log
+            self.assertIn("130", caught["detail"])
+            self.assertNotIn("ArgumentException", caught["detail"])  # the failed command's own log line is not read a second time
+            self.assertTrue(judge('expect log --all !contains "Exception" ignore=NullReferenceException')["ok"])
+
+    def test_a_call_that_answers_false_is_a_failed_command_unless_it_asks_a_question(self):
+        asked = ts.parse("call static:X Snapshot trial\ncall static:X IsReady --allow-false\n").lines
+        failed = console_run.cc.Console.native_result(asked[0], {"result": "False"})
+        self.assertFalse(failed.ok)
+        self.assertIn("call.returned-false", failed.error)
+        self.assertTrue(console_run.cc.Console.native_result(asked[0], {"result": "True"}).ok)
+        self.assertTrue(console_run.cc.Console.native_result(asked[1], {"result": "False"}).ok)
+
+
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReplicationCompare(unittest.TestCase):
+    """The detection ability of the join check: two tables that differ in one index must be reported, equal ones must pass."""
+    def test_a_differing_index_is_reported(self):
+        import compare_replication as compare
+        host = {"replication": "0:10;1:11;2:90", "replicationDigest": "a", "replicationCount": 3, "vanillaCount": 2, "ownOrder": "ER"}
+        self.assertEqual(compare.differences(host, dict(host)), [])
+        client = dict(host, replication="0:10;1:90;2:11", replicationDigest="b")
+        found = compare.differences(host, client)
+        self.assertEqual(found[0], "position 1: host 1:11, client 1:90")
+        self.assertTrue(any(row.startswith("replicationDigest") for row in found))

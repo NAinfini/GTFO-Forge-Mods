@@ -303,21 +303,22 @@ const SHOTS = {
     const top = document.querySelector('.topbar, header') ?? document.body;
     D.mark([
       { el: D.left(), n: 1 },
-      { el: D.find(D.t('gallery.open')) ?? D.stage().querySelector('h1,h2,button'), n: 2 },
+      { el: D.stage().querySelector('.stage-title'), n: 2 },
       { el: D.find(D.t('stage.simulate', { v0: D.t('trigger.kill') }))?.parentElement ?? D.find(D.t('trigger.kill'))?.parentElement, n: 3 },
       { el: D.right(), n: 4 },
       { el: [...document.querySelectorAll('.rail-tab')].pop()?.parentElement, n: 5, side: 'right' },
-      { el: D.find(D.t('topBar.publish')), n: 6 },
-      { el: D.find(D.t('topBar.k45')), n: 7 },
+      { el: document.querySelector('[data-tour=export]'), n: 6 },
+      { el: D.find(D.t('works.apply')), n: 7 },
     ]);
     void top;
     return { x: 0, y: 0, w: 1280, h: 800, max: 1200 };
   },
   gallery: async (D) => {
-    await D.click(D.find(D.t('gallery.open')), 700);
-    if (![...document.querySelectorAll('.gallery')].some(D.visible)) await D.click(D.find(D.t('gallery.open')), 700);
+    await D.click(D.find(D.t('works.tab')), 500);
+    const open = D.find(D.t('works.new'));
+    await D.click(open, 700);
     const g = [...document.querySelectorAll('.gallery')].find(D.visible);
-    return { ...D.union([D.rect(D.find(D.t('gallery.open'))), D.top(g, 520)]), max: 1000 };
+    return { ...D.union([D.rect(open), D.top(g, 520)]), max: 1000 };
   },
   'skins-panel': async (D) => {
     await D.click(D.find(D.t('works.tab')), 500);
@@ -485,10 +486,7 @@ const SHOTS = {
     );
   },
   'publish-menu': async (D) => {
-    return D.union([D.rect(D.find(D.t('topBar.publish'))), D.rect(await D.dropdown(D.t('topBar.publish')))]);
-  },
-  'apply-menu': async (D) => {
-    return D.union([D.rect(D.find(D.t('topBar.k45'))), D.rect(await D.dropdown(D.t('topBar.k46')))]);
+    return D.union([D.rect(D.find(D.t('topBar.export'))), D.rect(await D.dropdown(D.t('topBar.export')))]);
   },
   'settings-menu': async (D) => {
     const box = await D.dropdown(D.t('topBar.settings'));
@@ -496,11 +494,6 @@ const SHOTS = {
     const walk = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
     for (let n = walk.nextNode(); n; n = walk.nextNode()) if (/^[A-Z]:\\/.test(n.textContent.trim())) n.textContent = '%USERPROFILE%\\Documents\\ForgeSkin';
     return D.union([D.rect(D.find(D.t('topBar.settings'))), D.rect(box)]);
-  },
-  'tutorial-page': async (D, { title }) => {
-    await D.click(D.find(D.t('help.title')), 600);
-    await D.click(D.find(title, '.help-nav a, .help-nav button'), 700);
-    return { ...D.rect(D.modal()), max: 1100 };
   },
 };
 
@@ -599,6 +592,7 @@ let page;
 let close = () => {};
 let made = 0;
 let bytes = 0;
+const failed = [];
 const save = (lang, name, b64) => {
   const buf = Buffer.from(b64, 'base64');
   mkdirSync(join(outDir, lang), { recursive: true });
@@ -624,6 +618,8 @@ try {
       const scale = Math.min(1, (box.max ?? 760) / (clip.width * 1.5));
       const shot = await page.send('Page.captureScreenshot', { format: 'webp', quality: 84, clip: { ...clip, scale } });
       save(lang, name, shot.data);
+    } catch (e) {
+      console.error(`  FAILED ${lang}/${name}: ${String(e.message).split('\n')[0]}`);
     } finally {
       await page.run(tidy);
     }
@@ -662,7 +658,6 @@ try {
     }, lang);
     await page.run(names);
     await page.run((D) => D.settle(800));
-    ctx.title = readFileSync(join(docsDir, `${lang}.md`), 'utf8').match(/^# (.*?) \{#example\}/m)?.[1];
     for (const [name, fn] of Object.entries(SHOTS)) await shoot(lang, name, fn);
     if (character) for (const [name, fn] of Object.entries(CHARACTER_SHOTS)) await shoot(lang, name, fn);
   }

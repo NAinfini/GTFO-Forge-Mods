@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>RegenerateHookEvidence</AssemblyName>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The map and player readers and HookRows.cs are compiled into their native-layout tests too. -->
+    <Compile Include="../../../Testing/LocalInputs.cs" Link="Map/LocalInputs.cs" />
+    <Reference Include="Mono.Cecil" HintPath="$(GTFOBepInExPath)/core/Mono.Cecil.dll" />
+  </ItemGroup>
+  <ItemGroup><Compile Include="../../../Testing/SourceTools/InteropSignature.cs;../../../Testing/SourceTools/DomainTypes.cs" /><ProjectReference Include="../../../ForgeCore/Once/ForgeCore.Once.csproj" /></ItemGroup>
+</Project>

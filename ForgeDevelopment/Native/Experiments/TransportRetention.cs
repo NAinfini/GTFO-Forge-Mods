@@ -5,7 +5,7 @@ using System.Linq;
 namespace ForgeDevelopment.Native;
 
 /// <summary>
-/// Bounds the experimental transport folders: archived requests and results, swapped-fixture receipts and drive-session
+/// Bounds the experimental transport folders: archived requests and results and drive-session
 /// command receipts. A folder keeps its newest <c>keep</c> entries and nothing older than <see cref="MaximumAge"/>; anything
 /// written inside <see cref="LiveWindow"/> is left alone, because another session may still be using it. Reads and writes
 /// never fail on a prune: an unreadable or vanished entry is skipped and the transport continues.
@@ -26,20 +26,6 @@ internal static class TransportRetention
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return; }
         Prune(files.OrderByDescending(file => file.LastWriteTimeUtc).ToArray(), keep,
             file => (file.Attributes & FileAttributes.ReparsePoint) == 0, file => file.LastWriteTimeUtc, file => file.Delete());
-    }
-
-    /// <summary>Prunes the receipt directories of one swap input folder.</summary>
-    internal static void PruneDirectories(string directory, int keep)
-    {
-        if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory)) return;
-        var info = new DirectoryInfo(directory);
-        if ((info.Attributes & FileAttributes.ReparsePoint) != 0) return;
-        DirectoryInfo[] directories;
-        try { directories = info.GetDirectories("*", SearchOption.TopDirectoryOnly); }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return; }
-        Prune(directories.OrderByDescending(entry => entry.LastWriteTimeUtc).ToArray(), keep,
-            entry => (entry.Attributes & FileAttributes.ReparsePoint) == 0, entry => entry.LastWriteTimeUtc,
-            entry => entry.Delete(recursive: true));
     }
 
     private static void Prune<T>(T[] entries, int keep, Func<T, bool> physical, Func<T, DateTime> lastWrite, Action<T> delete)

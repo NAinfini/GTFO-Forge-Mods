@@ -16,7 +16,7 @@ public enum FxBlend
 /// <summary>The library's shaders (particle, marker, outline, procedural, the toon shader's three entries and the lit cut-out), loaded once from the bundle embedded
 /// in this DLL through <c>ForgeCore.Assets</c>, the base textures made in code, and the shared quad meshes. A failure is logged once and
 /// every caller gets null (its drawing is skipped, nothing falls back to another look).</summary>
-internal static class Shaders
+public static class Shaders
 {
     private static readonly int Src = Shader.PropertyToID("_Src"), Dst = Shader.PropertyToID("_Dst"), Additive = Shader.PropertyToID("_Additive");
     private static bool _tried;
@@ -31,6 +31,21 @@ internal static class Shaders
     internal static Shader? ToonDeferred => Load() ? _toonDeferred : null;
     internal static Shader? ToonOverlay => Load() ? _toonOverlay : null;
     internal static Shader? LitCutout => Load() ? _litCutout : null;
+
+    // The game's shaders by name, each looked up once: Shader.Find searches the loaded shaders by name on every call, and an imported model
+    // asked for one per material. One not loaded yet (the gear shader before the first level) is looked up again at the next ask, and so is
+    // a cached one that was destroyed.
+    private static readonly System.Collections.Generic.Dictionary<string, Shader> Game = new(StringComparer.Ordinal);
+
+    /// <summary>The game's shader of <paramref name="name"/> (<c>Shader.Find</c>, cached), or null while it is not loaded. Every package looks a game shader up here, not with its own <c>Shader.Find</c>.</summary>
+    public static Shader? Find(string name)
+    {
+        if (Game.TryGetValue(name, out var cached) && cached != null) return cached;
+        var shader = Shader.Find(name);
+        if (shader != null) Game[name] = shader;
+        else Game.Remove(name);
+        return shader;
+    }
 
     /// <summary>The one shared material of the marker shader; each renderer sets its own state through a property block.</summary>
     internal static Material? Marker()

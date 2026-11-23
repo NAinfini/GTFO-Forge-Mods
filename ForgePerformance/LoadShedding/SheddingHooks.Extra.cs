@@ -140,6 +140,56 @@ internal sealed partial class SheddingHooks
         }
     }
 
+    // Dissonance restarts the microphone through this method (VoiceRestartGuard, and VoiceFrameSkipFilter for its frame skip reason); with the probe on every call that runs is timed.
+    [HarmonyPatch(typeof(Dissonance.Audio.Capture.CapturePipelineManager), "RestartTransmissionPipeline")]
+    private static class VoiceRestart
+    {
+        [HarmonyPrefix]
+        private static bool Prefix(string reason, out long __state)
+        {
+            if (VoiceRestartGuard.FrameSkipFilter
+                && VoiceRestartGuard.IgnoreFrameSkip(reason, UnityEngine.Time.deltaTime, line => LoadSheddingController.Current?.LogGuard(line)))
+            {
+                ForgePerformance.Crowd.Probe.Count(ForgePerformance.Crowd.ProbePoint.VoiceFrameSkipIgnored);
+                __state = 0;
+                return false;
+            }
+            if (VoiceRestartGuard.Enabled && !VoiceRestartGuard.Allow(reason, line => LoadSheddingController.Current?.LogGuard(line)))
+            {
+                ForgePerformance.Crowd.Probe.Count(ForgePerformance.Crowd.ProbePoint.VoiceRestartHeldBack);
+                __state = 0;
+                return false;
+            }
+            __state = ForgePerformance.Crowd.Probe.Begin();
+            return true;
+        }
+        [HarmonyPostfix]
+        private static void Postfix(long __state) => ForgePerformance.Crowd.Probe.End(ForgePerformance.Crowd.ProbePoint.VoiceRestart, __state);
+    }
+
+    // Once per shadow redraw (a few dozen a frame). The overload with a material is the one the cluster shadow generator calls after
+    // DecorationShedding's InjectCommands prefix has filtered the lists, so ShadowProxyHold renews what is actually drawn.
+    [HarmonyPatch(typeof(ShadowUtility), nameof(ShadowUtility.InjectDrawCommands),
+        new[] { typeof(UnityEngine.Rendering.CommandBuffer), typeof(Material), typeof(Il2CppSystem.Collections.Generic.List<CullingSystem.C_Cullable>),
+                typeof(Il2CppSystem.Collections.Generic.List<CullingSystem.C_Cullable>), typeof(bool) })]
+    private static class ShadowProxy
+    {
+        [HarmonyPrefix] private static void Prefix(out long __state) => __state = ForgePerformance.Crowd.Probe.Begin();
+        [HarmonyPostfix]
+        private static void Postfix(Il2CppSystem.Collections.Generic.List<CullingSystem.C_Cullable> cullables,
+            Il2CppSystem.Collections.Generic.List<CullingSystem.C_Cullable> additionalCullables, long __state)
+        {
+            if (ShadowProxyHold.Enabled && LoadSheddingController.Current is { Active: true })
+            {
+                ShadowProxyHold.Call();
+                var now = Clock.Time;
+                ShadowProxyHold.Renew(cullables, now);
+                ShadowProxyHold.Renew(additionalCullables, now);
+            }
+            ForgePerformance.Crowd.Probe.End(ForgePerformance.Crowd.ProbePoint.ShadowInject, __state);
+        }
+    }
+
     [HarmonyPatch(typeof(UI_Apply), nameof(UI_Apply.ApplySetttings), new System.Type[0])]
     private static class GuiMirror
     { [HarmonyPrefix] private static void Prefix() => LoadSheddingController.Current?.Extras?.MirrorBefore(); }

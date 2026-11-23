@@ -21,25 +21,27 @@ public static class MeshArrays
     {
         var count = positions.Length / 3;
         var mesh = new Mesh { name = name, indexFormat = count > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16 };
+        // Field stores, not the constructors: in the interop assembly a Vector2/3/4 constructor is a call into the game's IL2CPP code, and
+        // there were three per vertex here.
         var points = new Vector3[count];
-        for (var v = 0; v < count; v++) points[v] = new Vector3(positions[v * 3], positions[v * 3 + 1], positions[v * 3 + 2]);
+        for (var v = 0; v < count; v++) points[v] = new Vector3 { x = positions[v * 3], y = positions[v * 3 + 1], z = positions[v * 3 + 2] };
         mesh.vertices = new Il2CppStructArray<Vector3>(points);
         if (normals != null)
         {
             var n = new Vector3[count];
-            for (var v = 0; v < count; v++) n[v] = new Vector3(normals[v * 3], normals[v * 3 + 1], normals[v * 3 + 2]);
+            for (var v = 0; v < count; v++) n[v] = new Vector3 { x = normals[v * 3], y = normals[v * 3 + 1], z = normals[v * 3 + 2] };
             mesh.normals = new Il2CppStructArray<Vector3>(n);
         }
         if (uv != null)
         {
             var t = new Vector2[count];
-            for (var v = 0; v < count; v++) t[v] = new Vector2(uv[v * 2], uv[v * 2 + 1]);
+            for (var v = 0; v < count; v++) t[v] = new Vector2 { x = uv[v * 2], y = uv[v * 2 + 1] };
             mesh.uv = new Il2CppStructArray<Vector2>(t);
         }
         if (tangents != null)
         {
             var t = new Vector4[count];
-            for (var v = 0; v < count; v++) t[v] = new Vector4(tangents[v * 4], tangents[v * 4 + 1], tangents[v * 4 + 2], tangents[v * 4 + 3]);
+            for (var v = 0; v < count; v++) t[v] = new Vector4 { x = tangents[v * 4], y = tangents[v * 4 + 1], z = tangents[v * 4 + 2], w = tangents[v * 4 + 3] };
             mesh.tangents = new Il2CppStructArray<Vector4>(t);
         }
         if (submeshes == null) mesh.triangles = new Il2CppStructArray<int>(indices);

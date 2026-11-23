@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Text;
 using ForgePerformance.LoadShedding;
 
@@ -8,8 +9,8 @@ namespace ForgePerformance.Crowd;
 /// installed so <see cref="PerformanceControl"/> can switch them during one session for a before/after comparison.</summary>
 internal static class CrowdSwitches
 {
-    internal static bool SetupRendererLookup, SpawnFrameDefer, FarAnimatorThrottle, FarSkinQuality,
-        ClientHiddenSyncThrottle, UpdateBudgets, AvoidanceQuality, PathfindingIterations, HitReactKeepsAgent;
+    internal static bool SetupRendererLookup, SpawnFrameDefer, FarSkinQuality,
+        ClientHiddenSyncThrottle, UpdateBudgets, AvoidanceQuality, PathfindingIterations;
     internal static int HiddenSyncInterval = 4, AvoidanceType = 1, PathfindingIterationsPerFrame = 100;
     private static SheddingSettings? _settings;
     private static bool _crowd;
@@ -19,13 +20,11 @@ internal static class CrowdSwitches
         _settings = settings; _crowd = crowdInstalled;
         SetupRendererLookup = settings.SetupRendererLookup;
         SpawnFrameDefer = settings.SpawnFrameDefer;
-        FarAnimatorThrottle = settings.FarAnimatorThrottle;
         FarSkinQuality = settings.FarSkinQuality;
         ClientHiddenSyncThrottle = settings.ClientHiddenSyncThrottle;
         UpdateBudgets = settings.UpdateBudgets;
         AvoidanceQuality = settings.AvoidanceQuality;
         PathfindingIterations = settings.PathfindingIterations;
-        HitReactKeepsAgent = settings.HitReactKeepsAgent;
         HiddenSyncInterval = settings.HiddenSyncInterval;
         AvoidanceType = settings.AvoidanceType;
         PathfindingIterationsPerFrame = settings.PathfindingIterationsPerFrame;
@@ -36,11 +35,10 @@ internal static class CrowdSwitches
         var text = new StringBuilder(160);
         void Add(string name, bool on) { if (on) text.Append(text.Length == 0 ? "" : ",").Append(name); }
         Add("SetupRendererLookup", SetupRendererLookup); Add("SpawnFrameDefer", SpawnFrameDefer);
-        Add("FarAnimatorThrottle", FarAnimatorThrottle);
         Add("FarSkinQuality", FarSkinQuality); Add("ClientHiddenSyncThrottle", ClientHiddenSyncThrottle);
         Add("UpdateBudgets", UpdateBudgets); Add("AvoidanceQuality=" + AvoidanceType, AvoidanceQuality);
-        Add("PathfindingIterations=" + PathfindingIterationsPerFrame, PathfindingIterations); Add("HitReactKeepsAgent", HitReactKeepsAgent);
-        Add("IrfPhysicsHalfRate", IrfCulling.PhysicsHalfRate); Add("TentacleLimitErrorFold", TentacleErrorFold.Enabled);
+        Add("PathfindingIterations=" + PathfindingIterationsPerFrame, PathfindingIterations);
+        Add("IrfPhysicsHalfRate", IrfCulling.PhysicsHalfRate); Add("ShadowProxyHold", ShadowProxyHold.Enabled); Add("VoiceFrameSkipFilter", VoiceRestartGuard.FrameSkipFilter); Add("TentacleLimitErrorFold", TentacleErrorFold.Enabled);
         return text.Length == 0 ? "none" : text.ToString();
     }
 
@@ -56,13 +54,18 @@ internal static class CrowdSwitches
             case nameof(SheddingSettings.IrfOffscreenSkip):
                 if (_settings?.IrfOffscreenSkip != true) return "refused: IrfOffscreenSkip was off at start";
                 IrfCulling.OffscreenSkip = on; return Switched(name, on);
+            case nameof(SheddingSettings.ShadowProxyHold):
+                if (_settings?.ShadowProxyHold != true && _settings?.Probe != true) return "refused: ShadowProxyHold was off at start";
+                ShadowProxyHold.Enabled = on; return Switched(name, on);
+            case nameof(SheddingSettings.VoiceFrameSkipFilter):
+                if (_settings?.VoiceFrameSkipFilter != true && _settings?.Probe != true) return "refused: VoiceFrameSkipFilter was off at start";
+                VoiceRestartGuard.FrameSkipFilter = on; return Switched(name, on);
             case nameof(SheddingSettings.TentacleLimitErrorFold):
                 if (_settings?.TentacleLimitErrorFold != true) return "refused: TentacleLimitErrorFold was off at start";
                 TentacleErrorFold.Enabled = on; return Switched(name, on);
         }
         if (_settings == null || !_crowd) return "refused: crowd options are not installed in this session";
         if (on && name == nameof(ClientHiddenSyncThrottle) && !CrowdPatches.SyncHooked) return "refused: EnemyTransformSync.Update is not hooked";
-        if (on && name == nameof(HitReactKeepsAgent) && !CrowdPatches.HitreactHooked) return "refused: SetNavMeshAgent or ES_Hitreact.Enter is not hooked";
         if (on && name == nameof(SetupRendererLookup) && !(_settings.FastCorpseHide || _settings.CorpseShadows))
             return "refused: the corpse options that use the lookup are off";
         Probe.Cut();
@@ -70,13 +73,11 @@ internal static class CrowdSwitches
         {
             case nameof(SetupRendererLookup): SetupRendererLookup = on; break;
             case nameof(SpawnFrameDefer): SpawnFrameDefer = on; break;
-            case nameof(FarAnimatorThrottle): FarAnimatorThrottle = on; break;
             case nameof(FarSkinQuality): FarSkinQuality = on; break;
             case nameof(ClientHiddenSyncThrottle): ClientHiddenSyncThrottle = on; break;
             case nameof(UpdateBudgets): UpdateBudgets = on; break;
             case nameof(AvoidanceQuality): AvoidanceQuality = on; break;
             case nameof(PathfindingIterations): PathfindingIterations = on; break;
-            case nameof(HitReactKeepsAgent): HitReactKeepsAgent = on; break;
             default: return "refused: unknown option " + name;
         }
         return Switched(name, on);
@@ -111,11 +112,24 @@ internal static class PerformanceControl
 {
     internal static string Set(string option, bool on) => CrowdSwitches.Set(option, on);
     internal static string Value(string option, int value) => CrowdSwitches.Value(option, value);
+    /// <summary>Limits Unity's active job worker count at once (<c>Workers 8</c>); 0 puts the count read at the first use back. The level exit also puts it back.</summary>
+    internal static string Workers(int count)
+    {
+        if (count < 0) return "refused: Workers cannot be " + count;
+        Probe.Cut();
+        var answer = RenderCuts.Current?.SetValue("job-workers", count) ?? "refused: load shedding is not installed";
+        Probe.Line("type=perf_probe_switch" + (char)9 + "option=Workers" + (char)9 + "value=" + answer);
+        return answer;
+    }
+    /// <summary>The HUD camera's culling mask (UI_Core.UIPassHUD), read only: which layers the second camera draws.</summary>
+    internal static string HudMask()
+    {
+        var pass = UI_Core.UIPassHUD;
+        var camera = pass == null ? null : pass.Camera;
+        return camera == null ? "hud=unavailable" : "hud_culling_mask=0x" + camera.cullingMask.ToString("x8", CultureInfo.InvariantCulture);
+    }
     internal static string Mark(string label) { Probe.Mark(label); return "label=" + label; }
     internal static string Limits() => Probe.FrameLimits().Replace('\t', ';');
-    /// <summary>FarAnimatorThrottle's hit-box offset: returns the statistics so far, then starts (true, from zero) or stops measuring.</summary>
-    internal static string Lag(bool on) => CrowdLoad.Lag(on);
-    internal static string Animators() => CrowdLoad.Animators();
     internal static string Physics() => ProbePhysics.Read();
     /// <summary>Starts a chase measurement; poll <see cref="ChaseState"/> (it answers "done…" when <paramref name="expected"/>
     /// enemies are within <paramref name="radius"/> metres, "done-timeout…" after 45 s).</summary>
@@ -128,7 +142,8 @@ internal static class PerformanceControl
     internal static string Foreground() => Probe.Foreground();
     internal static string Background() => Probe.Background();
     internal static string Read()
-        => "switches=" + CrowdSwitches.Describe() + ";probe=" + (Probe.On ? "on" : "off") + ";enemies=" + Probe.Enemies
-            + ";far_skins=" + Probe.FarSkins + ";throttled_animators=" + Probe.ThrottledAnimators + ";throttled_syncs=" + Probe.ThrottledSyncs
+        => "workers=" + (RenderCuts.Current?.Describe("job-workers") ?? "not-installed")
+            + ";switches=" + CrowdSwitches.Describe() + ";probe=" + (Probe.On ? "on" : "off") + ";enemies=" + Probe.Enemies
+            + ";far_skins=" + Probe.FarSkins + ";throttled_syncs=" + Probe.ThrottledSyncs
             + ";" + (LoadSheddingController.Current?.CrowdWork?.ReadGlobals() ?? "crowd=not-installed");
 }

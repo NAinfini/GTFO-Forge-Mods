@@ -4,9 +4,9 @@ using GameData;
 
 namespace ForgeCore;
 
-/// <summary>Adding data blocks (gear, archetypes, items ...) built in code to the game's tables. Blocks are only added, never
-/// changed: an ID or name the game or another mod already uses is refused, so mods cannot overwrite each other. The write itself is
-/// <see cref="NativeDataBlockTables"/>'s one transaction, the same one the JSON content path uses, with one ledger of owners.</summary>
+/// <summary>Adding data blocks (gear, archetypes, items ...) built in code to the game's tables. An ID or name the game or another
+/// mod already uses is refused, so mods cannot overwrite each other. The write itself is <see cref="NativeDataBlockTables.Transaction"/>,
+/// the same one the JSON content path uses, with one ledger of owners.</summary>
 public static class DataBlocks
 {
     /// <summary>A shallow copy of a donor block under a new name and ID, enabled; nested reference data is shared with the donor,
@@ -36,8 +36,8 @@ public static class DataBlocks
     /// <summary>Adds every block, of any tables, in one transaction and reads each back through the game's three indexes. Blocks
     /// <paramref name="modId"/> added before (same table, ID and name) are skipped: AlreadyAdded when none was left to write, else
     /// Added. Any other block under an ID or name of the set is a Conflict and nothing changes; a failed write is removed again
-    /// (ReadbackFailed). The error is logged. A rollback that itself fails throws and latches
-    /// <see cref="NativeDataBlockTables.HasUnknownState"/>.</summary>
+    /// (ReadbackFailed). The error is logged. When the removal could not restore the tables (AuditFailed, logged once by the
+    /// transaction), stop using this mod's content until restart. Replacing and removing rows: <see cref="NativeDataBlockTables.Transaction"/>.</summary>
     public static DataBlockResult AddAll(string modId, IReadOnlyList<object> blocks)
     {
         try { return NativeDataBlockTables.Add(modId, blocks) == 0 ? DataBlockResult.AlreadyAdded : DataBlockResult.Added; }
@@ -46,11 +46,7 @@ public static class DataBlocks
             Log.For(modId).Error("core-data-blocks-refused", "Data blocks refused: " + error.Message + ".");
             return DataBlockResult.Conflict;
         }
-        catch (NativeDataBlockRollbackException error)
-        {
-            Log.For(modId).Error("core-data-blocks-could-not-be-removed", "Data blocks could not be removed again after a failed add: " + error.InnerException?.Message);
-            throw;
-        }
+        catch (NativeDataBlockAuditException) { return DataBlockResult.AuditFailed; }
         catch (Exception error)
         {
             Log.For(modId).Error("core-data-blocks-were-not-added-all", "Data blocks were not added (all removed again): " + error.Message);

@@ -7,10 +7,10 @@ using ForgeEmote.Api;
 namespace ForgeEmote;
 
 [BepInPlugin(Id, "Forge Emote", Version)]
-[BepInDependency("NAinfini.ForgeCore", ">=1.0.2")]
+[BepInDependency("NAinfini.ForgeCore", ">=1.0.4")] // package-version: NAinfini-ForgeCore
 internal sealed class Plugin : BasePlugin
 {
-    internal const string Id = "NAinfini.ForgeEmote", Version = "1.0.3"; // package-version: NAinfini-ForgeEmote
+    internal const string Id = "NAinfini.ForgeEmote", Version = "1.0.4"; // package-version: NAinfini-ForgeEmote
 
     internal static ModLog Logger { get; private set; } = null!;
     internal static BepInEx.Logging.ManualLogSource Info { get; private set; } = null!;

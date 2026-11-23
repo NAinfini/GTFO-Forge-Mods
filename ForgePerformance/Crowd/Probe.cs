@@ -15,7 +15,7 @@ namespace ForgePerformance.Crowd;
 internal enum ProbePoint
 {
     EnemySpawned, OwnSetupPrefix, RagdollOn, EnemyDestroyed,
-    WakePropagation, ReachableQuery, NavAgentOn, NavAgentOff, HitreactKeptAgent,
+    WakePropagation, ReachableQuery, NavAgentOn, NavAgentOff,
     LightVisible, ShadowRedraw, TransformSync, TransformSyncSkipped, DamageBaseUpdate,
     ProjectileUpdate, ProjectileSpawn,
     // Where the main thread goes: the game-state update (the enemy update manager runs inside it), its per-enemy groups, the
@@ -27,7 +27,11 @@ internal enum ProbePoint
     MapDetailsLate,
     // This mod's own per-frame hooks on instanced decoration and wind, and the game's instanced-render compute update
     // (timed only while IrfPhysicsHalfRate's hook is installed).
-    OwnIrfLateUpdate, OwnIrfDraw, OwnWind, IrfRendererUpdate, Count
+    OwnIrfLateUpdate, OwnIrfDraw, OwnWind, IrfRendererUpdate,
+    // Dissonance's microphone restart: calls that ran (with their time) and calls VoiceRestartGuard held back or VoiceFrameSkipFilter ignored.
+    VoiceRestart, VoiceRestartHeldBack, VoiceFrameSkipIgnored,
+    // ShadowUtility.InjectDrawCommands (with the material), the call ShadowProxyHold hooks.
+    ShadowInject, Count
 }
 
 /// <summary>Developer measurement (the <c>Probe</c> option): per-call time and count of the probed game methods, frame time, and
@@ -45,7 +49,7 @@ internal static class Probe
     // Sum of the enemies in every GetReachableEnemiesInNodes result: the enemies PropagateTargetLimited walks.
     internal static long ReachableEnemies;
     // Gauges the crowd tick sets every 0.25 s.
-    internal static int Enemies, FarSkins, ThrottledAnimators, ThrottledSyncs;
+    internal static int Enemies, FarSkins, ThrottledSyncs;
     internal static int FrameIndex;
     // Whether this machine hosts, as the crowd tick last read it (in a level).
     internal static bool HostNow;
@@ -236,8 +240,9 @@ internal static class Probe
             .Append("\til2cpp_growth_kb_frame=").Append(F(_heapGrowth / 1024.0 / Math.Max(1, _frames)))
             .Append("\til2cpp_heap_mb=").Append(F(IL2CPP.il2cpp_gc_get_used_size() / 1048576.0))
             .Append("\tenemies=").Append(Enemies).Append("\tfar_skins=").Append(FarSkins)
-            .Append("\tthrottled_animators=").Append(ThrottledAnimators).Append("\tthrottled_syncs=").Append(ThrottledSyncs)
-            .Append("\treachable_enemies=").Append(ReachableEnemies);
+            .Append("\tthrottled_syncs=").Append(ThrottledSyncs)
+            .Append("\treachable_enemies=").Append(ReachableEnemies)
+            .Append("\tjob_workers=").Append(ForgePerformance.LoadShedding.JobWorkers.Count());
         for (var i = 0; i < Points; i++)
         {
             if (Calls[i] == 0) continue;

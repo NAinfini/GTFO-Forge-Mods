@@ -1,0 +1,49 @@
+<Project>
+  <!-- Only the canonical SDK project imports this gate. Source-linked harnesses consume its checked-in constant;
+       they are not a second SDK and must not fingerprint their own additional public test types. -->
+  <PropertyGroup>
+    <_ApiFingerprintToolProject>$(MSBuildThisFileDirectory)../tools/ApiFingerprintGen/ApiFingerprintGen.csproj</_ApiFingerprintToolProject>
+    <_ApiFingerprintSource>$(MSBuildThisFileDirectory)Serialization/RuntimeApi.Generated.cs</_ApiFingerprintSource>
+    <_ApiFingerprintDotNet Condition="'$(DOTNET_HOST_PATH)' != ''">$(DOTNET_HOST_PATH)</_ApiFingerprintDotNet>
+    <_ApiFingerprintDotNet Condition="'$(_ApiFingerprintDotNet)' == '' and Exists('$(DOTNET_ROOT)/dotnet')">$(DOTNET_ROOT)/dotnet</_ApiFingerprintDotNet>
+    <_ApiFingerprintDotNet Condition="'$(_ApiFingerprintDotNet)' == '' and Exists('$(DOTNET_ROOT)/dotnet.exe')">$(DOTNET_ROOT)/dotnet.exe</_ApiFingerprintDotNet>
+    <_ApiFingerprintDotNet Condition="'$(_ApiFingerprintDotNet)' == ''">dotnet</_ApiFingerprintDotNet>
+  </PropertyGroup>
+  <Target Name="RequireRuntimeApiFingerprintSource" BeforeTargets="CoreCompile">
+    <Error Condition="!Exists('$(_ApiFingerprintSource)')" Text="api-fingerprint-missing: RuntimeApi.Generated.cs is a tracked API pin; restore it from Git before compiling or explicitly regenerating it." />
+  </Target>
+  <Target Name="_PrepareRuntimeApiFingerprintTool" DependsOnTargets="ResolveReferences">
+    <PropertyGroup>
+      <_ApiFingerprintToolArtifacts>$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)api-fingerprint-tool', '$(MSBuildProjectDirectory)'))</_ApiFingerprintToolArtifacts>
+      <_ApiFingerprintRestoreSources Condition="'$(RestoreSources)' != ''">-p:RestoreSources=&quot;$([MSBuild]::Escape('$(RestoreSources)'))&quot;</_ApiFingerprintRestoreSources>
+      <_ApiFingerprintNuGetAudit Condition="'$(NuGetAudit)' != ''">-p:NuGetAudit=&quot;$(NuGetAudit)&quot;</_ApiFingerprintNuGetAudit>
+      <_ApiFingerprintReferences>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)api-fingerprint-references', '$(MSBuildProjectDirectory)'))</_ApiFingerprintReferences>
+      <_ApiFingerprintTool>$(_ApiFingerprintToolArtifacts)/bin/ApiFingerprintGen/release/ApiFingerprintGen</_ApiFingerprintTool>
+      <_ApiFingerprintTool Condition="'$(OS)' == 'Windows_NT'">$(_ApiFingerprintTool).exe</_ApiFingerprintTool>
+    </PropertyGroup>
+    <Exec Command="&quot;$(_ApiFingerprintDotNet)&quot; build &quot;$(_ApiFingerprintToolProject)&quot; -c Release --artifacts-path &quot;$(_ApiFingerprintToolArtifacts)&quot; --disable-build-servers --nologo -m:1 -nr:false $(_ApiFingerprintRestoreSources) $(_ApiFingerprintNuGetAudit)" Timeout="120000" ConsoleToMSBuild="true" IgnoreExitCode="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_ApiFingerprintBuildOutput" />
+      <Output TaskParameter="ExitCode" PropertyName="_ApiFingerprintBuildExit" />
+    </Exec>
+    <Error Condition="'$(_ApiFingerprintBuildExit)' != '0'" Text="api-fingerprint-tool-build-failed (exit $(_ApiFingerprintBuildExit)): $(_ApiFingerprintBuildOutput)" />
+    <RemoveDir Directories="$(_ApiFingerprintReferences)" />
+    <MakeDir Directories="$(_ApiFingerprintReferences)" />
+    <Copy SourceFiles="@(ReferencePath)" DestinationFolder="$(_ApiFingerprintReferences)" />
+  </Target>
+  <Target Name="VerifyRuntimeApiFingerprint" AfterTargets="Build" DependsOnTargets="_PrepareRuntimeApiFingerprintTool">
+    <Exec Command="&quot;$(_ApiFingerprintTool)&quot; check &quot;$(TargetPath)&quot; --references &quot;$(_ApiFingerprintReferences)&quot; --output &quot;$(_ApiFingerprintSource)&quot;" Timeout="180000" ConsoleToMSBuild="true" IgnoreExitCode="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_ApiFingerprintCheckOutput" />
+      <Output TaskParameter="ExitCode" PropertyName="_ApiFingerprintCheckExit" />
+    </Exec>
+    <!-- Exec output goes into the error text: under -v q a failing Exec prints only its exit code and hides the tool's message. -->
+    <Error Condition="'$(_ApiFingerprintCheckExit)' != '0'" Text="api-fingerprint-check-failed (exit $(_ApiFingerprintCheckExit)): $(_ApiFingerprintCheckOutput)" />
+  </Target>
+  <!-- The tracked API pin is present in a clean clone; regeneration updates it without deleting it.
+       Regeneration compiles only an intermediate DLL, writes the one generated constant, then stops.
+       A subsequent normal Build must compile and verify the generated constant before producing a verified SDK. -->
+  <Target Name="GenerateRuntimeApiFingerprint" DependsOnTargets="Compile;_PrepareRuntimeApiFingerprintTool">
+    <Error Condition="'@(IntermediateAssembly)' == ''" Text="No compiled intermediate SDK metadata is available for API fingerprint generation." />
+    <Exec Command="&quot;$(_ApiFingerprintTool)&quot; write &quot;@(IntermediateAssembly->'%(FullPath)')&quot; --references &quot;$(_ApiFingerprintReferences)&quot; --output &quot;$(_ApiFingerprintSource)&quot;" Timeout="180000" />
+    <Message Importance="high" Text="API fingerprint regenerated from intermediate metadata. Run a normal Build to compile and verify it." />
+  </Target>
+</Project>

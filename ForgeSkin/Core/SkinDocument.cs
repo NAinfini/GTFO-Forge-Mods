@@ -286,6 +286,31 @@ public sealed class MaterialOverride
     // the last stage whose kill count the local player reached with this skin on this gear, instead of Textures.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<WearStage>? Wear { get; set; }
+
+    // A game sight's lens: the see-through glass the game draws its reticles on (Unlit/HolographicSight_3Layers, the single-layer and the
+    // thermal siblings), the floating holograms' (Sight_20, 21, 24) included. Its picture slot is the lens's dirt and its colours its glow.
+    public static bool IsLensShader(string? shader) => shader != null && shader.Contains("HolographicSight", StringComparison.Ordinal);
+
+    // What a lens takes of this override: its reticles (their pictures and Params.Reticles), on the game's lens material, whose shader,
+    // blending and dirt stay. A picture, glow, tint, metal, paint layer or wear stage for it (a whole part's import or bake, a glow copied
+    // to every material) would cover the view with an opaque picture; they are left out and named in `left`.
+    public MaterialOverride OnLens(out List<string> left)
+    {
+        left = Textures.Keys.Where(c => !c.IsReticle()).Select(c => c.ToString()).ToList();
+        var p = Params;
+        if (p.EmissiveEnabled != null || p.EmissiveColor != null || p.EmissiveIntensity != null) left.Add("glow");
+        if (p.Tint != null) left.Add("tint");
+        if (p.Metallic != null || p.Smoothness != null) left.Add("metal");
+        if (Layers.Count > 0) left.Add("layers");
+        if (Wear is { Count: > 0 }) left.Add("wear");
+        return new MaterialOverride
+        {
+            Material = Material,
+            Part = Part,
+            Textures = Textures.Where(t => t.Key.IsReticle()).ToDictionary(t => t.Key, t => t.Value),
+            Params = new MaterialParams { Reticles = p.Reticles },
+        };
+    }
 }
 
 public sealed class WearStage

@@ -87,6 +87,23 @@ const char *ResultName(sl::Result result)
     }
 }
 
+// Why DLSS Frame Generation could not start (DlssMissing, bridge_common.h), from the Streamline result that stopped it.
+int g_missing = DlssFailed;
+int MissingOf(sl::Result result)
+{
+    switch (result)
+    {
+    case sl::Result::eOk: return DlssRuns;
+    case sl::Result::eErrorDriverOutOfDate: return DlssDriver;
+    case sl::Result::eErrorOSOutOfDate: return DlssWindows;
+    case sl::Result::eErrorOSDisabledHWS: return DlssScheduling;
+    case sl::Result::eErrorNoSupportedAdapterFound:
+    case sl::Result::eErrorAdapterNotSupported:
+    case sl::Result::eErrorFeatureNotSupported: return DlssGpu;
+    default: return DlssFailed;
+    }
+}
+
 void Check(sl::Result result, const char *what)
 {
     if (result == sl::Result::eOk) return;
@@ -264,7 +281,13 @@ public:
     bool Start(const wchar_t *folder, IDXGIAdapter *adapter, std::string &why) override
     {
         g_folder = folder;
+        g_missing = DlssFailed;
         bool initialized = false;
+        // Each Streamline answer that can stop it says why, for the plugin's fallback warning and settings hint.
+        auto check = [](sl::Result result, const char *what) {
+            if (result != sl::Result::eOk) g_missing = MissingOf(result);
+            Check(result, what);
+        };
         try
         {
             std::string foreign;
@@ -303,7 +326,7 @@ public:
             preferences.logMessageCallback = &OnStreamlineLog;
             // No over-the-air updates or downloaded plugins: only the packaged, pinned files run.
             preferences.flags = sl::PreferenceFlags::eUseManualHooking | sl::PreferenceFlags::eDisableCLStateTracking | sl::PreferenceFlags::eUseFrameBasedResourceTagging;
-            Check(g_init(preferences, sl::kSDKVersion), "starting Streamline");
+            check(g_init(preferences, sl::kSDKVersion), "starting Streamline");
             initialized = true;
 
             DXGI_ADAPTER_DESC desc{};
@@ -311,9 +334,10 @@ public:
             sl::AdapterInfo info{};
             info.deviceLUID = reinterpret_cast<uint8_t *>(&desc.AdapterLuid);
             info.deviceLUIDSizeInBytes = sizeof(LUID);
-            Check(g_supported(sl::kFeatureDLSS_G, info), "DLSS Frame Generation");
-            Check(g_supported(sl::kFeatureReflex, info), "NVIDIA Reflex");
-            Check(g_supported(sl::kFeaturePCL, info), "PC latency markers");
+            check(g_supported(sl::kFeatureDLSS_G, info), "DLSS Frame Generation");
+            check(g_supported(sl::kFeatureReflex, info), "NVIDIA Reflex");
+            check(g_supported(sl::kFeaturePCL, info), "PC latency markers");
+            g_missing = DlssRuns;
             SetReason("waiting for the first frame");
             BridgeLog(LogInfo, "Frame generation: Streamline started (DLSS Frame Generation, Reflex and PCL supported).");
             return true;
@@ -625,4 +649,6 @@ Backend &DlssBackend()
     static Dlss backend;
     return backend;
 }
+
+int DlssStartMissing() { return g_missing; }
 } // namespace fg

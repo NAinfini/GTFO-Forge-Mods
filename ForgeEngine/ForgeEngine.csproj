@@ -1,0 +1,88 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../Build/Common.props" />
+  <PropertyGroup>
+    <AssemblyName>ForgeEngine</AssemblyName>
+    <RootNamespace>ForgeEngine</RootNamespace>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- Map's native readers and Weapon's GameData constructor call (il2cpp_runtime_invoke) need unsafe blocks. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+    <!-- Local-only build input (Tools/resource-roots.json): FORGE_CATALOG_ROOT, else this checkout's file, else the main checkout's. -->
+    <NativeResourceNamesSource Condition="'$(NativeResourceNamesSource)' == '' And '$(FORGE_CATALOG_ROOT)' != ''">$(FORGE_CATALOG_ROOT)/resources/native-resource-names.json</NativeResourceNamesSource>
+    <NativeResourceNamesSource Condition="'$(NativeResourceNamesSource)' == '' And !Exists('$(MSBuildThisFileDirectory)../../catalog/resources/native-resource-names.json') And '$(ForgeMainCheckout)' != ''">$(ForgeMainCheckout)/catalog/resources/native-resource-names.json</NativeResourceNamesSource>
+    <NativeResourceNamesSource Condition="'$(NativeResourceNamesSource)' == ''">$(MSBuildThisFileDirectory)../../catalog/resources/native-resource-names.json</NativeResourceNamesSource>
+  </PropertyGroup>
+
+  <Target Name="ValidateGTFOBepInExPath" BeforeTargets="ResolveReferences">
+    <Error
+      Condition="'$(GTFOBepInExPath)' == '' or !Exists('$(GTFOBepInExPath)\core\BepInEx.Core.dll')"
+      Text="Set GTFO_BEPINEX_PATH or pass /p:GTFOBepInExPath=... with the path to the profile's BepInEx directory." />
+  </Target>
+
+  <Target Name="GenerateNativeResourceRuntimeProjection" BeforeTargets="AssignTargetPaths">
+    <PropertyGroup>
+      <NativeResourceRuntimeProjection>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'native-resource-runtime-projection.json'))</NativeResourceRuntimeProjection>
+    </PropertyGroup>
+    <Exec WorkingDirectory="$(MSBuildThisFileDirectory)../.."
+          IgnoreStandardErrorWarningFormat="true" Command="node --import ./Tools/register-typescript.ts Tools/Forge/build-native-resource-runtime-projection.ts --write --source &quot;$(NativeResourceNamesSource)&quot; --output &quot;$(NativeResourceRuntimeProjection)&quot;" />
+    <ItemGroup>
+      <EmbeddedResource Include="$(NativeResourceRuntimeProjection)" LogicalName="ForgeEngine.NativeModelResources.json" />
+    </ItemGroup>
+  </Target>
+
+  <Import Project="Framework/PrimitiveContracts.props" />
+  <Import Project="Framework/Domains.props" />
+  <ItemGroup>
+    <EmbeddedResource Include="$(ForgeNativeSchemaSource)" LogicalName="ForgeEngine.NativeSchema" />
+    <EmbeddedResource Include="../Release/release.json" LogicalName="ForgeEngine.ReleaseIdentity.json" />
+    <!-- The start elevator's seat and body geometry, the same file the map editor's landing preview reads. -->
+    <EmbeddedResource Include="../../catalog/forge-release/elevator-cage.json" LogicalName="ForgeMap.ElevatorCage.json" Link="Catalog/forge-release/elevator-cage.json" />
+    <!-- One assembly: the kernel (Framework/), the host and the four domains (Player/, Map/, Enemy/, Weapon/) compile here.
+         tests/ and tools/ folders, at the root and inside each domain, hold standalone projects. The offline registration
+         (refusing stand-ins for every game-bound body) belongs to the release export and the package admission only. -->
+    <Compile Remove="**\tests\**\*.cs;**\tools\**\*.cs;GameBindings\OfflineRuntime.cs" />
+    <ForgeDiagnosticConstants Include="RuntimeHostLogCodes;PresentationLogCodes;ObjectivePresentationLog" />
+    <!-- A Map action frames its result rows through the one row-set helper; every Map native source names it by this alias. -->
+    <Using Include="ForgeEngine.Framework.ResultRows" Alias="ResultRows" />
+    <!-- ForgeCore, the one public library (core, UI, audio, visual), ships as its own package in the release set (release.json libraries). -->
+    <ProjectReference Include="..\ForgeCore\ForgeCore.csproj" Private="false" />
+    <Reference Include="UnityEngine.ImageConversionModule" HintPath="$(GTFOBepInExPath)\interop\UnityEngine.ImageConversionModule.dll" Private="false" />
+    <Reference Include="0Harmony" HintPath="$(GTFOBepInExPath)\core\0Harmony.dll" Private="false" />
+    <!-- The host subscribes to GTFO-API's level lifecycle instead of patching GameStateManager itself. -->
+    <Reference Include="GTFO-API" HintPath="$(GTFOApiPath)" Private="false" />
+    <Reference Include="BepInEx.Core" HintPath="$(GTFOBepInExPath)\core\BepInEx.Core.dll" Private="false" />
+    <Reference Include="BepInEx.Unity.Common" HintPath="$(GTFOBepInExPath)\core\BepInEx.Unity.Common.dll" Private="false" />
+    <Reference Include="BepInEx.Unity.IL2CPP" HintPath="$(GTFOBepInExPath)\core\BepInEx.Unity.IL2CPP.dll" Private="false" />
+    <Reference Include="Il2CppInterop.Common" HintPath="$(GTFOBepInExPath)\core\Il2CppInterop.Common.dll" Private="false" />
+    <Reference Include="Il2CppInterop.Runtime" HintPath="$(GTFOBepInExPath)\core\Il2CppInterop.Runtime.dll" Private="false" />
+    <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)\interop\Il2Cppmscorlib.dll" Private="false" />
+    <!-- The interop assemblies' own BCL: an interop signature that exposes an Il2CppSystem collection needs these two. -->
+    <Reference Include="Il2CppSystem" HintPath="$(GTFOBepInExPath)\interop\Il2CppSystem.dll" Private="false" />
+    <Reference Include="Il2CppSystem.Core" HintPath="$(GTFOBepInExPath)\interop\Il2CppSystem.Core.dll" Private="false" />
+    <Reference Include="UnityEngine.AssetBundleModule" HintPath="$(GTFOBepInExPath)\interop\UnityEngine.AssetBundleModule.dll" Private="false" />
+    <!-- Map reads RundownManager.RundownProgression, a DropServer type; read-only like every interop reference. -->
+    <Reference Include="DropServerSDK-ASM" HintPath="$(GTFOBepInExPath)\interop\DropServerSDK-ASM.dll" Private="false" />
+    <Reference Include="GameData-ASM" HintPath="$(GTFOBepInExPath)\interop\GameData-ASM.dll" Private="false" />
+    <Reference Include="Modules-ASM" HintPath="$(GTFOBepInExPath)\interop\Modules-ASM.dll" Private="false" />
+    <Reference Include="Shards-ASM" HintPath="$(GTFOBepInExPath)\interop\Shards-ASM.dll" Private="false" />
+    <Reference Include="CellSound-ASM" HintPath="$(GTFOBepInExPath)\interop\CellSound-ASM.dll" Private="false" />
+    <!-- The sound rows post a followed game sound and stop it through the engine's own entries. -->
+    <Reference Include="Wwise-ASM" HintPath="$(GTFOBepInExPath)\interop\Wwise-ASM.dll" Private="false" />
+    <Reference Include="SemanticVersioning" HintPath="$(GTFOBepInExPath)\core\SemanticVersioning.dll" Private="false" />
+    <Reference Include="SNet_ASM" HintPath="$(GTFOBepInExPath)\interop\SNet_ASM.dll" Private="false" />
+    <Reference Include="SteamWorks_ASM" HintPath="$(GTFOBepInExPath)\interop\SteamWorks_ASM.dll" Private="false" />
+    <Reference Include="Unity.TextMeshPro" HintPath="$(GTFOBepInExPath)\interop\Unity.TextMeshPro.dll" Private="false" />
+    <Reference Include="UnityEngine.UI" HintPath="$(GTFOBepInExPath)\interop\UnityEngine.UI.dll" Private="false" />
+    <Reference Include="UnityEngine.AIModule" HintPath="$(GTFOBepInExPath)\interop\UnityEngine.AIModule.dll" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(GTFOBepInExPath)\interop\UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="UnityEngine.PhysicsModule" HintPath="$(GTFOBepInExPath)\interop\UnityEngine.PhysicsModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AnimationModule" HintPath="$(GTFOBepInExPath)\interop\UnityEngine.AnimationModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AudioModule" HintPath="$(GTFOBepInExPath)\interop\UnityEngine.AudioModule.dll" Private="false" />
+    <Reference Include="UnityEngine.ParticleSystemModule" HintPath="$(GTFOBepInExPath)\interop\UnityEngine.ParticleSystemModule.dll" Private="false" />
+    <Reference Include="UnityEngine.InputLegacyModule" HintPath="$(GTFOBepInExPath)\interop\UnityEngine.InputLegacyModule.dll" Private="false" />
+    <Reference Include="UnityEngine.UIModule" HintPath="$(GTFOBepInExPath)\interop\UnityEngine.UIModule.dll" Private="false" />
+    <Reference Include="UnityEngine.TextRenderingModule" HintPath="$(GTFOBepInExPath)\interop\UnityEngine.TextRenderingModule.dll" Private="false" />
+    <Reference Include="GlobalFramework-ASM" HintPath="$(GTFOBepInExPath)\interop\GlobalFramework-ASM.dll" Private="false" />
+    <Reference Include="Utils-ASM" HintPath="$(GTFOBepInExPath)\interop\Utils-ASM.dll" Private="false" />
+  </ItemGroup>
+</Project>

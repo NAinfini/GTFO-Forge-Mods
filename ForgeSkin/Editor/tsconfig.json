@@ -15,6 +15,7 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "paths": {
+      "electron": ["./node_modules/electron"],
       "three": ["./node_modules/@types/three/index.d.ts"],
       "@gltf-transform/core": ["./node_modules/@gltf-transform/core"],
       "@gltf-transform/extensions": ["./node_modules/@gltf-transform/extensions"],

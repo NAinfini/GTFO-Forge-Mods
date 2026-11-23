@@ -47,7 +47,9 @@ internal enum SheddingHookId
     IrfPhysics,
     TentacleError,
     MagazineDrop,
-    RepellerState
+    RepellerState,
+    VoiceRestart,
+    ShadowProxy
 }
 
 internal sealed class SheddingHookPlan
@@ -62,7 +64,7 @@ internal sealed class SheddingHookPlan
         RequiresExtras = settings.TextureStreamingOff || settings.ShadowDistance || settings.SoftParticlesOff || settings.StackTraceTrim
             || settings.GuiMirrorOff || settings.LowQualitySpitter || settings.LeakCleanup || settings.DecayCleanup
             || settings.DebrisFreeze || settings.GlueSoundRecycle || settings.DroppedMagazineCleanup
-            || settings.SpentFogRepellerCleanup;
+            || settings.SpentFogRepellerCleanup || settings.JobWorkerLimit > 0 || settings.LightningPreload;
         RequiresCrowd = settings.CrowdHooks;
     }
 
@@ -128,6 +130,8 @@ internal sealed class SheddingHookPlan
         Add(settings.TentacleLimitErrorFold, SheddingHookId.TentacleError);
         Add(settings.DroppedMagazineCleanup, SheddingHookId.MagazineDrop);
         Add(settings.SpentFogRepellerCleanup, SheddingHookId.RepellerState);
+        Add(settings.VoiceRestartGuard || settings.VoiceFrameSkipFilter || settings.Probe, SheddingHookId.VoiceRestart);
+        Add(settings.ShadowProxyHold || settings.Probe, SheddingHookId.ShadowProxy);
         return new SheddingHookPlan(settings, hooks.ToArray());
     }
 }

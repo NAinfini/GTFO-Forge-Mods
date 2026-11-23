@@ -1,0 +1,12 @@
+{
+  "name": "ForgeEngine",
+  "version_number": "1.0.0",
+  "website_url": "https://github.com/NAinfini/GTFO-Forge-Mods",
+  "description": "Forge runtime: loads the behaviour plans Rundown packages ship and runs them on the game's players, maps, enemies and weapons.",
+  "dependencies": [
+    "BepInEx-BepInExPack_GTFO-3.2.4",
+    "GTFOModding-GTFO_API-0.6.1",
+    "dakkhuza-MTFO-4.6.3",
+    "NAinfini-ForgeCore-1.0.4"
+  ]
+}

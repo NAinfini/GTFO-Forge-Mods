@@ -2,7 +2,7 @@ import {z} from 'zod';
 
 /** 公开到社区时的权利声明（合同 §3.2「公开到社区」）：上传者是原作者本人，或已获得原作者许可（写明原作者与许可来源）。
  *  音频、图片、动作、模型、geomorph 来源与作品都用这一份。 */
-export const resourceRightsLimits = {originalAuthor: 120, permissionSource: 500} as const;
+export const resourceRightsLimits = {originalAuthor: Number.POSITIVE_INFINITY, permissionSource: 500} as const;
 const field = (max: number) =>
     z
         .string()

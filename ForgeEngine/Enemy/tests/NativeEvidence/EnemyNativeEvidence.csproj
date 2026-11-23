@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>ForgeEnemy.NativeEvidence.Tests</AssemblyName>
+    <StartupObject>ForgeEnemy.Tests.EnemyEvidenceSuites</StartupObject>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework><IsPackable>false</IsPackable>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <Target Name="ValidateEvidenceReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(GTFOBepInExPath)/core/Mono.Cecil.dll') or !Exists('$(GTFOBepInExPath)/core/Iced.dll')"
+      Text="Set GTFO_BEPINEX_PATH or GTFOBepInExPath to existing BepInEx metadata/disassembly references." />
+  </Target>
+  <ItemGroup>
+    <Reference Include="Mono.Cecil" HintPath="$(GTFOBepInExPath)/core/Mono.Cecil.dll" />
+    <Reference Include="Iced" HintPath="$(GTFOBepInExPath)/core/Iced.dll" />
+    <ProjectReference Include="../../../../ForgeCore/Once/ForgeCore.Once.csproj" />
+    <Compile Include="../../../../ForgeCore/Native/HookPrologue.cs" Link="Runtime/HookPrologue.cs" />
+  </ItemGroup>
+  <ItemGroup><Compile Include="../../../../Testing/SourceTools/InteropSignature.cs;../../../../Testing/SourceTools/NativeIdentity.cs;../../../../Testing/SourceTools/DomainTypes.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../NativeLayout/*.cs;../HookInstall/*.cs" /></ItemGroup>
+</Project>

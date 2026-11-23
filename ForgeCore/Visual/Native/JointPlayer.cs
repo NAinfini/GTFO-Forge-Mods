@@ -151,7 +151,14 @@ public sealed class JointPlayer
     private readonly Quaternion[] _heldRotation = new Quaternion[ClipRig.Count];
     private readonly Vector3[] _heldPosition = new Vector3[ClipRig.Count];
     private readonly bool[] _held = new bool[ClipRig.Count];
-    private int _playing, _order;
+    // A joint the game's IK moves jumps between the IK pose and the animator's own when a clip takes it or lets it go (the IK is held for the clip's
+    // whole length). Each such joint keeps the local turn it had at the switch and eases from it to the pose the body has over HandoffSeconds.
+    private const float HandoffSeconds = 0.15f;
+    private readonly Quaternion[] _from = new Quaternion[ClipRig.Count];
+    private readonly float[] _handAt = new float[ClipRig.Count];
+    private readonly bool[] _hand = new bool[ClipRig.Count];
+    private int _playing, _order, _handing;
+    private bool _listed;
 
     private JointPlayer(Transform root, Quaternion[] align, Transform?[] bone, Vector3 restHip, float legHeight, Func<Transform?[], IkPause> ik)
     {
@@ -296,6 +303,7 @@ public sealed class JointPlayer
             _heldRotation[j] = _bone[j]!.localRotation;
             _heldPosition[j] = _bone[j]!.localPosition;
             _held[j] = true;
+            if (_ik.Moves(j)) BeginHandoff(j, _heldRotation[j]);
         }
         track.Clip = clip;
         track.Start = playback.Start;
@@ -309,7 +317,8 @@ public sealed class JointPlayer
         track.Order = ++_order;
         track.Shown = false;
         track.Fading = false;
-        if (_playing++ == 0) Active.Add(this);
+        _playing++;
+        Enlist();
         HoldIk();
         ReportStart(slot, track);
         return new JointTrack(this, slot, track.Generation);
@@ -465,7 +474,7 @@ public sealed class JointPlayer
         if (_tracks[slot].Clip == null) return;
         ReportStop(slot, 0f);
         _tracks[slot].Clip = null;
-        if (--_playing == 0) { Active.Remove(this); _ik.Release(); Array.Clear(_covered); }
+        if (--_playing == 0) { _ik.Release(); Array.Clear(_covered); }
         else HoldIk();
         for (var j = 0; j < ClipRig.Count; j++)
         {
@@ -473,6 +482,7 @@ public sealed class JointPlayer
             _held[j] = false;
             var bone = _bone[j];
             if (bone == null || bone.WasCollected) continue;
+            if (_ik.Moves(j)) { BeginHandoff(j, bone.localRotation); Enlist(); }
             bone.localRotation = _heldRotation[j];
             bone.localPosition = _heldPosition[j];
         }
@@ -505,9 +515,11 @@ public sealed class JointPlayer
             {
                 Active.RemoveAt(i);
                 foreach (var track in player._tracks) track.Clip = null;
-                player._playing = 0;
+                player._playing = player._handing = 0;
+                player._listed = false;
                 continue;
             }
+            if (!player.Busy) { Active.RemoveAt(i); player._listed = false; continue; }
             if (player.Manual) continue;
             // One body's failure does not stop the others from posing this frame.
             try { player.PoseAll(now); } catch (Exception error) { Scene.StepFailed("joint clips", error); }
@@ -522,7 +534,7 @@ public sealed class JointPlayer
     /// <summary>Poses the body now for the clips playing on it (for a <see cref="Manual"/> body; once a frame, after the game animated it).</summary>
     public void Pose()
     {
-        if (_playing > 0 && _root != null && !_root.WasCollected) PoseAll(ForgeCore.Frame.GameTime); // this frame's Time.time, read once by ForgeCore
+        if (Busy && _root != null && !_root.WasCollected) PoseAll(ForgeCore.Frame.GameTime); // this frame's Time.time, read once by ForgeCore
     }
 
     /// <summary>Stops every clip (the level ended or a checkpoint reloaded): the bodies they were on are gone or rebuilt.</summary>
@@ -553,8 +565,42 @@ public sealed class JointPlayer
             if (now >= next.Ending) { StopSlot(slot); continue; }
             var envelope = next.FadeIn > 0f ? Mathf.Clamp01((now - next.Began) / next.FadeIn) : 1f;
             if (next.FadeOut > 0f) envelope = Mathf.Min(envelope, Mathf.Clamp01((next.Ending - now) / next.FadeOut));
-            Pose(next, time, envelope);
+            Pose(next, time, Smooth(envelope));
             done++;
+        }
+        Handoff(now);
+    }
+
+    private bool Busy => _playing > 0 || _handing > 0;
+
+    private void Enlist()
+    {
+        if (_listed) return;
+        _listed = true;
+        Active.Add(this);
+    }
+
+    private static float Smooth(float t) => t * t * (3f - 2f * t);
+
+    private void BeginHandoff(int j, Quaternion from)
+    {
+        _from[j] = from;
+        _handAt[j] = Time.time;
+        if (_hand[j]) return;
+        _hand[j] = true;
+        _handing++;
+    }
+
+    private void Handoff(float now)
+    {
+        if (_handing == 0) return;
+        for (var j = 0; j < ClipRig.Count; j++)
+        {
+            if (!_hand[j]) continue;
+            var t = Mathf.Clamp01((now - _handAt[j]) / HandoffSeconds);
+            var bone = _bone[j];
+            if (bone == null || bone.WasCollected || t >= 1f) { _hand[j] = false; _handing--; continue; }
+            bone.localRotation = Quaternion.Slerp(_from[j], bone.localRotation, Smooth(t));
         }
     }
 

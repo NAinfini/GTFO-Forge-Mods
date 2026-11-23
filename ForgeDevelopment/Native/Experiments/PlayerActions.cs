@@ -227,7 +227,8 @@ internal static class PlayerActions
     /// <summary>How well an interaction answers a <c>name=</c> (lower is better; -1 does not match). <c>text@Owner</c> asks for an owner
     /// type containing <c>Owner</c> and, when <c>text</c> is given, own names containing it. A bare <c>text</c> matches either, and an
     /// interaction whose owner type contains it (rank 0) wins over one whose own names only do (rank 1): <c>name=Terminal</c> is the
-    /// terminal's own interaction before a prop named after terminals. Every comparison ignores case.</summary>
+    /// terminal's own interaction before a prop named after terminals, and one whose prompt text holds it only (rank 2) comes after both.
+    /// Every comparison ignores case.</summary>
     private static int Rank(Interact_Base interact, string name)
     {
         if (name.Length == 0) return 0;
@@ -239,7 +240,15 @@ internal static class PlayerActions
             string self = name[..at], wanted = name[(at + 1)..];
             return Has(owner, wanted) && (self.Length == 0 || Has(SelfOf(interact), self)) ? 0 : -1;
         }
-        return Has(owner, name) ? 0 : Has(SelfOf(interact), name) ? 1 : -1;
+        return Has(owner, name) ? 0 : Has(SelfOf(interact), name) ? 1 : Has(MessageOf(interact), name) ? 2 : -1;
+    }
+
+    /// <summary>The prompt a player reads on the interaction (a Forge button's label, a door's or terminal's own text): the one name of a
+    /// button a script can know without a generated id, so <c>interact name=返回现实</c> finds the button that says so.</summary>
+    private static string MessageOf(Interact_Base interact)
+    {
+        try { return interact.TryCast<Interact_Timed>()?.InteractionMessage ?? interact.TryCast<Interact_ComputerTerminal>()?.InteractionMessage ?? ""; }
+        catch (Exception) { return ""; }
     }
 
     /// <summary>The nearest level-generation component at or up to <see cref="OwnerDepth"/> objects above the interaction. The terminal
@@ -279,6 +288,16 @@ internal static class PlayerActions
             + "; hold=" + Number(best.TryCast<Interact_Timed>()?.InteractDuration ?? 0f) + "; blocked=" + best.IsBlocked.ToString().ToLowerInvariant()
             + "; front=" + (front is { } facing ? Point(facing) : "none") + "; height=" + Number(height) + "; posture=" + posture + "; eye=" + Number(eye)
             + "; stand=" + Point(stand) + "; standClear=" + clear.ToString().ToLowerInvariant();
+    }
+
+    /// <summary>The dimension index (the number a teleport spec takes) of the level piece that owns the interaction
+    /// <see cref="Interactable"/> finds for <paramref name="name"/> within <paramref name="radius"/> of the player: with its <c>stand</c> point this is
+    /// where <c>teleport near=&lt;name&gt;</c> puts the player, in whatever dimension the interaction is.</summary>
+    internal static string InteractableDimension(string name, float radius)
+    {
+        var best = FindInteraction(Local, name, "", radius);
+        var area = best.GetComponentInParent<LG_Area>() ?? throw new InvalidOperationException("interact.area-unavailable: no level area above " + NameOf(best));
+        return ((int)area.m_zone.DimensionIndex).ToString(CultureInfo.InvariantCulture);
     }
 
     /// <summary>Why the game would not take the interaction <see cref="Interactable"/> finds with the same arguments from where the player

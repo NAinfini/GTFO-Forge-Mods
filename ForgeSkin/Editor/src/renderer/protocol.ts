@@ -456,6 +456,7 @@ export type SkinsNoteKind =
   | 'layers'
   | 'wear'
   | 'reticleIntensity'
+  | 'sightLens'
   | 'attachments'
   | 'parts'
   | 'sounds'

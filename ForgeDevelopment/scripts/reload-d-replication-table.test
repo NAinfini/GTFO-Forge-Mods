@@ -1,0 +1,9 @@
+# One machine's enemy replication table (the order the game copies enemy prefabs by over the network), read after the machine holds the
+# content of the test packages (reload-d-entries.test, or the same packages installed and the game started). Run it on the host after a
+# generation change and on the machine that joined afterwards, then compare the two runs:
+#   python -B Mods/ForgeDevelopment/tools/compare_replication.py <host run folder> <client run folder>
+# The run folders are the console/<time>-reload-d-replication-table folders of each session. Steps are in the owner's checklist (PLAN of ForgeDevelopment).
+stop-on-fail
+entries ReloadD as=table
+expect $table.enemyRowsIncomplete == 0
+expect $table.ownOrder contains R

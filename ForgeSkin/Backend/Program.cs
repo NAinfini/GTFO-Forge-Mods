@@ -142,6 +142,10 @@ public static class Program
         for (int i = 0; i < args.Length - 1; i++)
             if (args[i] == "--data-dir") Paths.Data = Path.GetFullPath(args[i + 1]);
             else if (args[i] == "--former-data-dir") Paths.FormerData.Add(Path.GetFullPath(args[i + 1]));
+            else if (args[i] == "--manifest") ProgramManifest.Current = ProgramManifest.Load(Path.GetFullPath(args[i + 1]));
+        // `--methods a,b,x.*` (after the manifest, so it wins over the manifest's own list) narrows what a caller may use.
+        for (int i = 0; i < args.Length - 1; i++)
+            if (args[i] == "--methods") ProgramManifest.Current = ProgramManifest.Current with { Methods = args[i + 1].Split([',', ' '], StringSplitOptions.RemoveEmptyEntries) };
         // Release step: the keys of the located game's own textures, for its revision (GameAssets.IsVanilla).
         if (Array.IndexOf(args, "--write-vanilla-textures") is var at and >= 0 && at + 1 < args.Length)
         {

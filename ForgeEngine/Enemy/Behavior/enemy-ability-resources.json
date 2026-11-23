@@ -1,0 +1,17 @@
+{
+  "format": "forge-enemy-ability-resources",
+  "version": "1.0.0",
+  "separator": ":",
+  "maxIndex": 2147483647,
+  "kinds": [
+    {"id": "melee", "ability": 1},
+    {"id": "ranged", "ability": 2},
+    {"id": "alarm", "ability": 3},
+    {"id": "defensive", "ability": 4},
+    {"id": "healing", "ability": 5},
+    {"id": "group_enhance", "ability": 6},
+    {"id": "detection", "ability": 7},
+    {"id": "door_breaker", "ability": 8},
+    {"id": "spawn_children", "ability": 9}
+  ]
+}

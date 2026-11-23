@@ -372,9 +372,9 @@ internal sealed class GroundLay
             {
                 var i = 1 + s * _slots + j;
                 Vertices[i] = Vertices[0];
-                Uvs[i] = Vector2.zero;
-                Drapes[i] = Vector2.zero;
-                Colours[i] = new Color32(255, 0, 255, 0);
+                Uvs[i] = default;
+                Drapes[i] = default;
+                Colours[i] = new Color32 { r = 255, b = 255 };
                 _distance[i] = 0f;
             }
         }
@@ -383,11 +383,14 @@ internal sealed class GroundLay
     private void Put(int spoke, int slot, float r, float y, float light, bool open, float up, float drop)
     {
         var i = 1 + spoke * _slots + slot;
-        var flat = _direction[spoke] * r;
-        Vertices[i] = new Vector3(flat.x, y + Lift, flat.z);
-        Uvs[i] = new Vector2(Vector3.Dot(flat, _right) / _radius, Vector3.Dot(flat, _forward) / _radius);
-        Drapes[i] = new Vector2(up, drop);
-        Colours[i] = new Color32(255, open ? (byte)255 : (byte)0, 255, (byte)Math.Round(light * 255f));
+        // Field stores and plain arithmetic, not the Vector constructors, operators or Dot: in the interop assembly each is a call into
+        // the game's IL2CPP code (MeshArrays), and this runs for every vertex of every relay.
+        var d = _direction[spoke];
+        float fx = d.x * r, fz = d.z * r;
+        Vertices[i] = new Vector3 { x = fx, y = y + Lift, z = fz };
+        Uvs[i] = new Vector2 { x = (fx * _right.x + fz * _right.z) / _radius, y = (fx * _forward.x + fz * _forward.z) / _radius };
+        Drapes[i] = new Vector2 { x = up, y = drop };
+        Colours[i] = new Color32 { r = 255, g = open ? (byte)255 : (byte)0, b = 255, a = (byte)Math.Round(light * 255f) };
         _distance[i] = r / _spacing[spoke]; // in rings: neighbouring spokes of a strip differ in length, they are stitched ring to ring
     }
 
@@ -431,7 +434,7 @@ internal sealed class GroundLay
             {
                 var nearX = x + _edgeAt[more * _rings + _edges[fewer]];
                 var spare = 1 + _spokes * _slots + s;
-                Vertices[spare] = new Vector3(Vertices[lastY].x, Vertices[nearX + 1].y, Vertices[lastY].z);
+                Vertices[spare] = new Vector3 { x = Vertices[lastY].x, y = Vertices[nearX + 1].y, z = Vertices[lastY].z };
                 Uvs[spare] = Uvs[lastY];
                 Drapes[spare] = Drapes[nearX + 1];
                 Colours[spare] = Colours[nearX + 1];
@@ -457,8 +460,11 @@ internal sealed class GroundLay
             var c = b >= lastB || (a < lastA && _distance[a + 1] <= _distance[b + 1]) ? ++a : ++b;
             var first = c == a ? a - 1 : a;
             var second = c == b ? b - 1 : b;
-            var normal = Vector3.Cross(Vertices[second] - Vertices[first], Vertices[c] - Vertices[first]);
-            if (Math.Abs(normal.y) < steep * normal.magnitude) continue;
+            // The face normal in plain arithmetic: Cross, the operators and magnitude are IL2CPP calls in the interop assembly (Put).
+            Vector3 o = Vertices[first], p = Vertices[second], q = Vertices[c];
+            float ux = p.x - o.x, uy = p.y - o.y, uz = p.z - o.z, vx = q.x - o.x, vy = q.y - o.y, vz = q.z - o.z;
+            float nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+            if (Math.Abs(ny) < steep * MathF.Sqrt(nx * nx + ny * ny + nz * nz)) continue;
             Triangles[n++] = first; Triangles[n++] = second; Triangles[n++] = c;
         }
         return n;

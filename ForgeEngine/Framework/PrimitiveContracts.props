@@ -1,0 +1,50 @@
+<Project>
+  <!-- What every assembly that compiles the framework sources takes with them: the generated block table and the reviewed
+       release data the framework reads by name. -->
+  <PropertyGroup>
+    <_ForgeProjectionRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../..'))</_ForgeProjectionRoot>
+    <_ForgeBlockTable>$(_ForgeProjectionRoot)/artifacts/generated/blocks/Blocks.g.cs</_ForgeBlockTable>
+  </PropertyGroup>
+  <!-- The block table (Tools/Forge/build-primitive-runtime.ts) compiles in from its generated file. The file is not tracked:
+       it is written here when it is missing or older than its sources. -->
+  <Target Name="GenerateForgeBlockTable" BeforeTargets="PrepareForBuild"
+          Inputs="$(_ForgeProjectionRoot)/Docs/forge-contract/primitive/primitives.json;$(_ForgeProjectionRoot)/Docs/forge-contract/behavior/operators.json;$(_ForgeProjectionRoot)/Tools/Forge/capability-copy.json;$(_ForgeProjectionRoot)/Tools/Forge/capability-research-source.json;$(_ForgeProjectionRoot)/Web/locales/zh/textLanguageCapabilities.json;$(_ForgeProjectionRoot)/Web/locales/en/textLanguageCapabilities.json;$(_ForgeProjectionRoot)/Web/locales/zh/mapModelTransformCapabilities.json;$(_ForgeProjectionRoot)/Web/locales/en/mapModelTransformCapabilities.json;$(_ForgeProjectionRoot)/Tools/Forge/capability-player-copy.ts;$(_ForgeProjectionRoot)/Tools/Forge/build-primitive-runtime.ts"
+          Outputs="$(_ForgeBlockTable)">
+    <Exec Command="pnpm --config.verify-deps-before-run=false generate:ephemeral" WorkingDirectory="$(_ForgeProjectionRoot)" Timeout="120000" />
+    <Error Condition="!Exists('$(_ForgeBlockTable)')" Text="forge-blocks-missing: pnpm generate:ephemeral did not produce $(_ForgeBlockTable)." />
+    <Touch Files="$(_ForgeBlockTable)" />
+  </Target>
+  <ItemGroup>
+    <Compile Include="$(_ForgeBlockTable)" Link="Framework/Blocks.g.cs" />
+  </ItemGroup>
+  <!-- The wire vocabulary (Docs/forge-contract/wire/wire.json) compiles in from its generated tables. The file is not tracked:
+       it is written here when it is missing or older than its source. -->
+  <PropertyGroup>
+    <_ForgeWireTables>$(_ForgeProjectionRoot)/artifacts/generated/wire/Wire.g.cs</_ForgeWireTables>
+  </PropertyGroup>
+  <Target Name="GenerateForgeWireTables" BeforeTargets="PrepareForBuild"
+          Inputs="$(_ForgeProjectionRoot)/Docs/forge-contract/wire/wire.json;$(_ForgeProjectionRoot)/Tools/Forge/build-wire.ts"
+          Outputs="$(_ForgeWireTables)">
+    <Exec Command="pnpm --config.verify-deps-before-run=false generate:ephemeral" WorkingDirectory="$(_ForgeProjectionRoot)" Timeout="120000" />
+    <Error Condition="!Exists('$(_ForgeWireTables)')" Text="forge-wire-missing: pnpm generate:ephemeral did not produce $(_ForgeWireTables)." />
+    <Touch Files="$(_ForgeWireTables)" />
+  </Target>
+  <ItemGroup>
+    <Compile Include="$(_ForgeWireTables)" Link="Framework/Wire.g.cs" />
+  </ItemGroup>
+  <!-- The framework's diagnostic code constants compile in from their generated files (Mods/Build/DiagnosticConstants.targets). -->
+  <ItemGroup>
+    <ForgeDiagnosticConstants Include="RuntimeLogCodes;RuntimeLogReasonCodes;TriggerLogCodes" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)../../../catalog/forge-release/MANIFEST.json"
+                      LogicalName="ForgeEngine.Framework.ReviewedReleaseHashes.json"
+                      Link="Catalog/forge-release/MANIFEST.json" />
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)../../../catalog/forge-release/runtime-manifest.json"
+                      LogicalName="ForgeEngine.Framework.ReviewedRuntimeManifest.json"
+                      Link="Catalog/forge-release/runtime-manifest.json" />
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)../../../catalog/forge-release/tick-rate.json"
+                      LogicalName="ForgeEngine.Framework.TickRate.json"
+                      Link="Catalog/tick-rate.json" />
+  </ItemGroup>
+</Project>

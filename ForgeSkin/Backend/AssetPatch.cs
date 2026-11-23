@@ -400,11 +400,21 @@ public static class AssetPatch
             using (var tpk = typeof(AssetPatch).Assembly.GetManifestResourceStream("classdata.tpk")!) am.LoadClassPackage(tpk);
             am.LoadClassDatabaseFromPackage(inst.file.Metadata.UnityVersion);
             long next = inst.file.AssetInfos.Max(i => i.PathId) + 1;
-            foreach (var group in edits.GroupBy(e => e.PathId))
+            foreach (var byMaterial in edits.GroupBy(e => e.PathId))
             {
-                var info = GameAssets.Info(inst, group.Key);
+                var info = GameAssets.Info(inst, byMaterial.Key);
                 var mat = am.GetBaseField(inst, info);
                 var name = mat["m_Name"].AsString;
+                var shader = Texture(am, inst, data, mat["m_Shader"]);
+                // A sight's lens keeps the game's glass with only the skin's reticles on it (Core MaterialOverride.OnLens).
+                bool lens = MaterialOverride.IsLensShader(shader["m_ParsedForm.m_Name"].AsString);
+                var group = byMaterial.Select(e =>
+                {
+                    if (!lens) return e;
+                    var reticles = e.Override.OnLens(out var left);
+                    if (left.Count > 0) warningsOf(e.Skin).Add($"{name}: a sight lens; the skin's {string.Join(", ", left)} for it left out, the lens keeps the game's glass");
+                    return e with { Override = reticles };
+                }).ToList();
                 var envs = mat["m_SavedProperties.m_TexEnvs.Array"];
                 var textures = new Dictionary<TextureChannel, Edit>();
                 foreach (var e in group)
@@ -445,7 +455,7 @@ public static class AssetPatch
                     env["second.m_Texture.m_FileID"].AsInt = 0;
                     env["second.m_Texture.m_PathID"].AsLong = next++;
                 }
-                var hdr = Unity.HdrColours(Texture(am, inst, data, mat["m_Shader"]));
+                var hdr = Unity.HdrColours(shader);
                 foreach (var e in group) Params(mat, e.Override, name, hdr, warningsOf(e.Skin));
                 info.SetNewData(mat);
             }

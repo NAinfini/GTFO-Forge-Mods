@@ -186,7 +186,7 @@ def run(args: argparse.Namespace) -> dict:
         raise ValueError("retired files contain user edits; move or resolve them manually before upgrading: "
                          + ", ".join(row["relative"] for row in retired if row["action"] == "retired-customized"))
     if args.apply and retired and not args.prune_retired:
-        raise ValueError("retired installed resources require explicit --prune-retired; matching old bytes will be backed up: "
+        raise ValueError("retired installed resources require explicit --prune-retired; matching old files will be removed: "
                          + ", ".join(row["relative"] for row in retired))
     check_identities(merged)
     replacements = [row for row in changes if row["action"] == "replace"]
@@ -195,30 +195,21 @@ def run(args: argparse.Namespace) -> dict:
         if differences:
             raise ValueError("loaded config differs from shipped JSON: " + ", ".join(differences))
     if args.apply and replacements and not args.replace_existing:
-        raise ValueError("existing config differs; preview then explicitly use --replace-existing (old bytes are backed up): "
+        raise ValueError("existing config differs; preview then explicitly use --replace-existing (old files are overwritten, their sha256 is printed): "
                          + ", ".join(row["relative"] for row in replacements))
-    backup = None
     if args.apply:
         target.mkdir(parents=True, exist_ok=True)
-        if replacements or retired:
-            backup = Path(tempfile.mkdtemp(prefix="probe-backup-", dir=target))
-            for row in replacements:
-                saved = backup / row["relative"]
-                saved.parent.mkdir(parents=True, exist_ok=True)
-                saved.write_bytes((target / row["relative"]).read_bytes())
-            for row in retired:
-                path = target / row["relative"]
-                if digest(path.read_bytes()) != row["previousSha256"]:
-                    raise ValueError(f"retired file changed during install; preserved: {row['relative']}")
-                saved = backup / row["relative"]
-                saved.parent.mkdir(parents=True, exist_ok=True)
-                path.replace(saved)
+        for row in retired:
+            path = target / row["relative"]
+            if digest(path.read_bytes()) != row["previousSha256"]:
+                raise ValueError(f"retired file changed during install; preserved: {row['relative']}")
+            path.unlink()  # Not copied anywhere; the output lists it with its sha256.
         for row in changes:
             if row["action"] == "same":
                 continue
             path = target / row["relative"]
             path.parent.mkdir(parents=True, exist_ok=True)
-            # One atomic file replacement; old conflicting bytes are already saved.
+            # One atomic file replacement; the replaced file is listed in the output with its previous sha256 (no copy is kept).
             with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".probe-", delete=False) as stream:
                 temporary = Path(stream.name)
                 stream.write(shipped[row["relative"]])
@@ -243,7 +234,6 @@ def run(args: argparse.Namespace) -> dict:
     unmanaged = sorted(name for name in merged if name not in shipped and name not in previous)
     return {"mode": "check" if args.check else "apply" if args.apply else "preview",
             "loadedTraceDirectory": str(target / "trace"), "loadedCommandDirectory": str(target / "commands"),
-            "backupDirectory": str(backup) if backup else None,
             "restartRequired": bool(args.apply), "gameLoadVerified": False, "files": changes,
             "retired": retired, "unmanagedFiles": unmanaged, "packageVerified": package_receipt,
             "oldReceipt": "recycled" if old_receipt and args.apply else "found" if old_receipt else None,
@@ -258,7 +248,7 @@ def main() -> int:
     mode.add_argument("--apply", action="store_true")
     mode.add_argument("--check", action="store_true")
     parser.add_argument("--replace-existing", action="store_true")
-    parser.add_argument("--prune-retired", action="store_true", help="Back up/remove unmodified old resources identified by the previous install receipt")
+    parser.add_argument("--prune-retired", action="store_true", help="Remove unmodified old resources identified by the previous install receipt")
     args = parser.parse_args()
     if (args.replace_existing or args.prune_retired) and not args.apply:
         parser.error("--replace-existing/--prune-retired require --apply")

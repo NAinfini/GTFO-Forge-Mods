@@ -1,0 +1,118 @@
+# R7D1 pathfinding A/B with every door within 400 m open (r7d1-path.test opened them in this session; the line is repeated).
+# 96 aggressive Strikers (12 x 4 at a fixed point, 12 x 4 two metres ahead in case the fixed point is off the course) spawn where the god-mode player stood in zone 194 (13.5,6.49,273.3, read back in this session) (0/MainLayer/3). Every measured leg runs the same way: the player
+# teleports to zone 192 (0/MainLayer/1) and ChaseState is read 12 s and 30 s later (near = enemies within 8 m); then the player goes
+# back to zone 194 and waits 35 s for the crowd to return. PathfindingIterations off (A, the game's 100) / on (B, 50) alternate.
+god on
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
+teleport zone=0/MainLayer/3 area=0
+door open near:400
+wait 2s
+player as=start
+spawn Striker 4 at=13.5,6.49,273.3 mode=aggressive
+spawn Striker 4 at=13.5,6.49,273.3 mode=aggressive
+spawn Striker 4 at=13.5,6.49,273.3 mode=aggressive
+spawn Striker 4 at=13.5,6.49,273.3 mode=aggressive
+spawn Striker 4 at=13.5,6.49,273.3 mode=aggressive
+spawn Striker 4 at=13.5,6.49,273.3 mode=aggressive
+spawn Striker 4 at=13.5,6.49,273.3 mode=aggressive
+spawn Striker 4 at=13.5,6.49,273.3 mode=aggressive
+spawn Striker 4 at=13.5,6.49,273.3 mode=aggressive
+spawn Striker 4 at=13.5,6.49,273.3 mode=aggressive
+spawn Striker 4 at=13.5,6.49,273.3 mode=aggressive
+spawn Striker 4 at=13.5,6.49,273.3 mode=aggressive
+spawn Striker 4 at=front:2 mode=aggressive
+spawn Striker 4 at=front:2 mode=aggressive
+spawn Striker 4 at=front:2 mode=aggressive
+spawn Striker 4 at=front:2 mode=aggressive
+spawn Striker 4 at=front:2 mode=aggressive
+spawn Striker 4 at=front:2 mode=aggressive
+spawn Striker 4 at=front:2 mode=aggressive
+spawn Striker 4 at=front:2 mode=aggressive
+spawn Striker 4 at=front:2 mode=aggressive
+spawn Striker 4 at=front:2 mode=aggressive
+spawn Striker 4 at=front:2 mode=aggressive
+spawn Striker 4 at=front:2 mode=aggressive
+wait 30s
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "leg-A-1"
+teleport zone=0/MainLayer/1 area=0
+call static:ForgePerformance.Crowd.PerformanceControl Chase 80 8.0
+wait 12s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=leg_A_1_at12
+wait 18s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=leg_A_1_at30
+call static:ForgePerformance.Crowd.PerformanceControl Mark "return"
+teleport zone=0/MainLayer/3 area=0
+wait 35s
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "leg-B-1"
+teleport zone=0/MainLayer/1 area=0
+call static:ForgePerformance.Crowd.PerformanceControl Chase 80 8.0
+wait 12s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=leg_B_1_at12
+wait 18s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=leg_B_1_at30
+call static:ForgePerformance.Crowd.PerformanceControl Mark "return"
+teleport zone=0/MainLayer/3 area=0
+wait 35s
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "leg-A-2"
+teleport zone=0/MainLayer/1 area=0
+call static:ForgePerformance.Crowd.PerformanceControl Chase 80 8.0
+wait 12s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=leg_A_2_at12
+wait 18s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=leg_A_2_at30
+call static:ForgePerformance.Crowd.PerformanceControl Mark "return"
+teleport zone=0/MainLayer/3 area=0
+wait 35s
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "leg-B-2"
+teleport zone=0/MainLayer/1 area=0
+call static:ForgePerformance.Crowd.PerformanceControl Chase 80 8.0
+wait 12s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=leg_B_2_at12
+wait 18s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=leg_B_2_at30
+call static:ForgePerformance.Crowd.PerformanceControl Mark "return"
+teleport zone=0/MainLayer/3 area=0
+wait 35s
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "leg-A-3"
+teleport zone=0/MainLayer/1 area=0
+call static:ForgePerformance.Crowd.PerformanceControl Chase 80 8.0
+wait 12s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=leg_A_3_at12
+wait 18s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=leg_A_3_at30
+call static:ForgePerformance.Crowd.PerformanceControl Mark "return"
+teleport zone=0/MainLayer/3 area=0
+wait 35s
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "leg-B-3"
+teleport zone=0/MainLayer/1 area=0
+call static:ForgePerformance.Crowd.PerformanceControl Chase 80 8.0
+wait 12s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=leg_B_3_at12
+wait 18s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=leg_B_3_at30
+call static:ForgePerformance.Crowd.PerformanceControl Mark "return"
+teleport zone=0/MainLayer/3 area=0
+wait 35s
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "leg-A-4"
+teleport zone=0/MainLayer/1 area=0
+call static:ForgePerformance.Crowd.PerformanceControl Chase 80 8.0
+wait 12s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=leg_A_4_at12
+wait 18s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=leg_A_4_at30
+call static:ForgePerformance.Crowd.PerformanceControl Mark "return"
+teleport zone=0/MainLayer/3 area=0
+wait 35s
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
+call static:ForgePerformance.Crowd.PerformanceControl Read as=end
+clear enemies
+call static:ForgePerformance.Crowd.PerformanceControl Mark "end"
+expect log --all !contains "Exception"

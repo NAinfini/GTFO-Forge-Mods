@@ -5,7 +5,6 @@ import os
 from pathlib import Path
 import re
 import stat
-import uuid
 import zipfile
 import sys
 # In the repository safe_delete sits one folder up; a copied tooling folder holds it beside this file.
@@ -19,7 +18,7 @@ from game_process import IN_REPOSITORY, profiles_root, require_game_lock  # noqa
 # An install is run on the owner's explicit request and always names the profile (there is no default install profile);
 # Forge-TimeAttack is the competition profile he asked for (time-attack Rundown and its clean dependencies only).
 # The list binds this repository's tools; a copied tooling folder drives whichever profile its user names.
-ALLOWED_PROFILES = {"drive": frozenset({"Forge-Multiplayer"}), "install": frozenset({"Forge-Multiplayer", "Forge-TimeAttack"})}
+ALLOWED_PROFILES = {"drive": frozenset({"Forge-Multiplayer", "Forge-TimeAttack"}), "install": frozenset({"Forge-Multiplayer", "Forge-TimeAttack"})}
 _PROFILE_ROOT = profiles_root()
 DEFAULT_PROFILE = _PROFILE_ROOT / "Forge-Multiplayer"
 
@@ -42,8 +41,7 @@ def require_profile(profile, purpose="drive"):
 
 def package_dir(plugins, name):
     """The one folder of one package under plugins. A name is a single Author-Name identity: a list of names (spaces, commas,
-    separators), an empty name, or anything that resolves to the plugins root or outside it is refused, so no install, backup or
-    restore step can ever touch the plugins root itself."""
+    separators), an empty name, or anything that resolves to the plugins root or outside it is refused, so no install step can ever touch the plugins root itself."""
     if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_]+-[A-Za-z0-9_]+", name):
         raise ValueError("包名必须是单个 作者-名称，不接受包名串：" + repr(name))
     target = Path(plugins) / name
@@ -131,56 +129,19 @@ def installed_drift(root, installed):
             "unmanaged": sorted(name for name in actual if name not in installed)}
 
 
-def backup_packages(bep, identity, work):
-    """Before an install: the exact bytes of every shipped package folder now in the profile and of mods.yml, with their hashes,
-    so restore_packages can put the profile back as it was after the run."""
-    require_game_lock(bep)
-    backup = work / "profile-backup" / uuid.uuid4().hex
-    backup.mkdir(parents=True)
-    yaml = bep.parent / "mods.yml"
-    manifest = {"bepinex": str(bep), "modsYml": digest(yaml.read_bytes()) if yaml.exists() else None, "packages": {}}
-    if yaml.exists():
-        (backup / "mods.yml").write_bytes(yaml.read_bytes())
-    for package in shipped_packages(identity):
-        source = package_dir(bep / "plugins", package["packageName"])
-        files = package_contents(source, record=True) if source.exists() or data_dir(source).exists() else None
-        for name, data in (files or {}).items():
-            copy = package_path(backup / "plugins" / package["packageName"], name)
-            copy.parent.mkdir(parents=True, exist_ok=True)
-            copy.write_bytes(data)
-        manifest["packages"][package["packageName"]] = None if files is None else {name: digest(data) for name, data in files.items()}
-    (backup / "backup.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
-    return backup
-
-
-def restore_packages(backup):
-    """After the run: every package folder and mods.yml back to the backed-up bytes (a package that was absent is removed again),
-    then read back against the backup's hashes; a difference raises and keeps the backup."""
-    manifest = json.loads((backup / "backup.json").read_text(encoding="utf-8"))
-    bep = Path(manifest["bepinex"])
-    require_game_lock(bep)
-    displaced = backup.parent / (backup.name + "-displaced")
-    for name, files in manifest["packages"].items():
-        target = package_dir(bep / "plugins", name)
-        for folder in (target, data_dir(target)):
-            if folder.exists():
-                list(plain_tree(folder))
-                (displaced / folder.parent.name).mkdir(parents=True, exist_ok=True)
-                folder.rename(displaced / folder.parent.name / name)
-        for relative in files or {}:
-            package_path(target, relative).parent.mkdir(parents=True, exist_ok=True)
-            package_path(target, relative).write_bytes(package_path(backup / "plugins" / name, relative).read_bytes())
-        actual = {relative: digest(data) for relative, data in package_contents(target, record=True).items()} if target.exists() or data_dir(target).exists() else None
-        if actual != files:
-            raise RuntimeError("还原后的包与备份不一致，备份保留在 " + str(backup) + "：" + name)
-    if manifest["modsYml"] is not None:
-        yaml = bep.parent / "mods.yml"
-        atomic_bytes(yaml, (backup / "mods.yml").read_bytes())
-        if digest(yaml.read_bytes()) != manifest["modsYml"]:
-            raise RuntimeError("还原后的 mods.yml 与备份不一致，备份保留在 " + str(backup))
-    if displaced.exists():
-        safe_delete.remove(displaced, backup.parent)
-    safe_delete.remove(backup, backup.parent)
+def package_state(plugins, name):
+    """What one installed package is now, for the install log: its manifest.json version and the sha256 of its main dll (the dll
+    named like the package, else the only dll in the folder); None where the package or the file is absent or ambiguous."""
+    folder = package_dir(plugins, name)
+    if not folder.exists():
+        return {"packageName": name, "version": None, "mainDllSha256": None}
+    list(plain_tree(folder))
+    manifest = next(folder.rglob("manifest.json"), None)
+    dlls = sorted(folder.rglob("*.dll"))
+    main = next((p for p in dlls if p.stem == name.split("-", 1)[1]), dlls[0] if len(dlls) == 1 else None)
+    return {"packageName": name,
+            "version": json.loads(manifest.read_text(encoding="utf-8-sig")).get("version_number") if manifest else None,
+            "mainDllSha256": digest(main.read_bytes()) if main else None}
 
 
 # r2modman's install rules for GTFO (the installRules of its GTFO ecosystem entry), in its order: the folder under BepInEx/,
@@ -226,7 +187,7 @@ def installed_path(route, path, package):
 def export_pack_files(archive):
     """(package, {path: bytes}) of one exported Rundown or mod zip (manager_layout_files) in the installed package's layout
     (package_contents: its plugin folder as is, its MTFO folder as GameData/<file>); an entry placed anywhere else, which the
-    backup and drift record cannot follow, is refused. The Thunderstore manifest names no team, so the package is the
+    drift record cannot follow, is refused. The Thunderstore manifest names no team, so the package is the
     `package` of its identity document (forge/rundown.forge, else forge/content/pack.forge)."""
     files = {}
     for (route, path), data in manager_layout_files(archive).items():
@@ -240,15 +201,15 @@ def export_pack_files(archive):
     return json.loads(identity.decode("utf-8-sig"))["package"], files
 
 
-def install_export_pack(bep, archive, work):
+def install_export_pack(bep, archive):
     """Install one exported pack (export_pack_files) as its own package folder of an allowed profile, the tables in the folder
-    MTFO reads (BepInEx/GameData/<package>). The folder and mods.yml are backed up first with backup_packages; the returned backup
-    goes to restore_packages after the run. A refused entry stops it before anything changes."""
+    MTFO reads (BepInEx/GameData/<package>). Nothing is copied: the package being replaced is returned as `replaced` (package_state);
+    to go back, install the earlier pack zip again. A refused entry stops it before anything changes."""
     require_profile(Path(bep).parent, "install")
     require_game_lock(bep)
     name, files = export_pack_files(archive)
     target = package_dir(Path(bep) / "plugins", name)
-    backup = backup_packages(bep, {"packages": [{"packageName": name}]}, work)
+    replaced = package_state(Path(bep) / "plugins", name)
     for folder in (target, data_dir(target)):
         if folder.exists():
             list(plain_tree(folder))
@@ -262,7 +223,8 @@ def install_export_pack(bep, archive, work):
         raise RuntimeError("安装文件与导出包不同：" + name)
     # What we installed, so later checks compare only these files and not what another mod writes into the folder.
     atomic_bytes(target / INSTALLED_RECORD, json.dumps(actual, ensure_ascii=False, sort_keys=True).encode("utf-8"))
-    return {"packageName": name, "zipSha256": digest(Path(archive).read_bytes()), "files": actual, "backup": str(backup)}
+    return {"packageName": name, "zipSha256": digest(Path(archive).read_bytes()), "files": actual, "replaced": replaced,
+            "installed": package_state(Path(bep) / "plugins", name)}
 
 
 def package_zip_files(archive):
@@ -281,6 +243,7 @@ def install_package_zip(bep, archive):
     require_game_lock(bep)
     bep = Path(bep)
     name, files = package_zip_files(archive)
+    replaced = package_state(bep / "plugins", name)
     for route, _, owned in MANAGER_ROUTES:
         target = package_dir(bep / route, name)
         if owned and target.exists():
@@ -293,7 +256,7 @@ def install_package_zip(bep, archive):
     actual = {relative: digest((bep / relative).read_bytes()) for relative in files}
     if actual != {relative: digest(data) for relative, data in files.items()}:
         raise RuntimeError("安装文件与 zip 不同：" + name)
-    return {"packageName": name, "files": actual}
+    return {"packageName": name, "files": actual, "replaced": replaced, "installed": package_state(bep / "plugins", name)}
 
 TEAM_GUIDE = """怎么装
 
@@ -388,7 +351,6 @@ def main(argv=None):
     parser.add_argument("--zip", type=Path, action="append", default=[], help="install-pack：导出包（V1、回炉）；install-zip、team-zip：模组发行 zip 或第三方 Thunderstore 包（<作者>-<名称>-<版本>.zip），按 r2modman 的规则落位；可重复")
     parser.add_argument("--pack", type=Path, action="append", default=[], help="team-zip：导出包（V1、回炉）；可重复")
     parser.add_argument("--output", type=Path, help="team-zip 的输出")
-    parser.add_argument("--work-dir", type=Path, default=Path(__file__).resolve().parents[2] / "artifacts/work/pack-install", help="安装备份目录")
     args = parser.parse_args(argv)
     if not args.zip:
         parser.error(args.command + " 需要至少一个 --zip")
@@ -406,7 +368,7 @@ def main(argv=None):
     inside = profiles_root().absolute() in bep.parents
     with game_lock("pack-cli") if inside else contextlib.nullcontext():
         install = install_export_pack if args.command == "install-pack" else install_package_zip
-        results = [install(bep, archive, args.work_dir) if install is install_export_pack else install(bep, archive) for archive in args.zip]
+        results = [install(bep, archive) for archive in args.zip]
     print(json.dumps(results, ensure_ascii=False, indent=2))
 
 

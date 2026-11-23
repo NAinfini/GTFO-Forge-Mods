@@ -21,7 +21,9 @@ public sealed record InstallNote(string Code, Dictionary<string, string> Args, s
 // so they work while the game runs; only replacing the plugin DLL needs the game closed.
 public static class Install
 {
-    const string PluginDll = "ForgeSkin.Plugin.dll", CoreDll = "ForgeCore.dll", CoreFolder = "NAinfini-ForgeCore";
+    // The DLL ForgeSkin editors before the manifest installed into the editor's former folder (ProgramManifest.SkinProfile only).
+    const string PluginDll = "ForgeSkin.Plugin.dll";
+    static ProgramManifest Manifest => ProgramManifest.Current;
     // Left in the plugin folder by 1.0.3 and earlier: the format library is compiled into the plugin now and NVorbis ships
     // with ForgeCore, whose copy a second NVorbis.dll would clash with.
     static readonly string[] RetiredFiles = ["ForgeSkin.Format.dll", "NVorbis.dll"];
@@ -57,7 +59,7 @@ public static class Install
         WriteActive(profile, json);
     }
 
-    static void RequireProfile(string profile)
+    internal static void RequireProfile(string profile)
     {
         if (!Directory.Exists(Path.Combine(profile, "BepInEx"))) throw new BackendException("not-found", $"{profile} has no BepInEx folder");
     }
@@ -252,34 +254,35 @@ public static class Install
         AtomicFile.WriteText(Path.Combine(dir, $"{DateTime.UtcNow.Ticks}{SkinPack.PickExtension}"), JsonSerializer.Serialize(new { target = key, skin = doc.Id }));
     }
 
-    /// <summary>The ForgeSkin plugin version this editor ships (what a profile's plugin is held to), or null without a plugin build.</summary>
+    /// <summary>The primary package's version this program ships (what a profile's plugin is held to), or null without a plugin build.</summary>
     public static string? ShippedVersion()
     {
-        try { return DllVersion(Path.Combine(PluginSource(), "ForgeSkin", PluginDll)).ToString(3); }
+        try { return DllVersion(Path.Combine(PluginSource(), Manifest.PrimaryPackage.Folder, Manifest.PrimaryPackage.Dll)).ToString(3); }
         catch (BackendException) { return null; }
     }
 
-    // The plugin the app ships, next to the backend: plugin/ForgeSkin/ForgeSkin.Plugin.dll and plugin/ForgeCore/, the plugins/ForgeCore/
-    // folder of the NAinfini-ForgeCore package it depends on. In a checkout the same layout that Mods/ForgeSkin/tools/build-editor-release.ps1
-    // stages under artifacts/forge-skin-release/publish/plugin.
+    // The plugin the app ships, next to the backend: plugin/<package folder>/<dll> for every package of the manifest (ForgeSkin's:
+    // plugin/ForgeSkin/ForgeSkin.Plugin.dll and plugin/ForgeCore/, the plugins/ForgeCore/ folder of the NAinfini-ForgeCore package it
+    // depends on). In a checkout the same layout that Mods/ForgeSkin/tools/build-editor-release.ps1 stages under the manifest's PluginRoot.
     internal static string PluginSource()
     {
+        var needed = Manifest.Packages;
         // The folder to name when none is complete: the first that exists (a half-staged one), else the checkout's (the
         // folder holding .git), else plugin/ next to the backend.
         string? named = null, checkout = null;
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
         {
-            foreach (var plugin in new[] { Path.Combine(dir.FullName, "plugin"), Path.Combine(dir.FullName, "artifacts", "forge-skin-release", "publish", "plugin") })
+            foreach (var plugin in new[] { Path.Combine(dir.FullName, "plugin"), Path.Combine(dir.FullName, Manifest.PluginRoot) })
             {
-                if (File.Exists(Path.Combine(plugin, "ForgeSkin", PluginDll)) && File.Exists(Path.Combine(plugin, "ForgeCore", CoreDll))) return plugin;
+                if (needed.All(p => File.Exists(Path.Combine(plugin, p.Folder, p.Dll)))) return plugin;
                 if (Directory.Exists(plugin)) named ??= plugin;
             }
-            if (checkout == null && Path.Exists(Path.Combine(dir.FullName, ".git"))) checkout = Path.Combine(dir.FullName, "artifacts", "forge-skin-release", "publish", "plugin");
+            if (checkout == null && Path.Exists(Path.Combine(dir.FullName, ".git"))) checkout = Path.Combine(dir.FullName, Manifest.PluginRoot);
         }
         var where = named ?? checkout ?? Path.Combine(AppContext.BaseDirectory, "plugin");
-        var missing = new[] { Path.Combine(where, "ForgeSkin", PluginDll), Path.Combine(where, "ForgeCore", CoreDll) }.Where(f => !File.Exists(f));
-        throw new BackendException("no-plugin", "The plugin files this editor installs are missing: " + string.Join("; ", missing)
-            + ". A packaged editor carries them in resources/publish/plugin (reinstall it); a checkout stages them with Mods/ForgeSkin/tools/build-editor-release.ps1 -PluginOnly.");
+        var missing = needed.Select(p => Path.Combine(where, p.Folder, p.Dll)).Where(f => !File.Exists(f));
+        throw new BackendException("no-plugin", "The plugin files this program installs are missing: " + string.Join("; ", missing)
+            + ". A packaged program carries them in resources/publish/plugin (reinstall it); a checkout stages them (ForgeSkin: Mods/ForgeSkin/tools/build-editor-release.ps1 -PluginOnly).");
     }
 
     static Version DllVersion(string dll)
@@ -288,12 +291,12 @@ public static class Install
         return new Version(v.FileMajorPart, v.FileMinorPart, v.FileBuildPart);
     }
 
-    /// <summary>The two packages the editor ships and keeps in step (PLAN §4.5): the folder in its plugin/ and in the Thunderstore zip, and the DLL.
-    /// ForgeCore first: whether a newer ForgeSkin may stay depends on the ForgeCore the profile ends with.</summary>
-    internal static readonly (string Name, string Dll)[] Packages = [("ForgeCore", CoreDll), ("ForgeSkin", PluginDll)];
+    // The packages the program ships and keeps in step (PLAN §4.5) are ProgramManifest.Packages, in install order (ForgeSkin's: ForgeCore
+    // first, since whether a newer ForgeSkin may stay depends on the ForgeCore the profile ends with).
 
-    /// <summary>Where a mod manager installs a package, BepInEx/plugins/NAinfini-&lt;name&gt;/&lt;name&gt;/: the one copy of it a profile keeps.</summary>
-    public static string Home(string profile, string name) => Path.Combine(Plugins(profile), "NAinfini-" + name, name);
+    /// <summary>Where a mod manager installs a package, BepInEx/plugins/&lt;team&gt;-&lt;name&gt;/&lt;name&gt;/: the one copy of it a profile keeps.</summary>
+    public static string Home(string profile, string name) =>
+        Path.Combine(Plugins(profile), (Manifest.Packages.FirstOrDefault(p => p.Name == name)?.Team ?? "NAinfini") + "-" + name, name);
 
     internal static string Plugins(string profile) => Path.Combine(profile, "BepInEx", "plugins");
 
@@ -325,11 +328,12 @@ public static class Install
         }
     }
 
-    /// <summary>The plugin DLL the game loads from this profile (the one at its home, else the newest elsewhere), or null.</summary>
-    public static string? InstalledPlugin(string profile)
+    /// <summary>The DLL of `package` (default the primary one) the game loads from this profile (the one at its home, else the newest elsewhere), or null.</summary>
+    public static string? InstalledPlugin(string profile, PackageSpec? package = null)
     {
-        var home = Path.Combine(Home(profile, "ForgeSkin"), PluginDll);
-        return File.Exists(home) ? home : Folders(profile, PluginDll).Select(f => Path.Combine(f, PluginDll)).MaxBy(DllVersion);
+        package ??= Manifest.PrimaryPackage;
+        var home = Path.Combine(Home(profile, package.Name), package.Dll);
+        return File.Exists(home) ? home : Folders(profile, package.Dll).Select(f => Path.Combine(f, package.Dll)).MaxBy(DllVersion);
     }
 
     // A copy the editor leaves alone: one a mod manager installed from the store, newer than the shipped one. From the store means
@@ -358,30 +362,75 @@ public static class Install
     sealed record Step(string Name, string Source, string Home, string Dll, bool Keep, List<string> Others, string Why);
 
     // The rule (PLAN §4.5): each package ends as one loadable copy, at its home. A newer copy straight from the store at its home
-    // stays; ForgeSkin only while the ForgeCore the profile ends with is at least the minimum its [BepInDependency] declares (read
-    // from that DLL), else the shipped ForgeSkin replaces it. Any other home copy takes the shipped files.
+    // stays, but only while every package of the manifest decided before it ends at least at the minimum its [BepInDependency]
+    // declares (read from its DLL), else the shipped copy replaces it. Any other home copy takes the shipped files.
     static List<Step> Plan(string profile, string source)
     {
         var steps = new List<Step>();
-        Version? core = null;
-        var coreGuid = PluginMeta.Read(Path.Combine(source, "ForgeCore", CoreDll))?.Guid;
-        foreach (var (name, dll) in Packages)
+        var ends = new Dictionary<string, (string Name, Version Version)>(); // plugin GUID -> the package the profile ends with
+        foreach (var spec in Manifest.Packages)
         {
-            var from = Path.Combine(source, name);
+            var (name, dll) = (spec.Name, spec.Dll);
+            var from = Path.Combine(source, spec.Folder);
             var home = Home(profile, name);
             var at = Path.Combine(home, dll);
             var shipped = DllVersion(Path.Combine(from, dll));
             var keep = NewerFromStore(profile, at, Path.Combine(from, dll));
             var why = keep ? $"{at} {DllVersion(at)} came from the store and is newer than the shipped {shipped}, so it stays" : "";
-            if (keep && name == "ForgeSkin" && coreGuid != null && PluginMeta.Read(at)?.Minimum(coreGuid) is { } min && min > core)
-            {
-                keep = false;
-                why = $"{at} {DllVersion(at)} came from the store and is newer than the shipped {shipped}, but it needs ForgeCore >={min} and the profile ends with ForgeCore {core}, so the shipped ForgeSkin replaces it";
-            }
-            if (name == "ForgeCore") core = keep ? DllVersion(at) : shipped;
+            if (keep && PluginMeta.Read(at) is { } meta)
+                foreach (var (guid, (need, have)) in ends)
+                    if (meta.Minimum(guid) is { } min && min > have)
+                    {
+                        keep = false;
+                        why = $"{at} {DllVersion(at)} came from the store and is newer than the shipped {shipped}, but it needs {need} >={min} and the profile ends with {need} {have}, so the shipped {name} replaces it";
+                        break;
+                    }
+            if (PluginMeta.Read(Path.Combine(from, dll))?.Guid is { } own) ends[own] = (name, keep ? DllVersion(at) : shipped);
             steps.Add(new Step(name, from, home, dll, keep, [.. Folders(profile, dll).Where(f => !SameFolder(f, home))], why));
         }
         return steps;
+    }
+
+    // One package of a plan is current: a single copy at its home, the shipped files or a store copy that stays.
+    static bool StepCurrent(Step s, bool cached = true) => s.Others.Count == 0 && (s.Keep || Same(s.Source, s.Home, cached));
+
+    /// <summary>What a profile holds of each package of the manifest and of each plugin it only checks. Package: `Version` installed (null: none),
+    /// `Shipped` this program's, `Current` (one copy at its home, same content as the shipped files by hash or a newer store copy that stays),
+    /// `BelowMinimum` (installed, under the manifest's MinVersion). Dependency: `Ok` = found at least at its MinVersion.</summary>
+    public static (List<PackageStatus> Packages, List<DependencyStatus> Dependencies) Status(string profile)
+    {
+        string? source = null;
+        try { source = PluginSource(); } catch (BackendException) { }
+        var plan = source == null ? null : Plan(profile, source);
+        var packages = Manifest.Packages.Select(spec =>
+        {
+            var dll = InstalledPlugin(profile, spec);
+            var version = dll == null ? null : DllVersion(dll);
+            var step = plan?.First(s => s.Name == spec.Name);
+            return new PackageStatus(spec.Name, version?.ToString(3), step == null ? null : DllVersion(Path.Combine(step.Source, step.Dll)).ToString(3),
+                dll != null && step != null && StepCurrent(step), version != null && Version.TryParse(spec.MinVersion, out var min) && version < min);
+        }).ToList();
+        Dictionary<string, List<(string Path, string Version)>>? found = null;
+        var dependencies = Manifest.Dependencies.Select(d =>
+        {
+            found ??= PluginsByGuid(profile);
+            var versions = found.TryGetValue(d.Guid, out var copies) ? copies.Select(c => c.Version).ToList() : [];
+            // A plugin's version string may carry a SemVer suffix (MTFO's "4.6.3+git169eb91-main"): the number before it decides.
+            var best = versions.Select(v => Version.TryParse(v.Split('+', '-')[0], out var p) ? p : null).Where(p => p != null).Max();
+            return new DependencyStatus(d.Name, d.Package, best?.ToString(3), best != null && (!Version.TryParse(d.MinVersion, out var min) || best >= min));
+        }).ToList();
+        return (packages, dependencies);
+    }
+
+    // Every plugin under BepInEx/plugins by GUID, one (path, version) per copy (the account of a missing dependency, LoadLog).
+    internal static Dictionary<string, List<(string Path, string Version)>> PluginsByGuid(string profile)
+    {
+        var found = new Dictionary<string, List<(string, string)>>();
+        if (!Directory.Exists(Plugins(profile))) return found;
+        foreach (var dll in Directory.EnumerateFiles(Plugins(profile), "*.dll", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true }))
+            if (PluginMeta.Read(dll) is { } meta)
+                (found.TryGetValue(meta.Guid, out var list) ? list : found[meta.Guid] = []).Add((dll, meta.Version));
+        return found;
     }
 
     /// <summary>The profile's store copies newer than the shipped ones, which the editor leaves alone ("ForgeCore 1.0.3"), for the editor to say so.</summary>
@@ -399,35 +448,37 @@ public static class Install
         string source;
         try { source = PluginSource(); } catch (BackendException) { return false; }
         var former = Game.PluginDir(profile);
-        return !RetiredFiles.Any(f => File.Exists(Path.Combine(former, f)))
-            && Plan(profile, source).All(s => s.Others.Count == 0 && (s.Keep || Same(s.Source, s.Home, true)));
+        return !(Manifest.SkinProfile && RetiredFiles.Any(f => File.Exists(Path.Combine(former, f)))) && Plan(profile, source).All(s => StepCurrent(s));
     }
 
     // The plugin's in-game texts (lang/*.forge, beside its DLL) under `folder`, as paths relative to it.
     static IEnumerable<string> Texts(string folder) =>
         Directory.Exists(Path.Combine(folder, "lang")) ? Directory.GetFiles(Path.Combine(folder, "lang"), "*.forge").Select(f => Path.Combine("lang", Path.GetFileName(f))) : [];
 
-    // Refuses while GTFO runs and holds the DLL.
-    static void RequireUnlocked(string dll)
+    // Refuses while GTFO runs and holds the DLL. Only DLLs: .forge content is read by the running game and swapped under it (Content).
+    internal static void RequireUnlocked(string dll)
     {
         if (!File.Exists(dll) || !Game.Running) return;
         try { using var _ = File.Open(dll, FileMode.Open, FileAccess.ReadWrite, FileShare.None); }
         catch (IOException) { throw new BackendException("game-running", $"Close GTFO first: it has {dll} loaded, and the plugin files cannot be replaced while it runs"); }
     }
 
-    // ForgeCore and ForgeSkin end as one loadable copy each, at their home where a mod manager puts them (Plan). Every other copy
-    // goes: the editor's own former folder plugins/ForgeSkin/ is cleared, and a copy the editor did not put there goes to the
+    // Every package of the manifest ends as one loadable copy, at its home where a mod manager puts it (Plan). Every other copy
+    // goes: ForgeSkin's own former folder plugins/ForgeSkin/ is cleared, and a copy the program did not put there goes to the
     // Recycle Bin (whole when its folder holds nothing but the package's files, else its DLL alone) and is reported in `notes`
     // with its path. Nothing is touched while the game holds one of the files.
     public static object Plugin(string profile)
     {
         RequireProfile(profile);
         var source = PluginSource();
-        MovePreRenameInstall(profile);
-        Directory.CreateDirectory(Skins(profile));
+        if (Manifest.SkinProfile)
+        {
+            MovePreRenameInstall(profile);
+            Directory.CreateDirectory(Skins(profile));
+        }
         var former = Game.PluginDir(profile);
         var plan = Plan(profile, source);
-        foreach (var f in RetiredFiles.Append(PluginDll)) RequireUnlocked(Path.Combine(former, f));
+        if (Manifest.SkinProfile) foreach (var f in RetiredFiles.Append(PluginDll)) RequireUnlocked(Path.Combine(former, f));
         foreach (var s in plan)
         {
             foreach (var other in s.Others) RequireUnlocked(Path.Combine(other, s.Dll));
@@ -457,8 +508,8 @@ public static class Install
                 replaced.Add(s.Home);
             }
         }
-        foreach (var f in RetiredFiles.Select(f => Path.Combine(former, f)).Where(File.Exists)) File.Delete(f);
-        return new { installed = Home(profile, "ForgeSkin"), replaced, newer, notes, version = Game.Profiles().FirstOrDefault(p => Path.GetFullPath(p.Path) == Path.GetFullPath(profile))?.PluginVersion };
+        if (Manifest.SkinProfile) foreach (var f in RetiredFiles.Select(f => Path.Combine(former, f)).Where(File.Exists)) File.Delete(f);
+        return new { installed = Home(profile, Manifest.PrimaryPackage.Name), replaced, newer, notes, version = Game.ProfileAt(profile).PluginVersion };
     }
 
     // A loadable copy the editor did not install: to the Recycle Bin (never a plain delete), its folder whole when it holds only
@@ -519,15 +570,17 @@ public static class Install
 
     static string ConfigFile(string profile) => Path.Combine(profile, "BepInEx", "config", "ForgeSkin.cfg");
 
-    // Removes the ForgeSkin plugin the editor installed: its home copy unless a mod manager owns it (a Thunderstore manifest.json
-    // in NAinfini-ForgeSkin/), and what is left in the editor's former folder. Installed skins and ForgeCore stay.
+    // Removes the primary plugin (ForgeSkin's: ForgeSkin) the program installed: its home copy unless a mod manager owns it (a Thunderstore
+    // manifest.json in its package folder), and what is left in ForgeSkin's former folder. Installed skins and the other packages stay.
     public static object PluginUninstall(string profile)
     {
-        var home = Home(profile, "ForgeSkin");
-        var dirs = new List<string> { Game.PluginDir(profile) };
+        var primary = Manifest.PrimaryPackage;
+        var home = Home(profile, primary.Name);
+        var dirs = new List<string>();
+        if (Manifest.SkinProfile) dirs.Add(Game.PluginDir(profile));
         if (!File.Exists(Path.Combine(Path.GetDirectoryName(home)!, "manifest.json"))) dirs.Add(home);
         else Log.Write($"plugin.uninstall {profile}: {home} kept, a mod manager installed it (remove it there)");
-        var files = dirs.SelectMany(dir => new[] { PluginDll }.Concat(RetiredFiles).Concat(Texts(dir)).Select(f => Path.Combine(dir, f))).ToList();
+        var files = dirs.SelectMany(dir => new[] { primary.Dll }.Concat(Manifest.SkinProfile ? RetiredFiles : []).Concat(Texts(dir)).Select(f => Path.Combine(dir, f))).ToList();
         foreach (var f in files) RequireUnlocked(f);
         foreach (var f in files.Where(File.Exists)) File.Delete(f);
         return new { removed = dirs };

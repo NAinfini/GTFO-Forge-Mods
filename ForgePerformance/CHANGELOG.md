@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.3
+
+- 新增 `VoiceFrameSkipFilter`（默认开，`VoiceFrameSkipSeconds` 默认 0.5）：Dissonance 在任何超过其很短限值的帧之后重启麦克风（100 到 180 ms），等于一次卡顿后立刻再来一次；短于该秒数的帧不再触发重启，更长的帧照旧。代价是 0.2 到 0.5 秒的卡顿后语音可能有短暂杂音而不是被重置；未在多人语音中测试。探针新增 `VoiceFrameSkipIgnored`，诊断码 `perf.voice-frame-skip-ignored`。
+- 新增 `JobWorkerLimit`（默认 0，即游戏自己的数量，未实测）：关卡内限制 Unity job 工作线程的运行数量，关卡结束、卸载和退出时还原。开发控制台 `PerformanceControl Workers <n>` 立即生效，`Read` 读回当前与原始数量，探针行带 `job_workers`；新增 `tools/workers-ab.test`。
+- 新增 `VoiceRestartGuard`（默认开）：语音麦克风重启过于频繁时按 0.25 秒起逐次加倍、最长 5 秒的间隔放行，正常的麦克风不受影响；代价是设备更换后最多约 5 秒没有语音。探针新增语音重启次数与耗时两个点。
+- 新增 `LightningPreload`（默认开）：关卡生成时先读入闪电曲线，避免第一道闪电时同步读取卡住一秒多。
+- 新增 `ShadowProxyHold`（默认开）：被灯持续画阴影的敌人，每画一次就把阴影计时续一秒，不再每秒关开一次；停止被画一秒后照旧关闭，画面不变。控制台 `Set "ShadowProxyHold" true|false` 可同局切换，新增 `HudMask` 读回 HUD 相机的剔除层。
+- 日志：语音重启保护的读回改记 info 级，不再占 error；已放行的重启改用诊断码 `perf.voice-restart-allowed`，只有被拦下的才记 `perf.voice-restart-held-back`。
+- 本机探针采样同时采样 Unity 工作线程，`analyze_samples.py` 按标签输出工作线程的忙闲表。
+
+- 移除远处动画降频（`FarAnimatorThrottle`、`FarAnimatorDistance`、`FarAnimatorInterval`）：它会让侦察兵放完触手后接着滑步行走，而且实测没有帧率收益。配置文件里留下的这三项不再生效，可以删掉。
+- 开发控制台去掉 `Lag` 和 `Animators` 两个读回，探针行去掉 `throttled_animators` 一列。
+- 移除受击时保留导航（`HitReactKeepsAgent`）：原版主机上的受击硬直开导航而不是关导航，这个开关要拦的那一步根本不发生，从来没起过作用，也没测到任何收益。配置文件里留下的这一项不再生效，可以删掉。
+- 探针行和控制台读回去掉 `kept_agents` 一列。
+
 ## 1.0.2
 
 - 敌人成群时的定时检查（每 0.25 秒一次）更省：玩家是否存在每次只查一次，不再每个敌人查一遍；敌人有没有动画组件在登记时记下。各开关的作用和默认值不变。
@@ -14,7 +29,7 @@
 - `ClientHiddenSyncThrottle` / `HiddenSyncDistance` / `HiddenSyncInterval`（关，30 米，4 帧，只客户端）：影响玩法。看不见且较远的敌人每几帧才从主机同步一次位置，碰撞体随之滞后，隔墙射击或爆炸的判定可能不同；主机不受影响。
 - `UpdateBudgets` 和六个 `Budget…` 数值（关，只主机）：数值默认就是原版（游戏内读回 `5,2,1 / 10,4,1 / 12,3,1 / 20,10,5 / 5,2,1 / 1`），不改数值打开也不变；改了会影响玩法：敌人思考、侦测、移动的节奏变了。
 - `AvoidanceQuality` / `AvoidanceType`（关，1，只主机）：原版就是低质量避让（游戏内读回 1），只有 0（不避让）更省；改成 0 会影响玩法：敌人互相穿插、堵门方式变了。打开或改值时，已经在走的敌人当场换成新值，不再等它下次开导航。
-- `PathfindingIterations` / `PathfindingIterationsPerFrame`（关，100，只主机）：100 是原版值；调低会影响玩法：寻路摊到更多帧，敌人起步可能变慢。
+- `PathfindingIterations` / `PathfindingIterationsPerFrame`（开，50，只主机）：原版是 100；调低会影响玩法：寻路摊到更多帧，敌人起步可能变慢。
 - `HitReactKeepsAgent`（关，只主机）：影响玩法。敌人受击硬直时只停导航、不关再开，硬直结束的位置修正与原版不同，落点可能略有偏差。
 - 开关关着时用原版的值和代码，不碰游戏。
 - 新增开发用探针 `Probe` / `ProbeSeconds`（关，1 秒）：每个窗口写一行帧时间、主线程与渲染线程 CPU、敌人刷出、唤醒、导航开关、阴影重绘、逐敌人更新与射手弹体的次数和耗时，写到 `BepInEx/PerformanceLogs/ForgePerformance_*.log`；同时装上全部开关的钩子，可在一局里来回切换对比。探针还给游戏状态更新、敌人更新管理器各组的逐敌人更新、敌人移动、触手、FinalIK、玩家与敌人碰撞、相机、阴影图集、帧率限制器、音频等脚本更新计时，把主线程的脚本阶段拆开；每行带 `utc`，可与 ForgeDevelopment 的每秒行对齐。控制台可用 `Value` 改避让类型和寻路迭代数。每行带 `foreground_frames`（游戏窗口有焦点的帧数），每个标记带 `runInBackground`、垂直同步、目标帧率与当前焦点；控制台 `Limits` 读这些值，`Foreground` / `Background` 请求切换焦点（Windows 可能拒绝，结果写在返回里）。用 `tools/analyze_probe.py` 汇总（标签写成 `<项>-A-<n>` / `<项>-B-<n>` 时按段中位数做 A/B 对比，可并入 ForgeDevelopment 的阶段耗时），`tools/crowd-probe.test`、`tools/crowd-ab.test` 与前后台对照 `tools/crowd-focus.test` 是驱动脚本。

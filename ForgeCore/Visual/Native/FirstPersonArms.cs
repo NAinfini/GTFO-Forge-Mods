@@ -73,6 +73,13 @@ public sealed class FirstPersonArms
         return _track;
     }
 
+    /// <summary>The clip fades back over <paramref name="seconds"/>, then the arms go away and the first-person item comes back (<see cref="TickAll"/>).</summary>
+    public void Stop(float seconds)
+    {
+        if (_showing && seconds > 0f) _track.Stop(seconds);
+        else Stop();
+    }
+
     /// <summary>The arms go away and the first-person item comes back.</summary>
     public void Stop()
     {

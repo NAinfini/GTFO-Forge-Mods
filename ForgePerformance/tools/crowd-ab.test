@@ -1,6 +1,6 @@
 # ForgePerformance A/B comparison: each option alternates off (A) and on (B) in equal 8-second segments, A B A B A B A B A,
-# over a fixed crowd: 40 sleeping Strikers, then the same 40 awake around a god-mode player, then 8 big Strikers under fire
-# for HitReactKeepsAgent. AvoidanceQuality is measured with AvoidanceType 0 (the game already uses 1). The split-* labels
+# over a fixed crowd: 40 sleeping Strikers, then the same 40 awake around a god-mode player.
+# AvoidanceQuality is measured with AvoidanceType 0 (the game already uses 1). The split-* labels
 # are plain 16-second windows for the main-thread split. Needs the probe on (and ForgeDevelopment's performance log for
 # its phases); read with tools/analyze_probe.py <log> --forgedev <ForgeDevelopment log>. PLACE: an open room of V1 A1.
 # Every segment runs the same commands, so A and B segments last equally long.
@@ -10,13 +10,11 @@ teleport 35.5 0.06 50.5
 look 35.5 0.6 60
 call static:ForgePerformance.Crowd.PerformanceControl Set "SetupRendererLookup" false
 call static:ForgePerformance.Crowd.PerformanceControl Set "SpawnFrameDefer" false
-call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" false
 call static:ForgePerformance.Crowd.PerformanceControl Set "FarSkinQuality" false
 call static:ForgePerformance.Crowd.PerformanceControl Set "ClientHiddenSyncThrottle" false
 call static:ForgePerformance.Crowd.PerformanceControl Set "UpdateBudgets" false
 call static:ForgePerformance.Crowd.PerformanceControl Set "AvoidanceQuality" false
 call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
-call static:ForgePerformance.Crowd.PerformanceControl Set "HitReactKeepsAgent" false
 call static:ForgePerformance.Crowd.PerformanceControl Value "AvoidanceType" 0
 call static:ForgePerformance.Crowd.PerformanceControl Read as=before
 call static:ForgePerformance.Crowd.PerformanceControl Mark "split-empty"
@@ -95,32 +93,6 @@ call static:ForgePerformance.Crowd.PerformanceControl Set "FarSkinQuality" true
 wait 8s
 call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-B3-A-5"
 call static:ForgePerformance.Crowd.PerformanceControl Set "FarSkinQuality" false
-wait 8s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-B2-A-1"
-wait 8s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-B2-B-1"
-call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" true
-wait 8s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-B2-A-2"
-call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" false
-wait 8s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-B2-B-2"
-call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" true
-wait 8s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-B2-A-3"
-call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" false
-wait 8s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-B2-B-3"
-call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" true
-wait 8s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-B2-A-4"
-call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" false
-wait 8s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-B2-B-4"
-call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" true
-wait 8s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-B2-A-5"
-call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" false
 wait 8s
 call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-C1-A-1"
 wait 8s
@@ -243,60 +215,6 @@ call static:ForgePerformance.Crowd.PerformanceControl Set "SpawnFrameDefer" fals
 call static:ForgePerformance.Crowd.PerformanceControl Set "FarSkinQuality" false
 wait 8s
 call static:ForgePerformance.Crowd.PerformanceControl Read as=awake_end
-
-# hit reacts: 8 big Strikers, two seconds of fire in every segment
-clear enemies
-wait 3s
-teleport 35.5 0.06 50.5
-look 35.5 0.6 60
-spawn Striker_Big 4 at=front:7
-spawn Striker_Big 4 at=front:10
-wield primary
-wait 6s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "fire-C6-A-1"
-ammo fill
-fire 2s
-wait 6s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "fire-C6-B-1"
-call static:ForgePerformance.Crowd.PerformanceControl Set "HitReactKeepsAgent" true
-ammo fill
-fire 2s
-wait 6s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "fire-C6-A-2"
-call static:ForgePerformance.Crowd.PerformanceControl Set "HitReactKeepsAgent" false
-ammo fill
-fire 2s
-wait 6s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "fire-C6-B-2"
-call static:ForgePerformance.Crowd.PerformanceControl Set "HitReactKeepsAgent" true
-ammo fill
-fire 2s
-wait 6s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "fire-C6-A-3"
-call static:ForgePerformance.Crowd.PerformanceControl Set "HitReactKeepsAgent" false
-ammo fill
-fire 2s
-wait 6s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "fire-C6-B-3"
-call static:ForgePerformance.Crowd.PerformanceControl Set "HitReactKeepsAgent" true
-ammo fill
-fire 2s
-wait 6s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "fire-C6-A-4"
-call static:ForgePerformance.Crowd.PerformanceControl Set "HitReactKeepsAgent" false
-ammo fill
-fire 2s
-wait 6s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "fire-C6-B-4"
-call static:ForgePerformance.Crowd.PerformanceControl Set "HitReactKeepsAgent" true
-ammo fill
-fire 2s
-wait 6s
-call static:ForgePerformance.Crowd.PerformanceControl Mark "fire-C6-A-5"
-call static:ForgePerformance.Crowd.PerformanceControl Set "HitReactKeepsAgent" false
-ammo fill
-fire 2s
-wait 6s
 call static:ForgePerformance.Crowd.PerformanceControl Read as=final
 clear enemies
 call static:ForgePerformance.Crowd.PerformanceControl Mark "end"

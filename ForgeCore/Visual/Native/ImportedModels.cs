@@ -178,12 +178,46 @@ public sealed class ImportedModels : IDisposable
 
     public int Count => _models.Count;
 
-    /// <summary>Decodes the PNGs <see cref="Create"/> will need over later frames (<see cref="ForgeCore.Images.Queue(byte[], System.Action{UnityEngine.Texture2D, string}, bool, bool, int, bool, bool)"/>), so creating the
-    /// model does not decode them all in one frame: true once every one is decoded or failed (a failure is then refused by <see cref="Create"/>
-    /// as before), false while some are still queued. Call it again each frame until it is true; skipping it only moves the decoding into <see cref="Create"/>.</summary>
-    public bool Prepare(ImportedModelDescriptor descriptor, IReadOnlyList<byte[]> textures)
+    /// <summary>The longest main-thread step of a model this cache built over frames, in milliseconds: one mesh made in the image queue, or
+    /// <see cref="Create"/> (the materials and the model). 0 before the first.</summary>
+    public double LongestStepMs { get; private set; }
+
+    // A model on its way (Prepare with its mesh bytes): the mesh file read and checked, and its bone weights laid out, on a worker; then each
+    // Unity mesh (the still part, each facing part, each collision shape) made in its own step of ForgeCore's image queue, within that queue's
+    // frame budget and after the pictures queued before it; Create then makes only the materials.
+    private sealed class Staged
+    {
+        internal System.Threading.Tasks.Task<(ImportedMesh? Data, ImportedModelFailure Failure, BoneWeight[]? Weights)> Read = null!;
+        internal Mesh? Still;
+        internal Matrix4x4[]? Rest;
+        internal ImportedModelPart[] Facing = Array.Empty<ImportedModelPart>();
+        internal Mesh[] Collision = Array.Empty<Mesh>();
+        internal readonly List<Object> Owned = new();
+        internal readonly List<ForgeCore.ImageJob> Jobs = new();
+        internal int Waiting = -1; // steps queued and not yet run; -1: none queued
+        internal string Thrown = "";
+    }
+
+    private readonly Dictionary<string, Staged> _staged = new(StringComparer.Ordinal);
+
+    /// <summary><see cref="Prepare(ImportedModelDescriptor, byte[], IReadOnlyList{byte[]})"/> for the pictures only: the mesh is then read and built in <see cref="Create"/>'s frame.</summary>
+    public bool Prepare(ImportedModelDescriptor descriptor, IReadOnlyList<byte[]> textures) => Prepare(descriptor, null, textures);
+
+    /// <summary>Spreads the work of <see cref="Create"/> over later frames, so building a model takes no one long frame: the PNGs decode in
+    /// ForgeCore's image queue (<see cref="ForgeCore.Images.Queue(byte[], System.Action{UnityEngine.Texture2D, string}, bool, bool, int, bool, bool)"/>), the <paramref name="mesh"/> file is read and checked on a worker, and then each
+    /// of its Unity meshes is made in its own step of the same queue and frame budget (<see cref="ForgeCore.Images.QueueStep"/>). True once all of it is
+    /// done or failed (a failure is then refused by <see cref="Create"/> as before), false while some is still under way. Call it again each frame until it
+    /// is true, then <see cref="Create"/>; skipping it only moves the work into <see cref="Create"/>'s frame.</summary>
+    public bool Prepare(ImportedModelDescriptor descriptor, byte[]? mesh, IReadOnlyList<byte[]> textures)
     {
         if (_models.ContainsKey(descriptor.Key) || _failures.ContainsKey(descriptor.Key) || textures.Count != descriptor.Textures.Count) return true;
+        var ready = Pictures(descriptor, textures);
+        return mesh == null || Meshes(descriptor, mesh, textures) && ready;
+    }
+
+    // The pictures' part of Prepare: true once each is decoded or failed.
+    private bool Pictures(ImportedModelDescriptor descriptor, IReadOnlyList<byte[]> textures)
+    {
         var ready = true;
         bool One(int index, bool linear, bool normal = false)
         {
@@ -201,6 +235,73 @@ public sealed class ImportedModels : IDisposable
         return ready;
     }
 
+    // The mesh's part of Prepare: true once the worker's read failed or every mesh step ran.
+    private bool Meshes(ImportedModelDescriptor d, byte[] mesh, IReadOnlyList<byte[]> textures)
+    {
+        if (!_staged.TryGetValue(d.Key, out var s))
+        {
+            _staged[d.Key] = s = new Staged();
+            s.Read = System.Threading.Tasks.Task.Run(() =>
+            {
+                // Managed only: the one file check (ImportedModelDescriptor.CheckFiles) and the weights' layout, no Unity call.
+                var data = d.ReadFiles(mesh, textures, out var failure);
+                return (data, failure, data?.BoneIndices != null ? Weights(data) : null);
+            });
+        }
+        if (!s.Read.IsCompleted) return false;
+        if (s.Read.IsFaulted || s.Read.Result.Data is not { } data) return true; // Create refuses it
+        if (s.Waiting < 0)
+        {
+            // Each step is one Unity mesh. The still part draws the vertices before the facing parts; each facing part is its own mesh over its
+            // own vertex run, so it can turn. Collision meshes stay readable: the physics engine cooks a MeshCollider from the CPU copy.
+            var weights = s.Read.Result.Weights;
+            s.Facing = new ImportedModelPart[d.Facing.Count];
+            s.Collision = new Mesh[data.Collision.Length];
+            s.Waiting = 1 + s.Facing.Length + s.Collision.Length;
+            Step(s, () => s.Still = Kept(s, StillMesh(d, data, weights, out s.Rest)));
+            for (var f = 0; f < s.Facing.Length; f++)
+            {
+                var index = f;
+                Step(s, () => { s.Facing[index] = FacingPart(d, data, index); Kept(s, s.Facing[index].Mesh); });
+            }
+            for (var i = 0; i < s.Collision.Length; i++)
+            {
+                var index = i;
+                Step(s, () => s.Collision[index] = Kept(s, CollisionMesh(d, data, index)));
+            }
+        }
+        return s.Waiting == 0;
+    }
+
+    private void Step(Staged s, Action make)
+    {
+        s.Jobs.Add(ForgeCore.Images.QueueStep(() =>
+        {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            make();
+            LongestStepMs = Math.Max(LongestStepMs, watch.Elapsed.TotalMilliseconds);
+        }, thrown =>
+        {
+            s.Waiting--;
+            if (thrown.Length != 0 && s.Thrown.Length == 0) s.Thrown = thrown;
+        }));
+    }
+
+    // What a step made, owned by the model on its way and kept from a scene change's unused-asset sweep while it waits (a cache that keeps).
+    private T Kept<T>(Staged s, T made) where T : Object
+    {
+        s.Owned.Add(made);
+        if (_keep) ForgeCore.Assets.Keep(made);
+        return made;
+    }
+
+    // Drops a model on its way: its queued steps and what they made.
+    private static void Drop(Staged s)
+    {
+        foreach (var job in s.Jobs) job.Cancel();
+        foreach (var o in s.Owned) if (o != null && !o.WasCollected) Object.Destroy(o);
+    }
+
     /// <summary>The model of <paramref name="descriptor"/> from its mesh bytes and its PNG textures (in the descriptor's order).</summary>
     public ImportedModelResult Create(ImportedModelDescriptor descriptor, byte[] mesh, IReadOnlyList<byte[]> textures)
     {
@@ -209,16 +310,47 @@ public sealed class ImportedModels : IDisposable
         if (_failures.TryGetValue(key, out var prior)) return new ImportedModelResult(null, prior);
         if (BudgetBytes != 0 && ResidentBytes + descriptor.EstimatedBytes > BudgetBytes)
             return Refuse(descriptor, new ImportedModelFailure(ImportedModelCodes.OverBudget, descriptor.EstimatedBytes + " bytes on top of " + ResidentBytes + " pass the budget of " + BudgetBytes), false);
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        // What Prepare built over earlier frames; one still under way (Create called before Prepare said true) is dropped and built here.
+        _staged.TryGetValue(key, out var staged);
+        if (staged != null && (staged.Waiting != 0 || !staged.Read.IsCompleted))
+        {
+            Drop(staged);
+            _staged.Remove(key);
+            staged = null;
+        }
         // The one file check an exporter runs too (ImportedModelDescriptor.CheckFiles).
-        var data = descriptor.ReadFiles(mesh, textures, out var failure);
-        if (data == null) return Refuse(descriptor, failure, true);
-        if (Shader.Find(LitMaterial.ShaderName) == null)
+        ImportedMesh? data;
+        ImportedModelFailure failure;
+        if (staged != null) (data, failure) = staged.Read.IsFaulted
+            ? (null, new ImportedModelFailure(ImportedModelCodes.Build, staged.Read.Exception!.GetBaseException().Message))
+            : (staged.Read.Result.Data, staged.Read.Result.Failure);
+        else data = descriptor.ReadFiles(mesh, textures, out failure);
+        if (data == null)
+        {
+            if (staged != null) { Drop(staged); _staged.Remove(key); }
+            return Refuse(descriptor, failure, true);
+        }
+        if (Shaders.Find(LitMaterial.ShaderName) == null)
             return Refuse(descriptor, new ImportedModelFailure(ImportedModelCodes.ShaderUnavailable, "the game's gear shader is not loaded yet; models show once a level has been built"), false);
 
-        var owned = new List<Object>();
+        _staged.Remove(key);
+        var owned = staged?.Owned ?? new List<Object>();
         try
         {
-            var model = Build(descriptor, data, textures, owned, out failure);
+            if (staged is { Thrown.Length: > 0 }) throw new InvalidOperationException(staged.Thrown);
+            ImportedModel? model;
+            if (staged != null) model = Build(descriptor, data, textures, owned, staged.Still!, staged.Rest, staged.Facing, staged.Collision, out failure);
+            else
+            {
+                var still = StillMesh(descriptor, data, data.BoneIndices != null ? Weights(data) : null, out var rest);
+                owned.Add(still);
+                var facing = new ImportedModelPart[descriptor.Facing.Count];
+                for (var f = 0; f < facing.Length; f++) owned.Add((facing[f] = FacingPart(descriptor, data, f)).Mesh);
+                var collision = new Mesh[data.Collision.Length];
+                for (var i = 0; i < collision.Length; i++) owned.Add(collision[i] = CollisionMesh(descriptor, data, i));
+                model = Build(descriptor, data, textures, owned, still, rest, facing, collision, out failure);
+            }
             if (model == null)
             {
                 foreach (var o in owned) if (o != null && !o.WasCollected) Object.Destroy(o);
@@ -227,6 +359,7 @@ public sealed class ImportedModels : IDisposable
             if (_keep) foreach (var o in owned) ForgeCore.Assets.Keep(o);
             _models.Add(key, model);
             ResidentBytes += descriptor.EstimatedBytes;
+            if (staged != null) LongestStepMs = Math.Max(LongestStepMs, watch.Elapsed.TotalMilliseconds);
             return new ImportedModelResult(model, default);
         }
         catch (Exception error)
@@ -236,23 +369,12 @@ public sealed class ImportedModels : IDisposable
         }
     }
 
-    private ImportedModel? Build(ImportedModelDescriptor d, ImportedMesh data, IReadOnlyList<byte[]> pngs, List<Object> owned, out ImportedModelFailure failure)
+    // The still part's mesh, a skinned one with its bones (the rest poses out in `rest`; null for a still model). The mesh file carries no
+    // tangents: MeshArrays computes them, also for a model without a normal map.
+    private static Mesh StillMesh(ImportedModelDescriptor d, ImportedMesh data, BoneWeight[]? weights, out Matrix4x4[]? rest)
     {
-        failure = default;
-        // The mesh file carries no tangents: MeshArrays computes them, also for a model without a normal map.
-        // The still part draws the vertices before the facing parts; each facing part is its own mesh over its own vertex run, so it can turn.
         var mesh = Part("Forge imported " + d.MeshSha256[..8], data, 0, d.StillVertices, d.Submeshes);
-        owned.Add(mesh);
-        var facing = new ImportedModelPart[d.Facing.Count];
-        for (var f = 0; f < facing.Length; f++)
-        {
-            var spec = d.Facing[f];
-            var own = Part("Forge imported " + d.MeshSha256[..8] + " facing " + f, data, spec.VertexStart, spec.VertexCount, spec.Submeshes);
-            own.UploadMeshData(true);
-            owned.Add(own);
-            facing[f] = new ImportedModelPart(own, new Vector3(spec.Pivot[0], spec.Pivot[1], spec.Pivot[2]), Quaternion.AngleAxis(spec.Yaw * Mathf.Rad2Deg, Vector3.up), spec.Submeshes);
-        }
-        Matrix4x4[]? rest = null;
+        rest = null;
         if (d.Bones != null)
         {
             rest = new Matrix4x4[d.Bones.Count];
@@ -263,12 +385,31 @@ public sealed class ImportedModels : IDisposable
                 rest[b] = new Matrix4x4(new Vector4(m[0], m[1], m[2], m[3]), new Vector4(m[4], m[5], m[6], m[7]), new Vector4(m[8], m[9], m[10], m[11]), new Vector4(m[12], m[13], m[14], m[15]));
                 binds[b] = rest[b].inverse;
             }
-            mesh.boneWeights = new Il2CppStructArray<BoneWeight>(Weights(data));
+            mesh.boneWeights = new Il2CppStructArray<BoneWeight>(weights ?? Weights(data));
             mesh.bindposes = new Il2CppStructArray<Matrix4x4>(binds);
         }
         // A skinned mesh stays readable: the game may skin it on the CPU.
         mesh.UploadMeshData(rest == null);
+        return mesh;
+    }
 
+    private static ImportedModelPart FacingPart(ImportedModelDescriptor d, ImportedMesh data, int f)
+    {
+        var spec = d.Facing[f];
+        var own = Part("Forge imported " + d.MeshSha256[..8] + " facing " + f, data, spec.VertexStart, spec.VertexCount, spec.Submeshes);
+        own.UploadMeshData(true);
+        return new ImportedModelPart(own, new Vector3(spec.Pivot[0], spec.Pivot[1], spec.Pivot[2]), Quaternion.AngleAxis(spec.Yaw * Mathf.Rad2Deg, Vector3.up), spec.Submeshes);
+    }
+
+    // Collision meshes stay readable: the physics engine cooks a MeshCollider from the CPU copy.
+    private static Mesh CollisionMesh(ImportedModelDescriptor d, ImportedMesh data, int i) =>
+        ForgeCore.StaticColliders.Mesh("Forge imported collision " + d.MeshSha256[..8] + "." + i, data.Collision[i].Positions, data.Collision[i].Indices);
+
+    // The materials over the meshes made, and the model.
+    private ImportedModel? Build(ImportedModelDescriptor d, ImportedMesh data, IReadOnlyList<byte[]> pngs, List<Object> owned, Mesh mesh, Matrix4x4[]? rest,
+        ImportedModelPart[] facing, Mesh[] collision, out ImportedModelFailure failure)
+    {
+        failure = default;
         Texture2D? Decode(ImportedMaterial spec, int index, bool linear, out ImportedModelFailure fault, bool normal = false)
         {
             fault = default;
@@ -353,10 +494,6 @@ public sealed class ImportedModels : IDisposable
             part.Slots = new Material[part.Submeshes.Count];
             for (var i = 0; i < part.Slots.Length; i++) part.Slots[i] = made[part.Submeshes[i].Material];
         }
-        // Collision meshes stay readable: the physics engine cooks a MeshCollider from the CPU copy.
-        var collision = new Mesh[data.Collision.Length];
-        for (var i = 0; i < collision.Length; i++)
-            owned.Add(collision[i] = ForgeCore.StaticColliders.Mesh("Forge imported collision " + d.MeshSha256[..8] + "." + i, data.Collision[i].Positions, data.Collision[i].Indices));
         return new ImportedModel(d, mesh, slots, owned, rest, collision, facing);
     }
 
@@ -434,6 +571,8 @@ public sealed class ImportedModels : IDisposable
     /// <summary>Destroys every instance and everything the cache built, and forgets the failures.</summary>
     public void Dispose()
     {
+        foreach (var s in _staged.Values) Drop(s);
+        _staged.Clear();
         foreach (var model in _models.Values)
         {
             model.DestroySpawned();

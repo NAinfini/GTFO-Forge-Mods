@@ -67,6 +67,8 @@ internal sealed partial class SheddingHooks : IDisposable
         SheddingHookId.TentacleError => typeof(TentacleError),
         SheddingHookId.MagazineDrop => typeof(MagazineDrop),
         SheddingHookId.RepellerState => typeof(RepellerState),
+        SheddingHookId.VoiceRestart => typeof(VoiceRestart),
+        SheddingHookId.ShadowProxy => typeof(ShadowProxy),
         _ => throw new ArgumentOutOfRangeException(nameof(id))
     };
     public void Dispose() => _harmony.UnpatchSelf();

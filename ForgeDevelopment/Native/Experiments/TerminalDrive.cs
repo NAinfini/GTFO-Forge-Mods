@@ -35,6 +35,15 @@ internal static class TerminalDrive
         return "exited=" + terminal.m_serialNumber;
     }
 
+    /// <summary>Leaves the terminal in use if there is one (the console's reset between scripts); never throws for "none".</summary>
+    internal static string Release()
+    {
+        var terminal = Using(PlayerActions.Local);
+        if (terminal == null) return "terminal-free";
+        terminal.ExitFPSView();
+        return "released=" + terminal.m_serialNumber;
+    }
+
     /// <summary>The last <paramref name="count"/> lines of the terminal screen (ForgeCore's screen buffer read) and whether the local
     /// player is still using it. Without a terminal in use it reads the nearest one within 3 m of the player.</summary>
     internal static string Read(int count)

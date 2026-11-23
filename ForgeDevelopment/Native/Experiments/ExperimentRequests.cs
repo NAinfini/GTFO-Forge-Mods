@@ -28,7 +28,11 @@ internal static class ExperimentRequests
     private readonly record struct StatusKey(long World, string Session, string State, string Active, bool Stopped);
     private readonly record struct StatusSnapshot(StatusKey Key, string Utc, double MonotonicSeconds);
     private readonly record struct PollResult(bool RequestPending, StatusKey? WrittenStatus, long NextStatus,
-        long NextPrepare, long PollMicroseconds, long PrepareMicroseconds, long StatusMicroseconds);
+        long NextPrepare, long PollMicroseconds, long PrepareMicroseconds, long StatusMicroseconds, Prepared? Claimed, long ClaimMicroseconds);
+    // A request taken from request.forge on the background thread: every file operation (claim by rename, read, parse, the result
+    // fence and the command files with their hash) is done; only the checks on live game state and the run itself are left for the
+    // main thread. Faults are carried as data so the main thread rejects the request under its own identity.
+    private sealed record Prepared(string Archive, Request? Request, Exception? ReadError, bool Sealed, ExperimentCommand? Command, Exception? CatalogError);
     private static Task<PollResult>? _poll;
     private static bool _statusDirty;
     private static StatusKey? _statusKey;
@@ -47,7 +51,13 @@ internal static class ExperimentRequests
 
     internal static void Start()
     {
-        JoinBackground();
+        var orphan = JoinBackground();
+        if (orphan != null)
+        {
+            Plugin.PluginLog.LogWarning("experiment request claimed before the transport restarted; answered as aborted");
+            try { Admit(orphan, "Aborted", "transport restarted before the request ran"); }
+            catch (Exception error) { Plugin.PluginLog.LogError("experiment request restart failed: " + error.Message); }
+        }
         _stopped = _faulted = false;
         _nextPoll = _nextStatus = _nextPrepare = 0;
         _statusKey = null;
@@ -98,6 +108,14 @@ internal static class ExperimentRequests
             prepareMicros = Microseconds(started);
             nextPrepare = Stopwatch.GetTimestamp() + 30 * Stopwatch.Frequency;
         }
+        Prepared? claimed = null;
+        long claimMicros = 0;
+        if (requested)
+        {
+            started = Stopwatch.GetTimestamp();
+            claimed = Claim();
+            claimMicros = Microseconds(started);
+        }
         StatusKey? written = null;
         if (requested || now >= nextStatus || snapshot.Key != previous)
         {
@@ -107,7 +125,7 @@ internal static class ExperimentRequests
             nextStatus = Stopwatch.GetTimestamp() + Stopwatch.Frequency;
             written = snapshot.Key;
         }
-        return new(requested, written, nextStatus, nextPrepare, pollMicros, prepareMicros, statusMicros);
+        return new(requested, written, nextStatus, nextPrepare, pollMicros, prepareMicros, statusMicros, claimed, claimMicros);
     }
 
     private static long Microseconds(long started)
@@ -127,9 +145,16 @@ internal static class ExperimentRequests
             Slow("poll", result.PollMicroseconds, result.RequestPending, "background");
             Slow("prepare", result.PrepareMicroseconds, result.RequestPending, "background");
             Slow("status", result.StatusMicroseconds, result.RequestPending, "background");
-            if (_stopped || _faulted || !result.RequestPending) return;
+            Slow("claim", result.ClaimMicroseconds, result.RequestPending, "background");
+            if (result.Claimed == null) return;
+            if (_stopped || _faulted)
+            {
+                Plugin.PluginLog.LogWarning("experiment request claimed while the transport was stopping; answered as aborted");
+                Admit(result.Claimed, "Aborted", "transport stopped before the request ran");
+                return;
+            }
             var started = Stopwatch.GetTimestamp();
-            try { Consume(null, null); }
+            try { Admit(result.Claimed, null, null); }
             finally { Slow("request", Microseconds(started), true, "main"); }
             _statusDirty = true;
         }
@@ -174,13 +199,14 @@ internal static class ExperimentRequests
     {
         if (_stopped) return;
         _stopped = true;
-        JoinBackground();
+        var claimed = JoinBackground();
         if (status is not ("Aborted" or "Failed" or "Rejected")) status = "Aborted";
         try
         {
             PrepareFiles();
             if (_active != null) { Complete(_active, status, reason); _active = null; }
-            if (File.Exists(Path.Combine(Control, "request.forge"))) Consume(status, reason);
+            if (claimed != null) Admit(claimed, status, reason);
+            if (File.Exists(Path.Combine(Control, "request.forge"))) Admit(Claim(), status, reason);
             var snapshot = CurrentStatus();
             Status(snapshot);
             _statusKey = snapshot.Key;
@@ -188,19 +214,21 @@ internal static class ExperimentRequests
         catch (Exception error) { Plugin.PluginLog.LogError("experiment request shutdown failed: " + error.Message); }
     }
 
-    private static void JoinBackground()
+    private static Prepared? JoinBackground()
     {
         var poll = _poll;
         _poll = null;
-        if (poll == null) return;
+        if (poll == null) return null;
         try
         {
             var result = poll.GetAwaiter().GetResult();
             Slow("poll", result.PollMicroseconds, result.RequestPending, "background");
             Slow("prepare", result.PrepareMicroseconds, result.RequestPending, "background");
             Slow("status", result.StatusMicroseconds, result.RequestPending, "background");
+            Slow("claim", result.ClaimMicroseconds, result.RequestPending, "background");
+            return result.Claimed;
         }
-        catch (Exception error) { Plugin.PluginLog.LogError("experiment request background shutdown failed: " + error.Message); }
+        catch (Exception error) { Plugin.PluginLog.LogError("experiment request background shutdown failed: " + error.Message); return null; }
     }
 
     private static void PrepareFiles()
@@ -236,7 +264,8 @@ internal static class ExperimentRequests
         }, true, durable: false);
     }
 
-    private static void Consume(string? stoppedStatus, string? stoppedReason)
+    // Background-safe: touches only transport files, never game state or the static command catalog.
+    private static Prepared Claim()
     {
         var path = Path.Combine(Control, "request.forge");
         Physical(path);
@@ -244,13 +273,9 @@ internal static class ExperimentRequests
         var archive = Path.Combine(Control, "requests", Guid.NewGuid().ToString("D") + ".forge");
         RetrySharing(() => File.Move(path, archive));
         Request? request = null;
-        var executionsBefore = ExperimentRunner.SessionExecutions;
-        _runWorld = RecTime.WorldEpoch;
-        _runSession = RecSession.SessionId ?? "";
         try
         {
-            var bytes = Read(archive, MaximumRequest);
-            request = Parse(bytes);
+            request = Parse(Read(archive, MaximumRequest));
             var result = Path.Combine(Results, request.Id + ".forge");
             if (File.Exists(result))
             {
@@ -263,8 +288,48 @@ internal static class ExperimentRequests
                     value.GetProperty("recorderSession").GetString() != request.RecorderSession || value.GetProperty("evidenceScope").GetString() != "command-execution-only")
                     throw new InvalidDataException("existing result identity/hash conflict; preserved result and archived request");
                 // Existing immutable result is the replay fence; never execute or overwrite it.
-                return;
+                return new(archive, request, null, true, null, null);
             }
+        }
+        catch (Exception error) { return new(archive, request, error, false, null, null); }
+        try
+        {
+            TransportRetention.PruneFiles(ExperimentCatalog.DirectoryPath, "drivesession-*.forge", ExperimentCatalog.KeptDriveSessionFiles);
+            // Parse the exact bytes we hash, so a catalog read/hash race cannot start stale command content.
+            var installed = new List<ExperimentCommand>();
+            var found = new List<ExperimentCommand>();
+            foreach (var file in RetrySharing(() => Directory.GetFiles(ExperimentCatalog.DirectoryPath, "*.forge", SearchOption.TopDirectoryOnly)).OrderBy(f => f, StringComparer.Ordinal))
+            {
+                var source = Read(file, MaximumCommand);
+                var parsed = ExperimentParser.Parse(System.Text.Encoding.UTF8.GetString(source), Path.GetFileName(file), out var error);
+                if (error.Length != 0) continue;
+                foreach (var command in parsed.Where(command => command.Id == request.CommandId))
+                {
+                    installed.Add(command);
+                    if (!command.Valid) continue;
+                    if (ForgeCore.Hash.Sha256Hex(source) != request.CommandSha256) throw new InvalidDataException("installed command hash or validity changed");
+                    found.Add(command);
+                }
+            }
+            if (found.Count != 1) throw new InvalidDataException(ExperimentCatalog.Refusal(request.CommandId, installed));
+            return new(archive, request, null, false, found[0], null);
+        }
+        catch (Exception error) { return new(archive, request, null, false, null, error); }
+    }
+
+    // Main thread: the admission checks that read live game state, then the run. No file reads happen here.
+    private static void Admit(Prepared prepared, string? stoppedStatus, string? stoppedReason)
+    {
+        var archive = prepared.Archive;
+        var request = prepared.Request;
+        var executionsBefore = ExperimentRunner.SessionExecutions;
+        _runWorld = RecTime.WorldEpoch;
+        _runSession = RecSession.SessionId ?? "";
+        try
+        {
+            if (prepared.ReadError != null) throw prepared.ReadError;
+            if (prepared.Sealed) return;
+            if (request == null) throw new InvalidDataException("request missing");
             if (stoppedStatus != null) { Complete(request, stoppedStatus, stoppedReason ?? "runner stopped"); return; }
             if (request.ProcessId != Environment.ProcessId || request.Instance != Instance || request.WorldEpoch != RecTime.WorldEpoch ||
                 request.RecorderSession != (RecSession.SessionId ?? "")) throw new InvalidDataException(StaleIdentity);
@@ -272,31 +337,15 @@ internal static class ExperimentRequests
             if (request.ExpiresMonotonicSeconds <= now || request.ExpiresMonotonicSeconds > now + 60)
                 throw new InvalidDataException("request expired or expiry exceeds 60 seconds");
             if (ExperimentRunner.Running) throw new InvalidDataException("another experiment is running");
-            RetrySharing(ExperimentCatalog.Load);
-            var matches = ExperimentCatalog.All.Where(command => command.Id == request.CommandId && command.Valid).ToArray();
-            if (matches.Length != 1) throw new InvalidDataException(ExperimentCatalog.Refusal(request.CommandId, Directory.GetFiles(ExperimentCatalog.DirectoryPath, "*.forge", SearchOption.TopDirectoryOnly)
-                .SelectMany(file => ExperimentParser.Parse(File.ReadAllText(file), Path.GetFileName(file), out _))));
-            // Reparse the exact bytes we hash, so a catalog read/hash race cannot start stale command content.
-            var found = new List<ExperimentCommand>();
-            foreach (var file in Directory.GetFiles(ExperimentCatalog.DirectoryPath, "*.forge", SearchOption.TopDirectoryOnly))
-            {
-                var source = Read(file, MaximumCommand);
-                var parsed = ExperimentParser.Parse(System.Text.Encoding.UTF8.GetString(source), Path.GetFileName(file), out var error);
-                if (error.Length != 0) continue;
-                foreach (var command in parsed.Where(command => command.Id == request.CommandId))
-                {
-                    if (!command.Valid || ForgeCore.Hash.Sha256Hex(source) != request.CommandSha256) throw new InvalidDataException("installed command hash or validity changed");
-                    found.Add(command);
-                }
-            }
-            if (found.Count != 1) throw new InvalidDataException("command is missing or duplicated");
-            // Catalog IO may take time: recheck the precise admission context immediately before Run.
+            if (prepared.CatalogError != null) throw prepared.CatalogError;
+            var command = prepared.Command!;
+            // The command files were read in the background: recheck the precise admission context immediately before Run.
             if (request.WorldEpoch != RecTime.WorldEpoch || request.RecorderSession != (RecSession.SessionId ?? "") ||
                 request.ExpiresMonotonicSeconds <= MonotonicSeconds || ExperimentRunner.Running) throw new InvalidDataException(StaleContext);
             var executions = ExperimentRunner.SessionExecutions;
             _active = request;
             _activeExecution = executions + 1;
-            var refused = ExperimentRunner.Run(found[0], _ => null, _ => { });
+            var refused = ExperimentRunner.Run(command, _ => null, _ => { });
             if (refused != null || ExperimentRunner.SessionExecutions != executions + 1)
                 throw new InvalidDataException(refused ?? "runner did not start this request");
             _runWorld = RecTime.WorldEpoch;

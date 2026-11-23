@@ -202,7 +202,7 @@
       "pluginGuid": "NAinfini.ForgeEmote",
       "providerId": null,
       "providerIds": [],
-      "version": "1.0.3",
+      "version": "1.0.4",
       "audience": "player",
         "packager": "tools/package_release.py",
       "dependencies": [
@@ -222,7 +222,7 @@
       "pluginGuid": "ForgeSkin",
       "providerId": null,
       "providerIds": [],
-      "version": "1.0.2",
+      "version": "1.0.3",
       "audience": "player",
       "packager": "tools/package_release.py",
       "dependencies": [
@@ -285,7 +285,7 @@
       "pluginGuid": "NAinfini.ForgePerformance",
       "providerId": null,
       "providerIds": [],
-      "version": "1.0.2",
+      "version": "1.0.3",
       "audience": "player",
       "packager": "tools/package_release.py",
       "dependencies": [
@@ -305,7 +305,7 @@
       "pluginGuid": "NAinfini.ForgeReplay",
       "providerId": null,
       "providerIds": [],
-      "version": "1.0.2",
+      "version": "1.0.3",
       "audience": "player",
         "packager": "tools/package_release.py",
       "dependencies": [
@@ -326,7 +326,7 @@
       "pluginGuid": "NAinfini.ForgeWeaponEnergyLab",
       "providerId": null,
       "providerIds": [],
-      "version": "1.0.3",
+      "version": "1.0.4",
       "audience": "player",
       "packager": "tools/package_release.py",
       "dependencies": [

@@ -1,0 +1,23 @@
+# Course-graph connectivity between a level's elevator start room and the room behind its door-less exit, read the way enemy
+# navigation reads it. Written for the Time Attack cargo level (zone 0: geo_32x32_elevator_shaft_tech_01 at the grid origin, yaw 0,
+# joined without a door to geo_64x64_tech_lab_hub_HA_01_R8B1 one cell north); the two points are world positions, the first the
+# alarm-wave point anchor of that level (room-local -0.2, 0, 14.4 in a room standing at the origin), the second the hub's centre.
+# Start a session on that level, then run:
+#   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package NAinfini-TimeAttack --level <the cargo level> --work-dir artifacts/work/drivesession/<name>
+#   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name> run Mods/ForgeDevelopment/scripts/start-room-course.test
+#
+# Before the zone-entry fix the elevator node's only portal reads zonePortal=true, progressionLocked=true, and every enemyRoute
+# between the two rooms is null while graphReachable is true. After it the portal is neither, and the enemy route exists both ways.
+stop-on-fail
+god on
+
+nav course {"points":[[0.5,0.1,21.1],[0,0,64]],"sample":2} as=course
+expect $course.result !contains "\"node\":null"
+# the hub keeps its own locked zone doors, so judge the free passage between the two rooms, not every portal in the answer
+expect $course.result contains "\"gateType\":\"FreePassage\",\"zonePortal\":false,\"progressionLocked\":false,\"traversable\":true"
+expect $course.result !contains "\"enemyRoute\":null"
+
+# the same from where a player stands in the hub
+teleport 0.5 0.2 60
+nav course {"points":[[0.5,0.1,21.1]],"player":true,"sample":2} as=withPlayer
+expect $withPlayer.result !contains "\"enemyRoute\":null"

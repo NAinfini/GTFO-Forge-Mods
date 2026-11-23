@@ -1,7 +1,7 @@
 # V1 B1 mechanism hall, cell 终端多选一 (official mechanism m-terminal-choice: CHOOSE_A and CHOOSE_B on one terminal; choosing one
 # withdraws the other). Run on a freshly loaded B1 of the V1 package, as in b1-security-sensor.test.
 #
-# Room 机关样例区 room:c96b1d7b3466988a0d5e1f48fc58. Teleport points are room-local Unity metres: Unity (x, y, z) = editor (-x, y, z), the
+# Room 机关样例区. Teleport points are room-local Unity metres: Unity (x, y, z) = editor (-x, y, z), the
 # V1 builder's room frame with x mirrored (v1-test-kit cellSpot). The V1 build's terminals, Unity frame: 传感器终端 (7.678, -29),
 # 加时终端 (-9.678, -8), 多选一终端 (9.678, -40). A teleport lands 1.2 m on the room's +z side of one; `interact name=Terminal` presses
 # there when the game already selects the terminal, else walks to a stand in front of its screen.
@@ -12,7 +12,7 @@
 stop-on-fail
 god on
 
-teleport room=room:c96b1d7b3466988a0d5e1f48fc58 9.678 0 -38.8
+teleport room=机关样例区 9.678 0 -38.8
 state variables var.gb58119d0e1111a8192783772e6b3f3621bafd7331818f8a1a31ce33b35a97a70 as=none
 expect $none.matched == 0
 
@@ -23,7 +23,12 @@ wait 1s
 state variables var.gb58119d0e1111a8192783772e6b3f3621bafd7331818f8a1a31ce33b35a97a70 as=chosen
 expect $chosen.var.gb58119d0e1111a8192783772e6b3f3621bafd7331818f8a1a31ce33b35a97a70 == "A"
 
-# B is gone now: typing it changes nothing
+# B is gone now: the terminal's own listing no longer offers it, and typing it changes nothing. The listing read (on a cleared screen, so only
+# this listing is read) tells a withdrawn command (hidden) apart from a hidden one the terminal still takes when typed.
+terminal type "CLS"
+terminal type "COMMANDS"
+terminal read 40 as=listing
+expect $listing.tail !contains "CHOOSE_B"
 terminal type "CHOOSE_B" as=b
 wait 1s
 terminal exit

@@ -10,8 +10,6 @@ namespace ForgeDevelopment.Native;
 internal static class AuthoringFileSwap
 {
     private const int MaximumPayload = 32 * 1024 * 1024;
-    // Receipts hold the bytes a swap displaced; keep the latest few and a week, never the last hour.
-    private const int KeptReceipts = 8;
     private static readonly object Gate = new();
 
     internal static string Swap(string bepInExRoot, string caseName, string variant)
@@ -99,67 +97,51 @@ internal static class AuthoringFileSwap
         if (actualHash == toHash)
         {
             RequireHash(Read(target, MaximumPayload), toHash);
-            return Result("already-current", package, targetRelative, actualHash, toHash, "none");
+            return Result("already-current", package, targetRelative, actualHash, toHash);
         }
 
-        var receipts = Path.Combine(input, "receipts");
-        TransportRetention.PruneDirectories(receipts, KeptReceipts);
-        CreatePhysicalDirectory(receipts);
-        var receipt = Path.Combine(receipts, Guid.NewGuid().ToString("N"));
-        CreatePhysicalDirectory(receipt);
-        var saved = Path.Combine(receipt, "original");
-        WriteNew(saved, original);
-        RequireHash(Read(saved, MaximumPayload), fromHash);
-        var displaced = Path.Combine(receipt, "at-replacement-original");
-        var temporary = Path.Combine(Path.GetDirectoryName(target)!, ".forge-swap-" + Guid.NewGuid().ToString("N") + ".tmp");
-        var replaced = false;
+        var fromBytes = variant == "a" ? b : a;
         try
         {
-            Physical(target);
-            Physical(receipt);
-            WriteNew(temporary, desired);
-            RequireHash(Read(temporary, MaximumPayload), toHash);
             RequireHash(Read(target, MaximumPayload), fromHash);
-            // Windows ReplaceFile requires the validation handle closed; its displaced-file
-            // backup below verifies the actual version that was replaced across that boundary.
+            // Windows ReplaceFile requires the validation handle closed.
             current.Dispose();
-            // Content is the contract; optional Windows ACL/metadata merging must not
-            // turn a permitted fixture exchange into an access-denied failure.
-            File.Replace(temporary, target, displaced, ignoreMetadataErrors: true);
-            replaced = true;
-            // The replacement's backup detects a rename/replacement between the last check and commit.
-            RequireHash(Read(displaced, MaximumPayload), fromHash);
-            RequireHash(Read(target, MaximumPayload), toHash);
-            return Result("swapped", package, targetRelative, fromHash, toHash, receipt);
+            Replace(target, desired, toHash);
+            return Result("swapped", package, targetRelative, fromHash, toHash);
         }
         catch (Exception failure)
         {
-            if (replaced || File.Exists(displaced))
-            {
-                try
-                {
-                    Physical(receipt);
-                    // Never overwrite another writer's later version during recovery.
-                    RequireHash(Read(target, MaximumPayload), toHash);
-                    var rollback = Read(displaced, MaximumPayload);
-                    var recovery = Path.Combine(Path.GetDirectoryName(target)!, ".forge-recover-" + Guid.NewGuid().ToString("N") + ".tmp");
-                    WriteNew(recovery, rollback);
-                    File.Replace(recovery, target, Path.Combine(receipt, "recovery-displaced"), ignoreMetadataErrors: true);
-                    RequireHash(Read(target, MaximumPayload), ForgeCore.Hash.Sha256Hex(rollback));
-                }
-                catch (Exception recoveryFailure)
-                {
-                    throw new AggregateException("swap failed; recovery failed or unsafe; preserved bytes at " + receipt + " and fixture inputs", failure, recoveryFailure);
-                }
-                throw new IOException("swap failed; original at replacement restored; receipt=" + receipt, failure);
-            }
-            throw new IOException("swap refused before replacement; receipt=" + receipt, failure);
+            // Recovery comes from the hashed fixture bytes in memory, never from a copy; a file that is neither fixture belongs to someone else.
+            var now = ForgeCore.Hash.Sha256Hex(Read(target, MaximumPayload));
+            if (now == fromHash) throw new IOException("swap refused; target unchanged", failure);
+            if (now != toHash) throw new IOException("swap failed; target is neither fixture (written by someone else), left untouched", failure);
+            try { Replace(target, fromBytes, fromHash); }
+            catch (Exception recoveryFailure) { throw new AggregateException("swap failed; restoring the from fixture failed", failure, recoveryFailure); }
+            throw new IOException("swap failed; target restored from the from fixture", failure);
         }
-        // Receipt and staging bytes intentionally survive failures for inspection; inputs are never deleted.
     }
 
-    private static string Result(string status, string package, string target, string from, string to, string receipt) =>
-        "status=" + status + ";package=" + package + ";target=" + target + ";from=" + from + ";to=" + to + ";receipt=" + receipt;
+    /// <summary>Atomically replaces <paramref name="target"/> with <paramref name="bytes"/> through a verified temp file beside it; no backup is kept.</summary>
+    private static void Replace(string target, byte[] bytes, string hash)
+    {
+        var temporary = Path.Combine(Path.GetDirectoryName(target)!, ".forge-swap-" + Guid.NewGuid().ToString("N") + ".tmp");
+        try
+        {
+            Physical(target);
+            WriteNew(temporary, bytes);
+            RequireHash(Read(temporary, MaximumPayload), hash);
+            // Content is the contract; optional Windows ACL/metadata merging must not fail a permitted fixture exchange.
+            File.Replace(temporary, target, null, ignoreMetadataErrors: true);
+            RequireHash(Read(target, MaximumPayload), hash);
+        }
+        finally
+        {
+            try { File.Delete(temporary); }
+            catch (Exception error) { Console.Error.WriteLine("[ForgeDevelopment] swap temp file not removed: " + temporary + ": " + error.Message); }
+        }
+    }
+    private static string Result(string status, string package, string target, string from, string to) =>
+        "status=" + status + ";package=" + package + ";target=" + target + ";from=" + from + ";to=" + to;
 
     // Envelope/lock checks only; runtime binding and execution admission remain in ForgeEngine.
     private static void Envelope(JsonElement root, bool plan)
@@ -244,14 +226,6 @@ internal static class AuthoringFileSwap
             walk = Path.Combine(walk, segment);
             if ((File.GetAttributes(walk) & FileAttributes.ReparsePoint) != 0) throw new IOException("linked or reparse path: " + walk);
         }
-    }
-
-    private static void CreatePhysicalDirectory(string path)
-    {
-        Physical(Path.GetDirectoryName(path)!);
-        RejectLinkedPath(path, "linked or reparse directory: " + path);
-        Directory.CreateDirectory(path);
-        Physical(path);
     }
 
     /// <summary>Throws when <paramref name="path"/> exists as a link or reparse point; a path that does not exist yet is the normal case.</summary>

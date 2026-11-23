@@ -18,7 +18,7 @@ internal sealed partial class PerformanceLogWriter : IDisposable
     {
         "physics", "physics_late", "animation_begin", "animation_end", "behaviour_update",
         "behaviour_fixed", "behaviour_late", "renderers", "render_submission", "navigation",
-        "enemy_update", "enemy_fixed", "enemy_master", "enemy_master_fixed", "spawn_group", "gc_explicit",
+        "enemy_update", "enemy_fixed", "enemy_master", "enemy_master_fixed", "gc_explicit",
         "initialization", "early_update", "pre_update_other", "post_late_update_other"
     };
     private static readonly string[] FrameFields = MakeFrameFields();

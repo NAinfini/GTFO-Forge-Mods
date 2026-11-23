@@ -74,6 +74,10 @@ internal sealed class ExtraCuts
         if (_settings.GuiMirrorOff) ApplyMirror(true);
         IrfCulling.Configure(_settings);
         TentacleErrorFold.Enabled = _settings.TentacleLimitErrorFold;
+        VoiceRestartGuard.Enabled = _settings.VoiceRestartGuard;
+        VoiceRestartGuard.FrameSkipFilter = _settings.VoiceFrameSkipFilter;
+        VoiceRestartGuard.FrameSkipSeconds = _settings.VoiceFrameSkipSeconds;
+        ShadowProxyHold.Enabled = _settings.ShadowProxyHold;
     }
 
     internal void Dispose()
@@ -81,6 +85,8 @@ internal sealed class ExtraCuts
         _render.Dispose();
         IrfCulling.Reset();
         TentacleErrorFold.Reset();
+        VoiceRestartGuard.Reset();
+        ShadowProxyHold.Reset();
         MeleePacketReuse.Reset();
         if (_traceTrimmed)
         {
@@ -268,6 +274,12 @@ internal sealed class ExtraCuts
                 var (setups, reused, adopted) = MeleePacketReuse.Counts;
                 _owner.LogItem("melee-packet-reuse", setups, reused, 0, "shared_packets_adopted=" + adopted + "\tslots=kept_vanilla_indices");
             }
+            if (_settings.ShadowProxyHold)
+            {
+                var (calls, renewed, avoided) = ShadowProxyHold.Take();
+                _owner.LogItem("shadow-proxy-hold", calls, renewed, 0, "flips_avoided=" + avoided + "\tby=shadow_enabled_time_renewal");
+            }
+            if (_settings.VoiceRestartGuard || _settings.VoiceFrameSkipFilter) _owner.LogItem("voice-restart-guard", 0, 0, 0, VoiceRestartGuard.Summary());
         }
         if (irfFailure != null) _owner.LogExtraFailure("irf-culling", irfFailure);
         var tentacleErrors = TentacleErrorFold.Take();

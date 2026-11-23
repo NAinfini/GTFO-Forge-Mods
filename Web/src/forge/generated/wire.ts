@@ -204,3 +204,7 @@ export const reservedContentPersistentIdRange = {first: 0x40000000, last: 0x7fff
 export const seedWindow16 = {first: 0x8000, last: 0xffff} as const;
 /** Where the allocator starts in every other table. */
 export const seedWindowWide = {first: 0x20000000, last: 0x3fffffff} as const;
+/** The local band of every 16-bit table: an export with no site-issued number (signed out or offline) takes its numbers here, the site never issues them, and two installed packs that collide on a local number are both refused whole. */
+export const localContentIdRange16 = {first: 0x1000, last: 0x1fff} as const;
+/** The local band of every other table and of the non-native content number, under the same rule as localRange16. */
+export const localContentIdRangeWide = {first: 0xf0000000, last: 0xfffffffe} as const;

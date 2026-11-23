@@ -1,0 +1,114 @@
+# R7D1 ("Mother", 216 level enemies) with 96 aggressive Strikers around a god-mode player, every door within 400 m opened first. Needs Probe=true; read with
+# tools/analyze_probe.py. First PathfindingIterations: the player teleports between zone 194 (0/MainLayer/3) and zone 192
+# (0/MainLayer/1), A (off, the game's 100) and B (on, 50) alternating; ChaseState (near = enemies within 8 m,
+# not_arrived, farthest_m) is read 12 s and 30 s after each teleport. Then ShadowProxyHold off (A) / on (B) in zone 192 with the crowd.
+god on
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
+call static:ForgePerformance.Crowd.PerformanceControl Read as=before
+teleport zone=0/MainLayer/3 area=0
+door open near:400 as=opened
+wait 3s
+door read near:400 as=doors_after
+spawn Striker 16 at=front:2 mode=aggressive
+spawn Striker 16 at=front:3 mode=aggressive
+spawn Striker 16 at=front:4 mode=aggressive
+spawn Striker 16 at=front:5 mode=aggressive
+spawn Striker 16 at=front:6 mode=aggressive
+spawn Striker 16 at=front:7 mode=aggressive
+call static:ForgePerformance.Crowd.PerformanceControl Mark "path-settle"
+wait 15s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "path-A-1"
+teleport zone=0/MainLayer/1 area=0
+call static:ForgePerformance.Crowd.PerformanceControl Chase 80 8.0
+wait 12s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=at12
+wait 18s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=chase_A_1
+wait 5s
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "path-B-1"
+teleport zone=0/MainLayer/3 area=0
+call static:ForgePerformance.Crowd.PerformanceControl Chase 80 8.0
+wait 12s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=at12
+wait 18s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=chase_B_1
+wait 5s
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "path-A-2"
+teleport zone=0/MainLayer/1 area=0
+call static:ForgePerformance.Crowd.PerformanceControl Chase 80 8.0
+wait 12s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=at12
+wait 18s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=chase_A_2
+wait 5s
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "path-B-2"
+teleport zone=0/MainLayer/3 area=0
+call static:ForgePerformance.Crowd.PerformanceControl Chase 80 8.0
+wait 12s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=at12
+wait 18s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=chase_B_2
+wait 5s
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "path-A-3"
+teleport zone=0/MainLayer/1 area=0
+call static:ForgePerformance.Crowd.PerformanceControl Chase 80 8.0
+wait 12s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=at12
+wait 18s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=chase_A_3
+wait 5s
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "path-B-3"
+teleport zone=0/MainLayer/3 area=0
+call static:ForgePerformance.Crowd.PerformanceControl Chase 80 8.0
+wait 12s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=at12
+wait 18s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=chase_B_3
+wait 5s
+call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "path-A-4"
+teleport zone=0/MainLayer/1 area=0
+call static:ForgePerformance.Crowd.PerformanceControl Chase 80 8.0
+wait 12s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=at12
+wait 18s
+call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=chase_A_4
+wait 10s
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "z192-shadowhold-A-1"
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "z192-shadowhold-B-1"
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "z192-shadowhold-A-2"
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "z192-shadowhold-B-2"
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "z192-shadowhold-A-3"
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "z192-shadowhold-B-3"
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "z192-shadowhold-A-4"
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" true
+call static:ForgePerformance.Crowd.PerformanceControl Mark "z192-shadowhold-B-4"
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" false
+call static:ForgePerformance.Crowd.PerformanceControl Mark "z192-shadowhold-A-5"
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" true
+call static:ForgePerformance.Crowd.PerformanceControl Read as=end
+clear enemies
+call static:ForgePerformance.Crowd.PerformanceControl Mark "end"
+expect log --all !contains "Exception"

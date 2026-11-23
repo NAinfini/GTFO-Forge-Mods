@@ -123,8 +123,8 @@
         { "t": 0, "on": "grip" },
         { "t": 0.4, "on": "under" },
         { "t": 1.4, "on": "under" },
-        { "t": 1.9, "on": "under", "along": 0.45 },
-        { "t": 2.8, "on": "under", "along": 0.45 },
+        { "t": 1.9, "on": "under" },
+        { "t": 2.8, "on": "under" },
         { "t": 3.2, "on": "grip" }
       ]
     },
@@ -141,8 +141,8 @@
         { "t": 0, "on": "grip" },
         { "t": 0.4, "on": "under" },
         { "t": 1.4, "on": "under" },
-        { "t": 1.9, "on": "under", "along": 0.45 },
-        { "t": 2.8, "on": "under", "along": 0.45 },
+        { "t": 1.9, "on": "under" },
+        { "t": 2.8, "on": "under" },
         { "t": 3.2, "on": "grip" }
       ]
     },
@@ -159,8 +159,8 @@
         { "t": 0, "on": "grip" },
         { "t": 0.4, "on": "under" },
         { "t": 1.4, "on": "under" },
-        { "t": 1.9, "on": "under", "along": 0.3 },
-        { "t": 2.8, "on": "under", "along": 0.3 },
+        { "t": 1.9, "on": "under" },
+        { "t": 2.8, "on": "under" },
         { "t": 3.2, "on": "grip" }
       ]
     },
@@ -177,8 +177,8 @@
         { "t": 0, "on": "grip" },
         { "t": 0.4, "on": "under" },
         { "t": 1.4, "on": "under" },
-        { "t": 1.9, "on": "under", "along": 0.35 },
-        { "t": 2.8, "on": "under", "along": 0.35 },
+        { "t": 1.9, "on": "under" },
+        { "t": 2.8, "on": "under" },
         { "t": 3.2, "on": "grip" }
       ]
     },
@@ -213,8 +213,8 @@
         { "t": 0, "on": "grip" },
         { "t": 0.5, "on": "away" },
         { "t": 1.9, "on": "away" },
-        { "t": 2.35, "on": "under", "along": 0.5 },
-        { "t": 2.8, "on": "under", "along": 0.5 },
+        { "t": 2.35, "on": "under" },
+        { "t": 2.8, "on": "under" },
         { "t": 3.2, "on": "grip" }
       ]
     },
@@ -275,8 +275,8 @@
         { "t": 0, "on": "grip" },
         { "t": 0.7, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7] },
         { "t": 0.9, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7], "cue": "mag-out" },
-        { "t": 1.26, "on": "mag", "fingers": [1, 0.9, 0.9, 0.9, 0.9], "regrip": true },
-        { "t": 2.76, "on": "mag", "fingers": [1, 0.9, 0.9, 0.9, 0.9] },
+        { "t": 1.26, "on": "mag", "fingers": [0.3, 0.9, 0.9, 0.9, 0.9], "regrip": true },
+        { "t": 2.76, "on": "mag", "fingers": [0.3, 0.9, 0.9, 0.9, 0.9] },
         { "t": 3.06, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7], "regrip": true },
         { "t": 3.18, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7] },
         { "t": 3.25, "on": "mag", "face": "bottom", "fingers": [0.3, 0.4, 0.4, 0.45, 0.5], "offset": [0, 0.012, 0] },
@@ -316,8 +316,8 @@
         { "t": 0, "on": "grip" },
         { "t": 0.7, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7] },
         { "t": 0.9, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7], "cue": "mag-out" },
-        { "t": 1.26, "on": "mag", "fingers": [1, 0.9, 0.9, 0.9, 0.9], "regrip": true },
-        { "t": 2.86, "on": "mag", "fingers": [1, 0.9, 0.9, 0.9, 0.9] },
+        { "t": 1.26, "on": "mag", "fingers": [0.3, 0.9, 0.9, 0.9, 0.9], "regrip": true },
+        { "t": 2.86, "on": "mag", "fingers": [0.3, 0.9, 0.9, 0.9, 0.9] },
         { "t": 3.16, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7], "regrip": true },
         { "t": 3.28, "on": "mag", "face": "bottom", "fingers": [0.5, 0.7, 0.7, 0.7, 0.7] },
         { "t": 3.35, "on": "mag", "face": "bottom", "fingers": [0.3, 0.4, 0.4, 0.45, 0.5], "offset": [0, 0.012, 0] },
@@ -361,7 +361,7 @@
       ],
       "parts": [
         {
-          "node": "a_RevolverFold", "about": "bore",
+          "node": "a_RevolverFold", "about": "bore", "carrier": true,
           "keys": [
             { "t": 0.55 },
             { "t": 0.72, "turn": 80, "ease": "spring", "bounce": 0.09, "cue": "crane-open" },
@@ -451,19 +451,20 @@
         { "t": 0, "on": "grip" },
         { "t": 0.35, "on": "away" },
         { "t": 0.7, "on": "away" },
-        { "t": 1.3, "on": "node", "node": "a_Drum", "face": "left", "at": [0.7, 0.6], "spin": -90, "tips": true, "fingers": [0.2, 0.3, 0.3, 0, 0] },
-        { "t": 1.4, "on": "node", "node": "a_Drum", "face": "left", "at": [0.7, 0.6], "spin": -90, "tips": true, "fingers": [0.2, 0.3, 0.3, 0, 0] },
-        { "t": 1.47, "on": "node", "node": "a_Drum", "face": "left", "at": [0.7, 0.6], "spin": -90, "tips": true, "fingers": [0.2, 0.3, 0.3, 0, 0] },
+        { "t": 1.3, "on": "node", "node": "a_Drum", "face": "left", "at": [0.7, 0.6], "spin": -90, "tips": true, "fingers": [0.35, 0.25, 0.3, 0.65, 0.75] },
+        { "t": 1.4, "on": "node", "node": "a_Drum", "face": "left", "at": [0.7, 0.6], "spin": -90, "tips": true, "fingers": [0.35, 0.25, 0.3, 0.65, 0.75] },
+        { "t": 1.47, "on": "node", "node": "a_Drum", "face": "left", "at": [0.7, 0.6], "spin": -90, "tips": true, "fingers": [0.35, 0.25, 0.3, 0.65, 0.75] },
         { "t": 1.9, "on": "away" },
         { "t": 2.45, "on": "away" },
-        { "t": 2.85, "on": "node", "node": "a_RevolverFold", "face": "left", "at": [0.25, 0.8], "fingers": [0.2, 0.6, 0.8, 0.85, 0.9] },
+        { "t": 2.85, "on": "node", "node": "a_Drum", "face": "left", "at": [0.5, 0.5], "fingers": [0.3, 0.35, 0.4, 0.45, 0.5] },
+        { "t": 3.05, "on": "node", "node": "a_Drum", "face": "left", "at": [0.5, 0.5], "fingers": [0.3, 0.35, 0.4, 0.45, 0.5] },
         { "t": 3.25, "on": "under", "along": 0.4, "fingers": [0.3, 0.3, 0.3, 0.3, 0.3] },
         { "t": 3.75, "on": "under", "along": 0.4 },
         { "t": 4.1, "on": "grip" }
       ],
       "parts": [
         {
-          "node": "a_RevolverFold", "about": "bore",
+          "node": "a_RevolverFold", "about": "bore", "carrier": true,
           "keys": [
             { "t": 0.52 },
             { "t": 0.7, "turn": 80, "ease": "spring", "bounce": 0.09, "cue": "crane-open" },
@@ -507,9 +508,9 @@
         { "t": 0, "on": "grip" },
         { "t": 0.35, "on": "away" },
         { "t": 0.7, "on": "away" },
-        { "t": 1.3, "on": "node", "node": "a_Drum", "face": "left", "at": [0.45, 0.35], "spin": 100, "tips": true, "fingers": [0.2, 0.3, 0.3, 0, 0] },
-        { "t": 1.4, "on": "node", "node": "a_Drum", "face": "left", "at": [0.45, 0.35], "spin": 100, "tips": true, "fingers": [0.2, 0.3, 0.3, 0, 0] },
-        { "t": 1.47, "on": "node", "node": "a_Drum", "face": "left", "at": [0.45, 0.35], "spin": 100, "tips": true, "fingers": [0.2, 0.3, 0.3, 0, 0] },
+        { "t": 1.3, "on": "node", "node": "a_Drum", "face": "left", "at": [0.45, 0.35], "spin": 100, "tips": true, "fingers": [0.35, 0.25, 0.3, 0.65, 0.75] },
+        { "t": 1.4, "on": "node", "node": "a_Drum", "face": "left", "at": [0.45, 0.35], "spin": 100, "tips": true, "fingers": [0.35, 0.25, 0.3, 0.65, 0.75] },
+        { "t": 1.47, "on": "node", "node": "a_Drum", "face": "left", "at": [0.45, 0.35], "spin": 100, "tips": true, "fingers": [0.35, 0.25, 0.3, 0.65, 0.75] },
         { "t": 1.9, "on": "away" },
         { "t": 2.45, "on": "away" },
         { "t": 2.85, "on": "node", "node": "a_Fold", "face": "bottom", "at": [0.85, 0.5], "fingers": [0.4, 0.6, 0.7, 0.75, 0.8] },
@@ -550,18 +551,18 @@
     "slide-rack": {
       "gun": [
         { "t": 0 },
-        { "t": 0.65, "turn": -25, "tilt": 12, "roll": -55, "at": [0.2, -0.3], "cue": "turn" },
-        { "t": 1.05, "turn": -25, "tilt": 13, "roll": -56, "at": [0.2, -0.3] },
-        { "t": 1.3, "turn": -26, "tilt": 11, "roll": -57, "at": [0.2, -0.31], "hit": true },
-        { "t": 2.1, "turn": -24, "tilt": 13, "roll": -54, "at": [0.2, -0.3] },
-        { "t": 2.2, "turn": -25, "tilt": 15, "roll": -55, "at": [0.2, -0.29], "hit": true },
-        { "t": 2.75, "turn": -27, "tilt": 10, "roll": -42, "at": [0.2, -0.32] },
+        { "t": 0.65, "turn": -25, "tilt": 12, "roll": -55, "at": [0.2, -0.3], "fill": 0.75, "cue": "turn" },
+        { "t": 1.05, "turn": -25, "tilt": 13, "roll": -56, "at": [0.2, -0.3], "fill": 0.75 },
+        { "t": 1.3, "turn": -26, "tilt": 11, "roll": -57, "at": [0.2, -0.31], "fill": 0.75, "hit": true },
+        { "t": 2.1, "turn": -24, "tilt": 13, "roll": -54, "at": [0.2, -0.3], "fill": 0.75 },
+        { "t": 2.2, "turn": -25, "tilt": 15, "roll": -55, "at": [0.2, -0.29], "fill": 0.75, "hit": true },
+        { "t": 2.75, "turn": -27, "tilt": 10, "roll": -42, "at": [0.2, -0.32], "fill": 0.75 },
         { "t": 3.4 }
       ],
       "hand": [
         { "t": 0, "on": "grip" },
-        { "t": 0.85, "on": "node", "node": "a_slide", "face": "top", "at": [0.12, 0], "spin": 90, "fingers": [0.6, 0.75, 0.75, 0.7, 0.7] },
-        { "t": 2.1, "on": "node", "node": "a_slide", "face": "top", "at": [0.12, 0], "spin": 90, "fingers": [0.6, 0.75, 0.75, 0.7, 0.7] },
+        { "t": 0.85, "on": "node", "node": "a_slide", "face": "top", "at": [0.08, 0], "spin": 90, "fingers": [0.6, 0.75, 0.75, 0.7, 0.7], "scale": 0.8 },
+        { "t": 2.1, "on": "node", "node": "a_slide", "face": "top", "at": [0.08, 0], "spin": 90, "fingers": [0.6, 0.75, 0.75, 0.7, 0.7], "scale": 0.8 },
         { "t": 2.6, "on": "away" },
         { "t": 3.3, "on": "grip" }
       ],

@@ -1,0 +1,209 @@
+# ForgePerformance job-worker comparison. One session, a fixed crowd, equal 8-second segments: for each worker count the default
+# count (A, Workers 0) and the limited count (B) alternate A B A B ... A, so a drift in the scene cancels. Needs the probe on
+# (Probe = true, ProbeSeconds 1) and, for the worker table, ForgePerformance.NativeProbe.dll beside the plugin.
+# KEEP THE GAME WINDOW FOCUSED for the whole run (the first command asks Windows to bring it forward; do not click another
+# window): an unfocused window changes the audio capture and the frame pacing, and the earlier sampled session ran unfocused.
+# Read with: python Mods/ForgePerformance/tools/analyze_probe.py <probe log> --forgedev <ForgeDevelopment log>
+# and tools/analyze_samples.py <session folder> <probe log> --output report.md (it prints a job-worker table per label).
+# The last block (awake-shadowhold) compares ShadowProxyHold off (A) and on (B).
+# Segments are labelled <part>-w<N>-A-<n> / <part>-w<N>-B-<n>; the focus-* labels are plain 16-second windows.
+# PLACE: an open room of V1 A1 (same as crowd-ab.test). Every segment runs the same commands, so A and B last equally long.
+god on
+clear enemies
+teleport 35.5 0.06 50.5
+look 35.5 0.6 60
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+call static:ForgePerformance.Crowd.PerformanceControl Read as=before
+call static:ForgePerformance.Crowd.PerformanceControl HudMask
+call static:ForgePerformance.Crowd.PerformanceControl Physics as=empty
+call static:ForgePerformance.Crowd.PerformanceControl Mark "focus-empty"
+wait 16s
+# 40 sleepers: the short sleeping/empty part, one comparison of 8 workers
+spawn Striker 4 at=front:3 mode=hibernate
+spawn Striker 4 at=front:5 mode=hibernate
+spawn Striker 4 at=front:7 mode=hibernate
+spawn Striker 4 at=front:9 mode=hibernate
+spawn Striker 4 at=front:11 mode=hibernate
+spawn Striker 4 at=front:13 mode=hibernate
+spawn Striker 4 at=front:15 mode=hibernate
+spawn Striker 4 at=front:17 mode=hibernate
+spawn Striker 4 at=front:19 mode=hibernate
+spawn Striker 4 at=front:21 mode=hibernate
+wait 5s
+call static:ForgePerformance.Crowd.PerformanceControl Physics as=sleepers
+call static:ForgePerformance.Crowd.PerformanceControl Mark "focus-sleep"
+wait 16s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "sleep-w8-A-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "sleep-w8-B-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 8
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "sleep-w8-A-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "sleep-w8-B-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 8
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "sleep-w8-A-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "sleep-w8-B-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 8
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "sleep-w8-A-4"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+# the same 40 awake; god mode keeps the player alive and nobody shoots, so the count stays fixed
+noise 40
+wait 15s
+call static:ForgePerformance.Crowd.PerformanceControl Foreground
+call static:ForgePerformance.Crowd.PerformanceControl Read as=awake
+call static:ForgePerformance.Crowd.PerformanceControl Physics as=awake
+call static:ForgePerformance.Crowd.PerformanceControl Mark "focus-awake-default"
+wait 16s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w12-A-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w12-B-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 12
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w12-A-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w12-B-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 12
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w12-A-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w12-B-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 12
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w12-A-4"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w12-B-4"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 12
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w12-A-5"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w8-A-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w8-B-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 8
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w8-A-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w8-B-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 8
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w8-A-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w8-B-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 8
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w8-A-4"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w8-B-4"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 8
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w8-A-5"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w6-A-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w6-B-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 6
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w6-A-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w6-B-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 6
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w6-A-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w6-B-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 6
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w6-A-4"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w6-B-4"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 6
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w6-A-5"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w4-A-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w4-B-1"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 4
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w4-A-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w4-B-2"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 4
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w4-A-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w4-B-3"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 4
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w4-A-4"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w4-B-4"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 4
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-w4-A-5"
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+wait 8s
+# ShadowProxyHold over the same awake crowd: A = off (the game flips each enemy shadow once a second), B = on
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-shadowhold-A-1"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" false
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-shadowhold-B-1"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" true
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-shadowhold-A-2"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" false
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-shadowhold-B-2"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" true
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-shadowhold-A-3"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" false
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-shadowhold-B-3"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" true
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-shadowhold-A-4"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" false
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-shadowhold-B-4"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" true
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Mark "awake-shadowhold-A-5"
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" false
+wait 8s
+call static:ForgePerformance.Crowd.PerformanceControl Set "ShadowProxyHold" true
+call static:ForgePerformance.Crowd.PerformanceControl Physics as=awake_end
+call static:ForgePerformance.Crowd.PerformanceControl Workers 0
+call static:ForgePerformance.Crowd.PerformanceControl Read as=awake_end
+clear enemies
+call static:ForgePerformance.Crowd.PerformanceControl Mark "end"
+expect log --all !contains "Exception"

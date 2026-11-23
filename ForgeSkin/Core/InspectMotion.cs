@@ -69,7 +69,9 @@ public readonly record struct InspectGunKey(float Time, bool Rest, float Turn, f
 // where the hold would lay them along it); Fingers its finger shape (null: the hold's own); Cue a sound at the key.
 // Regrip: the way into this key from the key before, on the same part, is the hand changing its hold on the part (from one face to
 // another, say from under a magazine to its side), turning round the part and touching it all the way, within InspectMotion.RegripMost.
-public readonly record struct InspectHandKey(float Time, InspectHold On, float Along, int Part = -1, Vector3 Offset = default, ForgeVisual.FingerBend? Fingers = null, InspectFace Face = InspectFace.Left, float U = float.NaN, float V = 0.5f, string? Cue = null, bool Regrip = false, float Spin = 0f, bool Tips = false, bool Clasp = false);
+// Scale: the off hand drawn this many times its size, about its palm's middle (a hand that would fill the view working a part close to
+// the eye drawn smaller so the part shows); between keys on the hand's smooth step, 1 at the first and last keys.
+public readonly record struct InspectHandKey(float Time, InspectHold On, float Along, int Part = -1, Vector3 Offset = default, ForgeVisual.FingerBend? Fingers = null, InspectFace Face = InspectFace.Left, float U = float.NaN, float V = 0.5f, string? Cue = null, bool Regrip = false, float Spin = 0f, bool Tips = false, bool Clasp = false, float Scale = 1f);
 
 // A key of one of a motion's parts: Move (metres in the gun's space: x right, y up, z toward the muzzle), Out (metres along the node's own
 // down axis: a magazine pulled out of its well) and Clear (as many lengths of its mesh box along that axis), Turn (degrees about the
@@ -85,7 +87,9 @@ public readonly record struct InspectPartKey(float Time, Vector3 Move, float Out
 // that is not go with that part too (the rounds of a revolver's speed loader with its cylinder). A gun without a part's node, or whose
 // node draws nothing (a skin hid it), does not play the motion, unless the part is Optional (it moves what is there). Symmetry (degrees):
 // it looks the same turned by this much (a cylinder of six chambers 60), so a rest key turns it back only to the nearest such turn.
-public sealed record InspectPart(string Node, int Follow, Vector3 Axis, InspectPartKey[] Keys, bool Optional = false, string[]? Names = null, float Symmetry = 360f)
+// Carrier: the node only carries the motion's parts under it (a revolver's crane, whose node also holds the barrel and frame in the
+// game's model): what else hangs under it stays with the gun.
+public sealed record InspectPart(string Node, int Follow, Vector3 Axis, InspectPartKey[] Keys, bool Optional = false, string[]? Names = null, float Symmetry = 360f, bool Carrier = false)
 {
     public const string Magazine = "@mag", Round = "@round";
 
@@ -180,6 +184,13 @@ public sealed class InspectMotion
                 : s < RegripClose ? Opened : ForgeVisual.FingerBend.Lerp(Opened, close, Smooth((s - RegripClose) / (1f - RegripClose)));
         float wa = from != null ? 1f : 0f, wb = to != null ? 1f : 0f;
         return wa + (wb - wa) * s;
+    }
+
+    // The off hand's size at `time` (InspectHandKey.Scale), between its keys on the smooth step.
+    public float ScaleAt(float time)
+    {
+        HandSpan(time, out var a, out var b, out var s);
+        return Hand[a].Scale + (Hand[b].Scale - Hand[a].Scale) * s;
     }
 
     // A regrip into or out of a clasped magazine (`held`, InspectLook.Clasp) goes as a hand changes its hold: over the first third of
@@ -442,7 +453,9 @@ public sealed class InspectMotion
                 for (var k = 1; k + 1 < keys.Count; k++)
                     if (keys[k].Ease == InspectEase.Spring && keys[k + 1].Time - keys[k].Time < SpringSettle - 1e-4f) throw Bad(id, $"part {node}: a spring key's bounce takes {SpringSettle} s before the next key");
                 if (keys.Any(k => k.Carry != null) && follow >= 0) throw Bad(id, $"part {node}: a carried part follows no other part");
-                parts.Add(new InspectPart(node, follow, axis, keys.ToArray(), part.TryGetProperty("optional", out var op) && op.GetBoolean(), names.Length > 1 ? names : null, symmetry));
+                var carrier = part.TryGetProperty("carrier", out var cr2) && cr2.GetBoolean();
+                if (carrier && node[0] == '@') throw Bad(id, $"part {node}: carrier is for a named node");
+                parts.Add(new InspectPart(node, follow, axis, keys.ToArray(), part.TryGetProperty("optional", out var op) && op.GetBoolean(), names.Length > 1 ? names : null, symmetry, carrier));
             }
         var magazine = parts.FindIndex(p => p.Node == InspectPart.Magazine);
         var hand = new List<InspectHandKey>();
@@ -490,12 +503,15 @@ public sealed class InspectMotion
                 // `clasp`: the part held between the thumb and the fingers (InspectLook.Clasped), not laid against.
                 var clasp = key.TryGetProperty("clasp", out var cp) && cp.GetBoolean();
                 if (clasp && (on != InspectHold.Node || tips)) throw Bad(id, "clasp (the part held between the thumb and the fingers) is for a hand on a node, without tips");
-                hand.Add(new InspectHandKey(time, on, along, part, offset, Fingers(id, key), face, u, v, Cue(id, key), regrip, spin, tips, clasp));
+                var scale = key.TryGetProperty("scale", out var sc) ? sc.GetSingle() : 1f;
+                if (!(scale > 0f && float.IsFinite(scale))) throw Bad(id, "scale is a positive size of the hand");
+                hand.Add(new InspectHandKey(time, on, along, part, offset, Fingers(id, key), face, u, v, Cue(id, key), regrip, spin, tips, clasp, scale));
             }
         else hand.Add(new InspectHandKey(0f, InspectHold.Grip, 0.5f));
         if (hand[0].Time != 0f || hand[0].On != InspectHold.Grip || hand[^1].On != InspectHold.Grip || hand[^1].Time > gun[^1].Time)
             throw Bad(id, "the hand's first key is at 0, its first and last keys are grip, and it ends with the gun");
         if (hand[0].Fingers != null || hand[^1].Fingers != null) throw Bad(id, "the hand's first and last keys keep the game's fingers");
+        if (hand[0].Scale != 1f || hand[^1].Scale != 1f) throw Bad(id, "the hand's first and last keys keep the game's hand size");
         var fromHold = motion.TryGetProperty("from", out var fr) && (fr.GetString() == "hold" ? true : throw Bad(id, "from is hold (or left out: level and ahead)"));
         if (!fromHold && gun.Any(k => k.Palm)) throw Bad(id, "palm is for a motion from the hold");
         return new InspectMotion(id, gun.ToArray(), hand.ToArray(), parts.ToArray(), fromHold);
@@ -1472,19 +1488,6 @@ public sealed class InspectLook
         // frame rule (a long gun turning across the view swings its stock at the eye): the least bow whose frames keep the rules.
         _game = Shot(rig, rig.GunAt, rig.Gun, rig.TanHalf, gripAt);
         _bow = new Vector3[keys.Length];
-        // An off hand's place on the gun its arm cannot reach while the gun is turned (a shotgun's pump or a rifle's fore-end far up
-        // the gun, swung away from the body) slides back along the gun toward the grip, a centimetre at a time, until it can: on the
-        // keyed pose here, and again on the followed pose once the follow is solved (it carries the gun a little farther).
-        void Reach()
-        {
-            for (var h = 0; h < hands.Length; h++)
-                for (var tries = 0; tries < 80 && hands[h].On is InspectHold.Under or InspectHold.Open or InspectHold.Side or InspectHold.Top or InspectHold.Muzzle
-                    && MathF.Abs(gripAt.Z - _handAt[h].Z) >= 0.01f && OffBeyond(h); tries++)
-                    Anchor(hands[h], _rig, offAt, off, out _handAt[h], out _hand[h],
-                        (_held[h] != null && Support(hands[h]) ? _supportZ[h] : _handAt[h].Z + (hands[h].On is InspectHold.Under or InspectHold.Open ? 0f : Vector3.Transform(Palm, _hand[h]).Z))
-                        + MathF.Sign(gripAt.Z - _handAt[h].Z) * 0.01f);
-        }
-        Reach();
         for (var i = 0; i + 1 < keys.Length; i++)
         {
             // (Not between two keys that hold one pose: the gun is shown there and holds still; nor into a toss: the gun flies there,
@@ -1503,7 +1506,6 @@ public sealed class InspectLook
         }
         // The gun's pose follows the keys through a second-order system (the kind's feel), measured from here on.
         Follow();
-        Reach();
         Presses(rig, offAt, off);
         Around();
         RideHolds();
@@ -1568,21 +1570,6 @@ public sealed class InspectLook
         from y in new[] { 0f, -0.05f, -0.1f, -0.15f }
         from z in new[] { 0f, 0.05f, 0.1f, 0.15f, 0.2f, 0.25f }
         select new Vector3(x, y, z)).OrderBy(v => v.Length()).ToArray();
-
-    // Whether a frame on the way into or out of off hand key `key` puts its place on the gun out of its arm's reach (Breaks' rule).
-    bool OffBeyond(int key)
-    {
-        var hands = Motion.Hand;
-        float from = hands[Math.Max(0, key - 1)].Time * Slow, to = hands[Math.Min(hands.Length - 1, key + 1)].Time * Slow;
-        for (var time = from; time <= to; time += Step)
-        {
-            Motion.HandSpan(time / Slow, out var ha, out var hb, out var hs);
-            if ((ha != key && hb != key) || !OnGun(hands[ha].On) || !OnGun(hands[hb].On)) continue;
-            GunPose(time, 1f, _rig.GunAt, _rig.Gun, _rig.TanHalf, out _, out _, out _);
-            if (Vector3.Distance(HeldAt + Vector3.Transform(Vector3.Lerp(_handAt[ha], _handAt[hb], hs), HeldTurn), _rig.OffArm.Shoulder) > _rig.OffArm.Reach + 0.02f) return true;
-        }
-        return false;
-    }
 
     // The first sampled time in the way from gun key `key` to the next that breaks a rule (-1 when none) and how many do.
     float SpanBreaks(int key, out int count)
@@ -2228,6 +2215,10 @@ public sealed class InspectLook
         }
         Place(a, time, weight, gunAt, gun, liveAt, live, out var atA, out var turnA);
         Place(b, time, weight, gunAt, gun, liveAt, live, out var atB, out var turnB);
+        // (Both ends within the arm's reach before the way between them: clamped after, a way to a place out of reach stopped dead where
+        // it left the reach, before its key, and the hand jerked to a halt there. The game's hold is where the game has the hand.)
+        if (Motion.Hand[a].On != InspectHold.Grip) atA = _off.Within(atA);
+        if (Motion.Hand[b].On != InspectHold.Grip) atB = _off.Within(atB);
         var way = Vector3.Lerp(atA, atB, s);
         if (a != b && s > 0f && s < 1f && !Rides(a))
         {
@@ -2246,7 +2237,8 @@ public sealed class InspectLook
         var regrip = a != b && Motion.Hand[b].Regrip;
         var regripTurn = Quaternion.Identity;
         if (regrip) Regrip(a, b, s, time, weight, gunAt, gun, out way, out regripTurn);
-        at = _off.Within(Vector3.Lerp(liveAt, way, weight));
+        var wayAt = Vector3.Lerp(liveAt, way, weight);
+        at = _off.Within(wayAt);
         var placed = at;
         // To or from out of the view the forearm swings round with the hand: the wrist goes evenly from its turn at one place to its turn
         // at the other (in the forearm's frame where the hand is), not the hand's turn in the view, which bends the wrist far past both.
@@ -2350,11 +2342,28 @@ public sealed class InspectLook
                 at = _off.Within(at + back * hi);
             }
         }
+        // Leaving the game's hold and coming back to it the hand starts and ends exactly where the game has it (where the look lets the
+        // hand go, the game's target is the hand): what the look does to the way (the reach, the wrist's limits, the lift off the gun)
+        // comes in and goes out with the way, not at once on the frame the hand leaves or takes its grip, which made it twitch there.
+        if (a != b && (Motion.Hand[a].On == InspectHold.Grip || Motion.Hand[b].On == InspectHold.Grip))
+        {
+            var share = Motion.Hand[a].On == InspectHold.Grip ? s : 1f - s;
+            (at, turn) = (Vector3.Lerp(wayAt, at, share), Quaternion.Normalize(Quaternion.Slerp(wanted, turn, share)));
+        }
     }
 
     // How deep a finger's middle line may lie in the gun's meshes on a clasped magazine before the hand lifts (half of rule F's
     // InspectHand.Inside, the rest the baked fingers' give between their frames), and the most it lifts.
     const float ClaspSink = InspectHand.Inside / 2f, ClaspLift = 0.04f;
+
+    // The off hand's size at `time` as drawn (InspectHandKey.Scale, the look's `weight` of it), and its wrist's target `at` (turned
+    // `turn`) moved so that the hand drawn at that size about its wrist keeps its palm's middle where the look placed it.
+    public float OffScale(float time, float weight, ref Vector3 at, Quaternion turn)
+    {
+        var scale = 1f + (Motion.ScaleAt(MotionTime(time)) - 1f) * weight;
+        at += Vector3.Transform(Palm, turn) * (1f - scale);
+        return scale;
+    }
 
     // The off hand at `time` with the gun at `gunAt`, `gun` as the look solves it: the game's target on its grip goes with the gun.
     void OffPose(float time, Vector3 gunAt, Quaternion gun, out Vector3 at, out Quaternion turn)
@@ -2852,6 +2861,30 @@ public sealed class InspectLook
         (up, front, half) = (lean, Vector3.Cross(Vector3.UnitX, lean), new Vector3(size.X / 2f, length / 2f, depth / 2f));
     }
 
+    // A magazine wider than the hand spans (MagSpan), held by its side: cradled with its length (its longest side) across the palm, along
+    // the palm's crease and square to the fingers, the palm on its thinnest face and the four fingers curling over the far edge of the
+    // other side until they meet it (FingerStop), the thumb on the near side; the palm's middle MagKnuckles in from that edge. The fingers
+    // point to its front, under its base or to its right, whichever side they go over. A key's offset is to the magazine's left, up it
+    // and to its front; its spin turns the hand about the palm's way.
+    // How much thicker than the other the left face's side may be and still take the palm.
+    const float MagLeftFirst = 1.25f;
+    static void MagCradle(Vector3 mc, Vector3 up, Vector3 front, Vector3 half, in InspectHandKey key, out Vector3 at, out Quaternion turn)
+    {
+        Vector3[] axes = [Vector3.UnitX, up, front];
+        float[] h = [half.X, half.Y, half.Z];
+        var length = h[0] >= h[1] && h[0] >= h[2] ? 0 : h[1] >= h[2] ? 1 : 2;
+        int i = (length + 1) % 3, j = (length + 2) % 3;
+        // (The left face, which the left arm comes to, unless the other is clearly the thinner: MagLeftFirst.)
+        static float Thin(int axis, float[] h) => axis == 0 ? h[axis] / MagLeftFirst : h[axis];
+        var (palm, over) = Thin(i, h) <= Thin(j, h) ? (i, j) : (j, i);
+        var fingers = over == 1 ? -up : axes[over];
+        turn = Axes(-fingers, -axes[palm], Vector3.Cross(-fingers, -axes[palm]));
+        if (key.Spin != 0f) turn = Quaternion.Normalize(Quaternion.CreateFromAxisAngle(-axes[palm], key.Spin * MathF.PI / 180f) * turn);
+        var place = mc - axes[palm] * (h[palm] + PalmSkin) + fingers * MathF.Max(-h[over], h[over] - MagKnuckles)
+            - Vector3.UnitX * key.Offset.X + up * key.Offset.Y + front * key.Offset.Z;
+        at = place - Vector3.Transform(Palm, turn);
+    }
+
     // A magazine held by its side as a bottle is, clasped: a narrow face against the palm, the palm's middle at most ClaspPalm off it;
     // the thumb's pad on one big face and the pads of three fingers or more on the other, each pad's skin at most ClaspPad off its face;
     // nothing of the hand more than ClaspSquash into it; the hand's middle at its middle. Where the hand goes on a magazine of a size,
@@ -3196,7 +3229,7 @@ public sealed class InspectLook
         Quaternion.Normalize(Quaternion.CreateFromRotationMatrix(new Matrix4x4(x.X, x.Y, x.Z, 0f, y.X, y.Y, y.Z, 0f, z.X, z.Y, z.Z, 0f, 0f, 0f, 0f, 1f)));
 
     // `along`: where along the gun (its z) a hand under, beside, on top of or at the muzzle of the gun goes instead of the key's place
-    // (Reach slides it back toward the grip).
+    // (a clasp's support place).
     void Anchor(in InspectHandKey key, in InspectRig rig, Vector3 offAt, Quaternion off, out Vector3 at, out Quaternion turn, float along = float.NaN)
     {
         Vector3 c = rig.Centre, e = rig.Extents;
@@ -3266,10 +3299,21 @@ public sealed class InspectLook
                             at = pad - Vector3.Transform(MagThumbPad, turn);
                             return;
                         }
-                        var reach = Vector3.Normalize(front * MathF.Cos(MagYaw * MathF.PI / 180f) + Vector3.UnitX * MathF.Sin(MagYaw * MathF.PI / 180f));
+                        // Wider than the hand spans, by its side: cradled with its length across the palm (MagCradle).
+                        if (key.Face == InspectFace.Left)
+                        {
+                            MagCradle(mc, up, front, half, key, out at, out turn);
+                            return;
+                        }
+                        // (By its base the length across the palm too: a magazine longest front to back or across, a box, has the
+                        // fingers across it to the right instead of along it.)
+                        var reach = half.Z > half.Y && half.Z >= half.X ? Vector3.UnitX
+                            : half.X > half.Y && half.X > half.Z ? front
+                            : Vector3.Normalize(front * MathF.Cos(MagYaw * MathF.PI / 180f) + Vector3.UnitX * MathF.Sin(MagYaw * MathF.PI / 180f));
                         turn = Axes(-reach, -up, Vector3.Cross(reach, up));
                         if (key.Spin != 0f) turn = Quaternion.Normalize(Quaternion.CreateFromAxisAngle(-up, key.Spin * MathF.PI / 180f) * turn);
-                        var place = mc - up * half.Y + front * MathF.Max(-half.Z, half.Z - MagKnuckles) + Vector3.UnitX * MathF.Min(0f, MagThumb - half.X);
+                        var knuckles = reach == Vector3.UnitX ? Vector3.UnitX * MathF.Max(-half.X, half.X - MagKnuckles) : front * MathF.Max(-half.Z, half.Z - MagKnuckles);
+                        var place = mc - up * half.Y + knuckles + (reach == Vector3.UnitX ? Vector3.Zero : Vector3.UnitX * MathF.Min(0f, MagThumb - half.X));
                         at = place - up * PalmSkin - Vector3.UnitX * key.Offset.X + up * key.Offset.Y + front * key.Offset.Z - Vector3.Transform(Palm, turn);
                         return;
                     }
@@ -4101,6 +4145,195 @@ public sealed class InspectLook
         }
     }
 
+    // K, a hand that jumps (the owner's: where a motion starts and ends and between its segments the hand twitches back and forth, and
+    // the hand and its fingers snap from one place or shape to the next): frame to frame at JumpRate, from two frames before the look to
+    // two after it (where the game's hold shows), either hand's target where the item camera sees it moving faster than JumpMove metres
+    // a second or turning faster than JumpTurn degrees a second, or a joint of either hand's fingers as the game shows it (Shown) faster
+    // than JumpFinger degrees a second. No hand of a look moves that fast on its own; a way that does not reach where the next one starts,
+    // or a switch of how the hand is placed, does it in a frame. The grip hand is not counted while the gun is free of it (spun or tossed:
+    // it follows the gun round on purpose). Reported once per hand and what jumps, with how many frames and the fastest.
+    public const float JumpMove = 2.5f, JumpTurn = 1200f, JumpFinger = 1500f, JumpRate = 1f / 240f;
+
+    public void Jumps(List<(float Time, string Rule)> list)
+    {
+        var toGun = Quaternion.Inverse(_rig.Gun);
+        var (offInGun, offTurnInGun) = (Vector3.Transform(_rig.OffAt - _rig.GunAt, toGun), toGun * _rig.Off);
+        var frames = (int)(Seconds / JumpRate) + 5;
+        const int Joints = 31; // the off hand's 15, the grip hand's 15 and its index finger's lift
+        var (count, first, most) = (new int[4 + Joints], new float[4 + Joints], new float[4 + Joints]);
+        var lastJoint = new float[Joints];
+        Vector3 lastOff = default, lastGrip = default;
+        Quaternion lastOffTurn = default, lastGripTurn = default;
+        var (lastSeen, lastFree) = (false, false);
+        void Count(int what, float speed, float limit, float time)
+        {
+            if (speed <= limit) return;
+            if (count[what]++ == 0) first[what] = time;
+            most[what] = MathF.Max(most[what], speed);
+        }
+        static float Angle(Quaternion a, Quaternion b) => 2f * MathF.Acos(MathF.Min(1f, MathF.Abs(Quaternion.Dot(Quaternion.Normalize(a), Quaternion.Normalize(b))))) * 180f / MathF.PI;
+        for (var f = 0; f < frames; f++)
+        {
+            var time = (f - 2) * JumpRate;
+            Vector3 off, grip;
+            Quaternion offTurn, gripTurn;
+            float view;
+            var free = false;
+            // (Before the look and after it the game's own hold.)
+            if (time < 0f || time > Seconds) (off, offTurn, grip, gripTurn, view) = (_rig.OffAt, _rig.Off, _rig.GripAt, _rig.Grip, _rig.TanHalf);
+            else
+            {
+                GunPose(time, 1f, _rig.GunAt, _rig.Gun, _rig.TanHalf, out var gunAt, out var gun, out view);
+                free = Free || Twirling;
+                GripPose(HeldAt, HeldTurn, out grip, out gripTurn);
+                if (HandOff(time)) OffPose(time, gunAt, gun, out off, out offTurn);
+                else (off, offTurn) = (gunAt + Vector3.Transform(offInGun, gun), gun * offTurnInGun);
+            }
+            var seen = HandSeen(off, offTurn, view);
+            if (f > 0)
+            {
+                if (seen || lastSeen)
+                {
+                    Count(0, Vector3.Distance(off, lastOff) / JumpRate, JumpMove, time);
+                    Count(1, Angle(offTurn, lastOffTurn) / JumpRate, JumpTurn, time);
+                }
+                if (!free && !lastFree)
+                {
+                    Count(2, Vector3.Distance(grip, lastGrip) / JumpRate, JumpMove, time);
+                    Count(3, Angle(gripTurn, lastGripTurn) / JumpRate, JumpTurn, time);
+                }
+            }
+            for (var j = 0; j < Joints; j++)
+            {
+                var now = j < 15 ? Shown(0, j, time) : Shown(1, j - 15, time);
+                if (f > 0) Count(4 + j, MathF.Abs(now - lastJoint[j]) / JumpRate, JumpFinger, time);
+                lastJoint[j] = now;
+            }
+            (lastOff, lastOffTurn, lastGrip, lastGripTurn, lastSeen, lastFree) = (off, offTurn, grip, gripTurn, seen, free);
+        }
+        string[] what = ["off hand moves", "off hand turns", "grip hand moves", "grip hand turns"];
+        for (var k = 0; k < 4; k++)
+            if (count[k] > 0) list.Add((first[k], $"K: the {what[k]} by a jump {count[k]} times (at most {most[k]:0.0} {(k % 2 == 0 ? "m" : "degrees")} a second, at most {(k % 2 == 0 ? JumpMove : JumpTurn):0.#} wanted)"));
+        for (var j = 0; j < Joints; j++)
+        {
+            if (count[4 + j] == 0) continue;
+            var (hand, joint) = j < 15 ? ("off", j) : ("grip", j - 15);
+            var name = joint < 15 ? $"{InspectHand.Names[joint / 3]} joint {joint % 3}" : "index finger's lift";
+            list.Add((first[4 + j], $"K: the {hand} hand's {name} snaps {count[4 + j]} times (at most {most[4 + j]:0} degrees a second, at most {JumpFinger:0} wanted)"));
+        }
+    }
+
+    // D, the off hand drifting on the gun (the owner's: the hand under the gun is pulled back along it as the gun turns, and goes into it):
+    // over a run of keys holding the gun up (under, beside or on top of it), its palm's middle in the gun's own space moves more than
+    // DriftMost from where it took hold. A hand that holds a gun keeps its place on it as the gun turns.
+    public const float DriftMost = 0.02f;
+
+    public void Drifts(List<(float Time, string Rule)> list)
+    {
+        var hands = Motion.Hand;
+        for (var a = 0; a < hands.Length; a++)
+        {
+            if (!Support(hands[a]) || (a > 0 && Support(hands[a - 1]))) continue;
+            var last = a;
+            while (last + 1 < hands.Length && Support(hands[last + 1])) last++;
+            if (last == a) continue;
+            var (from, worst, when) = ((Vector3?)null, 0f, 0f);
+            for (var time = hands[a].Time * Slow; time <= hands[last].Time * Slow + 1e-4f; time += Step)
+            {
+                GunPose(time, 1f, _rig.GunAt, _rig.Gun, _rig.TanHalf, out var gunAt, out var gun, out _);
+                OffPose(time, gunAt, gun, out var off, out var offTurn);
+                var palm = Vector3.Transform(off + Vector3.Transform(Palm, offTurn) - gunAt, Quaternion.Inverse(gun));
+                from ??= palm;
+                if (Vector3.Distance(palm, from.Value) is var d && d > worst) (worst, when) = (d, time);
+            }
+            if (worst > DriftMost) list.Add((when, $"D: the off hand holding the gun from {hands[a].Time:0.00} s to {hands[last].Time:0.00} s moves {worst * 100f:0.0} cm on it (at most {DriftMost * 100f:0} wanted)"));
+        }
+    }
+
+    // G, a magazine held in the hand (the owner's: the magazine is not between the thumb and the fingers but outside the hand; a big one
+    // lies with its length along the fingers): while the off hand holds the magazine (both keys on it, not changing its hold), the
+    // magazine's middle in the hand's own frame lies on the palm's side of it, within the curled fingers' reach, and over the hand (from
+    // the wrist to past the fingertips, within a hand's breadth across), and its length (its longest side, where that is HoldLong times the next) lies no nearer the
+    // fingers' way than HoldAcross degrees. Each reported once, with how many samples.
+    public const float HoldAcross = 45f, HoldLong = 1.3f;
+
+    public void MagInHand(List<(float Time, string Rule)> list)
+    {
+        var moved = new (Quaternion R, Vector3 T)[Motion.Parts.Length];
+        var (outside, along, outAt, alongAt, worstAlong) = (0, 0, 0f, 0f, 90f);
+        foreach (var time in AuditTimes())
+        {
+            if (!HandOff(time) || ContactOf(time) is var part && (part < 0 || Motion.Parts[part].Node != InspectPart.Magazine)) continue;
+            Motion.HandSpan(MotionTime(time), out var a, out var b, out _);
+            if (a != b && Motion.Hand[b].Regrip) continue;
+            GunPose(time, 1f, _rig.GunAt, _rig.Gun, _rig.TanHalf, out var gunAt, out var gun, out _);
+            Moved(time, moved);
+            OffPose(time, gunAt, gun, out var off, out var offTurn);
+            var box = _rig.Parts![part];
+            if (box.Lo == box.Hi) continue;
+            MagBox(box.Lo, box.Hi, box.Down, out var mc, out var up, out var front, out var half);
+            var toHand = Quaternion.Inverse(offTurn);
+            Vector3 Point(Vector3 p) => Vector3.Transform(gunAt + Vector3.Transform(Vector3.Transform(p, moved[part].R) + moved[part].T, gun) - off, toHand);
+            Vector3 Way(Vector3 d) => Vector3.Transform(Vector3.Transform(Vector3.Transform(d, moved[part].R), gun), toHand);
+            // (The hand's frame: x from the fingers to the wrist, y out of the back of the hand, z toward the thumb.)
+            var c = Point(mc) - PalmSurface;
+            if (c.Y > 0f || c.Y < -HoldDepth || c.X > -Palm.X + 0.01f || c.X < Fingertip.X - Palm.X - 0.02f || MathF.Abs(c.Z) > HoldBreadth)
+                if (outside++ == 0) outAt = time;
+            float[] h = [half.X, half.Y, half.Z];
+            var sorted = h.OrderByDescending(v => v).ToArray();
+            if (sorted[0] < sorted[1] * HoldLong) continue;
+            var length = Way(h[0] == sorted[0] ? Vector3.UnitX : h[1] == sorted[0] ? up : front);
+            var off90 = MathF.Acos(Math.Clamp(MathF.Abs(length.X), 0f, 1f)) * 180f / MathF.PI; // from the fingers' way
+            if (off90 < HoldAcross)
+            {
+                if (along++ == 0) alongAt = time;
+                worstAlong = MathF.Min(worstAlong, off90);
+            }
+        }
+        if (outside > 0) list.Add((outAt, $"G: the magazine lies outside the hand's hold, not between the thumb and the fingers in front of the palm ({outside} samples)"));
+        if (along > 0) list.Add((alongAt, $"G: the magazine's length runs along the fingers ({worstAlong:0} degrees off them at the nearest, at least {HoldAcross:0} wanted; {along} samples)"));
+    }
+
+    // (Within a hand's breadth across, and no farther out of the palm than the curled fingers reach: InspectHand's fingers closed.)
+    const float HoldBreadth = 0.06f, HoldDepth = 0.08f;
+
+    // V, the off hand filling the view (the owner's: working a part the hand is big and close and covers the gun and the part it shows):
+    // where the item camera sees the off hand while it works a part, its palm's middle or its fingertips nearer the eye than HandNear, or
+    // the hand (drawn at its size, InspectMotion.ScaleAt, about its palm's middle) and forearm covering more than HandCovers of the middle
+    // of the view (Cover). Each reported once with the nearest and the most.
+    public const float HandNear = 0.2f, HandCovers = 0.4f;
+
+    public void HandInView(List<(float Time, string Rule)> list)
+    {
+        var (near, nearAt, nearest, covers, coverAt, most) = (0, 0f, float.MaxValue, 0, 0f, 0f);
+        for (var f = 0; f * Step * 2f <= Seconds; f++)
+        {
+            var time = f * Step * 2f;
+            if (!HandOff(time) || ContactOf(time) < 0) continue;
+            GunPose(time, 1f, _rig.GunAt, _rig.Gun, _rig.TanHalf, out var gunAt, out var gun, out var view);
+            OffPose(time, gunAt, gun, out var off, out var offTurn);
+            if (!HandSeen(off, offTurn, view)) continue;
+            var scale = Motion.ScaleAt(MotionTime(time));
+            var palm = off + Vector3.Transform(Palm, offTurn);
+            Vector3 wrist = palm + (off - palm) * scale, tip = palm + Vector3.Transform(Fingertip - Palm, offTurn) * scale;
+            var d = MathF.Min(palm.Length(), tip.Length());
+            if (d < HandNear)
+            {
+                if (near++ == 0) nearAt = time;
+                nearest = MathF.Min(nearest, d);
+            }
+            var elbow = _off.Elbow(off, OffSwivel);
+            var share = Cover(view, r => HitsCapsule(r, wrist, tip, PalmRadius * scale) || HitsCapsule(r, palm, palm, 0.055f * scale) || HitsCapsule(r, elbow, wrist, ForearmRadius));
+            if (share > HandCovers)
+            {
+                if (covers++ == 0) coverAt = time;
+                most = MathF.Max(most, share);
+            }
+        }
+        if (near > 0) list.Add((nearAt, $"V: the off hand working a part comes {nearest:0.00} m from the eye (at least {HandNear:0.00} wanted; {near} samples)"));
+        if (covers > 0) list.Add((coverAt, $"V: the off hand working a part covers {most:P0} of the middle of the view (at most {HandCovers:P0} wanted; {covers} samples)"));
+    }
+
     // The times the audit (and Snug's measures) look at: every other frame, and every hand and part key.
     IEnumerable<float> AuditTimes() => Enumerable.Range(0, (int)(Seconds / Step) + 1).Where(f => f % 2 == 0).Select(f => f * Step)
         .Concat(Motion.Hand.Select(k => k.Time * Slow)).Concat(Motion.Parts.SelectMany(p => p.Keys).Select(k => k.Time * Slow))
@@ -4142,6 +4375,10 @@ public sealed class InspectLook
         Twitches(list);
         StillFingers(list);
         Tosses(list);
+        Jumps(list);
+        Drifts(list);
+        MagInHand(list);
+        HandInView(list);
         if (indexDeep > InspectHand.Inside) list.Add((indexAt, $"F: the grip hand's index finger lies {indexDeep * 100f:0.0} cm inside the gun along its side"));
         if (!float.IsNaN(IndexBend) && _indexOff > TouchGap) list.Add((IndexTime, $"F: the grip hand's index finger lies {_indexOff * 100f:0.0} cm off the side of the gun"));
         list.Sort((x, y) => x.Time.CompareTo(y.Time));
@@ -4480,6 +4717,9 @@ public sealed class InspectLook
     // degrees a second over a finger's 110), and how fast the look takes the off hand's fingers over from the game's grip or gives
     // them back (its weight a second).
     public const float FingerBack = 1.5f, WeightSpeed = 8f;
+    // How fast a finger opens ahead of a mesh that opens it (shares of its bend a second: a finger's 110 degrees in a sixth of a second,
+    // half of K's JumpFinger).
+    public const float FingerAhead = 6f;
 
     // How deep the off hand's finger `finger` of shape `bend` lies in the gun's meshes (the hand at `off`, `offTurn`): its half
     // thickness less the least gap of the points along its three bones (negative: clear of them all).
@@ -4615,6 +4855,7 @@ public sealed class InspectLook
         Moved(0f, moved);
         // Each sample's hand where its fingers were stopped on the gun (for Steady), and how far their skin may press in.
         var posed = new (Vector3 Off, Quaternion OffTurn, Vector3 GunAt, Quaternion Gun, (Quaternion R, Vector3 T)[] Moved, float Give)?[n];
+        var keyedBend = new ForgeVisual.FingerBend[n]; // each posed sample's shape before the meshes stopped it
         float Touch(float time, Vector3 wrist, Quaternion hand, Vector3 at, Quaternion turn) => Pinched(time, out var pad)
             ? MathF.Max(0f, Gap(wrist + Vector3.Transform(pad, hand), at, turn, moved))
             : MathF.Max(0f, MathF.Min(Gap(wrist + Vector3.Transform(Palm, hand), at, turn, moved), Gap(wrist + Vector3.Transform(Fingertip, hand), at, turn, moved)));
@@ -4646,6 +4887,7 @@ public sealed class InspectLook
                 // the way off it.)
                 var placed = give > 0f && !(ha != hb && _held[ha] != null && _held[hb] == null);
                 if (placed) Array.Fill(shares, float.NaN);
+                keyedBend[i] = bend;
                 bend = Stopped(bend, off, offTurn, gunAt, gun, moved, give, placed || _snap ? null : shares);
                 posed[i] = (off, offTurn, gunAt, gun, ((Quaternion, Vector3)[])moved.Clone(), give);
                 posing = true;
@@ -4659,6 +4901,14 @@ public sealed class InspectLook
             if (i > 0 && !_snap) _offWeight[i] = Math.Clamp(_offWeight[i], _offWeight[i - 1] - WeightSpeed * FingerRate, _offWeight[i - 1] + WeightSpeed * FingerRate);
             _offBend[i] = bend;
             _gripWeight[i] = GripFingers(time, out _gripBend[i], out _indexWeight[i], out _indexBend[i]);
+        }
+        // (And it is back to none, the game's fingers, at the look's end: it starts giving them back soon enough to, as fast as above.
+        // Held back from the sample before alone, a hand that took its grip on the last key still had the look's fingers when the look
+        // ended, and they snapped to the game's.)
+        if (!_snap)
+        {
+            _offWeight[n - 1] = Motion.FingersAt(Seconds / Slow, out _, _held) is var end && !HandOff(Seconds) ? end : _offWeight[n - 1];
+            for (var i = n - 2; i >= 0; i--) _offWeight[i] = MathF.Min(_offWeight[i], _offWeight[i + 1] + WeightSpeed * FingerRate);
         }
         // The fingers' flicker taken out (Steady), each finger kept as stopped where steadied it would press further into the gun.
         var steady = Steady(_offBend, FingerRate);
@@ -4694,6 +4944,19 @@ public sealed class InspectLook
             var (here, next) = (_offBend[i], _offBend[i + 1]);
             for (var j = 0; j < 15; j++) joints[j] = MathF.Min(here.Joint(j / 3, j % 3), next.Joint(j / 3, j % 3) + open);
             _offBend[i] = ForgeVisual.FingerBend.ByJoints(joints, MathF.Min(here.Spread, next.Spread + open), MathF.Min(here.Oppose, next.Oppose + open));
+        }
+        // Everywhere else a finger the gun opens (it lets go at once where it would go into a mesh, FingerStop) opens at most FingerAhead
+        // a second, so sooner where a mesh opens it ahead: it never closes past where it was stopped, and does not snap open in a frame
+        // (the owner's: the fingers jump from one shape to the next). Only what the mesh opens: the keys' own shapes go between keys on
+        // their smooth step already, and a key that asks a snap gets it (rule J says so).
+        var ahead = FingerAhead * FingerRate;
+        for (var i = n - 2; i >= 0; i--)
+        {
+            if (posed[i] is null || posed[i + 1] is null) continue;
+            var (here, next, keyedNext) = (_offBend[i], _offBend[i + 1], keyedBend[i + 1]);
+            float Ahead(float h, float s, float k) => MathF.Min(h, s + ahead + MathF.Max(0f, h - k));
+            for (var j = 0; j < 15; j++) joints[j] = Ahead(here.Joint(j / 3, j % 3), next.Joint(j / 3, j % 3), keyedNext.Joint(j / 3, j % 3));
+            _offBend[i] = ForgeVisual.FingerBend.ByJoints(joints, Ahead(here.Spread, next.Spread, keyedNext.Spread), Ahead(here.Oppose, next.Oppose, keyedNext.Oppose));
         }
         // Last, every track of both hands made smooth (Smoothed): no finger jumps or stops and starts at once.
         var half = Math.Max(1, (int)MathF.Round(SmoothFor / FingerRate));
@@ -5015,7 +5278,7 @@ public sealed class InspectLook
     // of half of it), three times as much for every bit of that past the game's own view (widening is the last resort), how far the hand
     // is from where the game holds it (an arm reaching across the view looks wrong), a little for every degree the elbow swings from rest,
     // the centre's distance from the key's point of the view, every metre a place the off hand touches at this key is out of its arm's
-    // reach, and far more for every degree the wrist would have to bend past its limits to hold the turn there.
+    // reach (OutOfReach), and far more for every degree the wrist would have to bend past its limits to hold the turn there.
     static float Cost(in InspectGunKey key, in InspectRig rig, in InspectArm arm, Vector3 hand, float swivel, Vector3 at, Quaternion want, Quaternion hold, Vector3 gripAt, List<Vector3> touches)
     {
         var bend = 2f * MathF.Acos(Math.Min(1f, MathF.Abs(Quaternion.Dot(arm.Comfort(hand, hold, swivel), hold)))) * 180f / MathF.PI;
@@ -5025,9 +5288,15 @@ public sealed class InspectLook
         var off = new Vector2(centre.X / (centre.Z * rig.TanHalf * rig.Aspect), centre.Y / (centre.Z * rig.TanHalf)) - Aim(key);
         var need = Needed(key, rig, want, at, gripAt);
         var cost = need + 3f * MathF.Max(0f, need - rig.TanHalf) + 1.5f * Vector3.Distance(hand, rig.GripAt) + 0.002f * MathF.Abs(swivel) + (float.IsNaN(key.At.X) ? AtFree : AtHeld) * off.Length();
-        foreach (var t in touches) cost += 3f * MathF.Max(0f, Vector3.Distance(at + Vector3.Transform(t, want), rig.OffArm.Shoulder) - rig.OffArm.Reach);
+        // (Past the arm by as much as the game holds the hand at rest counts as in reach.)
+        var reach = MathF.Max(rig.OffArm.Reach, Vector3.Distance(rig.OffAt, rig.OffArm.Shoulder));
+        foreach (var t in touches) cost += OutOfReach * MathF.Max(0f, Vector3.Distance(at + Vector3.Transform(t, want), rig.OffArm.Shoulder) - reach);
         return cost;
     }
+    // What a metre of an off hand's place out of its arm's reach weighs: ten times the grip hand's distance from its hold, so the gun is
+    // brought to where the off hand keeps its place on it as the gun turns (the owner's: the hand under the gun stays where it holds
+    // it); the place is never slid along the gun, so a hand the gun is not brought near enough to falls short rather than moving on it.
+    const float OutOfReach = 40f;
     // How much a unit of the centre's distance from the key's point of the view weighs: a key that writes `at` holds the gun there (within
     // about 0.1 of the half view, giving way to the frame rules and the hand's place), one that does not leans a little toward the middle.
     const float AtHeld = 1f, AtFree = 0.05f;

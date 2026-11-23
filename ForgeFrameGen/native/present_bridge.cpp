@@ -16,6 +16,7 @@
 // for the other backend on the same window (Switch); the game keeps its swap chain, buffer 0 and waitable object.
 // Copyright (c) 2026 Xander Frangos. MIT License; the full text ships as RiskOfRainUpscaling-LICENSE.txt.
 #include "frame_generation.h"
+#include "bridge_common.h"
 #include <wrl/client.h>
 #include <array>
 #include <atomic>
@@ -36,9 +37,29 @@ using Microsoft::WRL::ComPtr;
 
 namespace
 {
-std::atomic<int> g_requested{0}, g_active{0}, g_creationFailures{0}, g_runtimeFailures{0};
+std::atomic<int> g_requested{0}, g_active{0}, g_creationFailures{0}, g_runtimeFailures{0}, g_fallbacks{0};
 std::atomic<int> g_devices{0}, g_factories{0}, g_chains{0};
 std::atomic<long long> g_presents{0};
+
+// Where the render thread is in the bridge (PresentStage), for the preloader's line when no frame comes through for a while: a game that
+// froze inside the bridge says where.
+enum PresentStage : int
+{
+    StageIdle = 0,
+    StageSlot = 1,      // waiting for a back buffer slot of the D3D12 queue
+    StageInputs = 2,    // frame generation's inputs and options for this present
+    StageDisplay = 3,   // inside the display swap chain's Present
+    StageResize = 4,    // ResizeBuffers
+    StageSwitch = 5,    // moving the display to another frame generation
+    StageFallback = 6,  // handing the window back to the game's own D3D11 swap chain
+};
+std::atomic<int> g_stage{StageIdle};
+struct StageScope
+{
+    int previous;
+    explicit StageScope(int stage) : previous(g_stage.exchange(stage)) {}
+    ~StageScope() { g_stage = previous; }
+};
 
 // Lines for the plugin's log (BridgeLogKind); the preloader runs before the plugin, so they wait here until it drains them. Info
 // lines are developer logs: the plugin says whether those are on, and until it has they are kept (the lines of the start-up). With
@@ -187,6 +208,10 @@ class Bridge final : public IDXGISwapChain2
     UINT64 _serial = 0;
     UINT _lastIndex = 0;
     bool _hasImage = false, _failed = false;
+    // Native: the bridge gave the window back to a D3D11 swap chain of the game's device (GoNative); _display is that chain, each present
+    // copies buffer 0 into its back buffer, and nothing of D3D12 or frame generation runs any more.
+    bool _native = false;
+    ComPtr<ID3D11Texture2D> _nativeBuffer;
     // The frame-latency waitable object the game gets when it creates its chain with one: the bridge's own semaphore, never the display
     // chain's. Streamline owns that chain and its waitable object (its DLSS-G guide, 12.1), so the display chain is made without one; a
     // game waiting on Streamline's object waited seconds at a time in the offline check. As DXGI's, it gives a frame back when a present
@@ -196,7 +221,7 @@ class Bridge final : public IDXGISwapChain2
     // the GPU with the waitable object; FSR has no Reflex here): the game builds one frame while the GPU draws the one before.
     static constexpr LONG kFsrLatency = 2;
     HANDLE _latency = nullptr;
-    LONG _latencyLimit = 1, _latencyApplied = 1, _latencyDebt = 0; // DXGI's default limit is 1; a lowered limit is paid by skipped releases
+    LONG _latencyLimit = 1, _latencyApplied = 1, _latencyDebt = 0; // DXGI's default limit is 1; the bridge's own lower cap is paid by skipped releases
     std::mutex _latencyLock;
     std::atomic<bool> _waitableAsked{false};
     bool _fsrOn = false; // _latencyLock
@@ -437,6 +462,104 @@ class Bridge final : public IDXGISwapChain2
             if (target) target->Release();
     }
 
+    // Buffer 0 of the game's own swap chain and the producer the game draws into at its size (kept when the size is the same: the game
+    // holds it).
+    void NativeBuffers()
+    {
+        Require(_display->GetDesc1(&_desc), "The game's own swap chain description");
+        Require(_display->GetBuffer(0, IID_PPV_ARGS(&_nativeBuffer)), "The game's own back buffer");
+        D3D11_TEXTURE2D_DESC have{};
+        if (_producer) _producer->GetDesc(&have);
+        if (_producer && have.Width == _desc.Width && have.Height == _desc.Height && have.Format == Typeless(_desc.Format)) return;
+        D3D11_TEXTURE2D_DESC texture{};
+        texture.Width = _desc.Width;
+        texture.Height = _desc.Height;
+        texture.MipLevels = texture.ArraySize = 1;
+        texture.Format = Typeless(_desc.Format);
+        texture.SampleDesc.Count = 1;
+        texture.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+        _producer.Reset();
+        Require(_device11->CreateTexture2D(&texture, nullptr, &_producer), "Bridge buffer 0");
+    }
+
+    // The way back to the game's own rendering when the bridge cannot go on (a D3D12 call failed or timed out, the D3D12 device was
+    // removed, the game asked for exclusive fullscreen): frame generation stops, the D3D12 display swap chain goes, and the window gets a
+    // D3D11 swap chain of the game's own device and factory, made as the game asked for its own (without the waitable object: the game
+    // keeps the bridge's). Written once as a failure line. False when even that chain cannot be made; the bridge then stops (Fail).
+    bool GoNative(const char *why)
+    {
+        if (_native) return true;
+        StageScope stage(StageFallback);
+        {
+            // As at a switch: no marker call of the main thread while the backend lets go (Streamline asks for none in parallel).
+            std::lock_guard<std::mutex> hold(fg::SwitchLock());
+            try
+            {
+                fg::Suspend();
+                Drain();
+            }
+            catch (const std::exception &)
+            {
+                // A queue that does not finish or a removed device: the chain is let go of all the same.
+            }
+            fg::ReleaseInputs();
+            ReleaseBuffers(false);
+            try
+            {
+                fg::ReleaseDisplay();
+            }
+            catch (const std::exception &)
+            {
+                // The backend's display goes with its references below either way.
+            }
+            _display.Reset();
+            _queue.Reset();
+            fg::Fail(why);
+        }
+        try
+        {
+            DXGI_SWAP_CHAIN_DESC1 desc = _displayDesc;
+            ComPtr<IDXGISwapChain1> chain;
+            {
+                BuildingScope building;
+                Require(_factory->CreateSwapChainForHwnd(_device11.Get(), _window, &desc, _hasFullscreen ? &_fullscreen : nullptr, _output.Get(), &chain),
+                        "The game's own D3D11 swap chain");
+            }
+            Require(chain.As(&_display), "The game's own swap chain interface");
+            NativeBuffers();
+        }
+        catch (const std::exception &error)
+        {
+            _display.Reset();
+            _nativeBuffer.Reset();
+            Log(LogFailure, "The present bridge could not give the window back to the game's own swap chain either (%s).", error.what());
+            return false;
+        }
+        _native = true;
+        ++g_fallbacks;
+        FollowFrameGeneration(); // frame generation is off: the game's own frame latency again
+        Log(LogFailure,
+            "The present bridge handed the window back to the game's own D3D11 swap chain (%s): the game renders as without Forge FrameGen's frame "
+            "generation until it restarts.",
+            why);
+        return true;
+    }
+
+    // A present on the game's own swap chain (_native): buffer 0 copied into its back buffer.
+    HRESULT NativePresent(UINT interval, UINT flags, const DXGI_PRESENT_PARAMETERS *parameters, bool present1)
+    {
+        StageScope stage(StageDisplay);
+        _context->CopyResource(_nativeBuffer.Get(), _producer.Get());
+        HRESULT result = present1 ? _display->Present1(interval, flags, parameters) : _display->Present(interval, flags);
+        if (SUCCEEDED(result))
+        {
+            if (!(flags & DXGI_PRESENT_DO_NOT_SEQUENCE)) UnbindProducer();
+            ++g_presents;
+            _hasImage = true;
+        }
+        return result;
+    }
+
     HRESULT Fail(const char *what, const std::exception &error)
     {
         _failed = true;
@@ -464,11 +587,22 @@ class Bridge final : public IDXGISwapChain2
         } retire{this};
         std::lock_guard<std::recursive_mutex> lock(_lock);
         if (_failed) return DXGI_ERROR_DEVICE_REMOVED;
+        auto native = [&] {
+            HRESULT result = NativePresent(interval, flags, parameters, present1);
+            if (result == DXGI_ERROR_WAS_STILL_DRAWING) retire.retire = false;
+            return result;
+        };
+        if (_native) return native();
         try
         {
+            if (g_testFaults.fetch_and(~(unsigned)FaultPresent) & FaultPresent) throw std::runtime_error("a present failure the offline check asked for");
             // The player picked the other frame generation: the display moves to it before this present.
             // Without the plugin (it loads before the first present) the display parks on a plain chain, and comes back if it shows up.
-            if (const int target = fg::Target(); target ? target != _kind : _kind && fg::Unclaimed()) Switch(target);
+            if (const int target = fg::Target(); target ? target != _kind : _kind && fg::Unclaimed())
+            {
+                StageScope stage(StageSwitch);
+                Switch(target);
+            }
             UINT index = _display->GetCurrentBackBufferIndex();
             auto &slot = _slots.at(index);
             if ((flags & DXGI_PRESENT_DO_NOT_WAIT) && _consumed12->GetCompletedValue() < slot.done)
@@ -476,7 +610,11 @@ class Bridge final : public IDXGISwapChain2
                 retire.retire = false;
                 return DXGI_ERROR_WAS_STILL_DRAWING;
             }
-            Wait(slot.done);
+            {
+                StageScope stage(StageSlot);
+                Wait(slot.done);
+            }
+            StageScope stage(StageInputs);
             fg::BeforeSignal(_device11.Get(), _context.Get(), _device12.Get(), index, _desc);
             _context->CopyResource(slot.shared11.Get(), _producer.Get());
             Require(slot.allocator->Reset(), "Bridge allocator reset");
@@ -508,7 +646,9 @@ class Bridge final : public IDXGISwapChain2
             _queue->ExecuteCommandLists(1, lists);
             fg::Prepare(index, _desc, interval, slot.backbuffer.Get());
             fg::PresentMarker(true);
+            g_stage = StageDisplay;
             HRESULT result = present1 ? _display->Present1(interval, flags, parameters) : _display->Present(interval, flags);
+            g_stage = StageInputs;
             fg::PresentMarker(false);
             Require(_queue->Signal(_consumed12.Get(), value), "D3D12 slot-retired signal");
             retire.at = value;
@@ -519,6 +659,10 @@ class Bridge final : public IDXGISwapChain2
             _hasImage = true;
             if (result == DXGI_ERROR_DEVICE_REMOVED || result == DXGI_ERROR_DEVICE_RESET || result == DXGI_ERROR_DEVICE_HUNG)
             {
+                // The D3D12 device is gone while the game's D3D11 one may be fine: this frame goes out on the game's own swap chain.
+                char why[128];
+                std::snprintf(why, sizeof why, "the D3D12 swap chain's Present failed with HRESULT 0x%08lX", (unsigned long)result);
+                if (GoNative(why)) return NativePresent(interval, flags, parameters, present1);
                 _failed = true;
                 ++g_runtimeFailures;
                 Log(LogFailure, "The D3D12 swap chain's Present failed (HRESULT 0x%08lX); the present bridge stopped.", (unsigned long)result);
@@ -535,6 +679,9 @@ class Bridge final : public IDXGISwapChain2
         }
         catch (const std::exception &error)
         {
+            char why[384];
+            std::snprintf(why, sizeof why, "Present: %s", error.what());
+            if (GoNative(why)) return native();
             return Fail("Present", error);
         }
     }
@@ -548,7 +695,8 @@ public:
         ComPtr<ID3D11DeviceContext> context;
         device->GetImmediateContext(&context);
         Require(context.As(&_context), "D3D11.4 context interface");
-        Require(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&_device12)), "D3D12 device on the renderer's adapter");
+        Require(g_testFaults & FaultBridgeDevice ? E_FAIL : D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&_device12)),
+                "D3D12 device on the renderer's adapter");
         if (generating)
         {
             try
@@ -588,7 +736,35 @@ public:
             _kind = 0;
             MakeDisplay(0);
         }
+        try
+        {
+            Finish(window, requested);
+        }
+        catch (const std::exception &error)
+        {
+            // The window must be free for the game's own swap chain (CreateBridge falls back to it): the display chain, its buffers and
+            // the backend's hold on it go now, not with the members.
+            ReleaseBuffers();
+            _display.Reset();
+            _queue.Reset();
+            try
+            {
+                fg::ReleaseDisplay();
+            }
+            catch (const std::exception &)
+            {
+                // The construction's own failure is the one reported.
+            }
+            fg::Fail(error.what());
+            for (HANDLE *handle : {&_event, &_latency, &_retireEvent})
+                if (*handle) CloseHandle(*handle), *handle = nullptr;
+            throw;
+        }
+    }
 
+    // The rest of the construction once the display swap chain exists: fences, buffers and the waitable object.
+    void Finish(HWND window, const DXGI_SWAP_CHAIN_DESC1 &requested)
+    {
         Require(_device12->CreateFence(0, D3D12_FENCE_FLAG_SHARED, IID_PPV_ARGS(&_produced12)), "Shared producer fence");
         HANDLE handle = nullptr;
         Require(_device12->CreateSharedHandle(_produced12.Get(), nullptr, GENERIC_ALL, nullptr, &handle), "Shared fence handle");
@@ -613,7 +789,8 @@ public:
 
     ~Bridge()
     {
-        try
+        // Handed back to the game's own swap chain, nothing of frame generation is left to release.
+        if (!_native) try
         {
             fg::Suspend();
             if (!_failed && _queue) Drain();
@@ -640,12 +817,35 @@ public:
         --g_active;
     }
 
+    // On the game's own swap chain: buffer 0 as the game drew it, which the last present copied out (its back buffer is the next one by now).
+    HRESULT NativeReadback(void *bytes)
+    {
+        D3D11_TEXTURE2D_DESC desc{};
+        _producer->GetDesc(&desc);
+        desc.Format = _desc.Format;
+        desc.BindFlags = 0;
+        desc.Usage = D3D11_USAGE_STAGING;
+        desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        ComPtr<ID3D11Texture2D> staging;
+        HRESULT result = _device11->CreateTexture2D(&desc, nullptr, &staging);
+        if (FAILED(result)) return result;
+        _context->CopyResource(staging.Get(), _producer.Get());
+        D3D11_MAPPED_SUBRESOURCE mapped{};
+        if (FAILED(result = _context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped))) return result;
+        for (UINT y = 0; y < _desc.Height; y++)
+            std::memcpy(static_cast<unsigned char *>(bytes) + (size_t)y * _desc.Width * 4, static_cast<unsigned char *>(mapped.pData) + (size_t)y * mapped.RowPitch,
+                        (size_t)_desc.Width * 4);
+        _context->Unmap(staging.Get(), 0);
+        return S_OK;
+    }
+
     // Copies the last presented back buffer (4 bytes a pixel, top row first) for the offline check and the development driver.
     HRESULT Readback(void *bytes, UINT size)
     {
         std::lock_guard<std::recursive_mutex> lock(_lock);
         if (_failed) return DXGI_ERROR_DEVICE_REMOVED;
         if (!_hasImage || !bytes || size != _desc.Width * _desc.Height * 4) return E_INVALIDARG;
+        if (_native) return NativeReadback(bytes);
         try
         {
             auto &slot = _slots[_lastIndex];
@@ -755,12 +955,11 @@ public:
     }
     HRESULT STDMETHODCALLTYPE SetFullscreenState(BOOL fullscreen, IDXGIOutput *target) override
     {
-        if (fullscreen)
-        {
-            Log(LogInfo, "Present bridge: exclusive fullscreen refused; frame generation runs in windowed or borderless mode only.");
-            return DXGI_ERROR_NOT_CURRENTLY_AVAILABLE;
-        }
-        return _display->SetFullscreenState(FALSE, target);
+        std::lock_guard<std::recursive_mutex> lock(_lock);
+        if (_failed) return DXGI_ERROR_DEVICE_REMOVED;
+        // Frame generation runs in windowed and borderless mode only; asked for exclusive fullscreen, the game gets it on its own swap chain.
+        if (fullscreen && !GoNative("the game asked for exclusive fullscreen, which frame generation does not run in")) return DXGI_ERROR_NOT_CURRENTLY_AVAILABLE;
+        return _display->SetFullscreenState(fullscreen, target);
     }
     HRESULT STDMETHODCALLTYPE GetFullscreenState(BOOL *fullscreen, IDXGIOutput **target) override { return _display->GetFullscreenState(fullscreen, target); }
     // The descriptions carry the game's own waitable flag: the display chain has none (_latency).
@@ -775,6 +974,25 @@ public:
         if (format != DXGI_FORMAT_UNKNOWN && Typeless(format) == DXGI_FORMAT_UNKNOWN) return DXGI_ERROR_UNSUPPORTED;
         std::lock_guard<std::recursive_mutex> lock(_lock);
         if (_failed) return DXGI_ERROR_DEVICE_REMOVED;
+        StageScope stage(StageResize);
+        const UINT asked = count;
+        // On the game's own swap chain: buffer 0 goes with the game's views on it (DXGI's rule for ResizeBuffers) and comes back at the new size.
+        auto native = [&]() -> HRESULT {
+            try
+            {
+                UnbindProducer();
+                _nativeBuffer.Reset();
+                _producer.Reset();
+                HRESULT result = _display->ResizeBuffers(asked, width, height, format, flags & ~DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT);
+                NativeBuffers();
+                return result;
+            }
+            catch (const std::exception &error)
+            {
+                return Fail("ResizeBuffers", error);
+            }
+        };
+        if (_native) return native();
         try
         {
             fg::Suspend(); // off while the size changes; the next frame's inputs at the new size turn it back on
@@ -800,6 +1018,9 @@ public:
         }
         catch (const std::exception &error)
         {
+            char why[384];
+            std::snprintf(why, sizeof why, "ResizeBuffers: %s", error.what());
+            if (GoNative(why)) return native();
             return Fail("ResizeBuffers", error);
         }
     }
@@ -845,6 +1066,11 @@ public:
         if (value < 1 || value > 16) return DXGI_ERROR_INVALID_CALL;
         std::lock_guard<std::mutex> lock(_latencyLock);
         if ((LONG)value == _latencyLimit) return S_OK;
+        // As DXGI: a higher limit gives the waitable object the frames of difference, a lower one takes none back, because the game waits
+        // them off itself (Unity 2019.4 waits once per frame of difference right after lowering it, UnityPlayer.dll 0x180469a5e). Taking
+        // them back here as well left the game one frame short for good: at a limit of 1 (GTFO's 最大渲染队列帧数 0 or 1) its next wait
+        // never returned and the picture froze. Only the bridge's own cap (AMD FSR Frame Generation) is still taken back from the releases.
+        if ((LONG)value < _latencyLimit) _latencyApplied -= _latencyLimit - (LONG)value;
         _latencyLimit = (LONG)value;
         Log(LogInfo, "Present bridge: the game set the maximum frame latency to %u (in force: %ld; AMD FSR Frame Generation %s).", value, LatencyFor(_fsrOn),
             _fsrOn ? "on" : "off");
@@ -1178,14 +1404,24 @@ __declspec(dllexport) int ForgeFrameGen_InstallGraphicsHooks(int bridge)
     return patched;
 }
 
-// 0 no bridge requested, 1 requested but no bridge built yet, 2 bridge active, -1 the bridge could not be built, -2 it stopped.
+// 0 no bridge requested, 1 requested but no bridge built yet, 2 bridge active, -1 the bridge could not be built, -2 it stopped, -3 it
+// handed the window back to the game's own D3D11 swap chain (the game renders on without frame generation).
 __declspec(dllexport) int ForgeFrameGen_PresentState()
 {
     if (g_runtimeFailures) return -2;
+    if (g_fallbacks) return -3;
     if (g_active) return 2;
     if (g_creationFailures) return -1;
     return g_requested;
 }
+
+// Where the render thread is in the bridge now (PresentStage: 0 not in it, 1 waiting for a back buffer slot, 2 frame generation's
+// inputs, 3 the display swap chain's Present, 4 ResizeBuffers, 5 switching frame generation, 6 handing the window back to the game's
+// own swap chain), for the preloader's line when no frame has come through for a while.
+__declspec(dllexport) int ForgeFrameGen_PresentStage() { return g_stage; }
+
+// Offline check only (BridgeCheck --fault): the failures to make happen (TestFault, bridge_common.h). Never called in the game.
+__declspec(dllexport) void ForgeFrameGen_TestFaults(unsigned faults) { g_testFaults = faults; }
 
 // Devices, factories and swap chains the hooks saw being created (0 when the hooks came too late), and frames the bridge presented.
 __declspec(dllexport) void ForgeFrameGen_GraphicsCounts(int *devices, int *factories, int *chains, long long *presents)
@@ -1233,10 +1469,13 @@ __declspec(dllexport) void ForgeFrameGen_FrameMarker(int marker, int frame) { fg
 // Reflex as the player set it: boost 1 for On + Boost, frameLimit in frames a second (0 none). Takes effect before the next frame's sleep.
 __declspec(dllexport) void ForgeFrameGen_SetReflex(int boost, int frameLimit) { fg::SetReflex(boost, frameLimit); }
 
-// The upscaler the player picked (0 Auto, 1 DLSS, 2 FSR): the preloader before ForgeFrameGen_InstallGraphicsHooks, the plugin whenever
-// the setting changes. With FSR, frame generation is AMD FSR's even where DLSS Frame Generation runs; a change moves the display swap
-// chain to the other backend at the bridge's next present.
+// The frame generation the player picked (0 Auto, 1 DLSS, 2 FSR): the preloader before ForgeFrameGen_InstallGraphicsHooks, the plugin
+// whenever the setting changes. With FSR, frame generation is AMD FSR's even where DLSS Frame Generation runs; a change moves the display
+// swap chain to the other backend at the bridge's next present.
 __declspec(dllexport) void ForgeFrameGen_SetFrameGenerationPreference(int method) { fg::Prefer(method); }
+
+// Why DLSS Frame Generation did not start (DlssMissing, bridge_common.h; 0 when it did), with the reason and the adapter in why.
+__declspec(dllexport) int ForgeFrameGen_DlssFrameGenerationMissing(char *why, int capacity) { return fg::WhyNoDlss(why, capacity); }
 
 // The frame generation that runs: 0 none, 1 DLSS Frame Generation, 2 AMD FSR Frame Generation.
 __declspec(dllexport) int ForgeFrameGen_FrameGenerationBackend() { return fg::Kind(); }

@@ -222,7 +222,7 @@ public static class Preview
         float[]? C(string k, int n) => d.Colors.TryGetValue(k, out var v) ? v[..n] : null;
         bool Has(string k) => d.Keywords.Contains(k);
         // Standard-style blend setup: _Mode 1 cutout, 2 fade, 3 transparent; a custom queue overrides the shader's.
-        var kind = d.Shader.Contains("HolographicSight") ? "reticle"
+        var kind = MaterialOverride.IsLensShader(d.Shader) ? "reticle"
             : d.Shader.Contains("Glass") || Has("_ALPHABLEND_ON") || Has("_ALPHAPREMULTIPLY_ON") || F("_Mode") >= 2 || d.RenderQueue >= 2500 ? "glass"
             : Has("_ALPHATEST_ON") || F("_Mode") == 1 || d.RenderQueue >= 2450 ? "cutout"
             : "opaque";

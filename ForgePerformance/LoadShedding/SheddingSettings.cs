@@ -55,11 +55,14 @@ internal sealed record SheddingSettings
     internal bool ClosedDoorDepthLimit { get; init; }
     internal int ClosedDoorDepth { get; init; }
     internal bool TextureStreamingOff { get; init; }
+    internal int JobWorkerLimit { get; init; }
+    internal bool VoiceRestartGuard { get; init; }
+    internal bool VoiceFrameSkipFilter { get; init; }
+    internal float VoiceFrameSkipSeconds { get; init; }
+    internal bool LightningPreload { get; init; }
+    internal bool ShadowProxyHold { get; init; }
     internal bool SetupRendererLookup { get; init; }
     internal bool SpawnFrameDefer { get; init; }
-    internal bool FarAnimatorThrottle { get; init; }
-    internal float FarAnimatorDistance { get; init; }
-    internal int FarAnimatorInterval { get; init; }
     internal bool FarSkinQuality { get; init; }
     internal float FarSkinDistance { get; init; }
     internal bool ClientHiddenSyncThrottle { get; init; }
@@ -76,10 +79,9 @@ internal sealed record SheddingSettings
     internal int AvoidanceType { get; init; }
     internal bool PathfindingIterations { get; init; }
     internal int PathfindingIterationsPerFrame { get; init; }
-    internal bool HitReactKeepsAgent { get; init; }
     internal bool Probe { get; init; }
     internal float ProbeSeconds { get; init; }
     // The enemy-crowd options and the probe: they need the enemy setup and death hooks and the per-frame controller.
-    internal bool CrowdHooks => Probe || SpawnFrameDefer || FarAnimatorThrottle || FarSkinQuality
-        || ClientHiddenSyncThrottle || UpdateBudgets || AvoidanceQuality || PathfindingIterations || HitReactKeepsAgent;
+    internal bool CrowdHooks => Probe || SpawnFrameDefer || FarSkinQuality
+        || ClientHiddenSyncThrottle || UpdateBudgets || AvoidanceQuality || PathfindingIterations;
 }

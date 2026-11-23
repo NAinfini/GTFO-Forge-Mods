@@ -7,13 +7,15 @@ const forgeVisual = fileURLToPath(new URL('../../ForgeCore/Visual', import.meta.
 // (Web/src/forge, Web/src/generated/rig) and plays moves with the site's pose copy (Web/src/shared/render); the converter's libraries
 // and three, i18next and zod are this app's own declared copies: every package Web/ imports is declared in package.json, resolved from here by dedupe for the bundle and by tsconfig paths for the type check (export-mirror.ps1 fails when Web/ imports one that package.json does not declare).
 const site = fileURLToPath(new URL('../../Web/src', import.meta.url));
+// The title bar's slot name, from the desktop shell that draws the bar (Desktop/shell).
+const titleBarIds = fileURLToPath(new URL('../../Desktop/shell/titlebar-ids.ts', import.meta.url));
 // The dev server starts at 5190 (FORGESKIN_DEV_PORT overrides it), leaving 5173 to other programs; a taken port moves on to the next free one.
 const port = Number(process.env.FORGESKIN_DEV_PORT) || 5190;
 export default defineConfig({
   plugins: [react()],
   resolve: { dedupe: ['@gltf-transform/core', '@gltf-transform/extensions', 'fast-png', 'i18next', 'three', 'zod'] },
   worker: { format: 'es' },
-  // A development run keeps its data in GTFO_UserData inside this folder (main/dataDir.ts). The dev server does not watch it: its
+  // A development run keeps its data in GTFO_UserData inside this folder (Desktop/shell/dataDir.ts). The dev server does not watch it: its
   // watch holds every folder there open, so a work's folders could not be moved to the Recycle Bin (project.delete, work-in-use).
-  server: { port, fs: { allow: [searchForWorkspaceRoot(process.cwd()), forgeVisual, site] }, watch: { ignored: ['**/GTFO_UserData/**'] } },
+  server: { port, fs: { allow: [searchForWorkspaceRoot(process.cwd()), forgeVisual, site, titleBarIds] }, watch: { ignored: ['**/GTFO_UserData/**'] } },
 });

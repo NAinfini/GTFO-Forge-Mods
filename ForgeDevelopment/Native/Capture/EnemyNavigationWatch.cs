@@ -4,13 +4,14 @@ using AIGraph;
 using Enemies;
 using LevelGeneration;
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace ForgeDevelopment.Native;
 
 /// <summary>Read-only polling, once a second in a level: one row when a door's traversable state changes (both side nodes, the door's own
 /// nodes, how many enemies are heading through it) and one row when a fighting enemy has stood still for three seconds (both agents' course
-/// nodes against what the voxel lookup says, enemy type, where the watch first saw it (within a second of its spawn), movement mode, next hop, line of sight, and the target's position, navigation position and last good
-/// position, which native stops updating while the agent stands on a cluster without a course node). Dev tool only; it patches nothing.</summary>
+/// nodes against what the voxel lookup says, enemy type, where the watch first saw it (within a second of its spawn), movement mode, next hop, line of sight, the target's position and navigation
+/// position, and the enemy's own nav mesh path answer toward its goal). Dev tool only; it patches nothing.</summary>
 internal static class EnemyNavigationWatch
 {
     private const float IntervalSeconds = 1f, StuckSeconds = 3f, MovedSqr = .25f;
@@ -110,7 +111,7 @@ internal static class EnemyNavigationWatch
         }
     }
 
-    // The Runtime log writer takes at most 16 values per record: same-node (enemyNode == targetNode) and the distance
+    // Same-node (enemyNode == targetNode) and the distance
     // (enemyPosition to targetPosition) are left to the reader, which has both inputs.
     private static void EnemyRow(EnemyAgent enemy, EB_States state, float stillSeconds, Vector3 firstSeen)
     {
@@ -127,7 +128,18 @@ internal static class EnemyNavigationWatch
             new("nextGate", gate == null ? "none" : gate.name + (gate.IsTraversable ? " open" : " closed")),
             new("targetLineOfSight", target?.m_hasLineOfSight ?? false),
             new("targetPosition", agent == null ? "none" : Text(agent.Position)), new("targetNavigation", agent == null ? "none" : Text(agent.NavigationPosition)),
-            new("targetGood", agent == null ? "none" : Text(agent.GoodPosition)), new("navGoal", Text(ai.NavmeshAgentGoal)));
+            new("navPath", NavPath(ai)), new("navGoal", Text(ai.NavmeshAgentGoal)));
+    }
+
+    /// <summary>The ground agent's own path answer toward <c>NavmeshAgentGoal</c>: whether it stands on the nav mesh, the Unity path status
+    /// (PathPartial or PathInvalid means the goal is not reachable on the mesh from here) and whether a path is still being computed.</summary>
+    private static string NavPath(EnemyAI ai)
+    {
+        var ground = ai.m_navMeshAgent?.TryCast<NavMeshAgentExtention.NavMeshAgentProxy>()?.m_agent;
+        if (ground == null) return "no-ground-agent";
+        if (!ground.enabled) return "agent-disabled";
+        return (ground.isOnNavMesh ? "on-mesh " : "off-mesh ") + ground.pathStatus + (ground.pathPending ? " pending" : "")
+            + FormattableString.Invariant($" left={ground.remainingDistance:0.0}");
     }
 
     private static bool OwnsCluster(AIG_CourseNode? node) => node?.m_nodeCluster?.m_courseNode?.Pointer == node?.Pointer && node != null;

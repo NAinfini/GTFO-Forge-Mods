@@ -4,13 +4,13 @@
 #   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package NAinfini-Forge_V1_Rundown --level A3 --work-dir artifacts/work/drivesession/<name>
 #   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name> run Mods/ForgeDevelopment/scripts/a3-checkpoint.test
 #
-# Room 入口廊 room:2e3b020234e22d35dc9bf5c9196b; its landing in front of the checkpoint door is (0, 0, -28.5) room-local.
+# Room 入口廊; its landing in front of the checkpoint door is (0, 0, -28.5) room-local.
 # Opening the door by name depends on the console interact fix of the devconsole-interact lane.
 stop-on-fail
 god on
 
 # open the checkpoint door: the game saves
-teleport room=room:2e3b020234e22d35dc9bf5c9196b 0 0 -28.5
+teleport room=入口廊 0 0 -28.5
 interact name=@LG_SecurityDoor radius=8
 wait 3s
 door read near:8 as=opened

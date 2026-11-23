@@ -13,6 +13,7 @@ import {
   dirName,
   type Attachment,
   type CatalogItem,
+  type InstallNote,
   type MeshImport,
   type Profile,
   type SkinDocument,
@@ -44,13 +45,11 @@ function packDoc(doc = shownDoc(st().doc), item = currentItem(), preview = st().
   out.materials = (out.materials ?? []).filter((m) => m && !off.has(m.material ?? ''));
   // Hidden layers are not baked, so they stay out of the pack.
   for (const m of out.materials) if (m) m.layers = (m.layers ?? []).filter((l) => l && l.visible !== false);
-  // Settings the game material has no property for (the preview reads them from the game files) stay out of the pack,
-  // as the inspector hides them: the game could not show them.
+  // A tint the game material has no property for (the preview reads them from the game files) stays out of the pack, as the
+  // inspector hides it: the game could not show it. Metallic and smoothness stay: bakeSurface writes them into the picture.
   for (const m of out.materials) {
     const game = m?.material ? preview?.params[m.material] : null;
     if (!game || !m?.params) continue;
-    if (game.metallic == null) m.params.metallic = null;
-    if (game.smoothness == null) m.params.smoothness = null;
     if (game.tint == null) m.params.tint = null;
   }
   // A GTFO/BlendHS material (vertex-coloured, no albedo texture) can only show a picture once the plugin draws it with a
@@ -114,7 +113,9 @@ export function problems(doc = st().doc, item = currentItem()): Problem[] {
     const ed = editorOf(doc);
     for (const p of item.parts) {
       if (ed.enabled[p.id] === false) continue;
+      // A sight's lens takes only its reticles in game (Core MaterialOverride.OnLens): it needs none of the four.
       const short = p.materials.some((mat) => {
+        if (st().preview?.params[mat]?.kind === 'reticle') return false;
         const textures = doc.materials?.find((m) => m?.material === mat)?.textures ?? {};
         return CHANNELS.some((ch) => !textures[ch]);
       });
@@ -222,6 +223,7 @@ async function build(out: string, skin?: { doc: SkinDocument; path: string; item
       (t) => useStore.setState({ busy: t }),
     );
     lap('livery');
+    await bakeSurface(doc, preview, projectPath);
     await bakeLayers(doc, preview, projectPath, (t) => useStore.setState({ busy: t }));
     lap('layers');
     for (const { m, layers } of animated) m.layers = [...layers, ...(m.layers ?? [])];
@@ -266,6 +268,51 @@ async function bakeTints(doc: SkinDocument, projectPath: string) {
     await writePng(path, tintedPicture(img, tint));
     const lit = !a.hologram && !m?.unlit;
     a.material = { ...m, textures: { ...m?.textures, albedo: path }, color: lit ? [1, 1, 1, m?.color?.[3] ?? 1] : m?.color };
+  }
+}
+
+/**
+ * The game's gear shader has no metallic or smoothness number, only the MetallicSmoothness picture (metallic in red, smoothness
+ * in green). A material the game gives no such number gets the author's value written over its whole surface into that channel
+ * of the packed picture (the game's own, or the livery's; every wear stage too): the value replaces the channel, it does not
+ * scale it. A channel left unset keeps the picture's. The number then leaves the document, so the plugin never looks for it.
+ */
+async function bakeSurface(doc: SkinDocument, preview: WeaponPreview | null, projectPath: string) {
+  const dir = `${dirName(projectPath)}\\.frames\\livery`;
+  for (const m of doc.materials ?? []) {
+    const game = m?.material ? preview?.params[m.material] : null;
+    if (!m?.material || !game || !m.params) continue;
+    const metal = game.metallic == null ? m.params.metallic : null;
+    const smooth = game.smoothness == null ? m.params.smoothness : null;
+    if (game.metallic == null) m.params.metallic = null;
+    if (game.smoothness == null) m.params.smoothness = null;
+    if (metal == null && smooth == null) continue;
+    const safe = m.material.replace(/[^\w.-]/g, '_');
+    const write = async (source: string | null, name: string) => {
+      const img = source ? await loadImage(source).catch(() => null) : null;
+      const c = document.createElement('canvas');
+      c.width = img?.naturalWidth || 4;
+      c.height = img?.naturalHeight || 4;
+      const ctx = c.getContext('2d', { willReadFrequently: true })!;
+      if (img) ctx.drawImage(img, 0, 0);
+      else {
+        ctx.fillStyle = 'rgb(0,89,0)'; // no picture to start from: the livery's plain paint
+        ctx.fillRect(0, 0, c.width, c.height);
+      }
+      const data = ctx.getImageData(0, 0, c.width, c.height);
+      for (let i = 0; i < data.data.length; i += 4) {
+        if (metal != null) data.data[i] = Math.round(metal * 255);
+        if (smooth != null) data.data[i + 1] = Math.round(smooth * 255);
+        data.data[i + 3] = 255;
+      }
+      ctx.putImageData(data, 0, 0);
+      const path = `${dir}\\${safe}_surface${name}_ms.png`;
+      await writePng(path, c);
+      return path;
+    };
+    m.textures ??= {};
+    m.textures.metallicSmoothness = await write(baseTexturePath(doc, preview, m.material, 'metallicSmoothness'), '');
+    for (const [i, stage] of (m.wear ?? []).entries()) if (stage?.textures?.metallicSmoothness) stage.textures.metallicSmoothness = await write(stage.textures.metallicSmoothness, `_wear${i}`);
   }
 }
 
@@ -345,20 +392,12 @@ export async function installPluginInto(profile: string) {
   return r;
 }
 
-// BepInEx's verdicts already reported, so a check repeated on focus, a profile change or a game start says each once per run.
-const toldLoad = new Set<string>();
-/** What BepInEx said about ForgeCore and ForgeSkin the last time the game started from `profile` (plugin.loadCheck reads its
- * LogOutput.log): each refusal once, the full account to app.log and a short toast. A ForgeSkin skipped only because ForgeCore
- * did not load is left to the ForgeCore message, which names the cause. */
+/** What BepInEx said about ForgeCore and ForgeSkin the last time the game started from `profile`, through the shell's load check
+ * (Desktop/shell/loadCheck.ts reads its LogOutput.log): each refusal once per run as a short toast, the full account in app.log.
+ * A ForgeSkin skipped only because ForgeCore did not load is left to the ForgeCore message, which names the cause. */
 export async function checkPluginLoad(profile: string): Promise<void> {
-  const r = await call('plugin.loadCheck', { profile }).catch((e: unknown) => (window.forge.appLog('plugin.loadCheck', detail(e)), null));
-  const notes = (r?.notes ?? []).filter((n) => !toldLoad.has(n.detail));
-  const causes = notes.filter((n) => n.code !== 'load-dependency-failed');
-  for (const note of notes) {
-    toldLoad.add(note.detail);
-    if (causes.length && !causes.includes(note)) window.forge.appLog(`install ${note.code}`, note.detail);
-    else st().report('error', note);
-  }
+  const r = await window.forge.loadCheck(profile).catch((e: unknown) => (window.forge.appLog('plugin.loadCheck', detail(e)), null));
+  for (const note of r?.notes ?? []) st().report('error', note as InstallNote);
 }
 
 // Profiles already told that the editor leaves their newer store plugin alone (once per editor run and set of copies, unless
@@ -803,7 +842,7 @@ export async function restoreSnapshot(path: string): Promise<void> {
 
 export const deleteSnapshot = (path: string) => call('project.delete', { path });
 
-/** Settings → data folder: saves the open skin, moves the data (main/dataDir.ts) and reloads the window on success. */
+/** Settings → data folder: saves the open skin, moves the data (Desktop/shell/dataDir.ts) and reloads the window on success. */
 export async function moveDataFolder(): Promise<void> {
   const [to] = await window.forge.openDialog('folder', undefined, 'dataDir');
   if (!to) return;

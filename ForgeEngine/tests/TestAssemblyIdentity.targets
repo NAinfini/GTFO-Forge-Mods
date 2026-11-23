@@ -1,0 +1,8 @@
+<Project>
+  <!-- Test project names are unique within this package. Pin their assembly identity to the project name so a
+       renamed test cannot shadow the shipped host/SDK or another suite. Does not grant SDK internal access. -->
+  <Target Name="VerifyTestAssemblyIdentity" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(AssemblyName)' != 'ForgeEngine.$(MSBuildProjectName).Tests'"
+           Text="Runtime test assembly must be ForgeEngine.$(MSBuildProjectName).Tests; got $(AssemblyName)." />
+  </Target>
+</Project>

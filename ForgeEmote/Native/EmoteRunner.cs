@@ -207,7 +207,7 @@ internal static class EmoteRunner
             else
             {
                 BindArms(local);
-                _arms?.Play(entry.FirstPerson, new JointPlayback(now, definition.Loop), definition.HideHeld);
+                _arms?.Play(entry.FirstPerson, new JointPlayback(now, definition.Loop, fadeIn: definition.FadeIn, fadeOut: definition.FadeOut), definition.HideHeld);
             }
         }
         Read("start", local, entry.Definition.Id);
@@ -322,7 +322,7 @@ internal static class EmoteRunner
         Body.Stop(fade);
         if (Plugin.Readback.Value && _local != null) { Read("end", _local, _readId); _readAt = Time.time + 1f; }
         _slot.Clear();
-        _arms?.Stop();
+        if (cut) _arms?.Stop(); else _arms?.Stop(fade);
         if (cut || _lease == null) EndView();
         else _leaving = true;
     }

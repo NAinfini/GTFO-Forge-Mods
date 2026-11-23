@@ -1,0 +1,17 @@
+<Project>
+  <!-- What every assembly that compiles the four domains' game-independent halves takes with them. ForgeEngine.csproj
+       compiles the sources by its own folder glob; ForgeEngine.Framework.csproj sets ForgeDomainSources to link them. -->
+  <PropertyGroup>
+    <_ForgeEngineRoot>$(MSBuildThisFileDirectory)../</_ForgeEngineRoot>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(ForgeDomainSources)' == 'link'">
+    <Compile Include="$(_ForgeEngineRoot)Player/**/*.cs;$(_ForgeEngineRoot)Map/**/*.cs;$(_ForgeEngineRoot)Enemy/**/*.cs;$(_ForgeEngineRoot)Weapon/**/*.cs"
+             Exclude="$(_ForgeEngineRoot)*/Native/**;$(_ForgeEngineRoot)*/tests/**;$(_ForgeEngineRoot)*/tools/**;$(_ForgeEngineRoot)*/bin/**;$(_ForgeEngineRoot)*/obj/**"
+             Link="Domains/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="$(_ForgeEngineRoot)../../catalog/forge-release/forge-release.json" LogicalName="ForgeMap.Generation.Release" Link="Catalog/forge-release/forge-release.json" />
+    <EmbeddedResource Include="$(_ForgeEngineRoot)Enemy/Behavior/enemy-ability-resources.json" LogicalName="forge.enemy.ability-resources" Link="Domains/enemy-ability-resources.json" />
+    <ForgeDiagnosticConstants Include="MapLogCodes;WaveLogCodes;EnemyLogCodes;WeaponLogCodes" />
+  </ItemGroup>
+</Project>

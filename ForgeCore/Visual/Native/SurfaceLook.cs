@@ -14,7 +14,6 @@ public static partial class SurfaceLook
     private const string ColorName = "_Color";
     private static readonly int ColorId = Shader.PropertyToID(ColorName), BumpMap = Shader.PropertyToID("_BumpMap"),
         MetallicGlossMap = Shader.PropertyToID("_MetallicGlossMap");
-    private static Shader? _surfaceShader;
 
     /// <summary>
     /// A new material showing <paramref name="look"/> over <paramref name="source"/> (never written). A tint draws with the game's flat
@@ -56,7 +55,7 @@ public static partial class SurfaceLook
     /// active emission cross over; no albedo, vertex-layer or procedural colour does.</summary>
     private static Material Recolour(Material source, float[] tint)
     {
-        var shader = _surfaceShader = _surfaceShader != null ? _surfaceShader : Shader.Find(Glow.SurfaceShader);
+        var shader = Shaders.Find(Glow.SurfaceShader);
         if (shader == null) throw new InvalidOperationException("model-surface-shader-unavailable");
         var material = new Material(shader) { name = source.name + " (Forge look)" };
         try

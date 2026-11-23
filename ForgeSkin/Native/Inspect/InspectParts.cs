@@ -26,6 +26,17 @@ sealed class InspectParts
         public NQuaternion GunTurn, ParentTurn;
         public Vector3 RestAt;
         public Quaternion RestTurn;
+        // A carrier's children that are no part of the motion (InspectPart.Carrier): held where they are in the gun as it turns.
+        public List<Kept>? Kept;
+    }
+
+    sealed class Kept
+    {
+        public Transform T = null!;
+        public NVector3 GunAt, Scale;
+        public NQuaternion GunTurn;
+        public Vector3 RestAt;
+        public Quaternion RestTurn;
     }
 
     const string Eject = "Front_SE"; // the shell-eject align, where the game spawns casings: the chamber's place
@@ -106,11 +117,13 @@ sealed class InspectParts
     public static InspectParts Bind(InspectMotion motion, Transform gun, GearPartHolder? holder, Dictionary<string, List<Transform>> names, List<(Renderer Mesh, NVector3 Lo, NVector3 Hi)> meshes, out InspectPartRig[] rig, out InspectBox[] boxes)
     {
         var parts = Bind(motion, gun, holder, names, out rig, out var found);
+        var kept = new HashSet<IntPtr>(parts._nodes.Where(n => n.Kept != null).SelectMany(n => n.Kept!).Select(k => k.T.Pointer));
         boxes = new InspectBox[meshes.Count];
         for (var m = 0; m < meshes.Count; m++)
         {
             boxes[m] = new InspectBox { Lo = meshes[m].Lo, Hi = meshes[m].Hi, Part = -1 };
-            for (var up = meshes[m].Mesh.transform; up != null && up.Pointer != gun.Pointer && boxes[m].Part < 0; up = up.parent)
+            // (A mesh under a carrier's kept child stays with the gun.)
+            for (var up = meshes[m].Mesh.transform; up != null && up.Pointer != gun.Pointer && boxes[m].Part < 0 && !kept.Contains(up.Pointer); up = up.parent)
                 for (var i = 0; i < found.Length; i++)
                     if (found[i].Any(t => t.Pointer == up.Pointer)) { boxes[m].Part = i; break; }
         }
@@ -183,7 +196,35 @@ sealed class InspectParts
                 for (var j = 0; j < found.Length; j++)
                     if (j != i && found[j].Any(t => t.Pointer == up.Pointer)) { rig[i].Under = j; break; }
         }
+        // A carrier's children that neither are nor hold another part of the motion stay with the gun (in the game's revolver model the
+        // crane's node holds the barrel and frame too: only the cylinder swings out).
+        var partNodes = found.Where(f => f != null).SelectMany(f => f).ToList();
+        foreach (var node in nodes)
+        {
+            if (node.Round || !motion.Parts[node.Part].Carrier) continue;
+            for (var k = 0; k < node.T.childCount; k++)
+            {
+                var child = node.T.GetChild(k);
+                if (partNodes.Any(p => Holds(child, p))) continue;
+                (node.Kept ??= new List<Kept>()).Add(new Kept
+                {
+                    T = child,
+                    GunAt = N(gun.InverseTransformPoint(child.position)),
+                    GunTurn = toGun * Q(child.rotation),
+                    Scale = N(node.T.lossyScale) / gunScale,
+                    RestAt = child.localPosition,
+                    RestTurn = child.localRotation,
+                });
+            }
+        }
         return new InspectParts(nodes.ToArray(), cartridge);
+
+        // Whether `t` is `p` or one of its ancestors.
+        static bool Holds(Transform t, Transform p)
+        {
+            for (var up = p; up != null; up = up.parent) if (up.Pointer == t.Pointer) return true;
+            return false;
+        }
     }
 
     // The look starts: the chamber's round is copied from the magazine's (hidden until a key shows it).
@@ -216,6 +257,14 @@ sealed class InspectParts
             var toParent = NQuaternion.Inverse(node.ParentTurn);
             node.T.localPosition = U(NVector3.Transform(at - node.ParentAt, toParent) / node.ParentScale);
             node.T.localRotation = U(NQuaternion.Normalize(toParent * turn));
+            if (node.Kept == null) continue;
+            var toNode = NQuaternion.Inverse(turn);
+            foreach (var kept in node.Kept)
+            {
+                if (kept.T.WasCollected) continue;
+                kept.T.localPosition = U(NVector3.Transform(kept.GunAt - at, toNode) / kept.Scale);
+                kept.T.localRotation = U(NQuaternion.Normalize(toNode * kept.GunTurn));
+            }
         }
     }
 
@@ -227,6 +276,8 @@ sealed class InspectParts
             if (node.Round || node.T is null || node.T.WasCollected) continue;
             node.T.localPosition = node.RestAt;
             node.T.localRotation = node.RestTurn;
+            foreach (var kept in node.Kept ?? [])
+                if (!kept.T.WasCollected) (kept.T.localPosition, kept.T.localRotation) = (kept.RestAt, kept.RestTurn);
         }
         if (_copy != null && !_copy.WasCollected) UnityEngine.Object.Destroy(_copy);
         _copy = null;

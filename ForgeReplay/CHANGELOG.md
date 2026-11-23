@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3
+
+Needs ForgeCore 1.0.4.
+
+- Fixed: pausing a replay and then moving the free camera no longer freezes the game after a few seconds. The game's sound stays silent while the replay is paused.
+
 ## 1.0.2
 
 Needs ForgeCore 1.0.3.

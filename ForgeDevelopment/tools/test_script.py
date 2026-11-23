@@ -10,7 +10,10 @@
 A syntax error rejects the whole file before the game is touched and names the line. `expect` and `wait until` read a value
 (`player Position.y`, `state ammo clip`, `enemy <id|$name> health`, `read <target> <path>`, `$name.path`) and compare it
 (`== != < <= > >=`, `~0.05` with a tolerance, `contains`, `!contains`); `expect log contains "text"` looks at the log lines written since the
-previous command started (those written after it returned included), `--all` at the whole session. Executing the lines is console_commands.py; this file holds the grammar and the
+previous command started (those written after it returned included), `--all` at the log of this script's run only (never lines an earlier run
+or the game's start wrote). A line the game logs for a command of this script that already failed as a command ("experiment: failed ...") is
+never counted a second time; `ignore=<regex>` (repeatable) drops other known unrelated lines from the window, and a failing log expect names
+the first line it matched and where in the log it stands. Executing the lines is console_commands.py; this file holds the grammar and the
 comparison, so a broken script and a wrong expectation can both be checked offline."""
 from __future__ import annotations
 
@@ -31,7 +34,7 @@ STATES = ("ammo", "stamina", "fog", "intel", "hud", "lifecycle", "variables")
 VERBS = {
     "status": (0, 0, (), ()), "level": (0, 3, ("seed", "timeout", "bots"), ()), "leave": (0, 0, (), ()), "reenter": (0, 0, ("timeout",), ()),
     "quit": (0, 0, (), ()),
-    "teleport": (0, 4, ("dim", "face", "zone", "area", "exit", "offset", "room"), ()), "look": (1, 3, (), ("--ads",)), "aim": (1, 3, (), ("--ads",)),
+    "teleport": (0, 4, ("dim", "face", "zone", "area", "exit", "offset", "room", "near"), ()), "look": (1, 3, (), ("--ads",)), "aim": (1, 3, (), ("--ads",)),
     "fire": (0, 1, ("at",), ("--direct",)), "melee": (0, 0, ("charge", "at"), ("--direct",)),
     "wield": (1, 1, (), ()), "reload": (0, 0, (), ("--direct",)), "throw": (0, 0, ("charge", "at"), ("--direct",)),
     "move": (1, 5, (), ()), "jump": (0, 0, (), ("--direct",)), "crouch": (0, 0, (), ("--direct",)), "stand": (0, 0, (), ("--direct",)),
@@ -39,10 +42,10 @@ VERBS = {
     "god": (1, 1, (), ()), "give": (1, 2, (), ()), "ammo": (1, 1, (), ()), "down": (0, 0, (), ()), "revive": (0, 0, (), ()),
     "spawn": (1, 2, ("at", "mode"), ()), "enemies": (0, 1, (), ()), "clear": (1, 1, (), ()), "hit": (1, None, (), ()), "limbs": (1, None, (), ()),
     "follow": (1, None, (), ()), "door": (2, 2, (), ()), "noise": (1, 1, (), ()), "event": (1, 1, (), ()), "checkpoint": (1, 1, (), ()),
-    "scan": (1, 2, (), ()), "extract": (1, 2, (), ()), "nav": (2, 2, (), ()), "model-shot": (1, 1, (), ()), "alarms": (0, 1, (), ()),
+    "install": (1, None, (), ()), "entries": (0, 1, (), ()), "scan": (1, 2, (), ()), "extract": (1, 2, (), ()), "nav": (2, 2, (), ()), "model-shot": (1, 1, (), ()), "alarms": (0, 1, (), ()),
     "recorder": (0, 0, (), ()), "terminal": (1, 2, (), ()), "toon": (1, 2, (), ()), "picker": (2, 2, (), ()),
     "player": (0, None, (), ()), "read": (2, None, (), ()), "state": (1, 2, (), ()), "log": (0, 0, ("tail", "grep"), ()),
-    "screenshot": (0, 1, (), ()), "call": (2, None, (), ()), "step": (1, 1, ("target", "host"), ()),
+    "screenshot": (0, 1, (), ()), "call": (2, None, (), ("--allow-false",)), "step": (1, 1, ("target", "host"), ()),
 }
 CONTROL = ("wait", "expect", "stop-on-fail")
 
@@ -80,6 +83,7 @@ class Line:
     amount: tuple | None = None  # wait <n>s|<n>f, as (number, unit)
     timeout: float = 10.0
     every: bool = False  # expect log ... --all
+    ignore: tuple = ()  # expect log ... ignore=<regex>: window lines that match are not read
 
 
 @dataclass
@@ -148,8 +152,16 @@ def parse_line(number, text, defined):
         return line
     if verb == "expect":
         every = any(part == "--all" and not part.quoted for part in parts)
-        body = [part for part in parts[1:] if not (part == "--all" and not part.quoted)]
-        line = Line(number, text.strip(), "expect", verb, condition=split_condition(number, body, "expect"), every=every)
+        ignore = tuple(str(part)[7:] for part in parts[1:] if not part.quoted and part.startswith("ignore="))
+        for pattern in ignore:
+            try:
+                re.compile(pattern)
+            except re.error as error:
+                raise ScriptError(number, "ignore= 不是合法的正则：" + str(error))
+        body = [part for part in parts[1:] if not (part == "--all" and not part.quoted) and (part.quoted or not part.startswith("ignore="))]
+        line = Line(number, text.strip(), "expect", verb, condition=split_condition(number, body, "expect"), every=every, ignore=ignore)
+        if ignore and line.condition.reader[0] != "log":
+            raise ScriptError(number, "ignore= 只用于 expect log")
         check_variables(number, line, defined)
         return line
     if verb not in VERBS:
@@ -254,8 +266,10 @@ def lookup(values, path):
 def expand(text, variables):
     """`$name.path` becomes the kept value; a text with no $ is returned unchanged."""
     def one(match):
-        found = lookup(variables.get(match.group(1), {}), match.group(2) or "")
+        kept = variables.get(match.group(1))
+        found = lookup(kept or {}, match.group(2) or "")
         if found is None:
-            raise KeyError(match.group(0))
+            raise ValueError(match.group(0) + (" 没有值：定义它的指令（as=" + match.group(1) + "）没有成功，所以没有保存任何读回" if kept is None
+                                               else " 没有这个字段；该指令读回的字段有：" + (", ".join(sorted(kept)[:16]) or "（无）")))
         return str(found)
     return re.sub(r"\$([A-Za-z_][A-Za-z0-9_]*)(?:\.([A-Za-z0-9_.\[\]]+))?", one, text)

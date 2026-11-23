@@ -93,11 +93,18 @@ def literal(token):
 def cmd_call(client, state, args):
     """A static method by name; --until then polls another method of the same type (no arguments) until its answer starts with the text."""
     value = {"result": bounded(client, args.wait).call(args.target, args.method, [literal(a) for a in args.args])}
+    if str(value["result"]).strip().lower() == "false" and not getattr(args, "allow_false", False):
+        raise ValueError("call.returned-false: " + args.target + " " + args.method + " answered False, so it did not do what it names "
+                         "(a query that may answer no takes --allow-false)")
     if args.until:
         method, expected = args.until
         reading = []
         def answered():
             reading[:] = [client.call(args.target, method)]
+            if str(reading[0]) == "":
+                # Nothing to wait for: an empty answer is the game saying it publishes no such reading (the Engine's generation progress
+                # is empty when Map published none), and no later poll will change that.
+                raise ValueError("call.empty-answer: " + method + " answered an empty text, so there is no state to wait for " + repr(expected))
             return str(reading[0]).startswith(expected)
         client.deadline = time.monotonic() + args.timeout + args.wait
         ds.wait_until(client, answered, args.timeout, method + " 等到 " + expected, lambda: reading[0] if reading else "无读回")
@@ -182,8 +189,9 @@ def console_folder(state, name=""):
     return ds.output_root(Path(state["workDir"]) / "console" / (stamp + ("-" + name if name else "")))
 
 
-def run_lines(args, script, folder_name=""):
-    """Runs a parsed script on the live session; the run's document, and its folder, come back."""
+def run_lines(args, script, folder_name="", isolate=True):
+    """Runs a parsed script on the live session; the run's document, and its folder, come back. `isolate` gives the session its baseline
+    before and after the lines (console_run.Run.reset); one typed command keeps what it did."""
     state = ds.document(args.session)
     if state.get("format") != "forge.drive-session" or state.get("phase") != "ready":
         raise ValueError("会话尚未落地、已结束或版本不受支持（phase=" + str(state.get("phase")) + "）")
@@ -191,8 +199,8 @@ def run_lines(args, script, folder_name=""):
     folder.mkdir(parents=True)
     client, state = ds.from_session(args.session, folder / "client")
     try:
-        console = cc.Console(client, state, natives(client, state, args.wait))
-        return console_run.Run(script, console, folder, state).run(), folder
+        console = cc.Console(client, state, natives(client, state, args.wait), session_path=args.session)
+        return console_run.Run(script, console, folder, state, isolate=isolate).run(), folder
     finally:
         client.close()
 
@@ -201,6 +209,9 @@ def cmd_run(args):
     script = ts.parse_file(args.script)
     document, folder = run_lines(args, script, Path(args.script).stem)
     emit({"run": str(folder / "run.json"), "summary": document["summary"]})
+    for row in document["rows"]:
+        if not row["ok"]:
+            print(console_run.explain(row), file=sys.stderr)
     return 1 if document["summary"]["failed"] else 0
 
 
@@ -219,7 +230,7 @@ def cmd_replay(args):
 
 def cmd_console(args, line):
     """One console command, run like a one-line script so it leaves its result and log in a folder."""
-    document, folder = run_lines(args, ts.Script([line], "", ""), line.verb)
+    document, folder = run_lines(args, ts.Script([line], "", ""), line.verb, isolate=False)
     row = document["rows"][0]
     emit({"ok": row["ok"], "actual": row["actual"], "detail": row["detail"], "folder": str(folder)})
     return 0 if row["ok"] else 1
@@ -256,7 +267,8 @@ def parser():
     call.add_argument("target")
     call.add_argument("method")
     call.add_argument("args", nargs="*")
-    call.add_argument("--until", nargs=2, metavar=("STATE_METHOD", "PREFIX"), help="再轮询同一类型的一个无参方法，直到回答以 PREFIX 开头")
+    call.add_argument("--allow-false", action="store_true", help="这个调用本来就是问“是不是”：回答 False 不算失败（默认 False 就是失败）")
+    call.add_argument("--until", nargs=2, metavar=("STATE_METHOD", "PREFIX"), help="再轮询同一类型的一个无参方法，直到回答以 PREFIX 开头；回答是空文本时立刻报错而不是等到超时")
     call.add_argument("--timeout", type=float, default=300, help="--until 等待的秒数")
     read = modes.add_parser("read", help="原生读回：read localPlayer Alive Position")
     read.add_argument("target")

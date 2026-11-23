@@ -161,6 +161,28 @@ public class FormatTests(ITestOutputHelper output)
         Assert.Equal(LookFit.Mismatch, Look.Fit(back.Gear[0], doc, gear.Hash + 1, out _, out _));
         back.Gear[0].Tweaks.Add(LookTweak.Of(0, LookChange.PlayerColor, 5, 0)); // a player colour the skin does not have
         Assert.Equal(LookFit.BadValue, Look.Fit(back.Gear[0], doc, gear.Hash, out _, out _));
+
+        // A game sight's lens as the plugin and the game-file patch put an override on it (MaterialOverride.OnLens): one made opaque on
+        // purpose (the floating hologram's Sight_21_1 given a part's whole import, an opaque tint, a glow and a paint layer) keeps only its
+        // reticles, and every left-out piece is named; a gear material is no lens.
+        var opaque = new MaterialOverride
+        {
+            Material = "Sight_21_1",
+            Textures = { [TextureChannel.Albedo] = "textures/a.png", [TextureChannel.Normal] = "textures/n.png", [TextureChannel.ReticleA] = "textures/r.png" },
+            Params = new MaterialParams { Tint = [1, 0.5f, 0, 1], EmissiveEnabled = true, Metallic = 1, Reticles = new() { [TextureChannel.ReticleA] = new Reticle { Color = [1, 0, 0] } } },
+            Layers = { doc.Materials[0].Layers[0] },
+            Wear = [new WearStage { Kills = 10, Textures = { [TextureChannel.Albedo] = "textures/w.png" } }],
+        };
+        Assert.True(MaterialOverride.IsLensShader("Unlit/HolographicSight_3Layers"));
+        Assert.True(MaterialOverride.IsLensShader("Unlit/HolographicSight_Thermal"));
+        Assert.False(MaterialOverride.IsLensShader("Cell/Player/CustomGearShader"));
+        var lens = opaque.OnLens(out var left);
+        Assert.Equal([TextureChannel.ReticleA], lens.Textures.Keys);
+        Assert.Same(opaque.Params.Reticles, lens.Params.Reticles);
+        Assert.True(lens.Params is { Tint: null, EmissiveEnabled: null, EmissiveColor: null, EmissiveIntensity: null, Metallic: null, Smoothness: null });
+        Assert.Empty(lens.Layers);
+        Assert.Null(lens.Wear);
+        Assert.Equal(["Albedo", "Normal", "glow", "tint", "metal", "layers", "wear"], left);
     }
 
     // A deliberately broken pack per error-code family (document, path, resource, mesh content, screen, audio, sound event, player
@@ -874,6 +896,26 @@ public class FormatTests(ITestOutputHelper output)
         // J: the off hand's fingers snapped shut and open again from one finger sample to the next (a 30th of a second), over and over.
         Assert.Contains(Broken("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 20 }, { "t": 2.4, "turn": -30, "roll": 20 }, { "t": 3.0 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.5, "on": "side", "cue": "tap" }, { "t": 1, "on": "side", "fingers": [0, 0, 0, 0, 0] }, { "t": 1.0333, "on": "side", "fingers": [1, 1, 1, 1, 1] }, { "t": 1.0667, "on": "side", "fingers": [0, 0, 0, 0, 0] }, { "t": 1.1, "on": "side", "fingers": [1, 1, 1, 1, 1] }, { "t": 1.1333, "on": "side", "fingers": [0, 0, 0, 0, 0] }, { "t": 1.1667, "on": "side", "fingers": [1, 1, 1, 1, 1] }, { "t": 1.2, "on": "side", "fingers": [0, 0, 0, 0, 0] }, { "t": 1.2333, "on": "side", "fingers": [1, 1, 1, 1, 1] }, { "t": 1.2667, "on": "side", "fingers": [0, 0, 0, 0, 0] }, { "t": 2.5, "on": "side" }, { "t": 2.9, "on": "grip" }] }""", rifleFeel).Audit(),
             a => a.Rule.StartsWith("J: the off hand's"));
+        // K: the off hand thrown 10 cm across the gun and back between two frames a 200th of a second apart; held still, it is not.
+        const string Thrown = """{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 20 }, { "t": 1.6, "turn": -30, "roll": 20 }, { "t": 2.4 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.7, "on": "node", "node": "a_top", "face": "left", "cue": "tap" }, { "t": 1.105, "on": "node", "node": "a_top", "face": "left" }, { "t": 1.11, "on": "node", "node": "a_top", "face": "left", "offset": [0, 0.1, 0] }, { "t": 1.115, "on": "node", "node": "a_top", "face": "left" }, { "t": 1.5, "on": "node", "node": "a_top", "face": "left" }, { "t": 2.3, "on": "grip" }], "parts": [{ "node": "a_top", "keys": [{ "t": 0 }, { "t": 2.4 }] }] }""";
+        Assert.Contains(Broken(Thrown, rifleFeel).Audit(), a => a.Rule.StartsWith("K: the off hand moves"));
+        Assert.DoesNotContain(Broken(Thrown.Replace("\"offset\": [0, 0.1, 0]", "\"offset\": [0, 0, 0]"), rifleFeel).Audit(), a => a.Rule.StartsWith("K: the off hand moves"));
+        // K on the fingers: the off hand's fingers snapped from open to shut in a hundredth of a second.
+        Assert.Contains(Broken("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 20 }, { "t": 2.4, "turn": -30, "roll": 20 }, { "t": 3.0 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.5, "on": "side", "cue": "tap" }, { "t": 1, "on": "side", "fingers": [0, 0, 0, 0, 0] }, { "t": 1.01, "on": "side", "fingers": [1, 1, 1, 1, 1] }, { "t": 2.5, "on": "side", "fingers": [1, 1, 1, 1, 1] }, { "t": 2.9, "on": "grip" }] }""", rifleFeel).Audit(),
+            a => a.Rule.StartsWith("K: the off hand's") && a.Rule.Contains("snaps"));
+        // D: the off hand under the gun moved half its length along it between two holds; keeping its place, it does not drift.
+        const string Slid = """{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -45, "roll": 30 }, { "t": 1.3, "turn": -43, "tilt": 2, "roll": 32 }, { "t": 2.0, "turn": -35, "tilt": 10, "roll": 20 }, { "t": 2.7, "turn": -33, "tilt": 11, "roll": 20 }, { "t": 3.35 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.4, "on": "under", "along": 0.2, "cue": "tap" }, { "t": 1.4, "on": "under", "along": 0.2 }, { "t": 1.9, "on": "under", "along": ALONG }, { "t": 2.8, "on": "under", "along": ALONG }, { "t": 3.2, "on": "grip" }] }""";
+        Assert.Contains(Broken(Slid.Replace("ALONG", "0.5"), rifleFeel).Audit(), a => a.Rule.StartsWith("D:"));
+        Assert.DoesNotContain(Broken(Slid.Replace("ALONG", "0.2"), rifleFeel).Audit(), a => a.Rule.StartsWith("D:"));
+        // G: a magazine wider than the hand spans, held by its side, is cradled with its length across the palm; turned a quarter about
+        // the palm its length runs along the fingers, and moved 10 cm to its left it lies outside the hand.
+        var cradle = UnderMag.Replace("\"face\": \"bottom\", ", "");
+        Assert.DoesNotContain(Broken(cradle, rifleFeel).Audit(), a => a.Rule.StartsWith("G:"));
+        Assert.Contains(Broken(cradle.Replace("\"on\": \"mag\",", "\"on\": \"mag\", \"spin\": 90,"), rifleFeel).Audit(), a => a.Rule.StartsWith("G: the magazine's length runs along"));
+        Assert.Contains(Broken(cradle.Replace("\"on\": \"mag\",", "\"on\": \"mag\", \"offset\": [0.1, 0, 0],"), rifleFeel).Audit(), a => a.Rule.StartsWith("G: the magazine lies outside"));
+        // V: the gun brought up to fill the view while the off hand works a part on its side: the hand covers the middle of the view.
+        Assert.Contains(Broken("""{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 20, "fill": 1 }, { "t": 1.6, "turn": -30, "roll": 20, "fill": 1 }, { "t": 2.4 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.7, "on": "node", "node": "a_top", "face": "left", "cue": "tap" }, { "t": 1.5, "on": "node", "node": "a_top", "face": "left" }, { "t": 2.3, "on": "grip" }], "parts": [{ "node": "a_top", "keys": [{ "t": 0 }, { "t": 2.4 }] }] }""", rifleFeel).Audit(),
+            a => a.Rule.StartsWith("V:"));
         // T: a toss that asks one flip, with another tossed flip at once after its catch, turns about two turns while it settles; the toss alone does not.
         const string Flipped = """{ "gun": [{ "t": 0 }, { "t": 0.6, "turn": -30, "roll": 15, "through": true }, { "t": 1.0, "turn": -30, "tilt": 3, "roll": 25, "through": true }, { "t": 1.75, "turn": -30, "tilt": 3, "roll": 25, "flip": 360, "toss": 0.05, "through": true }, AFTER{ "t": 2.3, "turn": -28, "tilt": 4, "roll": 14, "flip": 720 }, { "t": 3.0 }], "hand": [{ "t": 0, "on": "grip" }, { "t": 0.5, "on": "away" }, { "t": 2.5, "on": "away", "cue": "tap" }, { "t": 2.95, "on": "grip" }] }""";
         Assert.Contains(Broken(Flipped.Replace("AFTER", """{ "t": 2.25, "turn": -30, "tilt": 3, "roll": 25, "flip": 720, "toss": 0.03, "through": true }, """), rifleFeel, TossSounds).Audit(), a => a.Rule.StartsWith("T: the toss"));
@@ -947,14 +989,19 @@ public class FormatTests(ITestOutputHelper output)
         foreach (var motion in blades)
             Assert.True(motion.FromHold && motion.Hand.All(k => k.On is InspectHold.Grip or InspectHold.Away or InspectHold.Under), $"{motion.Id}: the off hand does more than hold the weapon up or stay out of the view");
         var faults = new List<string>();
-        void Keeps(InspectLook look, string on) { if (!float.IsNaN(look.Fault)) faults.Add($"{look.Motion.Id} on the {on}: at {look.Fault:0.00} s {look.FaultRule}"); }
+        var audited = new List<(string Rule, string Line)>();
+        void Keeps(InspectLook look, string on)
+        {
+            if (!float.IsNaN(look.Fault)) faults.Add($"{look.Motion.Id} on the {on}: at {look.Fault:0.00} s {look.FaultRule}");
+            foreach (var (time, rule) in look.Audit()) audited.Add((rule[..Math.Max(1, rule.IndexOf(':'))], $"{look.Motion.Id} on the {on}: at {time:0.00} s {rule}"));
+        }
         foreach (var motion in table.Motions.Where(m => m.Id != "spin"))
         {
             if (handguns.Contains(motion)) Keeps(InspectLook.Solve(motion, WithParts(pistol, motion, table)), "pistol");
             if (!longGuns.Contains(motion)) continue;
             Keeps(InspectLook.Solve(motion, WithParts(rig, motion, table)), "rifle");
             // A pump shotgun (Buckland s870, its bounds and left-hand point read from the game files) held where the rifle is: its
-            // off hand on the pump far up the gun slides back to where the arm reaches when the gun turns away.
+            // off hand on the pump far up the gun keeps its place there, the gun brought near enough for the arm as it turns away.
             Keeps(InspectLook.Solve(motion, WithParts(rig with
             {
                 Centre = new Vector3(-0.0287f, -0.1025f, 0.048f),
@@ -964,5 +1011,7 @@ public class FormatTests(ITestOutputHelper output)
         }
         // What the rules find on the shipped motions is a report for the owner, who decides which motions are good; it gates nothing.
         output.WriteLine($"{faults.Count} rule findings on the shipped motions:\n" + string.Join("\n", faults));
+        output.WriteLine($"{audited.Count} audit findings on the shipped motions, by rule: " + string.Join(", ", audited.GroupBy(a => a.Rule).OrderBy(g => g.Key).Select(g => $"{g.Key} {g.Count()}"))
+            + "\n" + string.Join("\n", audited.Select(a => a.Line)));
     }
 }

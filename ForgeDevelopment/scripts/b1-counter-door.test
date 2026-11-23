@@ -2,7 +2,7 @@
 # picked up, kills count only for the enemies chosen in its one enemy list (24 sleeping Striker and 13 wave Striker; the cell also places one sleeping Striker), and the fourth count opens the
 # hall's entrance door. Run on a freshly loaded B1 of the V1 package, as in b1-security-sensor.test.
 #
-# Room 机关样例区 room:c96b1d7b3466988a0d5e1f48fc58; teleport points are room-local Unity metres, Unity (x, y, z) = editor (-x, y, z) (v1-test-kit cellSpot mirrors x).
+# Room 机关样例区; teleport points are room-local Unity metres, Unity (x, y, z) = editor (-x, y, z) (v1-test-kit cellSpot mirrors x).
 # Glow sticks (item 114) stand at editor x -13.678, z 36 / 40 / 44 (Unity x 13.678); the cell's sleeping Striker (24) at editor (-6.678, 40),
 # Unity (6.678, 40), 6.7 m from the walkway point (0, 0, 40) the spawns below are made from.
 # Level variables (var.g + sha256 of [NAinfini-Forge_V1_Rundown, expedition:876af89dc8833731cdd9a1dbeea5, variable id]):
@@ -14,24 +14,24 @@ god on
 wield secondary
 ammo fill
 
-teleport room=room:c96b1d7b3466988a0d5e1f48fc58 12 0 36
+teleport room=机关样例区 12 0 36
 state variables var.g0f65b7f1d9b5e534e69fb107e8ec8a7eaab64062631956e72c1d6046d4977afd as=none
 expect $none.matched == 0
 
 # three pickups, one count each
 interact name=Interact_Pickup radius=3
 wait until state variables var.g0f65b7f1d9b5e534e69fb107e8ec8a7eaab64062631956e72c1d6046d4977afd var.g0f65b7f1d9b5e534e69fb107e8ec8a7eaab64062631956e72c1d6046d4977afd == 1 timeout=10s
-teleport room=room:c96b1d7b3466988a0d5e1f48fc58 12 0 40
+teleport room=机关样例区 12 0 40
 interact name=Interact_Pickup radius=3
 wait until state variables var.g0f65b7f1d9b5e534e69fb107e8ec8a7eaab64062631956e72c1d6046d4977afd var.g0f65b7f1d9b5e534e69fb107e8ec8a7eaab64062631956e72c1d6046d4977afd == 2 timeout=10s
-teleport room=room:c96b1d7b3466988a0d5e1f48fc58 12 0 44
+teleport room=机关样例区 12 0 44
 interact name=Interact_Pickup radius=3
 wait until state variables var.g0f65b7f1d9b5e534e69fb107e8ec8a7eaab64062631956e72c1d6046d4977afd var.g0f65b7f1d9b5e534e69fb107e8ec8a7eaab64062631956e72c1d6046d4977afd == 3 timeout=10s
 state variables var.g15a8d27c3ecb0d87849dc5911e7e4fa8d4bf87660c1c4b4fe9d826a48b341eea as=not_yet
 expect $not_yet.matched == 0
 
 # another enemy type does not count
-teleport room=room:c96b1d7b3466988a0d5e1f48fc58 0 0 40
+teleport room=机关样例区 0 0 40
 spawn Shooter 1 at=front:6 mode=hibernate as=other
 fire 12 at=other
 wait 3s

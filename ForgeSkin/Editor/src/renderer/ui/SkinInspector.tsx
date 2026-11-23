@@ -22,6 +22,7 @@ import {
   IconTrash,
   IconX,
 } from '@tabler/icons-react';
+import { FINISHES } from '../livery';
 import { importMesh, MEMORY_FINE, MEMORY_HEAVY, mb } from '../actions';
 import { ShapeItems, ShapeMenuItems } from './ShapePanel';
 import { Empty, FEATURE, FeatureTile, Info, InspHead, Section } from './Features';
@@ -255,25 +256,39 @@ function EmissiveSection({ material }: { material: string }) {
 
 function MaterialParams({ material }: { material: string }) {
   const { setParams } = useStore.getState();
-  const { p, preview } = useParams(material);
-  // Only what the game material has (the preview reads its values from the game files); the plugin ignores the rest.
+  const { m, p, preview } = useParams(material);
+  // The colour tint only where the game material has one (the preview reads its values from the game files); the plugin ignores it elsewhere.
   const game = preview?.params[material];
   const has = (v: unknown) => !game || v != null;
-  const none = game && game.metallic == null && game.smoothness == null && game.tint == null;
+  // Metallic and smoothness: a number on the game material where it has one; where it has none (the gear shader reads only the
+  // picture) the value replaces that channel over the whole surface when the skin is packed. Unset keeps the picture's.
+  const surface = (v: unknown) => !!game && v == null;
+  const finish = m?.finish ? FINISHES[m.finish] : null;
+  const row = (key: 'metallic' | 'smoothness', label: string, shown: number, game: number | null | undefined) => (
+    <Field label={label}>
+      <Group gap="xs" wrap="nowrap">
+        <Slider value={p[key] ?? shown} onChange={(v) => setParams(material, { [key]: v }, `${key}-${material}`)} />
+        {surface(game) && m?.params?.[key] != null && (
+          <Tooltip label={t('skinInspector.surfaceUnset')}>
+            <ActionIcon size="sm" variant="filled" color="dark" onClick={() => setParams(material, { [key]: null })}>
+              <IconX size={12} />
+            </ActionIcon>
+          </Tooltip>
+        )}
+      </Group>
+    </Field>
+  );
   return (
-    <Section id="tex-material" title={t('skinInspector.k29')} icon={IconAdjustmentsHorizontal} color="var(--scan)" info={none ? t('skinInspector.noParams') : undefined}>
-      {none && <Empty>{t('skinInspector.noParamsShort')}</Empty>}
-      {!none && has(game?.metallic) && (
-        <Field label={t('skinInspector.k22')}>
-          <Slider value={p.metallic ?? 1} onChange={(v) => setParams(material, { metallic: v }, `met-${material}`)} />
-        </Field>
-      )}
-      {!none && has(game?.smoothness) && (
-        <Field label={t('skinInspector.k23')}>
-          <Slider value={p.smoothness ?? 1} onChange={(v) => setParams(material, { smoothness: v }, `smo-${material}`)} />
-        </Field>
-      )}
-      {!none && has(game?.tint) && (
+    <Section
+      id="tex-material"
+      title={t('skinInspector.k29')}
+      icon={IconAdjustmentsHorizontal}
+      color="var(--scan)"
+      info={surface(game?.metallic) || surface(game?.smoothness) ? t('skinInspector.surfaceInfo') : undefined}
+    >
+      {row('metallic', t('skinInspector.k22'), surface(game?.metallic) ? (finish?.metal ?? 0) : 1, game?.metallic)}
+      {row('smoothness', t('skinInspector.k23'), surface(game?.smoothness) ? (finish?.smooth ?? 0.5) : 1, game?.smoothness)}
+      {has(game?.tint) && (
         <Field label={t('skinInspector.k24')}>
           <Color slot={{ kind: 'tint', target: material }} value={p.tint ?? [1, 1, 1, 1]} onChange={(c) => setParams(material, { tint: [c[0], c[1], c[2], 1] }, `tint-${material}`)} />
         </Field>

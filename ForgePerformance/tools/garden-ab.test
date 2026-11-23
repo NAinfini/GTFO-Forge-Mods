@@ -1,14 +1,13 @@
 # ForgePerformance A/B in R8A1 ("Order") zone 7, the heaviest garden zone. Needs Probe=true. Every option alternates off (A)
 # and on (B) in equal segments, A B A B A B A B A; read with tools/analyze_probe.py. Sections: the 40 s after the teleport
 # into zone 7 (spike), the empty zone with IrfPhysicsHalfRate, 48 aggressive Strikers around a god-mode player with
-# TentacleLimitErrorFold, then chases between two areas of the zone for FarAnimatorThrottle (with the hit-box offset
-# measurement on) and PathfindingIterations: each chase starts when the player teleports away and ends when 40 enemies
-# stand within 6 m (ChaseState answers done, or done-timeout after 45 s). Options that are not under test stay off.
+# TentacleLimitErrorFold, then chases between two areas of the zone for PathfindingIterations: each chase starts
+# when the player teleports away and ends when 40 enemies stand within 6 m (ChaseState answers done, or done-timeout after 45 s).
+# Options that are not under test stay off.
 level 35 1 0
 god on
 call static:ForgePerformance.Crowd.PerformanceControl Set "IrfPhysicsHalfRate" false
 call static:ForgePerformance.Crowd.PerformanceControl Set "TentacleLimitErrorFold" false
-call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" false
 call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
 call static:ForgePerformance.Crowd.PerformanceControl Read as=before
 call static:ForgePerformance.Crowd.PerformanceControl Mark "tele-0"
@@ -83,56 +82,6 @@ wait 8s
 call static:ForgePerformance.Crowd.PerformanceControl Mark "tentacle-A-5"
 call static:ForgePerformance.Crowd.PerformanceControl Set "TentacleLimitErrorFold" false
 wait 8s
-call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" false
-call static:ForgePerformance.Crowd.PerformanceControl Lag false as=lag-animator-1
-call static:ForgePerformance.Crowd.PerformanceControl Mark "animator-A-1"
-teleport zone=0/MainLayer/7 area=1
-call static:ForgePerformance.Crowd.PerformanceControl Chase 40 6.0
-call static:ForgePerformance.Crowd.PerformanceControl ChaseState --until ChaseState done --timeout 60
-call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=chase-animator-1
-wait 4s
-call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" true
-call static:ForgePerformance.Crowd.PerformanceControl Lag true as=lag-animator-2
-call static:ForgePerformance.Crowd.PerformanceControl Mark "animator-B-2"
-teleport zone=0/MainLayer/7 area=0
-call static:ForgePerformance.Crowd.PerformanceControl Chase 40 6.0
-call static:ForgePerformance.Crowd.PerformanceControl ChaseState --until ChaseState done --timeout 60
-call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=chase-animator-2
-wait 4s
-call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" false
-call static:ForgePerformance.Crowd.PerformanceControl Lag false as=lag-animator-3
-call static:ForgePerformance.Crowd.PerformanceControl Mark "animator-A-3"
-teleport zone=0/MainLayer/7 area=1
-call static:ForgePerformance.Crowd.PerformanceControl Chase 40 6.0
-call static:ForgePerformance.Crowd.PerformanceControl ChaseState --until ChaseState done --timeout 60
-call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=chase-animator-3
-wait 4s
-call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" true
-call static:ForgePerformance.Crowd.PerformanceControl Lag true as=lag-animator-4
-call static:ForgePerformance.Crowd.PerformanceControl Mark "animator-B-4"
-teleport zone=0/MainLayer/7 area=0
-call static:ForgePerformance.Crowd.PerformanceControl Chase 40 6.0
-call static:ForgePerformance.Crowd.PerformanceControl ChaseState --until ChaseState done --timeout 60
-call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=chase-animator-4
-wait 4s
-call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" false
-call static:ForgePerformance.Crowd.PerformanceControl Lag false as=lag-animator-5
-call static:ForgePerformance.Crowd.PerformanceControl Mark "animator-A-5"
-teleport zone=0/MainLayer/7 area=1
-call static:ForgePerformance.Crowd.PerformanceControl Chase 40 6.0
-call static:ForgePerformance.Crowd.PerformanceControl ChaseState --until ChaseState done --timeout 60
-call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=chase-animator-5
-wait 4s
-call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" true
-call static:ForgePerformance.Crowd.PerformanceControl Lag true as=lag-animator-6
-call static:ForgePerformance.Crowd.PerformanceControl Mark "animator-B-6"
-teleport zone=0/MainLayer/7 area=0
-call static:ForgePerformance.Crowd.PerformanceControl Chase 40 6.0
-call static:ForgePerformance.Crowd.PerformanceControl ChaseState --until ChaseState done --timeout 60
-call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=chase-animator-6
-wait 4s
-call static:ForgePerformance.Crowd.PerformanceControl Set "FarAnimatorThrottle" false
-call static:ForgePerformance.Crowd.PerformanceControl Lag false as=lag-animator-end
 call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
 call static:ForgePerformance.Crowd.PerformanceControl Mark "path-A-1"
 teleport zone=0/MainLayer/7 area=1
@@ -176,7 +125,6 @@ call static:ForgePerformance.Crowd.PerformanceControl ChaseState --until ChaseSt
 call static:ForgePerformance.Crowd.PerformanceControl ChaseState as=chase-path-6
 wait 4s
 call static:ForgePerformance.Crowd.PerformanceControl Set "PathfindingIterations" false
-call static:ForgePerformance.Crowd.PerformanceControl Lag false as=lag-path-end
 call static:ForgePerformance.Crowd.PerformanceControl Read as=final
 clear enemies
 call static:ForgePerformance.Crowd.PerformanceControl Mark "end"

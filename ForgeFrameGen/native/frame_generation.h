@@ -58,10 +58,13 @@ struct FrameParams
 #pragma pack(pop)
 static_assert(sizeof(FrameParams) == 424, "fg::FrameParams layout is shared with the plugin");
 
-// The upscaler the player picked (the plugin's Method: 0 Auto, 1 DLSS, 2 FSR), any time: the preloader before the swap chain is made,
-// the plugin whenever the setting changes. With FSR, frame generation is AMD's even on a card DLSS Frame Generation runs on; otherwise
-// DLSS Frame Generation where it runs. The bridge follows at its next present (Target).
+// The frame generation the player picked (the plugin's [Frame Generation] Method less one: 0 Auto, 1 DLSS, 2 FSR; the upscaler does not
+// enter into it), any time: the preloader before the swap chain is made, the plugin whenever the setting changes. FSR: AMD's even on a
+// card DLSS Frame Generation runs on; otherwise DLSS Frame Generation where it runs. The bridge follows at its next present (Target).
 void Prefer(int method);
+// Why DLSS Frame Generation did not start on the game's adapter (DlssMissing, bridge_common.h; 0 when it did or before Start), with the
+// reason and the adapter into why (UTF-8, NUL-terminated). Any thread.
+int WhyNoDlss(char *why, int capacity);
 // Once per process, when the game makes its swap chain, before the bridge's D3D12 device exists: starts DLSS Frame Generation where it
 // can run (the packaged Streamline runtime from folder, its signature checked; Streamline must start before the device is made), and
 // AMD FSR Frame Generation (the packaged AMD FSR SDK DLLs) when FSR is picked or DLSS Frame Generation cannot run; otherwise AMD's starts

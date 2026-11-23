@@ -330,8 +330,12 @@ internal static class Replayer
     }
 
     // Paused, the world stands still with the replay: the game's own time stops (its animations, its particle effects, an enemy attack's
-    // state and timers, the puppets' actions) and so does Wwise, where every game sound plays (an attack's loop, a gunshot's tail, a
-    // scan's hum) and every sound the replay posts (ReplaySounds). Played again, all of it goes on from where it stood: nothing starts again and nothing is doubled.
+    // state and timers, the puppets' actions) and Wwise, where every game sound plays (an attack's loop, a gunshot's tail, a scan's hum)
+    // and every sound the replay posts (ReplaySounds), is suspended with its output off but its processing on (Suspend(true)): the game's
+    // thread keeps posting to Wwise while paused (the listener on the moving camera, puppets made and parked round a free camera, the
+    // room tone), and this Wwise (2017.1) blocks the caller when its command queue is full ("Audio command queue is full, blocking
+    // caller"); suspended without processing nothing empties the queue, so a free camera flown while paused froze the game for good after
+    // a few seconds. What was sounding goes on unheard meanwhile: a tail that ends during the pause is over when play resumes.
     // The replay itself runs on real time (its clock, camera, screen), so it keeps working while paused. Not while the level is being
     // prepared: the game's bots and drop need their time then.
     private static bool _frozen;
@@ -350,7 +354,7 @@ internal static class Replayer
                 var scale = Time.timeScale;
                 _scaleBefore = scale > 0f ? scale : 1f;
                 Time.timeScale = 0f;
-                AkSoundEngine.Suspend(false);
+                AkSoundEngine.Suspend(true);
             }
             else
             {

@@ -12,8 +12,8 @@ namespace ForgeSkin.Plugin;
 // The toon setting's three choices, in the picker's order.
 enum ToonMode { Forward, Deferred, Off }
 
-[BepInPlugin(Guid, "ForgeSkin", "1.0.2")] // package-version: NAinfini-ForgeSkin
-[BepInDependency("NAinfini.ForgeCore", ">=1.0.3")]
+[BepInPlugin(Guid, "ForgeSkin", "1.0.3")] // package-version: NAinfini-ForgeSkin
+[BepInDependency("NAinfini.ForgeCore", ">=1.0.4")] // package-version: NAinfini-ForgeCore
 [BepInProcess("GTFO.exe")]
 public sealed class ForgeSkinPlugin : BasePlugin
 {
@@ -65,10 +65,10 @@ public sealed class ForgeSkinPlugin : BasePlugin
     }
 
     // A skin's own content that the game shows without one part (a model with no bone for a part, a hand pose that is not a full set
-    // of rows, a material or sight part with no place for the skin's addition): the author fixes the skin, nothing failed. These codes
+    // of rows, a material or sight part with no place for the skin's addition) and a teammate's skin that is not installed here: nothing failed. These codes
     // are a Warning in BepInEx, once per text, like the warn forgeskin.log gives them; every other code is an error and stays one.
     static readonly HashSet<string> ContentNotices = new(StringComparer.Ordinal)
-        { "skin-character-part-skipped", "skin-hand-fingers-skipped", "skin-reticle-skipped", "skin-sight-skipped" };
+        { "skin-character-part-skipped", "skin-hand-fingers-skipped", "skin-reticle-skipped", "skin-sight-skipped", "skin-look-missing" };
     static readonly HashSet<string> Warned = new(StringComparer.Ordinal);
     static BepInEx.Logging.ManualLogSource _bepInEx = null!;
 

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../Build/Common.props" />
+  <PropertyGroup>
+    <AssemblyName>ForgeEngine.Framework</AssemblyName>
+    <RootNamespace>ForgeEngine.Framework</RootNamespace>
+    <ForgeDomainSources>link</ForgeDomainSources>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The game-independent build of the kernel and the four domains: the same sources ForgeEngine.dll compiles, without a
+         game reference. Only the offline package admission and the tests use it; it is not in the player package. -->
+    <InternalsVisibleTo Include="ForgeEngine.Testing" />
+    <!-- PluginStartup compiles the host Plugin.cs itself, so it stands in for the host and sees what the host sees. -->
+    <InternalsVisibleTo Include="ForgeEngine.EngineContracts.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The one hash and the one deterministic random come from ForgeCore's game-independent assembly. -->
+    <ProjectReference Include="../../ForgeCore/Once/ForgeCore.Once.csproj" Private="false" />
+  </ItemGroup>
+  <Import Project="PrimitiveContracts.props" />
+  <Import Project="Domains.props" />
+  <Import Project="ApiFingerprint.targets" />
+</Project>

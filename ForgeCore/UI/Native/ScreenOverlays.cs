@@ -159,7 +159,7 @@ internal static class ScreenOverlays
     }
     internal static Material Material(Texture texture, int queue)
     {
-        var shader = Shader.Find("Sprites/Default") ?? throw new InvalidOperationException("the game has no Sprites/Default shader");
+        var shader = ForgeVisual.Shaders.Find("Sprites/Default") ?? throw new InvalidOperationException("the game has no Sprites/Default shader");
         var material = ScreenLayer.Material(shader, new Color(1f, 1f, 1f, 0f), queue);
         material.mainTexture = texture;
         return material;

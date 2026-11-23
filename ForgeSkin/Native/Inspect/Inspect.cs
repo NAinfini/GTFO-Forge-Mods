@@ -81,6 +81,9 @@ static class Inspect
         public RootMotion.FinalIK.IKSolverLimb.BendModifier Was;
         public Transform? GoalWas, Elbow;
         public float WeightWas;
+        // The hand's bone and its size as the game had it (a key's scale draws the hand smaller, InspectLook.OffScale).
+        public Transform? Hand;
+        public Vector3 HandScale = Vector3.one;
     }
     static readonly Bend _gripBend = new(), _offBend = new();
 
@@ -709,11 +712,16 @@ static class Inspect
         var live = N(_view.InverseTransformPoint(_offTarget.TransformPoint(Vec.Zero)));
         if (!_look.HandOff(_time))
         {
+            var held = live;
+            if (_offBend.Hand != null && !_offBend.Hand.WasCollected) _offBend.Hand.localScale = _offBend.HandScale * _look.OffScale(_time, _weight, ref held, NQuaternion.Identity);
             if (_offBend.Elbow != null) _offBend.Elbow.position = _view.TransformPoint(U(_look.OffElbowAt(_time, _weight, live)));
             return;
         }
         var toView = NQuaternion.Inverse(_viewTurn);
         _look.HandPose(_time, _weight, _gunAt, _gunTurn, live, toView * Turn(_offTarget), out var at, out var turn);
+        // (The hand drawn at the key's size about its palm's middle: its bone scaled, its wrist's target moved to keep the palm in place.)
+        var scale = _look.OffScale(_time, _weight, ref at, turn);
+        if (_offBend.Hand != null && !_offBend.Hand.WasCollected) _offBend.Hand.localScale = _offBend.HandScale * scale;
         _offTarget.SetPositionAndRotation(_view.TransformPoint(U(at)), U(_viewTurn * turn));
         if (_offBend.Elbow != null) _offBend.Elbow.position = _view.TransformPoint(U(_look.OffElbow(at)));
     }
@@ -730,6 +738,8 @@ static class Inspect
             bend.Elbow = go.transform;
         }
         (bend.Solver, bend.Was, bend.GoalWas, bend.WeightWas) = (solver, solver.bendModifier, solver.bendGoal, solver.bendModifierWeight);
+        bend.Hand = solver.bone3?.transform;
+        bend.HandScale = bend.Hand != null ? bend.Hand.localScale : Vector3.one;
         solver.bendGoal = bend.Elbow;
         solver.bendModifier = RootMotion.FinalIK.IKSolverLimb.BendModifier.Goal;
         solver.bendModifierWeight = 1f;
@@ -743,7 +753,8 @@ static class Inspect
             bend.Solver.bendGoal = bend.GoalWas;
             bend.Solver.bendModifierWeight = bend.WeightWas;
         }
-        (bend.Solver, bend.GoalWas) = (null, null);
+        if (bend.Hand != null && !bend.Hand.WasCollected) bend.Hand.localScale = bend.HandScale;
+        (bend.Solver, bend.GoalWas, bend.Hand) = (null, null, null);
     }
 
     // A transform's world rotation from its axes (read through methods: no property of the game's is read each frame).

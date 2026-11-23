@@ -66,11 +66,12 @@ public static class Methods
     // not hold up a project save.
     static readonly Lock FileGate = new(), JobGate = new();
     static readonly HashSet<string> FileWrites = ["game.setDir", "profiles.add", "profiles.remove", "project.save", "project.delete", "project.copy", "skins.import",
-        "pack.install", "pack.list", "pack.remove", "pack.adopt", "pack.activate", "plugin.install", "plugin.uninstall"];
+        "pack.install", "pack.list", "pack.remove", "pack.adopt", "pack.activate", "plugin.install", "plugin.uninstall", "content.install", "content.remove"];
     static readonly HashSet<string> Jobs = ["pack.build", "pack.exportMod", "assets.apply", "assets.restore", "assets.export"];
 
     public static object? Call(string method, JsonObject p, long id)
     {
+        if (!ProgramManifest.Current.Allows(method)) throw new BackendException("method-not-allowed", $"{method} is not available in this program");
         var gate = FileWrites.Contains(method) ? FileGate : Jobs.Contains(method) ? JobGate : null;
         if (gate == null) return Dispatch(method, p, id);
         lock (gate) return Dispatch(method, p, id);
@@ -127,6 +128,11 @@ public static class Methods
         "plugin.install" => Install.Plugin(Str(p, "profile")),
         "plugin.uninstall" => Install.PluginUninstall(Str(p, "profile")),
         "plugin.loadCheck" => LoadLog.Check(Str(p, "profile")),
+        "plugin.gameLog" => LoadLog.Lines(Str(p, "profile")),
+        "plugin.mods" => LoadLog.Mods(Str(p, "profile")),
+        "content.install" => Content.Add(Str(p, "zip"), Str(p, "profile")),
+        "content.list" => Content.List(Str(p, "profile")),
+        "content.remove" => Content.Remove(Str(p, "profile"), Str(p, "package")),
         "export.obj" => WithGame(g => ObjExport.Export(g, Str(p, "weaponId"), Opt<List<string>>(p, "parts"), Opt<string>(p, "mode") ?? "separate", Str(p, "outDir"))),
         "assets.apply" => AssetPatch.Apply(Str(p, "pack"), Opt<string>(p, "gameDir"), id),
         "assets.restore" => AssetPatch.Restore(Opt<string>(p, "skinId"), Opt<bool?>(p, "discardStale") ?? false, Opt<string>(p, "gameDir")),
@@ -151,10 +157,15 @@ public static class Methods
         var clock = System.Diagnostics.Stopwatch.StartNew();
         // A character skin reads nothing of the game.
         if (project.Character != null) return PackBuilder.Build(project, projectPath, outPath, [], [], id);
-        var (catalog, baseline) = WithGame(g => (Catalog.Get(g),
-            project.Target.Weapon is { } w ? Preview.Weapon(g, w, id).Textures : new Dictionary<string, Dictionary<TextureChannel, string>>()));
+        var (catalog, baseline, lenses) = WithGame(g =>
+        {
+            var items = Catalog.Get(g);
+            if (project.Target.Weapon is not { } w) return (items, new Dictionary<string, Dictionary<TextureChannel, string>>(), new HashSet<string>());
+            var lensMaterials = SkinsFormat.Materials(g, Catalog.Item(items, w)).Where(m => MaterialOverride.IsLensShader(m.Value.Shader)).Select(m => m.Key).ToHashSet();
+            return (items, Preview.Weapon(g, w, id).Textures, lensMaterials);
+        });
         long game = clock.ElapsedMilliseconds;
-        var result = PackBuilder.Build(project, projectPath, outPath, catalog, baseline, id);
+        var result = PackBuilder.Build(project, projectPath, outPath, catalog, baseline, id, lenses);
         Log.Write($"pack.build {project.Target.Weapon}: game files {game} ms, pack {clock.ElapsedMilliseconds - game} ms", echo: false);
         return result;
     }

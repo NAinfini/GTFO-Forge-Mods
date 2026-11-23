@@ -3,7 +3,7 @@
 #   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package NAinfini-Forge_V1_Rundown --level E2 --work-dir artifacts/work/drivesession/<name>
 #   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name> run Mods/ForgeDevelopment/scripts/e2-fog-rise.test
 #
-# Room 波次测试大厅 room:fa3983cd8074ae4861619b63d2c5; teleport points are room-local Unity metres. Buttons: 降雾
+# Room 波次测试大厅; teleport points are room-local Unity metres. Buttons: 降雾
 # v1-mx-3151869bedebbafc452c9cdbe9f2, 停止变浓 v1-mx-64cdb457b285182f300fd453c840.
 # Level variables (var.g + sha256 of [NAinfini-Forge_V1_Rundown, E2 expedition:c0f79f1c282f415a05ea618b73db, row id]):
 #   雾变浓档位 level.v1.e2_fog_tier     var.g31eb750cba7713a10c2d7814bcc09d4a7d631188e39b027789319c89c4a7ecd5
@@ -12,7 +12,7 @@
 stop-on-fail
 god on
 
-teleport room=room:fa3983cd8074ae4861619b63d2c5 0 0 -48
+teleport room=波次测试大厅 0 0 -48
 
 # the first step comes within a minute of the start
 wait until state variables var.g31eb750cba7713a10c2d7814bcc09d4a7d631188e39b027789319c89c4a7ecd5 var.g31eb750cba7713a10c2d7814bcc09d4a7d631188e39b027789319c89c4a7ecd5 >= 1 timeout=75s

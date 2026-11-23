@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.4
+
+Needs ForgeCore 1.0.4. No change to how the guns work: the game's shaders are now found through ForgeCore.
+
 ## 1.0.3
 
 Needs ForgeCore 1.0.3.

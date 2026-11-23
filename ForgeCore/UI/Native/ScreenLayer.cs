@@ -259,7 +259,7 @@ internal sealed class ScreenPanels
     {
         Destroy();
         _user.Reset();
-        var sprite = Shader.Find("Sprites/Default") ?? throw new InvalidOperationException("the game has no Sprites/Default shader");
+        var sprite = ForgeVisual.Shaders.Find("Sprites/Default") ?? throw new InvalidOperationException("the game has no Sprites/Default shader");
         var black = new Color(0f, 0f, 0f, 1f);
         _fadeMaterial = ScreenLayer.Material(sprite, black, 4000);
         _fade = ScreenLayer.Piece("Fade", ScreenLayer.Quad, _fadeMaterial);

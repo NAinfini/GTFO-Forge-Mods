@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>ForgeEngine.EngineNativeEvidence.Tests</AssemblyName>
+    <StartupObject>ForgeEngine.Tests.EngineEvidenceSuites</StartupObject>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <Target Name="RequireCecil" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(GTFOBepInExPath)/core/Mono.Cecil.dll')" Text="Set GTFOBepInExPath to the read-only QA BepInEx references." />
+  </Target>
+  <ItemGroup>
+    <Reference Include="Mono.Cecil" HintPath="$(GTFOBepInExPath)/core/Mono.Cecil.dll" />
+    <ProjectReference Include="../../Framework/ForgeEngine.Framework.csproj" Condition="'$(ForgeFrameworkAssembly)' == ''" />
+    <Reference Include="ForgeEngine.Framework" HintPath="$(ForgeFrameworkAssembly)" Condition="'$(ForgeFrameworkAssembly)' != ''" />
+    <ProjectReference Include="../../../Testing/ForgeEngine.Testing.csproj" />
+    <Using Include="ForgeEngine.Testing" />
+    <Compile Include="../NativeHandoverEvidence/*.cs" />
+    <Compile Include="../../../Testing/SourceTools/InteropSignature.cs" />
+  </ItemGroup>
+  <Import Project="../TestAssemblyIdentity.targets" />
+</Project>

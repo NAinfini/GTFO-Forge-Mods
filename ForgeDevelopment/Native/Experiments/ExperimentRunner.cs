@@ -492,7 +492,7 @@ internal sealed class ExperimentRunner : MonoBehaviour
             json.WriteString("run", _runId);
             json.WriteString("step", outcome.Kind);
             json.WriteBoolean("ok", outcome.Ok);
-            json.WriteString("detail", RecReflect.Truncate(outcome.Message, 4096));
+            json.WriteString("detail", RecReflect.Truncate(outcome.Message, 32768));
             json.WriteNumber("ms", Math.Round(outcome.Milliseconds, 4));
         });
         Add(new ExperimentEvent(outcome.Ok ? outcome.Kind : "error", outcome.Message));

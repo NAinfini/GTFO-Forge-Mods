@@ -1,7 +1,7 @@
 # V1 B1 mechanism hall, cell 任务步骤 (official mechanism m-task-steps on the main objective: hold 步骤装置, then step into 步骤黄圈; the
 # current-task line on the HUD follows each step: the objective panel's progression[1], not its empty objective field). Run on a freshly loaded B1 of the V1 package, as in b1-security-sensor.test.
 #
-# Room 机关样例区 room:c96b1d7b3466988a0d5e1f48fc58; teleport points are room-local Unity metres, Unity (x, y, z) = editor (-x, y, z) (v1-test-kit cellSpot mirrors x); the V1 build puts 步骤装置 at Unity (-13.678, 1.02, -29) and 步骤黄圈 at (-10.678, 1.52, -20).
+# Room 机关样例区; teleport points are room-local Unity metres, Unity (x, y, z) = editor (-x, y, z) (v1-test-kit cellSpot mirrors x); the V1 build puts 步骤装置 at Unity (-13.678, 1.02, -29) and 步骤黄圈 at (-10.678, 1.52, -20).
 # 步骤装置 is the interaction point b1-held-point-aa15ac2e1102acac633ddd072e5b (in game the object ForgeInteractionPoint:<that id>).
 # Level variable 任务步骤 · steps.progress level.v375c1cffa99641a08c3315ab4d1443de, identity var.g + sha256 of
 # [NAinfini-Forge_V1_Rundown, expedition:876af89dc8833731cdd9a1dbeea5, row id]:
@@ -10,7 +10,7 @@
 stop-on-fail
 god on
 
-teleport room=room:c96b1d7b3466988a0d5e1f48fc58 -11.5 0 -29
+teleport room=机关样例区 -11.5 0 -29
 state hud as=start
 state variables var.gda23591a4ebb7cbc4c6735ad25db650a2dad31c8a8211adffb736619a3212bc1 as=none
 expect $none.matched == 0
@@ -24,7 +24,7 @@ state hud as=after_one
 expect $after_one.progression[1] != $start.progression[1]
 
 # step two: into the yellow circle
-teleport room=room:c96b1d7b3466988a0d5e1f48fc58 -10.678 0 -20
+teleport room=机关样例区 -10.678 0 -20
 wait 1s
 state variables var.gda23591a4ebb7cbc4c6735ad25db650a2dad31c8a8211adffb736619a3212bc1 as=two
 expect $two.var.gda23591a4ebb7cbc4c6735ad25db650a2dad31c8a8211adffb736619a3212bc1 == 2

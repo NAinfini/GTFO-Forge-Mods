@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>ForgeEngine.EngineContracts.Tests</AssemblyName>
+    <StartupObject>ForgeEngine.Tests.EngineContractSuites</StartupObject>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Framework/ForgeEngine.Framework.csproj" Condition="'$(ForgeFrameworkAssembly)' == ''" />
+    <Reference Include="ForgeEngine.Framework" HintPath="$(ForgeFrameworkAssembly)" Condition="'$(ForgeFrameworkAssembly)' != ''" />
+    <ProjectReference Include="../../../Testing/ForgeEngine.Testing.csproj" />
+    <Using Include="ForgeEngine.Testing" />
+    <Compile Include="../Architecture/**/*.cs" Exclude="../*/bin/**/*.cs;../*/obj/**/*.cs" />
+  </ItemGroup>
+  <Import Project="../TestAssemblyIdentity.targets" />
+  <Import Project="../../../Testing/MergedSuites.targets" />
+</Project>

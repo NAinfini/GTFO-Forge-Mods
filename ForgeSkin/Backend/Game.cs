@@ -11,7 +11,12 @@ public sealed record GameInfo(string? GameDir, string? DataDir, bool Found, bool
 // Reason: why HasBepInEx is false. Modified: last time the profile changed or the game ran from it (BepInEx log).
 // PluginCurrent: Install.PluginCurrent (the shipped plugin and ForgeCore files, nothing retired beside them).
 // PluginShipped: the plugin version the editor ships. PluginNewer: store copies newer than the shipped ones, left alone (Install.Newer).
-public sealed record ProfileInfo(string Name, string Path, bool HasBepInEx, string? PluginVersion, bool PluginCurrent, string? Reason, bool Custom, DateTime Modified, string? PluginShipped, int Packs = 0, string[]? PluginNewer = null);
+// PluginVersion, PluginCurrent, PluginShipped and PluginNewer speak for the manifest's primary package; Packages and Dependencies
+// report every package and every checked plugin of the manifest (Install.Status).
+public sealed record ProfileInfo(string Name, string Path, bool HasBepInEx, string? PluginVersion, bool PluginCurrent, string? Reason, bool Custom, DateTime Modified, string? PluginShipped, int Packs = 0, string[]? PluginNewer = null,
+    List<PackageStatus>? Packages = null, List<DependencyStatus>? Dependencies = null);
+public sealed record PackageStatus(string Name, string? Version, string? Shipped, bool Current, bool BelowMinimum);
+public sealed record DependencyStatus(string Name, string Package, string? Version, bool Ok);
 
 // Finds the GTFO install (saved choice, then Steam registry + libraryfolders.vdf + common dirs) and BepInEx profiles.
 public static class Game
@@ -20,7 +25,10 @@ public static class Game
     // What the Steam search found, kept: searched again only when it found nothing or the folder is no longer an install.
     static string? _searched;
 
-    public static bool Running => Process.GetProcessesByName("GTFO").Length > 0;
+    // Whether a GTFO process runs; tests replace the probe.
+    public static Func<bool> RunningProbe { get; set; } = () => Process.GetProcessesByName("GTFO").Length > 0;
+
+    public static bool Running => RunningProbe();
 
     // Whether a running game was started from `profile`: the plugin writes its log in the profile when the game loads it, so that
     // log is newer than the game's start. A profile whose plugin has no log was not loaded by any game.
@@ -186,8 +194,10 @@ public static class Game
         // Packs in its skins folder, for the profile menu (skin mods' packs are counted only for the chosen profile, by pack.list).
         var skins = SkinFolders.Skins(BepInEx(dir));
         var packs = Directory.Exists(skins) ? Directory.GetFiles(skins, "*" + SkinPack.Extension).Length : 0;
+        var (packages, dependencies) = Install.Status(dir);
         return new ProfileInfo(Path.GetFileName(dir.TrimEnd('\\', '/')), dir, reason == null,
-            dll != null ? ShortVersion(FileVersionInfo.GetVersionInfo(dll)) : null, dll != null && Install.PluginCurrent(dir), reason, custom, modified, Install.ShippedVersion(), packs, dll != null ? Install.Newer(dir) : null);
+            dll != null ? ShortVersion(FileVersionInfo.GetVersionInfo(dll)) : null, dll != null && Install.PluginCurrent(dir), reason, custom, modified, Install.ShippedVersion(), packs, dll != null ? Install.Newer(dir) : null,
+            packages, dependencies);
     }
 
     // Accepts a profile root, its BepInEx folder or a game folder holding BepInEx.

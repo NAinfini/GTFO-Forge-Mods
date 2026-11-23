@@ -573,7 +573,6 @@ function appendCollision(node: GltfNode, out: Collected): void {
     const world = node.getWorldMatrix(),
         {flip} = normalMatrix(world),
         name = node.getName(),
-        limit = importedModelLimits.extent,
         positions: number[] = [],
         indices: number[] = [];
     for (const primitive of node.getMesh()!.listPrimitives()) {
@@ -589,7 +588,8 @@ function appendCollision(node: GltfNode, out: Collected): void {
             const wx = Math.fround(-(world[0]! * x + world[4]! * y + world[8]! * z + world[12]!)),
                 wy = Math.fround(world[1]! * x + world[5]! * y + world[9]! * z + world[13]!),
                 wz = Math.fround(world[2]! * x + world[6]! * y + world[10]! * z + world[14]!);
-            requireImported(Math.abs(wx) <= limit && Math.abs(wy) <= limit && Math.abs(wz) <= limit, 'extent', {limit});
+            // Collision points are 32-bit floats: a coordinate past that range is the only one they cannot carry.
+            requireImported(Number.isFinite(wx) && Number.isFinite(wy) && Number.isFinite(wz), 'non-finite');
             positions.push(wx, wy, wz);
         }
         const total = source ? source.length : count;
@@ -703,7 +703,7 @@ function readSkeleton(skins: GltfSkin[], extra: GltfNode[], follow: ReadonlyMap<
     const names = new Set<string>();
     const bones = order.map(index => {
         const name = nodes[index]!.getName();
-        requireImported(name.length > 0 && name.length <= 200 && !/[\u0000-\u001f\u007f]/.test(name) && !names.has(name), 'skin-bone-name', {name});
+        requireImported(name.length > 0 && !/[\u0000-\u001f\u007f]/.test(name) && !names.has(name), 'skin-bone-name', {name});
         names.add(name);
         return {
             name,
@@ -774,8 +774,7 @@ function append(
         }
     }
     const count = keep ? keep.length : full,
-        base = out.positions.length / 3,
-        limit = importedModelLimits.extent;
+        base = out.positions.length / 3;
     if (bones && rigid)
         for (let vertex = 0; vertex < count; vertex++) {
             out.joints.push(bones[0]!, 0, 0, 0);
@@ -810,7 +809,8 @@ function append(
         const wx = -(world[0]! * x + world[4]! * y + world[8]! * z + world[12]!),
             wy = world[1]! * x + world[5]! * y + world[9]! * z + world[13]!,
             wz = world[2]! * x + world[6]! * y + world[10]! * z + world[14]!;
-        requireImported(Math.abs(wx) <= limit && Math.abs(wy) <= limit && Math.abs(wz) <= limit, 'extent', {limit});
+        // The mesh stores 32-bit floats: a coordinate past that range is the only one it cannot carry.
+        requireImported(Number.isFinite(Math.fround(wx)) && Number.isFinite(Math.fround(wy)) && Number.isFinite(Math.fround(wz)), 'non-finite');
         out.positions.push(wx, wy, wz);
         const nx = normal[vertex * 3]!,
             ny = normal[vertex * 3 + 1]!,

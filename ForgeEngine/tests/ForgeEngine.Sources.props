@@ -1,0 +1,15 @@
+<Project>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)../Framework/**/*.cs"
+             Exclude="$(MSBuildThisFileDirectory)../Framework/bin/**/*.cs;$(MSBuildThisFileDirectory)../Framework/obj/**/*.cs"
+             Link="Framework/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+  <!-- Framework sources use ForgeCore.PosixPath, Hash, Fnv, DeterministicRandom and FormatVersion. A project that already references ForgeCore.Once sets ForgeCoreOnceReferenced. -->
+  <ItemGroup Condition="'$(ForgeCoreOnceReferenced)' != 'true'">
+    <Compile Include="$(MSBuildThisFileDirectory)../../ForgeCore/Once/PosixPath.cs" Link="PosixPath.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../ForgeCore/Once/Hash.cs" Link="Hash.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../ForgeCore/Once/Fnv.cs" Link="Fnv.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../ForgeCore/Once/DeterministicRandom.cs" Link="DeterministicRandom.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../ForgeCore/Once/FormatVersion.cs" Link="FormatVersion.cs" />
+  </ItemGroup>
+</Project>

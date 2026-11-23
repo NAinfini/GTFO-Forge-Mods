@@ -14,9 +14,6 @@ export const importedModelLimits = Object.freeze({
     /** 贴图边长（像素）。 */
     textureSide: formatLimits.textureSide,
     bones: formatLimits.bones,
-    /** 变换后任一坐标的绝对值（米）。 */
-    extent: 1000,
-    nameLength: 80,
     advised: Object.freeze({faces: 100_000, materials: 8, textures: 8, textureSide: 2048})
 });
 
@@ -170,10 +167,7 @@ export function readImportedModelDescriptor(value: unknown): ImportedModelDescri
             metal = material.metalTexture,
             emissive = material.emissiveColor,
             emissiveTexture = material.emissiveTexture;
-        requireImported(
-            typeof material.name === 'string' && material.name.length > 0 && material.name.length <= 200 && !/[\u0000-\u001f\u007f]/.test(material.name),
-            'descriptor-material'
-        );
+        requireImported(typeof material.name === 'string' && material.name.length > 0 && !/[\u0000-\u001f\u007f]/.test(material.name), 'descriptor-material');
         requireImported(Array.isArray(color) && color.length === 4 && color.every(inUnit), 'descriptor-material');
         requireImported(Number.isSafeInteger(texture) && (texture as number) >= -1 && (texture as number) < textures.length, 'descriptor-material');
         requireImported((texture as number) < 0 || color.every(channel => channel === 1), 'descriptor-material');
@@ -290,10 +284,7 @@ function readBones(value: unknown): ImportedModelBone[] {
     return rows.map((bone, index) => {
         fields(bone, ['name', 'parent', 'rest'], 'descriptor-skin');
         const {name, parent, rest} = bone;
-        requireImported(
-            typeof name === 'string' && name.length > 0 && name.length <= 200 && !/[\u0000-\u001f\u007f]/.test(name) && !names.has(name),
-            'descriptor-skin'
-        );
+        requireImported(typeof name === 'string' && name.length > 0 && !/[\u0000-\u001f\u007f]/.test(name) && !names.has(name), 'descriptor-skin');
         names.add(name);
         requireImported(Number.isSafeInteger(parent) && (parent as number) >= -1 && (parent as number) < index, 'descriptor-skin');
         requireImported(

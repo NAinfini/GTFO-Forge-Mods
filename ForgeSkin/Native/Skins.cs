@@ -173,15 +173,30 @@ sealed class Skin
             _reading = null;
             if (reading.IsFaulted) return Abort(reading.Exception!.InnerException!, out finished);
             var c = reading.Result;
-            try
-            {
-                foreach (var (path, m) in c.Meshes) _meshes[path] = ToMesh(m, path);
-                if (Doc.Sounds.Count > 0) _sounds = SkinSounds.Load(Doc.Sounds, file => c.Sounds[file], _cues);
-            }
+            // The sounds' containers are checked here (a fraction of a millisecond for a pack's worth); ForgeCore decodes them on workers.
+            try { if (Doc.Sounds.Count > 0) _sounds = SkinSounds.Load(Doc.Sounds, file => c.Sounds[file], _cues); }
             catch (Exception e) { return Abort(e, out finished); }
             if (c.Model != null) _model = c;
-            _decoding = c.Textures.Count;
+            _decoding = c.Textures.Count + c.Meshes.Count;
             int load = ++_loads;
+            _longestMesh = 0;
+            // One mesh per step of ForgeCore's image queue, within its frame budget, not every mesh of the pack in this frame.
+            foreach (var (path, m) in c.Meshes)
+            {
+                var (p, data) = (path, m);
+                _jobs.Add(ForgeCore.Images.QueueStep(() =>
+                {
+                    if (load != _loads || State != SkinState.Loading) return;
+                    var watch = System.Diagnostics.Stopwatch.StartNew();
+                    _meshes[p] = ToMesh(data, p);
+                    _longestMesh = Math.Max(_longestMesh, watch.Elapsed.TotalMilliseconds);
+                }, failure =>
+                {
+                    if (load != _loads || State != SkinState.Loading) return;
+                    _decoding--;
+                    if (failure.Length > 0) _failure ??= new SkinFormatException("bad-mesh", $"{p}: {failure}");
+                }));
+            }
             foreach (var (path, channel, compress, bytes, packed) in c.Textures)
             {
                 var (p, ch, comp) = (path, channel, compress);
@@ -201,23 +216,25 @@ sealed class Skin
         _jobs.Clear();
         State = SkinState.Ready;
         finished = true;
-        ForgeSkinPlugin.Info($"loaded skin {Doc.Id}: {(Doc.Character != null ? "its character model, " : "")}{_textures.Count} gear textures, {_meshes.Count} gear meshes, {_cues.Count} sounds in {_watch.ElapsedMilliseconds} ms");
+        ForgeSkinPlugin.Info($"loaded skin {Doc.Id}: {(Doc.Character != null ? "its character model, " : "")}{_textures.Count} gear textures, {_meshes.Count} gear meshes " +
+                             $"(the longest {_longestMesh:0.0} ms in one frame), {_cues.Count} sounds in {_watch.ElapsedMilliseconds} ms");
         return null;
     }
 
     Exception? _failure;
+    double _longestMesh; // ms of the longest gear mesh step of this load
 
-    // The character model from what the worker read, once per load: the PNGs decode in this frame (ForgeCore ImportedModels). Without the
-    // game's gear shader yet (before the first gear is built) it waits (_model stays) and is tried again next frame. The failure, or null.
+    // The character model from what the worker read, once per load (ForgeCore ImportedModels). Without the game's gear shader yet (before the
+    // first gear is built) it waits (_model stays) and is tried again next frame. The failure, or null.
     Exception? BuildCharacter()
     {
-        // Its PNGs decode over the frames before (ForgeCore's image queue and frame budget), not all in the frame that builds it.
-        if (!(_models ??= new ImportedModels(keep: true)).Prepare(_model!.Model!, _model.ModelTextures)) return null;
-        var decoded = _watch.ElapsedMilliseconds;
+        // Its PNGs decode and its meshes are made over the frames before (ForgeCore's image queue and frame budget); Create makes the materials.
+        if (!(_models ??= new ImportedModels(keep: true)).Prepare(_model!.Model!, _model.Mesh, _model.ModelTextures)) return null;
+        var prepared = _watch.ElapsedMilliseconds;
         var build = System.Diagnostics.Stopwatch.StartNew();
         var result = _models.Create(_model.Model!, _model.Mesh, _model.ModelTextures);
         if (result.Failure.Code == ImportedModelCodes.ShaderUnavailable) return null;
-        ForgeSkinPlugin.Info($"character model of {Doc.Id}: pictures decoded {decoded} ms after the load began, built in {build.ElapsedMilliseconds} ms in one frame");
+        ForgeSkinPlugin.Info($"character model of {Doc.Id}: pictures and meshes ready {prepared} ms after the load began, materials in {build.ElapsedMilliseconds} ms; the longest step in one frame {_models.LongestStepMs:0.0} ms");
         if (result.Model is not { Skinned: true } built)
             return new SkinFormatException(result.Failure.Code == ImportedModelCodes.CutoutUnsupported ? "unsupported-character-material" : "bad-character-model", result.Failure.ToString());
         try { Links = CharacterRig.Links(Doc.Character!, _model.Model!); }
@@ -819,8 +836,11 @@ static class Skins
 
     // ---- loading on demand ----
 
-    // A skin no gear has shown or waited for this long is freed; switching back within it costs no second decode.
+    // Out of a level, a skin no gear has shown or waited for this long is freed; switching back within it costs no second load.
     const float KeepUnused = 30f;
+    // From the start of a level's generation to its end (SkinnedGear.StateChanged) no loaded skin is freed for being unused, so the gear
+    // rebuilt for the level, a teammate who rejoins or a pick taken back loads nothing; the 30 s count from the level's end.
+    public static bool InLevel;
     static readonly List<Skin> Resident = new(); // loading or loaded
     static bool _arrived;
 
@@ -890,13 +910,13 @@ static class Skins
         }
     }
 
-    // Frees the skins no gear in `used` shows or waits for: retired ones at once, the others after KeepUnused.
+    // Frees the skins no gear in `used` shows or waits for: retired ones at once, the others after KeepUnused out of a level.
     public static void Release(float now, HashSet<Skin> used)
     {
         for (int i = Resident.Count - 1; i >= 0; i--)
         {
             var skin = Resident[i];
-            if (used.Contains(skin)) { skin.LastUsed = now; continue; }
+            if (used.Contains(skin) || InLevel && !skin.Retired) { skin.LastUsed = now; continue; }
             if (!skin.Retired && now - skin.LastUsed < KeepUnused) continue;
             skin.Unload();
             Resident.RemoveAt(i);

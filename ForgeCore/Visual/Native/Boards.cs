@@ -28,7 +28,7 @@ public sealed class WorldBackdrop
     internal static (GameObject Target, Material Material)? SpriteQuad(Transform parent, string name, Color color, int queue,
         Texture? texture = null, int? layer = null)
     {
-        var shader = Shader.Find("Sprites/Default");
+        var shader = Shaders.Find("Sprites/Default");
         if (shader == null) return null;
         var material = new Material(shader) { color = color, renderQueue = queue };
         var target = new GameObject(name);

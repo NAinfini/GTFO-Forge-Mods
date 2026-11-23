@@ -21,6 +21,7 @@
 #include "nvsdk_ngx.h"
 #include "nvsdk_ngx_helpers.h"
 #include "nvsdk_ngx_helpers_d3d.h"
+#include "bridge_common.h"
 #include "frame_generation.h"
 #include "fsr_upscale.h"
 #include <wrl/client.h>
@@ -81,7 +82,9 @@ std::atomic<int> g_status{StatusIdle};
 std::atomic<int> g_backend{MethodAuto}; // the upscaler started: MethodDlss, MethodFsr, or MethodAuto for none
 std::mutex g_choiceLock;
 std::string g_choice;      // why that upscaler (or none) runs, for the plugin's log and settings hint
-bool g_fellBack = false;   // the player's choice could not run here and the automatic choice was taken
+bool g_fellBack = false;   // the player's choice, or DLSS on an NVIDIA card under Auto, could not run here and FSR (or the other) was taken
+std::atomic<int> g_dlssMissing{DlssRuns};                          // why DLSS Super Resolution does not run (DlssMissing)
+std::atomic<unsigned> g_dlssDriverMajor{0}, g_dlssDriverMinor{0}; // with DlssDriver: the driver NGX asks for
 std::string g_fsrVersions; // the FSR versions the SDK offers for this card, newest first
 std::atomic<long long> g_evaluations{0};
 std::mutex g_messagesLock;
@@ -219,6 +222,7 @@ bool StartDlss(const InitParams *init, int &status, std::string &why)
     // Load the packaged library by full path first, so the copy in the package is the one in the process.
     g_expectedLibrary = std::wstring(init->libraryFolder) + L"\\nvngx_dlss.dll";
     if (!g_packagedLibrary) g_packagedLibrary = LoadLibraryExW(g_expectedLibrary.c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+    g_dlssMissing = DlssFailed;
     if (!g_packagedLibrary)
     {
         status = StatusFailed;
@@ -238,6 +242,7 @@ bool StartDlss(const InitParams *init, int &status, std::string &why)
     {
         status = result == NVSDK_NGX_Result_FAIL_FeatureNotSupported ? StatusUnavailable : StatusFailed;
         why = ResultText("NVSDK_NGX_D3D11_Init_with_ProjectID", result);
+        g_dlssMissing = result == NVSDK_NGX_Result_FAIL_FeatureNotSupported ? DlssGpu : result == NVSDK_NGX_Result_FAIL_OutOfDate ? DlssDriver : DlssFailed;
         return false;
     }
     g_ngxInitialized = true;
@@ -263,9 +268,13 @@ bool StartDlss(const InitParams *init, int &status, std::string &why)
         status = StatusUnavailable;
         why = needsDriver ? "DLSS Super Resolution needs a newer NVIDIA driver (at least " + std::to_string(major) + "." + std::to_string(minor) + ")"
                           : "DLSS Super Resolution is not available on this GPU";
+        g_dlssMissing = needsDriver ? DlssDriver : DlssGpu;
+        g_dlssDriverMajor = major;
+        g_dlssDriverMinor = minor;
         ReleaseNgx();
         return false;
     }
+    g_dlssMissing = DlssRuns;
     return true;
 }
 
@@ -290,24 +299,29 @@ void Initialize(const InitParams *init)
     texture->GetDevice(&g_device);
     g_device->GetImmediateContext(&g_context);
 
+    // The card is the one Unity's device renders on, whatever other adapters the PC has (an integrated GPU, a virtual display).
     UINT vendor = 0;
     ComPtr<IDXGIDevice> dxgi;
     ComPtr<IDXGIAdapter> adapter;
-    DXGI_ADAPTER_DESC adapterDesc{};
-    if (SUCCEEDED(g_device->QueryInterface(IID_PPV_ARGS(&dxgi))) && SUCCEEDED(dxgi->GetAdapter(&adapter)) && SUCCEEDED(adapter->GetDesc(&adapterDesc)))
-        vendor = adapterDesc.VendorId;
-    char card[64];
-    std::snprintf(card, sizeof card, "%s graphics card (vendor 0x%04X)", vendor == 0x10DE ? "NVIDIA" : vendor == 0x1002 ? "AMD" : vendor == 0x8086 ? "Intel" : "other", vendor);
-    const std::string cardText = card;
+    if (SUCCEEDED(g_device->QueryInterface(IID_PPV_ARGS(&dxgi)))) dxgi->GetAdapter(&adapter);
+    std::string cardText = "graphics card the game renders on (" + AdapterText(adapter.Get(), vendor) + ")";
+    const std::string otherNvidia = vendor == 0x10DE ? std::string() : OtherNvidiaCard(adapter.Get());
+    if (!otherNvidia.empty()) cardText += ", not this PC's " + otherNvidia + " (Windows' graphics settings choose the card)";
+    const int notNvidia = otherNvidia.empty() ? DlssNotNvidia : DlssOtherCard;
 
     int method = init->method == MethodDlss || init->method == MethodFsr ? init->method : MethodAuto;
     bool fellBack = false;
+    g_dlssMissing = vendor == 0x10DE ? DlssRuns : notNvidia;
     std::string dlssWhy, fsrWhy;
     int dlssStatus = StatusUnavailable;
     bool triedDlss = false, triedFsr = false;
     auto tryDlss = [&] {
         triedDlss = true;
-        if (!StartDlss(init, dlssStatus, dlssWhy)) return false;
+        if (!StartDlss(init, dlssStatus, dlssWhy))
+        {
+            if (vendor != 0x10DE) g_dlssMissing = notNvidia;
+            return false;
+        }
         g_status = StatusReady;
         return true;
     };
@@ -333,8 +347,11 @@ void Initialize(const InitParams *init)
     std::string chosen = method == MethodDlss ? "DLSS was chosen but cannot run here (" + dlssWhy + "); automatic choice: "
                          : method == MethodFsr ? "FSR was chosen but cannot run here (" + fsrWhy + "); automatic choice: " : "";
     if (vendor == 0x10DE && !triedDlss && tryDlss()) return Choose(MethodDlss, chosen + "DLSS on the " + cardText, fellBack);
+    // Under Auto, FSR is a fallback too on an NVIDIA card where DLSS could not start, and on a PC with an NVIDIA card the game does not
+    // render on.
     if (!triedFsr && tryFsr())
-        return Choose(MethodFsr, chosen + "FSR on the " + cardText + (triedDlss ? " without DLSS (" + dlssWhy + ")" : "") + "; the FSR SDK offers " + g_fsrVersions, fellBack);
+        return Choose(MethodFsr, chosen + "FSR on the " + cardText + (triedDlss ? " without DLSS (" + dlssWhy + ")" : "") + "; the FSR SDK offers " + g_fsrVersions,
+                      fellBack || (vendor == 0x10DE && triedDlss) || !otherNvidia.empty());
     Choose(MethodAuto, chosen + "no upscaler on the " + cardText, fellBack);
     std::string reasons = (triedDlss ? "DLSS: " + dlssWhy : std::string()) + (triedDlss && triedFsr ? "; " : "") + (triedFsr ? "FSR: " + fsrWhy : std::string());
     Fail(triedDlss && dlssStatus == StatusFailed && !triedFsr ? StatusFailed : StatusUnavailable, "No upscaler can run here (" + reasons + ")");
@@ -475,7 +492,8 @@ __declspec(dllexport) int ForgeFrameGen_PopMessage(char *buffer, int capacity)
 }
 
 // The upscaler that runs (Method: 0 none, 1 DLSS, 2 FSR); why it was chosen into buffer (UTF-8, NUL-terminated), with the FSR
-// version once FSR runs; fellBack 1 when the player's choice could not run here and the automatic choice was taken.
+// version once FSR runs; fellBack 1 when the player's choice could not run here and the automatic choice was taken, or Auto could not
+// start DLSS on an NVIDIA card and took FSR (ForgeFrameGen_DlssMissing says why).
 __declspec(dllexport) int ForgeFrameGen_Upscaler(char *buffer, int capacity, int *fellBack)
 {
     std::lock_guard<std::mutex> lock(g_choiceLock);
@@ -489,6 +507,15 @@ __declspec(dllexport) int ForgeFrameGen_Upscaler(char *buffer, int capacity, int
         buffer[length] = '\0';
     }
     return g_backend;
+}
+
+// Why DLSS Super Resolution does not run on the game's card (DlssMissing, bridge_common.h; 0 when it runs or was not tried), with the
+// driver NGX asks for when it is too old.
+__declspec(dllexport) int ForgeFrameGen_DlssMissing(unsigned *driverMajor, unsigned *driverMinor)
+{
+    if (driverMajor) *driverMajor = g_dlssDriverMajor;
+    if (driverMinor) *driverMinor = g_dlssDriverMinor;
+    return g_dlssMissing;
 }
 
 // Render size for an output size and quality, from NGX or FSR; 0 when no upscaler is ready.

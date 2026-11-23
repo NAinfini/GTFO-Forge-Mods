@@ -9,7 +9,7 @@ namespace ForgePerformance;
 /// <summary>Speed-ups only. The plugin installs a piece when its setting is on and nothing otherwise: with every setting off it
 /// registers no hook, no component and no quit callback, so it costs nothing. The developer probe (Probe option, off by default)
 /// measures frame time and the game's enemy work for this mod's own tuning.</summary>
-[BepInPlugin("NAinfini.ForgePerformance", "Forge Performance", "1.0.2")] // package-version: NAinfini-ForgePerformance
+[BepInPlugin("NAinfini.ForgePerformance", "Forge Performance", "1.0.3")] // package-version: NAinfini-ForgePerformance
 [BepInDependency("dev.gtfomodding.gtfo-api", ">=0.6.1")]
 public sealed class Plugin : BasePlugin
 {
@@ -31,7 +31,7 @@ public sealed class Plugin : BasePlugin
         }
         Crowd.CrowdSwitches.Configure(settings, settings.CrowdHooks);
         if (settings.Probe) Crowd.Probe.Start(Paths.BepInExRootPath, settings.ProbeSeconds, Crowd.CrowdSwitches.Describe, line => Log.LogError(line));
-        if (settings.Probe || settings.ClientHiddenSyncThrottle || settings.HitReactKeepsAgent || settings.FarAnimatorThrottle)
+        if (settings.Probe || settings.ClientHiddenSyncThrottle)
             Crowd.CrowdPatches.Install(settings, line => { Log.LogError(line); Crowd.Probe.Line(line); });
         var plan = LoadShedding.SheddingHookPlan.Create(settings);
         if (plan.HasShedding)

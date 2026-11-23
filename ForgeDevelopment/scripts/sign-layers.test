@@ -2,8 +2,16 @@
 # all its materials, the main font's and each fallback-font sub-mesh's (CJK glyphs come from separate fonts), in the queue
 # over the backdrop with the scene depth test, and the backdrop in its own queue below. Run on a level with at least one
 # sign with a background shown (the V1 button wall); no room ids, so any such level works. Run as in combat-basics.test.
+#
+# The first two lines prove the check itself: SelfTest judges a correct material and three deliberately broken ones (queue one below,
+# depth test Always, no material) with the same judgement that reads the level, and passes only when all three are caught.
+# Then the level: no board with no text, no board whose text is not above its backdrop (unordered), and no wrong material. A material whose
+# shader declares no depth-test property (the fallback fonts) has its queue judged and is counted in noDepthProperty, which is reported, not failed.
 stop-on-fail
+call static:ForgeDevelopment.Native.SignLayers SelfTest as=selftest
+expect $selftest.result contains "selftest=ok;control=1;caught=3/3"
 call static:ForgeDevelopment.Native.SignLayers Read as=layers
 expect $layers.result !contains "boards=0;"
 expect $layers.result !contains "subMeshes=0;"
 expect $layers.result contains "wrong=0;"
+expect $layers.result contains "unordered=0;"

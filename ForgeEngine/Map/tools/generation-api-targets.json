@@ -1,0 +1,193 @@
+[
+  {
+    "type": "LevelGeneration.Builder",
+    "methods": [
+      "Build",
+      "BuildDone",
+      "OnLevelCleanup"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_Factory",
+    "methods": [
+      "FactoryDone",
+      "InjectJob",
+      "NextBatch",
+      "add_OnFactoryBatchDone",
+      "add_OnFactoryBuildDone",
+      "add_OnFactoryBuildStart"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_Factory/BatchName",
+    "methods": []
+  },
+  {
+    "type": "LevelGeneration.LG_LoadComplexDataSetResourcesJob",
+    "methods": [
+      "Build",
+      "ComplexAssetBundleLoaded"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_ZoneJob_CreateExpandFromData",
+    "methods": [
+      "AddCustomGeomorphAreas",
+      "BlockAndCleanFailedAreasFromZone",
+      "Build",
+      "CleanupFailedZoneBuilds",
+      "ExpandZone"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_LevelBuilder",
+    "methods": [
+      "BuildFloor",
+      "GetTilePosition",
+      "PlaceRoot"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_BuildGeomorphJob",
+    "methods": [
+      "Build"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_CustomGeomorphBuildJob",
+    "methods": [
+      "Build"
+    ]
+  },
+  {
+    "type": "LG_Geomorph",
+    "methods": [
+      "ScanChildrenAreas",
+      "SetPlaced",
+      "SetupAreas",
+      "SetupGates",
+      "get_m_areas",
+      "get_m_plugs"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_BuildAreaJob",
+    "methods": [
+      "Build"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_Area",
+    "methods": [
+      "get_m_courseNode",
+      "get_m_navInfo",
+      "get_m_zoneExpanders"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_ZoneExpanderType",
+    "methods": []
+  },
+  {
+    "type": "LevelGeneration.LG_Plug",
+    "methods": [
+      "Pair",
+      "SetPlaced",
+      "TryPair",
+      "get_m_dir",
+      "get_m_pariedWith"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_BuildPlugJob",
+    "methods": [
+      "Build",
+      "BuildGateFromPlugDoorAlign"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_BuildCustomPlugJob",
+    "methods": [
+      "Build"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_BuildGateJob",
+    "methods": [
+      "Build",
+      "SetupDoor"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_FixColliderJob",
+    "methods": [
+      "Build"
+    ]
+  },
+  {
+    "type": "LG_BuildUnityGraphJob",
+    "methods": [
+      "Build",
+      "NavmeshDone",
+      "get_IgnoreUnityBuildJob"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_BuildAIGraphJob_Prepare",
+    "methods": [
+      "Build"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_BuildAIGraphJob_End",
+    "methods": [
+      "Build"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_LinkAIPlugJob",
+    "methods": [
+      "Build"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_GenerateNavigationInfoJob",
+    "methods": [
+      "Build"
+    ]
+  },
+  {
+    "type": "AIGraph.AIG_NodeVolume",
+    "methods": [
+      "BakeNavigationObstacles",
+      "EndBuild",
+      "StartBuild"
+    ]
+  },
+  {
+    "type": "LG_Dimension",
+    "methods": [
+      "TryGetDimensionBounds"
+    ]
+  },
+  {
+    "type": "CullingSystem.C_Portal",
+    "methods": [
+      "Setup"
+    ]
+  },
+  {
+    "type": "UnityEngine.AI.NavMeshBuilder",
+    "methods": [
+      "CollectSources",
+      "UpdateNavMeshDataAsync"
+    ]
+  },
+  {
+    "type": "UnityEngine.AI.NavMesh",
+    "methods": [
+      "CalculatePath",
+      "SamplePosition"
+    ]
+  }
+]

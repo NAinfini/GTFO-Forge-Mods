@@ -120,6 +120,8 @@ internal static unsafe class DlssBridge
     private static delegate* unmanaged<int, void> _setHud;
     private static delegate* unmanaged<int, void> _prefer;
     private static delegate* unmanaged<void> _pluginConnected;
+    private static delegate* unmanaged<uint*, uint*, int> _dlssMissing;
+    private static delegate* unmanaged<byte*, int, int> _generationDlssMissing;
     internal static IntPtr RenderEvent { get; private set; }
 
     /// <summary>The bridge's plain render event (<c>GL.IssuePluginEvent</c>; the event id is the Unity frame number) that marks the start of a
@@ -175,6 +177,8 @@ internal static unsafe class DlssBridge
             _setHud = (delegate* unmanaged<int, void>)NativeLibrary.GetExport(handle, "ForgeFrameGen_SetHudInGeneratedFrames");
             _prefer = (delegate* unmanaged<int, void>)NativeLibrary.GetExport(handle, "ForgeFrameGen_SetFrameGenerationPreference");
             _pluginConnected = (delegate* unmanaged<void>)NativeLibrary.GetExport(handle, "ForgeFrameGen_PluginConnected");
+            _dlssMissing = (delegate* unmanaged<uint*, uint*, int>)NativeLibrary.GetExport(handle, "ForgeFrameGen_DlssMissing");
+            _generationDlssMissing = (delegate* unmanaged<byte*, int, int>)NativeLibrary.GetExport(handle, "ForgeFrameGen_DlssFrameGenerationMissing");
             RenderEvent = ((delegate* unmanaged<IntPtr>)NativeLibrary.GetExport(handle, "ForgeFrameGen_RenderEventFunc"))();
             RenderSubmitStartEvent = ((delegate* unmanaged<IntPtr>)NativeLibrary.GetExport(handle, "ForgeFrameGen_RenderSubmitStartFunc"))();
         }
@@ -223,28 +227,71 @@ internal static unsafe class DlssBridge
     private static int _pickedAt;
     private static FrameGenerationMethod? _generationFallbackWarned;
 
-    /// <summary>Once per pick: the frame generation picked cannot run on this PC and the other one runs (the settings row says so too).</summary>
+    /// <summary>Once per pick: the frame generation wanted (picked, or DLSS's under Auto on an NVIDIA card) cannot run on this PC and the
+    /// other one runs, with the reason (the settings row says so too).</summary>
     private static void ReportGenerationFallback()
     {
-        if (FrameGenerationFallback() is not { } picked || picked == _generationFallbackWarned) return;
-        _generationFallbackWarned = picked;
+        if (FrameGenerationFallback() is not { } wanted || Plugin.FrameGeneration.Value == _generationFallbackWarned) return;
+        _generationFallbackWarned = Plugin.FrameGeneration.Value;
         const string code = "framegen-frame-generation-fallback";
-        Plugin.Info.LogWarning(code + ": " + picked + " frame generation cannot run on this PC; "
-            + (picked == FrameGenerationMethod.DLSS ? "AMD FSR" : "DLSS") + " frame generation runs instead (the bridge's log says why).");
+        var why = wanted == FrameGenerationMethod.DLSS ? FrameGenerationDlssMissing().Why : "see the bridge's error lines above";
+        Plugin.Info.LogWarning(code + ": " + (Plugin.FrameGeneration.Value == FrameGenerationMethod.Auto ? "Auto wanted " : "picked ") + wanted
+            + " frame generation, which cannot run on this PC (" + why + "); " + (wanted == FrameGenerationMethod.DLSS ? "AMD FSR" : "DLSS")
+            + " frame generation runs instead.");
     }
 
     /// <summary>The frame generation backend that runs now: 0 none, 1 NVIDIA DLSS Frame Generation, 2 AMD FSR Frame Generation. It follows
     /// <see cref="Plugin.FrameGeneration"/> while the game runs.</summary>
     internal static int FrameGenerationBackend => Loaded ? _generationBackend() : 0;
 
-    /// <summary>DLSS or FSR frame generation was picked and the other one runs, because this PC cannot run the pick (null otherwise). A pick
-    /// takes a present or two to reach the display, so for ten frames after it nothing counts as a fallback.</summary>
+    /// <summary>The frame generation wanted and not running because this PC cannot run it, while the other one runs (null otherwise): the
+    /// pick, DLSS or FSR; under Auto, DLSS's on an NVIDIA card (on another card AMD's is Auto's own choice, not a fallback). A pick takes a
+    /// present or two to reach the display, so for ten frames after it nothing counts as a fallback.</summary>
     internal static FrameGenerationMethod? FrameGenerationFallback()
     {
         var picked = Plugin.FrameGeneration.Value;
-        if (picked is not (FrameGenerationMethod.DLSS or FrameGenerationMethod.FSR) || Frame.Count - _pickedAt < 10) return null;
+        if (picked == FrameGenerationMethod.Off || Frame.Count - _pickedAt < 10) return null;
         int running = FrameGenerationBackend;
+        if (picked == FrameGenerationMethod.Auto)
+            return running == 2 && (Missing)_generationDlssMissing(null, 0) is not (Missing.Runs or Missing.NotNvidia) ? FrameGenerationMethod.DLSS : null;
         return running != 0 && running != (int)picked - 1 ? picked : null;
+    }
+
+    /// <summary>Why DLSS does not run on the card the game renders on (native DlssMissing, bridge_common.h).</summary>
+    internal enum Missing
+    {
+        Runs = 0,
+        NotNvidia = 1,
+        Driver = 2,
+        Gpu = 3,
+        Scheduling = 4,
+        Windows = 5,
+        Failed = 6,
+        OtherCard = 7,
+    }
+
+    /// <summary>Why DLSS Super Resolution does not run (Runs when it does or was not tried), with the driver NGX asks for when it is too old.</summary>
+    internal static (Missing Code, uint Major, uint Minor) DlssMissing()
+    {
+        if (!Loaded) return (Missing.Failed, 0, 0);
+        uint major, minor;
+        var code = (Missing)_dlssMissing(&major, &minor);
+        return (code, major, minor);
+    }
+
+    private static readonly byte[] MissingBuffer = new byte[512];
+
+    /// <summary>Why DLSS Frame Generation did not start (Runs when it did, or before the present bridge started it), with the reason and the
+    /// card (developer text).</summary>
+    internal static (Missing Code, string Why) FrameGenerationDlssMissing()
+    {
+        if (!Loaded) return (Missing.Failed, "native bridge not loaded");
+        fixed (byte* buffer = MissingBuffer)
+        {
+            var code = (Missing)_generationDlssMissing(buffer, MissingBuffer.Length);
+            int length = Array.IndexOf(MissingBuffer, (byte)0);
+            return (code, Encoding.UTF8.GetString(buffer, length < 0 ? 0 : length));
+        }
     }
 
     /// <summary>The present bridge is active (frame generation was asked for and can run): markers and inputs are worth sending.</summary>
@@ -377,7 +424,7 @@ internal static unsafe class DlssBridge
     /// render thread with <paramref name="anyTexture"/>'s device (Unity's D3D11 device), once per <see cref="Restart"/>.</summary>
     internal static void Initialize(Texture anyTexture)
     {
-        if (!Loaded || _initIssued || (_restarting && _status() != (int)State.Idle)) return;
+        if (!Loaded || !Plugin.UpscalerOn || _initIssued || (_restarting && _status() != (int)State.Idle)) return; // Off is never handed to the bridge
         _initIssued = true;
         _restarting = false;
         var data = Path.Combine(Paths.CachePath, "ForgeFrameGen");

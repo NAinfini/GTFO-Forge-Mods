@@ -15,6 +15,7 @@ namespace ForgeSkin.Tests;
 // Local-resource layer. Asset replacement runs on a copy of the game files the HEL needs (copied on first use under the test
 // data dir and refreshed when the game's file differs); the real install is only read. The copy has the real build id, so
 // it reads the catalog and prefab index the real install wrote (preview.weapon and project.load run first).
+[Collection("process state")]
 public class AssetPatchTests
 {
     static JsonNode Call(string method, object? args = null) =>

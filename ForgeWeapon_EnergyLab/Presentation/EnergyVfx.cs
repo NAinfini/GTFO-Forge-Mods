@@ -143,7 +143,7 @@ internal static class EnergyVfx
         for (var i = 0; i < 4; i++)
         {
             var material = renderer.sharedMaterials[i] ?? throw new InvalidDataException("Missing disc material.");
-            material.shader = Shader.Find(i == 3 ? "Sprites/Default" : "Standard")
+            material.shader = ForgeVisual.Shaders.Find(i == 3 ? "Sprites/Default" : "Standard")
                 ?? throw new InvalidOperationException("Native disc shader is unavailable.");
             if (i < 3) material.EnableKeyword("_EMISSION");
         }

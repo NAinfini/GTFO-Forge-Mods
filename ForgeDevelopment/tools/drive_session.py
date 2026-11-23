@@ -114,7 +114,8 @@ def engine_installed(bep):
 
 
 class FileLease:
-    """Durable byte/key receipts. Displaced QA bytes are moved to evidence, never deleted."""
+    """Durable key receipts: a config key is leased with its original value and written back by key; a whole file the drive writes is
+    recorded with its original sha256 only. No file is copied; what cannot be written back from the record is reported by restore."""
     def __init__(self, bep, work):
         self.bep, self.work = plain(bep), plain(work)
         self.work.mkdir(parents=True, exist_ok=True)
@@ -123,7 +124,7 @@ class FileLease:
         self.trees = []
         if self.receipt.exists():
             saved = document(self.receipt, 256 * 1024 * 1024)
-            if set(saved) != {"format", "schemaVersion", "bepinexRoot", "files", "trees"} or saved["format"] != "forge.drive-file-lease" or saved["schemaVersion"] != "1.0.0" or saved["bepinexRoot"] != str(self.bep):
+            if set(saved) != {"format", "schemaVersion", "bepinexRoot", "files", "trees"} or saved["format"] != "forge.drive-file-lease" or saved["schemaVersion"] != "2.0.0" or saved["bepinexRoot"] != str(self.bep):
                 raise ValueError("租约身份或版本不匹配")
             self.rows = saved["files"]
             self.trees = saved["trees"]
@@ -140,7 +141,7 @@ class FileLease:
         return path
 
     def save(self):
-        host.atomic_json(self.receipt, {"format": "forge.drive-file-lease", "schemaVersion": "1.0.0",
+        host.atomic_json(self.receipt, {"format": "forge.drive-file-lease", "schemaVersion": "2.0.0",
             "bepinexRoot": str(self.bep), "files": self.rows, "trees": self.trees})
 
     def new_tree(self, relative):
@@ -155,10 +156,10 @@ class FileLease:
         row = next((row for row in self.rows if row["relative"] == relative), None)
         if row is None:
             original = path.read_bytes() if path.exists() else None
-            row = {"relative": relative, "original": original.hex() if original is not None else None,
+            row = {"relative": relative, "originalSha256": digest(original) if original is not None else None,
                    "allowed": list(allowed), "config": [], "restored": False}
             if original is not None:
-                row["allowed"].append(digest(original))
+                row["allowed"].append(row["originalSha256"])
             self.rows.append(row)
         row["allowed"] = sorted(set(row["allowed"]) | set(allowed))
         self.save()
@@ -186,52 +187,33 @@ class FileLease:
 
     def restore(self):
         failures = []
-        for index, row in reversed(list(enumerate(self.rows))):
+        for row in reversed(self.rows):
             if row["restored"]:
                 continue
             try:
                 path = self.path(row["relative"])
-                original = bytes.fromhex(row["original"]) if row["original"] is not None else None
                 current = path.read_bytes() if path.exists() else None
-                desired = original
-                recovery = row.get("restoring")
-                if recovery:
-                    desired = bytes.fromhex(recovery["desired"]) if recovery["desired"] is not None else None
-                    if current in (None, desired):
-                        if current is None and desired is not None:
-                            path.parent.mkdir(parents=True, exist_ok=True)
-                            game_profile.atomic_bytes(path, desired)
-                        if (path.read_bytes() if path.exists() else None) != desired:
-                            raise ValueError("恢复还原事务后的字节读回不符")
-                        row["restored"] = True
-                        self.save()
-                        continue
-                    if digest(current) != recovery["fromSha256"]:
-                        raise ValueError("还原期间文件被其他写入方修改")
-                if not recovery and row["config"] and current is not None and digest(current) not in row["allowed"]:
+                if row["config"]:
+                    if current is None:
+                        raise ValueError("配置文件已不存在，无法写回键；租用前的键值见 lease.forge")
                     text = current.decode("utf-8")
                     for item in row["config"]:
-                        if host.cfg_value(text, item["section"], item["key"]) != item["leased"]:
-                            raise ValueError("租用配置键已被其他写入方修改")
-                    for item in row["config"]:
-                        text = host.cfg_edit(text, item["section"], item["key"], item["before"])
-                    baseline = (original or b"").decode("utf-8")
-                    desired = original if sorted(host.cfg_entries(text)) == sorted(host.cfg_entries(baseline)) else text.encode("utf-8")
-                elif not recovery and current != original and (current is None or digest(current) not in row["allowed"]):
-                    raise ValueError("文件缺失或内容锁冲突；保留当前字节与租约")
-                if current != desired:
-                    row["restoring"] = {"desired": desired.hex() if desired is not None else None,
-                                        "fromSha256": digest(current) if current is not None else None}
-                    self.save()
+                        value = host.cfg_value(text, item["section"], item["key"])
+                        if value not in (item["leased"], item["before"]):
+                            raise ValueError("租用配置键已被其他写入方修改：" + item["section"] + "/" + item["key"])
+                        if value == item["leased"]:
+                            text = host.cfg_edit(text, item["section"], item["key"], item["before"])
+                    if row["originalSha256"] is None and not list(host.cfg_entries(text)):
+                        path.unlink()  # The config file did not exist before this lease and holds no key now.
+                    elif text.encode("utf-8") != current:
+                        game_profile.atomic_bytes(path, text.encode("utf-8"))
+                elif row["originalSha256"] is None:
                     if current is not None:
-                        displaced = self.work / "displaced" / str(index) / str(time.time_ns()) / path.name
-                        displaced.parent.mkdir(parents=True, exist_ok=True)
-                        path.rename(displaced)
-                    if desired is not None:
-                        path.parent.mkdir(parents=True, exist_ok=True)
-                        game_profile.atomic_bytes(path, desired)
-                if (path.read_bytes() if path.exists() else None) != desired:
-                    raise ValueError("还原字节读回不一致")
+                        if digest(current) not in row["allowed"]:
+                            raise ValueError("文件内容与租约不符，已保留")
+                        path.unlink()  # A file this lease created.
+                elif current is None or digest(current) != row["originalSha256"]:
+                    raise ValueError("租约改写过的文件没有保存副本，无法写回；请重装它所属的包，原 sha256 " + row["originalSha256"])
                 row["restored"] = True
                 self.save()
             except (OSError, ValueError, RuntimeError) as error:
@@ -285,7 +267,7 @@ class Client:
     def trace(self, kind, **values):
         # External driver diagnostics: no work, callbacks or per-frame logging on the game's CPU budget.
         self.work.mkdir(parents=True, exist_ok=True)
-        row = {"format": "forge.development-drive-timing", "schemaVersion": "1.0.0", "kind": kind,
+        row = {"format": "forge.development-drive-timing", "schemaVersion": "2.0.0", "kind": kind,
                "atMs": round((time.monotonic() - self._started) * 1000, 3),
                "monotonicSeconds": transport.monotonic_seconds(), **values}
         with (self.work / "driver-timing.jsonl").open("ab") as stream:
@@ -758,7 +740,7 @@ def inventory(client, destination):
     if status["gameState"] != "InLevel":
         raise ValueError("运行态清点需要已落地关卡")
     # One read action resolves each set once, keeping its #index identities aligned.
-    value = {"format": "forge.drive-inventory", "schemaVersion": "1.0.0", "processId": status["processId"],
+    value = {"format": "forge.drive-inventory", "schemaVersion": "2.0.0", "processId": status["processId"],
              "instance": status["instance"], "worldEpoch": world, "recorderSession": status["recorderSession"],
              "utc": dt.datetime.now(dt.timezone.utc).isoformat(), "evidenceScope": "native-readback-only"}
     value["player"] = client.read("localPlayer", ["GlobalID", "Position", "DimensionIndex", "Alive"], world)

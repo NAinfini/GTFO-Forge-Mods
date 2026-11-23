@@ -1,0 +1,34 @@
+{
+  "team": "ReloadD",
+  "baseEnemy": 24,
+  "level": {
+    "rooms": [
+      {"name": "Entry elevator", "template": "native-geo-49e0a47b8e2bc049"},
+      {"name": "Entry room", "template": "native-geo-f12ead2c5f8847e9", "parent": 0, "tile": {"x": 0, "z": 1, "rotation": 270}}
+    ]
+  },
+  "rundown": {
+    "name": "Rundown",
+    "title": "ReloadD Rundown",
+    "menuSlot": 8,
+    "v1": [
+      {"id": "reloadd-row-keep", "name": "ReloadD Row Keep", "health": 41},
+      {"id": "reloadd-row-swap", "name": "ReloadD Row Swap", "health": 42},
+      {"id": "reloadd-row-drop", "name": "ReloadD Row Drop", "health": 43}
+    ],
+    "v3": [
+      {"id": "reloadd-row-keep", "name": "ReloadD Row Keep", "health": 41},
+      {"id": "reloadd-row-swap", "name": "ReloadD Row Swap Replaced", "health": 52}
+    ]
+  },
+  "enemies": {
+    "name": "Enemies",
+    "v2": {"id": "enemy-a", "name": "ReloadD Entry Enemy A", "health": 71},
+    "v3": {"id": "enemy-b", "name": "ReloadD Entry Enemy B", "health": 72}
+  },
+  "weapons": {
+    "name": "Weapons",
+    "v2": {"id": "weapon-w", "name": "ReloadD Entry Weapon"},
+    "v3": {"id": "weapon-w", "name": "ReloadD Entry Weapon Replaced"}
+  }
+}

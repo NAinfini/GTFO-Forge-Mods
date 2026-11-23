@@ -17,12 +17,12 @@
 #
 # Rooms (teleport points are room-local Unity metres, the positions the package writes: editor (x, y, z) is Unity (c.x - x, y, c.z + z)
 # with c the room's centre; most rooms here have c = 0, the echo station's native cave has c = (-60.85, 0, -4.65)):
-#   数据档案 room:168c6a8970c27a13d3388944485e holds the station 维度入口 v1-button-9a7597a338a1b33ecc6c4ca6a732 (behavior teleport into
-#     dimension 1, onto the echo station's trigger zone e1-landing-81fb6749e66466ba621a5fb47d23 at (-58.85, 0.137, 7.35)).
+#   数据档案 holds the station 维度入口 (behavior teleport into
+#     dimension 1, onto the echo station's trigger zone the e1 landing zone at (-58.85, 0.137, 7.35)).
 #   回声站 cab9571d-1ebf-4186-8129-8f405aff002f: dimension landings slot 0..3 at (-59.5, 0.23, 6), (-59.5, 0.01, 12),
-#     (-59.5, -0.06, 16), (-67.5, -0.29, 8); the station 返回现实 v1-button-5c6a41874081f45067e6090c4d33 stands here (behavior
-#     teleport onto the trigger zone e1-landing-c8252988b26a625fee4ec7681b31 of 归途与结局 at (0, 0.134, -27)).
-#   归途与结局 room:6c374e24d931dfaa3d749895e574: opening its door warps the team into dimension 1 (the dimension journey, one-way).
+#     (-59.5, -0.06, 16), (-67.5, -0.29, 8); the station 返回现实 stands here (behavior
+#     teleport onto the trigger zone the e1 return landing zone of 归途与结局 at (0, 0.134, -27)).
+#   归途与结局: opening its door warps the team into dimension 1 (the dimension journey, one-way).
 # Authored echo station sky (dimension data block): IsOutside true, Sandstorm true, Exposure 3.37, AmbientIntensity 1,
 # LightAzimuth -34, LightElevation 14.3, LightIntensity 0.3048.
 # A reference point is read by teleporting to it inside the dimension the player is already in (no extra crossing): its `landed` is
@@ -30,8 +30,8 @@
 god on
 
 # 1. the station 维度入口, and the echo station's sky as the game holds it
-teleport room=room:168c6a8970c27a13d3388944485e 10 0 -7
-interact name=v1-button-9a7597a338a1b33ecc6c4ca6a732 radius=6
+teleport near=维度入口
+interact name=维度入口 radius=6
 wait 4s
 player Position DimensionIndex CourseNode.m_zone.LocalIndex as=station_in
 expect $station_in.DimensionIndex contains "Dimension_1"
@@ -43,7 +43,7 @@ state fog as=fog_echo
 screenshot as=shot_echo
 
 # 2. the station 返回现实 (behavior teleport back onto the return room's trigger zone)
-interact name=v1-button-5c6a41874081f45067e6090c4d33 radius=8
+interact name=返回现实 radius=8
 wait 4s
 player Position DimensionIndex CourseNode.m_zone.LocalIndex as=station_back
 expect $station_back.DimensionIndex contains "Reality"

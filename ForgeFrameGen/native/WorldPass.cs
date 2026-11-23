@@ -58,12 +58,12 @@ internal static unsafe partial class WorldPass
     {
         if (!DlssBridge.Loaded) return;
         Frame.OnLateUpdate(Plugin.Id, FollowWorldCamera);
-        Plugin.Mode.SettingChanged += (_, _) => SyncPreCull();
         // Another upscaler: the pass stops (its next frame starts it again at the new upscaler's render size) and the bridge restarts.
         Plugin.Upscaler.SettingChanged += (_, _) =>
         {
             Stop();
             DlssBridge.Restart();
+            SyncPreCull();
         };
         SyncPreCull();
         GameEvents.StateChanged += () =>
@@ -81,10 +81,10 @@ internal static unsafe partial class WorldPass
     }
 
     /// <summary>Subscribes to the cameras' pre-cull while DLSS is on or still running, and not otherwise: every subscribed call makes the
-    /// interop wrap its camera, for every camera of every frame, so with the mode Off and the pass stopped nothing is subscribed.</summary>
+    /// interop wrap its camera, for every camera of every frame, so with the upscaler Off and the pass stopped nothing is subscribed.</summary>
     private static void SyncPreCull()
     {
-        bool wanted = Plugin.Mode.Value != DlssMode.Off || _active;
+        bool wanted = Plugin.UpscalerOn || _active;
         if (wanted && _preCull == null) _preCull = Frame.OnPreCull(Plugin.Id, PreCull);
         else if (!wanted && _preCull != null)
         {
@@ -176,14 +176,14 @@ internal static unsafe partial class WorldPass
         }
         else
         {
-            if (Plugin.Mode.Value == DlssMode.Off) return; // off and not running: nothing is read from the game
+            if (!Plugin.UpscalerOn) return; // off and not running: nothing is read from the game
             var world = WorldCamera();
             if (world == null || world.Pointer != pointer) return;
             _camera = camera;
         }
         var mode = Plugin.Mode.Value;
         var status = DlssBridge.Status;
-        if (mode == DlssMode.Off || status is not (DlssBridge.State.Idle or DlssBridge.State.Ready or DlssBridge.State.Running))
+        if (!Plugin.UpscalerOn || status is not (DlssBridge.State.Idle or DlssBridge.State.Ready or DlssBridge.State.Running))
         {
             Stop();
             return;

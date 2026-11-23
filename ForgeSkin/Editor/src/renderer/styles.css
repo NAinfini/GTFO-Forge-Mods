@@ -57,7 +57,7 @@ body {
 /* ---------- shell ---------- */
 .shell {
   display: grid;
-  grid-template-rows: 44px 1fr 28px;
+  grid-template-rows: 1fr 28px;
   height: 100%;
 }
 .panes {
@@ -72,50 +72,24 @@ body {
 .sep-v[data-separator='active'] {
   background: var(--flare);
 }
+/* The editor's controls in the shell's title bar (its slot; Desktop/shell draws the name and the window buttons). */
 .topbar {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  padding-left: var(--sp-4);
-  min-width: 0;
-  border-bottom: 1px solid var(--line-soft);
-  -webkit-app-region: drag;
 }
 .topbar > * {
-  -webkit-app-region: no-drag;
   flex-shrink: 0;
 }
 /* One control height on the bar, with even room above and below. */
 .topbar .mantine-Button-root,
 .topbar .mantine-ActionIcon-root {
-  height: 30px;
-  min-height: 30px;
+  height: 28px;
+  min-height: 28px;
 }
 .topbar .mantine-ActionIcon-root {
-  width: 30px;
-  min-width: 30px;
-}
-.topbar .spacer {
-  flex: 1;
-  min-width: 8px;
-  align-self: stretch;
-  -webkit-app-region: drag;
-}
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-  -webkit-app-region: drag;
-}
-.brand .logo {
   width: 28px;
-  height: 28px;
-}
-.brand b {
-  font: 17px/1 var(--stencil);
-  letter-spacing: 0.04em;
-  color: var(--bone);
+  min-width: 28px;
 }
 .topbar .modes {
   background: var(--ground);
@@ -126,38 +100,6 @@ body {
 }
 .topbar .modes .mantine-SegmentedControl-label[data-active] {
   color: var(--flare);
-}
-/* Windows-style caption buttons: full bar height, flush right. */
-.winctl {
-  display: flex;
-  align-self: stretch;
-  margin-left: var(--sp-2);
-}
-.winctl button {
-  width: 46px;
-  border: 0;
-  background: transparent;
-  color: var(--dust);
-  display: grid;
-  place-items: center;
-  cursor: default;
-  transition:
-    background-color 80ms,
-    color 80ms;
-}
-.winctl button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--bone);
-}
-.winctl button:active {
-  background: rgba(255, 255, 255, 0.16);
-}
-.winctl button.close:hover {
-  background: #c42b1c;
-  color: #fff;
-}
-.winctl button.close:active {
-  background: #b22a1d;
 }
 .topbar .primary {
   margin-left: var(--sp-2);

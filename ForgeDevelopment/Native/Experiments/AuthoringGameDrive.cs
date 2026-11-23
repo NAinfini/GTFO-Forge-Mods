@@ -50,7 +50,7 @@ internal static partial class AuthoringGameDrive
                 "drive.ads.sample" => 1,
                 "drive.enemies.spawn" => 1,
                 "drive.doors.read" or "drive.doors.open" => 1,
-                "drive.nav.sample" or "drive.nav.path" or "drive.nav.voxel" or "drive.nav.near" or "drive.noise.make" => 1,
+                "drive.nav.sample" or "drive.nav.path" or "drive.nav.voxel" or "drive.nav.near" or "drive.nav.course" or "drive.noise.make" => 1,
                 "drive.enemy.hit" or "drive.enemy.limbs" or "drive.enemy.follow" => 1,
                 _ => 0
             };
@@ -76,6 +76,7 @@ internal static partial class AuthoringGameDrive
                     "drive.nav.path" => AuthoringNavReadback.Path(Text(0)),
                     "drive.nav.voxel" => AuthoringNavReadback.Voxel(Text(0)),
                     "drive.nav.near" => AuthoringNavReadback.Near(Text(0)),
+                    "drive.nav.course" => AuthoringNavReadback.Course(Text(0)),
                     _ => throw new ArgumentException("drive.unknown-operation")
                 };
                 return ExperimentCallResult.Done(nav, nav);

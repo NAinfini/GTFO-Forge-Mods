@@ -3,7 +3,7 @@
 #   python -B Mods/ForgeDevelopment/tools/run-drive-session.py start --package NAinfini-Forge_V1_Rundown --level B1 --work-dir artifacts/work/drivesession/<name>
 #   python -B Mods/ForgeDevelopment/tools/drive_cli.py --session artifacts/work/drivesession/<name>/session.forge run Mods/ForgeDevelopment/scripts/b1-security-sensor.test
 #
-# Room 机关样例区 room:c96b1d7b3466988a0d5e1f48fc58. Teleport points are room-local Unity metres: Unity (x, y, z) = editor (-x, y, z), the
+# Room 机关样例区. Teleport points are room-local Unity metres: Unity (x, y, z) = editor (-x, y, z), the
 # V1 builder's room frame with x mirrored (v1-test-kit cellSpot). The circle is a 5 m wide, 3 m tall cylinder centred at (11.678, 1.52, -21)
 # whose floor face is the room floor, judged on the player's body (`bodyHit`: a 0.35 m capsule from the feet up), so a body that reaches the
 # drawn circle counts and a body 0.35 m or more outside it does not. Points on the x line through the centre:
@@ -19,34 +19,34 @@ stop-on-fail
 god on
 
 # far outside: nothing tripped yet
-teleport room=room:c96b1d7b3466988a0d5e1f48fc58 5 0 -21 as=far
+teleport room=机关样例区 5 0 -21 as=far
 state variables var.g59187e4d6c24dc31335e687c65db4e95fb0e9408de95dcbf9e772e17798066a1 as=none
 expect $none.matched == 0
 
 # just outside the drawn rim: still nothing
-teleport room=room:c96b1d7b3466988a0d5e1f48fc58 8.4 0 -21 as=near
+teleport room=机关样例区 8.4 0 -21 as=near
 wait 1s
 state variables var.g59187e4d6c24dc31335e687c65db4e95fb0e9408de95dcbf9e772e17798066a1 as=near_count
 expect $near_count.matched == 0
 
 # step in at the edge: one trip
-teleport room=room:c96b1d7b3466988a0d5e1f48fc58 9.378 0 -21 as=edge
+teleport room=机关样例区 9.378 0 -21 as=edge
 wait 1s
 state variables var.g59187e4d6c24dc31335e687c65db4e95fb0e9408de95dcbf9e772e17798066a1 as=one
 expect $one.var.g59187e4d6c24dc31335e687c65db4e95fb0e9408de95dcbf9e772e17798066a1 == 1
 
 # out, past the 5 s cooldown, in again at the centre: two
-teleport room=room:c96b1d7b3466988a0d5e1f48fc58 5 0 -21
+teleport room=机关样例区 5 0 -21
 wait 6s
-teleport room=room:c96b1d7b3466988a0d5e1f48fc58 11.678 0 -21 as=centre
+teleport room=机关样例区 11.678 0 -21 as=centre
 wait 1s
 state variables var.g59187e4d6c24dc31335e687c65db4e95fb0e9408de95dcbf9e772e17798066a1 as=two
 expect $two.var.g59187e4d6c24dc31335e687c65db4e95fb0e9408de95dcbf9e772e17798066a1 == 2
 
 # out and back in at the edge once more: three
-teleport room=room:c96b1d7b3466988a0d5e1f48fc58 5 0 -21
+teleport room=机关样例区 5 0 -21
 wait 6s
-teleport room=room:c96b1d7b3466988a0d5e1f48fc58 9.378 0 -21
+teleport room=机关样例区 9.378 0 -21
 wait 1s
 state variables var.g59187e4d6c24dc31335e687c65db4e95fb0e9408de95dcbf9e772e17798066a1 as=three
 expect $three.var.g59187e4d6c24dc31335e687c65db4e95fb0e9408de95dcbf9e772e17798066a1 == 3

@@ -1,36 +1,28 @@
 using System;
-using System.Collections.Generic;
 using AIGraph;
 using CullingSystem;
 using Enemies;
 using HarmonyLib;
 using ForgePerformance.LoadShedding;
-using UnityEngine.AI;
 
 namespace ForgePerformance.Crowd;
 
-/// <summary>The probe's timed game methods, ClientHiddenSyncThrottle (inside EnemyTransformSync.Update) and HitReactKeepsAgent
-/// (inside EnemyAI.SetNavMeshAgent while ES_Hitreact.Enter runs). A target is patched when the probe is on or the option that
-/// acts inside it is configured on; otherwise nothing is patched. Each target is patched through <see cref="EntryAdmission"/>;
-/// a refused one is left out and logged once. The game method always runs unless the option that owns the call decides
+/// <summary>The probe's timed game methods and ClientHiddenSyncThrottle (inside EnemyTransformSync.Update). A target is patched
+/// when the probe is on or the option that acts inside it is configured on; otherwise nothing is patched. Each target is
+/// patched through <see cref="EntryAdmission"/>; a refused one is left out and logged once. The game method always runs unless the option that owns the call decides
 /// otherwise.</summary>
 // patch-targets: GameStateManager.Update, GameStateManager.FixedUpdate, UpdateBehaviourGroup.UpdateMember, UpdateDetectionGroup.UpdateMember, UpdateLocomotionGroup.UpdateMember, FixedUpdateLocomotionGroup.UpdateMember, UpdateNetworkGroup.UpdateMember, UpdateNodeGroup.UpdateMember, ES_PathMove.Update, EnemyMaterialFeeder.Update, C_MovingCuller.Update, TentacleBase.Update, TentacleBase.LateUpdate, MovingEnemyTentacleBase.LateUpdate, SolverManager.LateUpdate, PlayerEnemyCollision.LateUpdate, FPSCamera.LateUpdate, FPSCamera.OnPreCull, LocalPlayerAgent.Update, LocalPlayerAgent.LateUpdate, GPUCurvyManager.LateUpdate, CL_ShadowAtlas.LateUpdate, FrameRateLimiter.LateUpdate, IndirectBatcherCamera.LateUpdate, ControlRigLinker.LateUpdate, AkInitializer.LateUpdate, MapDetails.LateUpdate
 internal static class CrowdPatches
 {
     private static readonly Harmony Patcher = new("NAinfini.ForgePerformance.Crowd");
-    private static int _hitreactDepth;
-    // EnemyAI pointers whose navigation HitReactKeepsAgent stopped instead of switching off; resumed by the next switch-on.
-    private static readonly HashSet<IntPtr> Kept = new();
     internal static bool SyncHooked { get; private set; }
-    internal static bool HitreactHooked { get; private set; }
-    internal static long KeptTotal, SyncSkippedTotal;
+    internal static long SyncSkippedTotal;
 
     /// <summary>Takes every patch <see cref="Install"/> put on off again (the plugin's unload).</summary>
     internal static void Uninstall()
     {
         Patcher.UnpatchSelf();
-        SyncHooked = HitreactHooked = false;
-        Kept.Clear();
+        SyncHooked = false;
     }
 
     internal static void Install(SheddingSettings settings, Action<string> error)
@@ -48,9 +40,7 @@ internal static class CrowdPatches
         Patch(all, typeof(SpawnedTime));
         Patch(all, typeof(WakeTime));
         Patch(all, typeof(ReachableTime));
-        var nav = Patch(all || settings.HitReactKeepsAgent, typeof(NavSwitch));
-        HitreactHooked = nav && Patch(true, typeof(HitreactDepth));
-        Patch(settings.FarAnimatorThrottle, typeof(PathMoveExit));
+        Patch(all, typeof(NavTime));
         Patch(all, typeof(LightTime));
         Patch(all, typeof(ShadowTime));
         SyncHooked = Patch(all || settings.ClientHiddenSyncThrottle, typeof(SyncThrottle));
@@ -118,8 +108,6 @@ internal static class CrowdPatches
     private static class IndirectBatcherLateTime { private static void Prefix(out long __state) => __state = Probe.Begin(); private static void Postfix(long __state) => Probe.End(ProbePoint.IndirectBatcherLate, __state); }
     private static class ControlRigLateTime { private static void Prefix(out long __state) => __state = Probe.Begin(); private static void Postfix(long __state) => Probe.End(ProbePoint.ControlRigLate, __state); }
     private static class MapDetailsLateTime { private static void Prefix(out long __state) => __state = Probe.Begin(); private static void Postfix(long __state) => Probe.End(ProbePoint.MapDetailsLate, __state); }
-
-    internal static void EndLevel() => Kept.Clear();
 
     [HarmonyPatch(typeof(EnemyAllocator), nameof(EnemyAllocator.OnEnemySpawned))]
     private static class SpawnedTime
@@ -196,57 +184,10 @@ internal static class CrowdPatches
         private static void Postfix(long __state) => Probe.End(ProbePoint.TransformSync, __state);
     }
 
-    // FarAnimatorThrottle: only a walking (PathMove) enemy is throttled, so its animator is switched back on when that state
-    // exits, which the game does before the next state's Enter calls CrossFade or Play. ES_PathMove.Exit and SyncExit share
-    // one native body (RVA 0x16E7C00, check-patch-bodies.py), so this one patch also runs for a client's SyncExit; a second
-    // patch on the same address would overflow the stack.
-    [HarmonyPatch(typeof(ES_PathMove), nameof(ES_PathMove.Exit))]
-    private static class PathMoveExit
-    {
-        private static void Prefix(ES_PathMove __instance) => CrowdLoad.WalkEnding(__instance.m_enemyAgent);
-    }
-
-    [HarmonyPatch(typeof(ES_Hitreact), nameof(ES_Hitreact.Enter))]
-    private static class HitreactDepth
-    {
-        private static void Prefix() => _hitreactDepth++;
-        private static Exception? Finalizer(Exception? __exception) { _hitreactDepth--; return __exception; }
-    }
-
-    // EnemyAI.SetNavMeshAgent(false) switches the agent off: set_enabled(false), set_updatePosition(false) and avoidance None.
-    // HitReactKeepsAgent, only for the call ES_Hitreact.Enter (the host's stagger entry) makes, leaves the agent on and stopped
-    // with the same updatePosition and avoidance, so it stays in the crowd. The next SetNavMeshAgent(true) clears isStopped and
-    // then runs the game's own switch-on (enable, updatePosition, avoidance, the position check and warp).
     [HarmonyPatch(typeof(EnemyAI), nameof(EnemyAI.SetNavMeshAgent))]
-    private static class NavSwitch
+    private static class NavTime
     {
-        private static bool Prefix(EnemyAI __instance, bool __0, out long __state)
-        {
-            __state = 0;
-            if (!__0 && _hitreactDepth > 0 && CrowdSwitches.HitReactKeepsAgent && Keep(__instance))
-            {
-                KeptTotal++; Probe.Count(ProbePoint.HitreactKeptAgent);
-                return false;
-            }
-            if (__0 && Kept.Count != 0 && Kept.Remove(__instance.Pointer))
-            {
-                var agent = __instance.m_navMeshAgent;
-                if (agent != null && agent.enabled) agent.isStopped = false;
-            }
-            __state = Probe.Begin();
-            return true;
-        }
+        private static void Prefix(out long __state) => __state = Probe.Begin();
         private static void Postfix(bool __0, long __state) => Probe.End(__0 ? ProbePoint.NavAgentOn : ProbePoint.NavAgentOff, __state);
-
-        private static bool Keep(EnemyAI ai)
-        {
-            var agent = ai.m_navMeshAgent;
-            if (agent == null || !agent.enabled) return false;
-            agent.isStopped = true;
-            agent.updatePosition = false;
-            agent.obstacleAvoidanceType = ObstacleAvoidanceType.NoObstacleAvoidance;
-            Kept.Add(ai.Pointer);
-            return true;
-        }
     }
 }

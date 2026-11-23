@@ -1,0 +1,9 @@
+{
+  "carry.sling": "背到背上",
+  "carry.take": "拿回手上",
+  "level.generation-failed": "这一关没能生成，已退回大厅。可以先换一关，或者把游戏日志发给关卡作者。",
+  "suspended": "Forge 因出错已暂停，下一关可能恢复。原因见游戏日志。",
+  "suspended.content-stopped": "Forge 内容已停用，重启游戏前不会恢复：游戏里的数据表和 Forge 放进去的内容对不上了。原版游戏照常进行，原因见游戏日志。",
+  "suspended.host-mismatch": "本局 Forge 已停用：房主装的 Forge 内容和你的不一样。装上相同的包后重新加入；原版游戏照常进行。",
+  "suspended.unsupported": "Forge 已停用：不支持当前的游戏版本或 Forge 安装，换成匹配的版本并重启游戏前不会恢复。原因见游戏日志。"
+}

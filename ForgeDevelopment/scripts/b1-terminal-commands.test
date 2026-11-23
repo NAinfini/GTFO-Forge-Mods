@@ -2,7 +2,7 @@
 # command in the game's COMMANDS listing, before anyone typed it. Run on a freshly loaded B1 of the V1 package, as in
 # b1-security-sensor.test. Typing the commands is covered by b1-security-sensor, b1-extend-timer and b1-terminal-choice.
 #
-# Room 机关样例区 room:c96b1d7b3466988a0d5e1f48fc58. Teleport points are room-local Unity metres: Unity (x, y, z) = editor (-x, y, z), the
+# Room 机关样例区. Teleport points are room-local Unity metres: Unity (x, y, z) = editor (-x, y, z), the
 # V1 builder's room frame with x mirrored (v1-test-kit cellSpot). The V1 build's terminals, Unity frame: 传感器终端 (7.678, -29),
 # 加时终端 (-9.678, -8), 多选一终端 (9.678, -40). A teleport lands 1.2 m on the room's +z side of one; `interact name=Terminal` presses
 # there when the game already selects the terminal, else walks to a stand in front of its screen.
@@ -11,7 +11,7 @@ stop-on-fail
 god on
 
 # 传感器终端 (m-security-sensor)
-teleport room=room:c96b1d7b3466988a0d5e1f48fc58 7.68 0 -27.8
+teleport room=机关样例区 7.68 0 -27.8
 interact name=Terminal radius=4
 terminal type "COMMANDS"
 terminal read 40 as=sensor
@@ -19,7 +19,7 @@ expect $sensor.tail contains "SENSOR_OFF"
 terminal exit
 
 # 加时终端 (m-extend-timer)
-teleport room=room:c96b1d7b3466988a0d5e1f48fc58 -9.678 0 -6.8
+teleport room=机关样例区 -9.678 0 -6.8
 interact name=Terminal radius=4
 terminal type "COMMANDS"
 terminal read 40 as=extend
@@ -27,7 +27,7 @@ expect $extend.tail contains "ADMIN_TEMP_OVERRIDE"
 terminal exit
 
 # 多选一终端 (m-terminal-choice): both options are there until one is chosen
-teleport room=room:c96b1d7b3466988a0d5e1f48fc58 9.678 0 -38.8
+teleport room=机关样例区 9.678 0 -38.8
 interact name=Terminal radius=4
 terminal type "COMMANDS"
 terminal read 40 as=choice

@@ -3,26 +3,23 @@ import {
   IconBox,
   IconGridDots,
   IconChevronDown,
-  IconCopy,
   IconDownload,
   IconFileImport,
   IconFileZip,
   IconFolder,
   IconListCheck,
-  IconMinus,
   IconPackage,
   IconPackageExport,
   IconRefresh,
   IconRestore,
   IconSettings,
-  IconSquare,
   IconWorldUpload,
-  IconX,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { TITLEBAR_READY, TITLEBAR_SLOT } from '../../../../../Desktop/shell/titlebar-ids';
 import { exportObj, exportPack, exportThunderstore, exportUvTemplates, moveDataFolder } from '../actions';
 import { useStore } from '../store';
-import logo from '../../../assets/icon.png';
 import { t, useLang, type Lang } from '../i18n';
 import { Info } from './Features';
 import { exportGameFiles, ReplaceModal, RestoreModal } from './GameFiles';
@@ -147,29 +144,6 @@ function SettingsMenu() {
   );
 }
 
-/** Windows-style minimize / maximize-restore / close for the frameless window. */
-function WindowControls() {
-  const [maximized, setMaximized] = useState(false);
-  useEffect(() => {
-    void window.forge.isMaximized().then(setMaximized);
-    return window.forge.onMaximized(setMaximized);
-  }, []);
-  const size = maximized ? t('topBar.restore') : t('topBar.maximize');
-  return (
-    <div className="winctl">
-      <button type="button" aria-label={t('topBar.minimize')} title={t('topBar.minimize')} onClick={() => window.forge.minimize()}>
-        <IconMinus size={16} stroke={1.25} />
-      </button>
-      <button type="button" aria-label={size} title={size} onClick={() => window.forge.toggleMaximize()}>
-        {maximized ? <IconCopy size={14} stroke={1.25} style={{ transform: 'scaleX(-1)' }} /> : <IconSquare size={13} stroke={1.25} />}
-      </button>
-      <button type="button" className="close" aria-label={t('topBar.close')} title={t('topBar.close')} onClick={() => window.forge.close()}>
-        <IconX size={16} stroke={1.25} />
-      </button>
-    </div>
-  );
-}
-
 /** Getting the work to other players, by category: a weapon skin as a mod, a pack, game files or models; a character as a mod. */
 function ExportMenu() {
   const [replace, setReplace] = useState(false);
@@ -238,18 +212,23 @@ function ExportMenu() {
   );
 }
 
+/** The editor's controls, in the slot of the shell's title bar (Desktop/shell, which draws the name and the window buttons). */
 export function TopBar() {
-  return (
-    <header className="topbar">
-      <div className="brand">
-        <img className="logo" src={logo} alt="" />
-        <b>FORGESKIN</b>
-      </div>
-      <div className="spacer" />
+  const [slot, setSlot] = useState(() => document.getElementById(TITLEBAR_SLOT));
+  useEffect(() => {
+    if (slot) return;
+    const found = () => setSlot(document.getElementById(TITLEBAR_SLOT));
+    window.addEventListener(TITLEBAR_READY, found, { once: true });
+    found();
+    return () => window.removeEventListener(TITLEBAR_READY, found);
+  }, [slot]);
+  if (!slot) return null;
+  return createPortal(
+    <div className="topbar">
       <HelpButton />
       <SettingsMenu />
       <ExportMenu />
-      <WindowControls />
-    </header>
+    </div>,
+    slot,
   );
 }

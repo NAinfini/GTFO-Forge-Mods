@@ -268,6 +268,9 @@ sealed partial class SkinnedGear
     public static void StateChanged(eGameStateName state)
     {
         Characters.Dirty();
+        // A level runs from its generation to the results screen or the lobby (an abort or a lost lobby included).
+        if (state == eGameStateName.Generating) Skins.InLevel = true;
+        else if (state is eGameStateName.AfterLevel or eGameStateName.Lobby or eGameStateName.NoLobby) Skins.InLevel = false;
         if (state != eGameStateName.Generating) return;
         LastHeld.Clear();
         Wear.Save(Time.unscaledTime, true);
@@ -819,7 +822,8 @@ sealed partial class SkinnedGear
             {
                 if (m == null) continue;
                 if (overrides.TryGetValue(BaseName(m.name), out var o)) byMaterial[m.Pointer] = o;
-                else if (meshNames) byMaterial.TryAdd(m.Pointer, byMesh);
+                // A sight's lens is reached only by its own name: the body's look would cover the glass.
+                else if (meshNames && !MaterialOverride.IsLensShader(m.shader?.name)) byMaterial.TryAdd(m.Pointer, byMesh);
             }
         }
         for (int r = 0; r < renderers.Count; r++)
@@ -927,6 +931,13 @@ sealed partial class SkinnedGear
             ForgeSkinPlugin.Info($"{_label}: material {source.name} ({BlendHS}) drawn with {template.shader.name} copied from {template.name}");
         }
         else look = Own(new Material(source) { name = name });
+        // A sight's lens stays the game's glass with only the skin's reticles on it (Core MaterialOverride.OnLens).
+        if (MaterialOverride.IsLensShader(source.shader.name))
+        {
+            o = o.OnLens(out var left);
+            if (left.Count > 0)
+                ForgeSkinPlugin.Fail("skin-sight-skipped", $"skin {skin.Doc.Id}: {o.Material} is a sight lens ({source.shader.name}); its {string.Join(", ", left)} left out, the lens keeps the game's glass");
+        }
         var textures = o.Textures;
         // A teammate's gear shows the stage their look names (their kills are counted on their machine).
         if (o.Wear is { Count: > 0 } && Remote)

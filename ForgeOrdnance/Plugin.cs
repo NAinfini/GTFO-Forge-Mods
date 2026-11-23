@@ -15,7 +15,7 @@ namespace ForgeOrdnance;
 /// It is the only place that names all three: each of the game's moments has one handler here, which runs the parts' steps in order.</summary>
 [BepInPlugin(Id, "Forge Ordnance", Version)]
 [BepInDependency("dev.gtfomodding.gtfo-api", ">=0.6.1")]
-[BepInDependency("NAinfini.ForgeCore", ">=1.0.3")]
+[BepInDependency("NAinfini.ForgeCore", ">=1.0.4")] // package-version: NAinfini-ForgeCore
 // MTFO marks the game as modded (achievements and public matchmaking off) and provides the CustomPath the definitions live in.
 [BepInDependency("com.dak.MTFO", ">=4.6.3")]
 internal sealed class Plugin : BasePlugin

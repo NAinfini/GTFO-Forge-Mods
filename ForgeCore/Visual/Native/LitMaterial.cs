@@ -29,7 +29,7 @@ public static class LitMaterial
     public static Material? Create(string name, Texture albedo, Texture metallicSmooth, bool cutout, float cutoff, out string? why)
     {
         why = null;
-        var shader = Shader.Find(ShaderName);
+        var shader = Shaders.Find(ShaderName);
         if (shader == null) { why = "the game's gear shader is not loaded yet"; return null; }
         if (cutout && (shader = Shaders.LitCutout) == null) { why = "ForgeVisual's cut-out shader could not be loaded (logged)"; return null; }
         var material = new Material(shader) { name = name };
@@ -53,7 +53,7 @@ public static class LitMaterial
     /// a 5% tint into an opaque white pane: the smoothness stays low for a faint sheen, with no extra opacity at grazing angles. The caller owns it.</summary>
     public static Material? Glass(string name, Color tint)
     {
-        var shader = Shader.Find(GlassShaderName);
+        var shader = Shaders.Find(GlassShaderName);
         if (shader == null) return null;
         var glass = new Material(shader) { name = name, color = tint, renderQueue = 3000 };
         glass.SetFloat(SupportsFps, 1f);

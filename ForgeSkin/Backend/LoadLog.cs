@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace ForgeSkin.Backend;
 
-// plugin.loadCheck (PLAN §4.5): what BepInEx itself said about ForgeCore and ForgeSkin the last time the game started from the
+// plugin.loadCheck (PLAN §4.5): what BepInEx itself said about the manifest's packages (ForgeSkin's: ForgeCore and ForgeSkin) the last time the game started from the
 // profile. Only BepInEx/LogOutput.log is read, never written. A plugin BepInEx refused ("Could not load [...] because ...") or
 // skipped ("Skipping [...] because ...") becomes a note: a short message for the player and the full account for the logs.
 public static partial class LoadLog
@@ -19,7 +19,14 @@ public static partial class LoadLog
     private static partial Regex Incompatible();
 
     // Dependencies of ours that are not ours, by GUID: the name a player knows and the mod manager package to install.
+    // The manifest's own dependencies come first.
     static readonly Dictionary<string, (string Name, string Package)> Known = new() { ["dev.gtfomodding.gtfo-api"] = ("GTFO-API", "GTFOModding-GTFO_API") };
+
+    static bool KnownDependency(string guid, out (string Name, string Package) known)
+    {
+        if (ProgramManifest.Current.Dependencies.FirstOrDefault(d => d.Guid == guid) is { } d) { known = (d.Name, d.Package); return true; }
+        return Known.TryGetValue(guid, out known);
+    }
 
     // What was already written to the backend log, so a check repeated every few seconds logs a skip or a finding once.
     static readonly HashSet<string> Said = [];
@@ -49,17 +56,18 @@ public static partial class LoadLog
         var ours = new List<(string Package, string Name, string Guid)>();
         string? source = null;
         try { source = Install.PluginSource(); } catch (BackendException e) { Once($"plugin.loadCheck {profile}: no shipped plugin to fall back on ({e.Message}); only the copies at home are read"); }
-        foreach (var (name, dll) in Install.Packages)
+        foreach (var spec in ProgramManifest.Current.Packages)
         {
+            var (name, dll) = (spec.Name, spec.Dll);
             var home = Path.Combine(Install.Home(profile, name), dll);
-            var meta = File.Exists(home) ? PluginMeta.Read(home) : source != null ? PluginMeta.Read(Path.Combine(source, name, dll)) : null;
+            var meta = File.Exists(home) ? PluginMeta.Read(home) : source != null ? PluginMeta.Read(Path.Combine(source, spec.Folder, dll)) : null;
             if (meta != null) ours.Add((name, meta.Name, meta.Guid));
             else Once($"plugin.loadCheck {profile}: {name} has no readable DLL at its home nor in the shipped plugin, so its lines are not looked for");
         }
         string[] lines;
         using (var s = new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
         using (var r = new StreamReader(s)) lines = r.ReadToEnd().Split('\n');
-        Dictionary<string, List<string>>? installed = null;
+        Dictionary<string, List<(string Path, string Version)>>? installed = null;
         foreach (var raw in lines)
         {
             var line = raw.TrimEnd('\r');
@@ -75,10 +83,10 @@ public static partial class LoadLog
                     var guid = d.Groups["guid"].Value;
                     var range = d.Groups["range"].Success ? d.Groups["range"].Value.Trim() : "";
                     var min = VersionIn().Match(range).Value;
-                    installed ??= InstalledPlugins(profile);
-                    var (shown, store) = Known.TryGetValue(guid, out var k) ? k
-                        : ours.FirstOrDefault(o => o.Guid == guid) is { Package: { } p } ? (p, "NAinfini-" + p) : (guid, guid);
-                    var found = installed.TryGetValue(guid, out var copies) ? string.Join("; ", copies) : "none";
+                    installed ??= Install.PluginsByGuid(profile);
+                    var (shown, store) = KnownDependency(guid, out var k) ? k
+                        : ours.FirstOrDefault(o => o.Guid == guid) is { Package: { } p } ? (p, ProgramManifest.Current.Packages.First(x => x.Name == p).Team + "-" + p) : (guid, guid);
+                    var found = installed.TryGetValue(guid, out var copies) ? string.Join("; ", copies.Select(c => $"{c.Path} {c.Version}")) : "none";
                     notes.Add(new InstallNote(min.Length > 0 ? "load-missing-dependency" : "load-missing-dependency-any", new() { ["plugin"] = package, ["dependency"] = shown, ["version"] = min },
                         $"{head} Cause: {package} requires {guid}{(range.Length > 0 ? " " + range : "")} ({shown}); found under BepInEx/plugins: {found}. "
                         + $"Fix: install or update {shown} (mod manager package {store}){(min.Length > 0 ? $" to {min} or newer" : "")} in the mod manager, then start the game again."));
@@ -101,23 +109,64 @@ public static partial class LoadLog
         return new { log, notes };
     }
 
+    [GeneratedRegex(@"^\[(?<level>Fatal|Error|Warning|Message|Info|Debug)\s*:\s*(?<source>[^\]]*)\]\s?(?<text>.*)$")]
+    private static partial Regex Header();
+
+    // plugin.gameLog: the lines of BepInEx/LogOutput.log a problem report and the program's game-log reading need, read only. Every
+    // Fatal, Error and Warning line, and every line of a source whose name holds "Forge" (whatever its level; the caller keeps the ones
+    // it wants, such as those carrying a Forge diagnostic code). A line without a header continues the one before it (a stack trace).
+    // `stale`: the log was last written before the last change under BepInEx/plugins, so it says nothing about the plugins there now.
+    public static object Lines(string profile)
+    {
+        var log = Path.Combine(profile, "BepInEx", "LogOutput.log");
+        if (!File.Exists(log)) return new { log, exists = false, written = (DateTime?)null, changed = (DateTime?)null, stale = false, lines = Array.Empty<GameLine>() };
+        var written = File.GetLastWriteTimeUtc(log);
+        var changed = LastPluginChange(profile);
+        string[] raw;
+        using (var s = new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+        using (var r = new StreamReader(s)) raw = r.ReadToEnd().Split('\n');
+        var lines = new List<GameLine>();
+        GameLine? last = null;
+        foreach (var part in raw)
+        {
+            var line = part.TrimEnd('\r');
+            if (Header().Match(line) is { Success: true } m)
+            {
+                var (level, source) = (m.Groups["level"].Value, m.Groups["source"].Value.Trim());
+                last = level is "Fatal" or "Error" or "Warning" || source.Contains("Forge", StringComparison.OrdinalIgnoreCase) ? new GameLine(level, source, m.Groups["text"].Value) : null;
+                if (last != null) lines.Add(last);
+            }
+            else if (last != null && line.Length > 0) last.Text += "\n" + line;
+        }
+        return new { log, exists = true, written = (DateTime?)written, changed = (DateTime?)changed, stale = written < changed, lines };
+    }
+
+    public sealed class GameLine(string level, string source, string text)
+    {
+        public string Level { get; } = level;
+        public string Source { get; } = source;
+        public string Text { get; set; } = text;
+    }
+
+    // plugin.mods: every plugin under BepInEx/plugins whose GUID or name holds "Forge", with its version, the DLL's path and SHA-256. Read only.
+    public static object Mods(string profile)
+    {
+        var plugins = Install.Plugins(profile);
+        var mods = new List<object>();
+        if (Directory.Exists(plugins))
+            foreach (var dll in Directory.EnumerateFiles(plugins, "*.dll", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true }))
+                if (PluginMeta.Read(dll) is { } meta && (meta.Guid.Contains("Forge", StringComparison.OrdinalIgnoreCase) || meta.Name.Contains("Forge", StringComparison.OrdinalIgnoreCase)))
+                    mods.Add(new { guid = meta.Guid, name = meta.Name, version = meta.Version, path = dll, sha256 = FileHash.Sha256(dll, cached: true).ToLowerInvariant() });
+        return new { plugins, mods };
+    }
+
     // When the profile's plugins last changed: BepInEx/plugins and each folder in it (a mod manager adds, removes or replaces
     // package folders; the editor stamps the folders it installs into). A log older than that predates the plugins there now.
     static DateTime LastPluginChange(string profile)
     {
         var plugins = Install.Plugins(profile);
         if (!Directory.Exists(plugins)) return DateTime.MinValue;
-        var folders = Directory.GetDirectories(plugins).Concat(Install.Packages.Select(p => Install.Home(profile, p.Name)).Where(Directory.Exists)).Append(plugins);
+        var folders = Directory.GetDirectories(plugins).Concat(ProgramManifest.Current.Packages.Select(p => Install.Home(profile, p.Name)).Where(Directory.Exists)).Append(plugins);
         return folders.Max(Directory.GetLastWriteTimeUtc);
-    }
-
-    // Every plugin under BepInEx/plugins by GUID, "<path> <version>" per copy, for the account of a missing dependency.
-    static Dictionary<string, List<string>> InstalledPlugins(string profile)
-    {
-        var found = new Dictionary<string, List<string>>();
-        foreach (var dll in Directory.EnumerateFiles(Install.Plugins(profile), "*.dll", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true }))
-            if (PluginMeta.Read(dll) is { } meta)
-                (found.TryGetValue(meta.Guid, out var list) ? list : found[meta.Guid] = []).Add($"{dll} {meta.Version}");
-        return found;
     }
 }

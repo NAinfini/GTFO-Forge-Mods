@@ -1,7 +1,7 @@
 // ForgeFrameGen frame generation (Docs/forge-upscale/PLAN.md §3.3, stage 4b): the layer both backends share. See frame_generation.h and
-// frame_generation_backend.h. Here: which backends started and which one runs (the player's upscaler picks it while the game runs), the
-// frame's inputs drawn into the slot's shared textures, why a present is left out (with the hold after repeated defects), the readback,
-// the counters and the log lines.
+// frame_generation_backend.h. Here: which backends started and which one runs (the player's frame generation setting picks it while the
+// game runs), the frame's inputs drawn into the slot's shared textures, why a present is left out (with the hold after repeated defects),
+// the readback, the counters and the log lines.
 //
 // Portions adapted from RiskOfRainUpscaling (https://github.com/xanderfrangos/RiskOfRainUpscaling, commit
 // 2bea5e1e1122751264ff2512ca66d646112e24eb: native/FrameGeneration/DlssFrameGenerator.cpp, FrameGenerationSpace.h).
@@ -53,6 +53,8 @@ Backend &Of(int kind) { return kind == 1 ? DlssBackend() : FsrBackend(); }
 // Readback.
 std::mutex g_reasonLock;
 std::string g_reason = "not started";
+int g_dlssMissing = DlssRuns; // why DLSS Frame Generation did not start (DlssMissing), with g_dlssWhy; both under g_reasonLock
+std::string g_dlssWhy;
 
 constexpr const char *kSkipNames[SkipCount] = {"no-inputs", "switched-off", "menu", "resizing", "unsupported", "switching", "other-frame", "markers-missing", "no-token", "status"};
 std::atomic<long long> g_switches{0}, g_skips[SkipCount]{};
@@ -159,9 +161,22 @@ bool Start(const wchar_t *folder, IDXGIAdapter *adapter)
     g_adapter = adapter;
     // Streamline must start before the bridge's D3D12 device is made, so DLSS Frame Generation starts now wherever it can run, whatever
     // the player picked, and stays ready for a switch. AMD's starts now when it is picked or DLSS's cannot run, else when first picked.
+    // The adapter is the one the game's D3D11 device renders on, whatever other adapters the PC has.
+    UINT vendor = 0;
+    std::string card = AdapterText(adapter, vendor);
+    const std::string otherNvidia = vendor == 0x10DE ? std::string() : OtherNvidiaCard(adapter);
+    if (!otherNvidia.empty()) card += ", not this PC's " + otherNvidia + " (Windows' graphics settings choose the card)";
     std::string why[3];
-    if (DlssBackend().Start(folder, adapter, why[1])) g_started[1] = &DlssBackend();
-    else g_broken[1] = true;
+    // Only an NVIDIA card tries DLSS Frame Generation (plan §1): elsewhere Streamline is not started at all, so nothing of NVIDIA's
+    // runs in the game before AMD FSR's swap chain is made.
+    if (vendor != 0x10DE) why[1] = "the game's graphics card is not NVIDIA's";
+    else if (DlssBackend().Start(folder, adapter, why[1])) g_started[1] = &DlssBackend();
+    if (!g_started[1]) g_broken[1] = true;
+    {
+        std::lock_guard<std::mutex> lock(g_reasonLock);
+        g_dlssMissing = g_started[1] ? DlssRuns : vendor == 0x10DE ? DlssStartMissing() : otherNvidia.empty() ? DlssNotNvidia : DlssOtherCard;
+        g_dlssWhy = g_started[1] ? std::string() : why[1] + " on " + card;
+    }
     if (g_preferred == 2 || !g_started[1])
     {
         if (FsrBackend().Start(folder, adapter, why[2])) g_started[2] = &FsrBackend();
@@ -176,7 +191,9 @@ bool Start(const wchar_t *folder, IDXGIAdapter *adapter)
         g_failed = true;
         return false;
     }
-    if (kind != first) BridgeLog(LogInfo, "%s is not available (%s); %s runs.", Name(first), why[first].c_str(), Name(kind));
+    // The player's warning for a fallback is the plugin's (framegen-frame-generation-fallback, from DlssMissing); this is the developer line.
+    if (kind != first) BridgeLog(LogInfo, "%s is not available on %s (%s); %s runs.", Name(first), card.c_str(), why[first].c_str(), Name(kind));
+    else BridgeLog(LogInfo, "Frame generation starts with %s on %s.", Name(kind), card.c_str());
     g_backend = g_started[kind];
     attempted = 1;
     SetReason("waiting for the first frame");
@@ -495,6 +512,18 @@ int State(char *reason, int capacity, long long *frames, long long *generated, i
     if (lastPresented) *lastPresented = g_lastPresented;
     if (!Running()) return 0;
     return g_backend.load()->On() ? 2 : 1;
+}
+
+int WhyNoDlss(char *why, int capacity)
+{
+    std::lock_guard<std::mutex> lock(g_reasonLock);
+    if (why && capacity > 0)
+    {
+        int length = (int)std::min<size_t>(g_dlssWhy.size(), (size_t)capacity - 1);
+        std::memcpy(why, g_dlssWhy.data(), length);
+        why[length] = '\0';
+    }
+    return g_dlssMissing;
 }
 
 int Counters(char *text, int capacity)

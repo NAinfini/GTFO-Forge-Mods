@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ForgeSkin.Backend;
@@ -32,6 +33,7 @@ public sealed class PluginFactAttribute : FactAttribute
     }
 }
 
+[Collection("process state")] // with AssetPatchTests: both read Game.Running, which these tests replace
 public class GameTests
 {
     static JsonNode Call(string method, object? args = null) =>
@@ -168,6 +170,149 @@ public class GameTests
         var note = Assert.Single(Call("plugin.loadCheck", new { profile })["notes"]!.AsArray())!;
         Assert.Equal(("load-missing-dependency", "ForgeCore", "GTFO-API", "0.6.1"),
             ((string)note["code"]!, (string)note["args"]!["plugin"]!, (string)note["args"]!["dependency"]!, (string)note["args"]!["version"]!));
+    }
+
+    // The program manifest and the running-game probe are process-wide: set for one test, put back after.
+    static void With(ProgramManifest manifest, bool gameRuns, Action run)
+    {
+        var (was, probe) = (ProgramManifest.Current, Game.RunningProbe);
+        (ProgramManifest.Current, Game.RunningProbe) = (manifest, () => gameRuns);
+        try { run(); }
+        finally { (ProgramManifest.Current, Game.RunningProbe) = (was, probe); }
+    }
+
+    static string Profile()
+    {
+        var profile = Directory.CreateTempSubdirectory("sf-manifest-").FullName;
+        File.WriteAllText(Path.Combine(Directory.CreateDirectory(Path.Combine(profile, "BepInEx", "core")).FullName, "BepInEx.Unity.IL2CPP.dll"), "");
+        return profile;
+    }
+
+    // A shipped plugin folder of stand-in DLLs (a copy of the backend's own assembly: it has a file version, no BepInPlugin).
+    static string Shipped(params (string Folder, string Dll)[] packages)
+    {
+        var root = Directory.CreateTempSubdirectory("sf-shipped-").FullName;
+        foreach (var (folder, dll) in packages)
+            File.Copy(typeof(Methods).Assembly.Location, Path.Combine(Directory.CreateDirectory(Path.Combine(root, folder)).FullName, dll));
+        return root;
+    }
+
+    static string Zip(string name, params (string Entry, string Text)[] entries)
+    {
+        var file = Path.Combine(Directory.CreateTempSubdirectory("sf-content-").FullName, name);
+        using var zip = ZipFile.Open(file, ZipArchiveMode.Create);
+        foreach (var (entry, text) in entries)
+        {
+            using var w = new StreamWriter(zip.CreateEntry(entry).Open());
+            w.Write(text);
+        }
+        return file;
+    }
+
+    // The package list is the manifest's (no name written in the backend): ForgeSkin's default list installs as before (one copy of each
+    // at its home, the editor's former folder cleared, the profile current, each package reported), and another program's list changes
+    // the packages, their team, their shipped folder and the checked plugins, without ForgeSkin's skins folder.
+    [Fact]
+    public void ManifestPackages()
+    {
+        var defaults = ProgramManifest.ForgeSkin with { PluginRoot = Shipped(("ForgeCore", "ForgeCore.dll"), ("ForgeSkin", "ForgeSkin.Plugin.dll")) };
+        With(defaults, false, () =>
+        {
+            var profile = Profile();
+            File.WriteAllText(Path.Combine(Directory.CreateDirectory(Game.PluginDir(profile)).FullName, "ForgeSkin.Plugin.dll"), "an older editor's copy");
+            Assert.Empty(Call("plugin.install", new { profile })["notes"]!.AsArray());
+            Assert.False(File.Exists(Path.Combine(Game.PluginDir(profile), "ForgeSkin.Plugin.dll")));
+            foreach (var (name, dll) in new[] { ("ForgeCore", "ForgeCore.dll"), ("ForgeSkin", "ForgeSkin.Plugin.dll") })
+                Assert.True(File.Exists(Path.Combine(profile, "BepInEx", "plugins", "NAinfini-" + name, name, dll)));
+            var info = Call("profiles.get", new { path = profile });
+            Assert.True((bool)info["pluginCurrent"]!);
+            Assert.Equal(["ForgeCore", "ForgeSkin"], info["packages"]!.AsArray().Select(p => (string)p!["name"]!));
+            Assert.All(info["packages"]!.AsArray(), p => Assert.True((bool)p!["current"]!));
+        });
+
+        var workshop = new ProgramManifest
+        {
+            Packages = [new("Alpha", "Alpha.dll", "Acme", "a"), new("Beta", "Beta.dll", "Acme", "b", "9.0.0")],
+            Dependencies = [new("test.missing", "Missing", "Acme-Missing")],
+            SkinProfile = false,
+            PluginRoot = Shipped(("a", "Alpha.dll"), ("b", "Beta.dll")),
+        };
+        With(workshop, false, () =>
+        {
+            var profile = Profile();
+            Call("plugin.install", new { profile });
+            Assert.True(File.Exists(Path.Combine(profile, "BepInEx", "plugins", "Acme-Alpha", "Alpha", "Alpha.dll")));
+            Assert.False(Directory.Exists(Path.Combine(profile, "BepInEx", "ForgeSkin")));
+            var info = Call("profiles.get", new { path = profile });
+            var beta = info["packages"]!.AsArray().Single(p => (string)p!["name"]! == "Beta")!;
+            Assert.Equal((true, true), ((bool)beta["current"]!, (bool)beta["belowMinimum"]!));
+            Assert.False((bool)info["dependencies"]!.AsArray().Single()!["ok"]!);
+        });
+    }
+
+    // content.install: the exported zip becomes BepInEx/plugins/<Team-Name>/ (tables beside in GameData/<Team-Name>/) with the install
+    // record of file hashes; installing it again replaces the folder whole, content.list sees it, content.remove takes it out.
+    [Fact]
+    public void ContentInstall()
+    {
+        With(ProgramManifest.ForgeSkin, false, () =>
+        {
+            var profile = Profile();
+            Call("content.install", new
+            {
+                zip = Zip("a.zip", ("plugins/forge/content/pack.forge", """{"package":"Acme-Pack"}"""), ("plugins/forge/a.forge", "one"),
+                ("GameData/table.json", "{}"), ("manifest.json", "{}")),
+                profile
+            });
+            var folder = Path.Combine(profile, "BepInEx", "plugins", "Acme-Pack");
+            Assert.True(File.Exists(Path.Combine(folder, "forge", "a.forge")));
+            Assert.True(File.Exists(Path.Combine(profile, "BepInEx", "GameData", "Acme-Pack", "table.json")));
+            var record = JsonNode.Parse(File.ReadAllText(Path.Combine(folder, ".forge-installed.json")))!.AsObject();
+            Assert.Equal(["GameData/table.json", "forge/a.forge", "forge/content/pack.forge", "manifest.json"], record.Select(kv => kv.Key).Order(StringComparer.Ordinal));
+            Assert.Equal(ForgeSkin.Backend.FileHash.Sha256(Path.Combine(folder, "forge", "a.forge")).ToLowerInvariant(), (string)record["forge/a.forge"]!);
+            Assert.False(Directory.Exists(Path.Combine(profile, "BepInEx", ".forge-staging")));
+
+            // A second install replaces the package whole: a file the new zip lacks is gone.
+            Call("content.install", new { zip = Zip("b.zip", ("plugins/forge/rundown.forge", """{"package":"Acme-Pack"}""")), profile });
+            Assert.False(File.Exists(Path.Combine(folder, "forge", "a.forge")));
+            Assert.False(Directory.Exists(Path.Combine(profile, "BepInEx", "GameData", "Acme-Pack")));
+            Assert.Equal(["Acme-Pack"], Call("content.list", new { profile })["packages"]!.AsArray().Select(p => (string)p!["package"]!));
+
+            Call("content.remove", new { profile, package = "Acme-Pack" });
+            Assert.False(Directory.Exists(folder));
+            Assert.Throws<BackendException>(() => Call("content.install", new { zip = Zip("c.zip", ("plugins/x.forge", "")), profile })); // no identity file
+        });
+    }
+
+    // With GTFO running, a DLL it holds is never replaced (game-running), while a package of .forge files, which the game hot-loads, installs.
+    [Fact]
+    public void ContentWhileGameRuns()
+    {
+        var profile = Profile();
+        With(ProgramManifest.ForgeSkin, false, () => Call("content.install", new { zip = Zip("d.zip", ("plugins/forge/rundown.forge", """{"package":"Acme-Dll"}"""), ("plugins/Acme.dll", "x")), profile }));
+        var dll = Path.Combine(profile, "BepInEx", "plugins", "Acme-Dll", "Acme.dll");
+        using var held = new FileStream(dll, FileMode.Open, FileAccess.ReadWrite, FileShare.None); // what the running game's loaded DLL does
+        With(ProgramManifest.ForgeSkin, true, () =>
+        {
+            var refused = Assert.Throws<BackendException>(() => Call("content.install",
+                new { zip = Zip("e.zip", ("plugins/forge/rundown.forge", """{"package":"Acme-Dll"}"""), ("plugins/Acme.dll", "y")), profile }));
+            Assert.Equal("game-running", refused.Code);
+            Call("content.install", new { zip = Zip("f.zip", ("plugins/forge/rundown.forge", """{"package":"Acme-Forge"}"""), ("plugins/forge/a.forge", "z")), profile });
+            Assert.True(File.Exists(Path.Combine(profile, "BepInEx", "plugins", "Acme-Forge", "forge", "a.forge")));
+        });
+    }
+
+    // The manifest's method list: a method outside it is refused with its own code, the ones inside (exact or `prefix.*`) run.
+    [Fact]
+    public void MethodAllowList()
+    {
+        With(ProgramManifest.ForgeSkin with { Methods = ["game.locate", "content.*"] }, false, () =>
+        {
+            Assert.Equal("method-not-allowed", Assert.Throws<BackendException>(() => Call("catalog.get")).Code);
+            Assert.Equal("method-not-allowed", Assert.Throws<BackendException>(() => Call("game.setDir", new { dir = "x" })).Code);
+            Call("game.locate");
+            Call("content.list", new { profile = Profile() });
+        });
     }
 
     static void WriteJson(string path, object value)

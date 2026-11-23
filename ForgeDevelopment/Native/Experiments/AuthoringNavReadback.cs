@@ -100,6 +100,123 @@ internal static class AuthoringNavReadback
         return Serialize(new { schemaVersion = "1.0.0", heightSens = sens, rows });
     }
 
+    /// <summary>{"points":[[..],..],"player":true,"sample":2}: the course graph at each point (and at the local player when asked):
+    /// the course node the native lookup gives (AIG_CourseNode.TryGetCourseNode), its zone and area, and every portal of that node
+    /// with the opposite node, gate, zone-portal mark, progression lock and traversable state. Then, for every ordered pair of
+    /// points, whether the second node is reachable over all portals and over the portals an enemy may take
+    /// (EnemyCourseNavigation.TryFindNodeTowardGoalNode skips IsProgressionLocked portals), with the enemy route's node ids.</summary>
+    internal static string Course(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        var root = Spec(document, "points", "player", "sample");
+        var sample = Number(root, "sample", 2f);
+        var at = new List<Vector3>();
+        if (root.TryGetProperty("points", out var points))
+        {
+            if (points.ValueKind != JsonValueKind.Array) throw new ArgumentException("drive.nav.point-required:points ([[x,y,z],...])");
+            foreach (var element in points.EnumerateArray().Take(MaxRows))
+            {
+                if (element.ValueKind != JsonValueKind.Array || element.GetArrayLength() != 3)
+                    throw new ArgumentException("drive.nav.point-required:points ([x,y,z])");
+                at.Add(new Vector3(element[0].GetSingle(), element[1].GetSingle(), element[2].GetSingle()));
+            }
+        }
+        var dimension = eDimensionIndex.Reality;
+        if (root.TryGetProperty("player", out var wantsPlayer) && wantsPlayer.ValueKind == JsonValueKind.True)
+        {
+            var player = Player.PlayerManager.GetLocalPlayerAgent() ?? throw new InvalidOperationException("drive.nav.no-local-player");
+            at.Add(player.Position);
+            dimension = player.DimensionIndex;
+        }
+        if (at.Count == 0) throw new ArgumentException("drive.nav.missing-field:points");
+        var nodes = new AIGraph.AIG_CourseNode?[at.Count];
+        var rows = new List<object>();
+        for (var i = 0; i < at.Count; i++)
+        {
+            nodes[i] = AIGraph.AIG_CourseNode.TryGetCourseNode(dimension, at[i], sample, out var found) && found != null ? found : null;
+            var node = nodes[i];
+            rows.Add(new
+            {
+                point = Array3(at[i]),
+                node = node?.NodeID,
+                zone = node?.m_zone == null ? null : $"{(int)node.m_zone.DimensionIndex}/{(int)node.m_zone.Layer.m_type}/{(int)node.m_zone.LocalIndex}",
+                area = node?.m_area == null ? null : (node.m_area.m_geomorph == null ? "?" : node.m_area.m_geomorph.name) + "/" + node.m_area.name,
+                ownsCluster = node != null && node.m_nodeCluster?.m_courseNode?.Pointer == node.Pointer,
+                portals = node == null ? null : Portals(node)
+            });
+        }
+        var routes = new List<object>();
+        for (var i = 0; i < nodes.Length; i++)
+            for (var j = 0; j < nodes.Length; j++)
+            {
+                if (i == j || nodes[i] == null || nodes[j] == null) continue;
+                routes.Add(new
+                {
+                    from = i,
+                    to = j,
+                    graphReachable = Route(nodes[i]!, nodes[j]!, false) != null,
+                    enemyRoute = Route(nodes[i]!, nodes[j]!, true)
+                });
+            }
+        return Serialize(new { schemaVersion = "1.0.0", sample, rows, routes });
+    }
+
+    private static object[] Portals(AIGraph.AIG_CourseNode node)
+    {
+        var list = node.m_portals;
+        if (list == null) return Array.Empty<object>();
+        var rows = new List<object>();
+        for (var i = 0; i < list.Count && rows.Count < MaxRows; i++)
+        {
+            var portal = list[i];
+            if (portal == null) continue;
+            var gate = portal.Gate;
+            rows.Add(new
+            {
+                to = portal.GetOppositeNode(node)?.NodeID,
+                gate = gate == null ? null : gate.name,
+                gateType = gate == null ? null : gate.Type.ToString(),
+                zonePortal = gate != null && portal.IsZonePortal,
+                progressionLocked = gate != null && portal.IsProgressionLocked,
+                traversable = gate != null && portal.IsTraversable,
+                door = gate?.SpawnedDoor == null ? null : gate.SpawnedDoor.ToString()
+            });
+        }
+        return rows.ToArray();
+    }
+
+    /// <summary>Breadth-first node ids from <paramref name="start"/> to <paramref name="goal"/>, or null when unreachable; with
+    /// <paramref name="enemy"/> a progression-locked portal is not taken, as the enemy course navigation does not take it.</summary>
+    private static int[]? Route(AIGraph.AIG_CourseNode start, AIGraph.AIG_CourseNode goal, bool enemy)
+    {
+        var previous = new Dictionary<IntPtr, AIGraph.AIG_CourseNode?> { [start.Pointer] = null };
+        var queue = new Queue<AIGraph.AIG_CourseNode>();
+        queue.Enqueue(start);
+        while (queue.Count > 0)
+        {
+            var node = queue.Dequeue();
+            if (node.Pointer == goal.Pointer)
+            {
+                var path = new List<int>();
+                for (AIGraph.AIG_CourseNode? step = node; step != null; step = previous[step.Pointer]) path.Add(step.NodeID);
+                path.Reverse();
+                return path.ToArray();
+            }
+            var portals = node.m_portals;
+            if (portals == null) continue;
+            for (var i = 0; i < portals.Count; i++)
+            {
+                var portal = portals[i];
+                if (portal == null || enemy && portal.Gate != null && portal.IsProgressionLocked) continue;
+                var next = portal.GetOppositeNode(node);
+                if (next == null || previous.ContainsKey(next.Pointer)) continue;
+                previous[next.Pointer] = node;
+                queue.Enqueue(next);
+            }
+        }
+        return null;
+    }
+
     /// <summary>{"center":[..],"radius":3,"limit":60}: colliders (triggers included) and NavMeshObstacles inside a sphere, nearest first.</summary>
     internal static string Near(string json)
     {

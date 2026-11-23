@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4
+
+Needs ForgeCore 1.0.4.
+
+- Changed: an action fades in and out along a smooth curve, and the limbs it places blend in over 0.15 seconds when it takes them and blend back when it lets go. Your first-person arms fade in and out with the action too.
+
 ## 1.0.3
 
 Needs ForgeCore 1.0.3. No change to how actions work; this version carries the new icon and depends on the current ForgeCore.

@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ForgeCoreOnceReferenced>true</ForgeCoreOnceReferenced>
+    <AssemblyName>ForgeEngine.EngineCore.Tests</AssemblyName>
+    <StartupObject>ForgeEngine.Tests.EngineCoreSuites</StartupObject>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <IsPackable>false</IsPackable>
+    <!-- No AllowUnsafeBlocks: the host project compiles Network/** without it, so the rig must not let an unsafe
+         construct in either. -->
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <!-- Every suite compiles the real SDK, host and domain sources under this one test identity; no test friend grants access. -->
+  <Import Project="../ForgeEngine.Sources.props" />
+  <Import Project="../../Framework/PrimitiveContracts.props" />
+  <Import Project="../TestAssemblyIdentity.targets" />
+  <ItemGroup>
+    <Compile Include="../Framework/**/*.cs;../Network/**/*.cs" Exclude="../*/bin/**/*.cs;../*/obj/**/*.cs;../Framework/PlayerCancellationProviderIdDouble.cs" />
+    <Compile Include="../../../Testing/TestRuntime.cs;../../../Testing/TestContexts.cs;../../../Testing/TestProviders.cs;../../../Testing/TestIssuer.cs;../../../Testing/LocalInputs.cs" LinkBase="Testing" />
+    <Compile Include="../../GameBindings/FrameworkFiles.cs;../../GameBindings/PlanDiscovery.cs;../../GameBindings/ContentPackDiscovery.cs;../../GameBindings/ContentPlanAdmission.cs;../../GameBindings/ContentDependencyLocks.cs;../../GameBindings/BehaviorContentRegistration.cs;../../GameBindings/ContentPackages.cs;../../GameBindings/ContentGenerations.cs" LinkBase="GameBindings" />
+    <Compile Include="../../GameBindings/Presentation/PresentationContract.cs;../../GameBindings/Presentation/CustomSounds.cs" Link="Presentation/%(Filename)%(Extension)" />
+    <Compile Include="../../Network/**/*.cs" Link="Network/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../../Logging/RuntimeHostLogCodes.cs;../../Logging/RuntimeLogWriter.cs;../../Logging/DynamicDiagnosticCodes.cs;../../Logging/DynamicDiagnosticCodes.Generated.cs" LinkBase="Logging" />
+    <ForgeDiagnosticConstants Include="RuntimeHostLogCodes" />
+    <Compile Include="../../GameBindings/DomainCommands.cs;../../GameBindings/DomainCommandRouting.cs;../../GameBindings/NativeHookObservers.cs;../../GameBindings/DomainStateChannel.NativeState.cs;../../GameBindings/DomainStateChannel.RecipientState.cs" LinkBase="GameBindings" />
+    <!-- The body of a client's teleport report, which the Network suite sends over the command route. -->
+    <Compile Include="../../Player/Framework/State/PlayerTeleportReport.cs" LinkBase="Player" />
+    <!-- The one Map record whose replication the Network suite checks: the door-alarm native state key. -->
+    <Compile Include="../../Map/Doors/DoorAlarmRecord.cs" LinkBase="Map" />
+    <Compile Include="../../../ForgeCore/Core/NativeDataBlockTables.cs;../../../ForgeCore/Core/NativeDataBlockTransaction.cs;../../../ForgeCore/Core/Store.cs;../../../ForgeCore/Core/Log.cs" LinkBase="ForgeCore" />
+    <!-- The Network suite runs the engine's network on ForgeCore's real node, over the in-memory session ForgeCore's own tests use. -->
+    <Compile Include="../../../ForgeCore/Net/*.cs;../../../ForgeCore/tests/Core/NetHub.cs" LinkBase="ForgeCore/Net" />
+    <ProjectReference Include="../../../ForgeCore/Once/ForgeCore.Once.csproj" />
+    <EmbeddedResource Include="$(ForgeNativeSchemaSource)" LogicalName="ForgeEngine.NativeSchema" />
+    <EmbeddedResource Include="../../../Release/release.json" LogicalName="ForgeEngine.ReleaseIdentity.json" />
+    <Reference Include="BepInEx.Core" HintPath="$(GTFOBepInExPath)/core/BepInEx.Core.dll" />
+    <Reference Include="SemanticVersioning" HintPath="$(GTFOBepInExPath)/core/SemanticVersioning.dll" />
+    <Reference Include="SNet_ASM" HintPath="$(GTFOBepInExPath)/interop/SNet_ASM.dll" />
+  </ItemGroup>
+  <Target Name="ValidateReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(GTFOBepInExPath)/core/BepInEx.Core.dll')" Text="Set GTFO_BEPINEX_PATH to existing local compile references." />
+  </Target>
+  <Import Project="../../../Testing/MergedSuites.targets" />
+</Project>

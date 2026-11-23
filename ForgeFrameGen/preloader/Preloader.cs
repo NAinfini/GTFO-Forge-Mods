@@ -42,27 +42,65 @@ public sealed unsafe class Preloader : BasePatcher
         }
     }
 
-    /// <summary>The plugin logs the bridge's lines once it loads. When it does not (a missing dependency such as GTFO-API leaves it out),
-    /// the bridge parks on a plain swap chain at the game's first present; this says so once and writes the bridge's queued lines, which
-    /// nothing else would. The thread ends once the plugin is there, the bridge has parked, or no bridge was built.</summary>
+    /// <summary>The plugin logs the bridge's lines once it loads, on the game's main thread. Two cases leave them unwritten, and this thread
+    /// writes them: the plugin does not load (a missing dependency such as GTFO-API leaves it out), so the bridge parks on a plain swap chain
+    /// at the game's first present; or no frame goes through the bridge for ten seconds once the plugin is there, as in a game that froze,
+    /// where the line also says where in the bridge the render thread is. Each is written once. The thread ends when no bridge was built.</summary>
     private static void WatchForPlugin(IntPtr native, BepInEx.Logging.ManualLogSource log)
     {
         var parked = (delegate* unmanaged<int>)NativeLibrary.GetExport(native, "ForgeFrameGen_Parked");
         var pop = (delegate* unmanaged<byte*, int, int*, int>)NativeLibrary.GetExport(native, "ForgeFrameGen_PopBridgeMessage");
         var state = (delegate* unmanaged<int>)NativeLibrary.GetExport(native, "ForgeFrameGen_PresentState");
+        var counts = (delegate* unmanaged<int*, int*, int*, long*, void>)NativeLibrary.GetExport(native, "ForgeFrameGen_GraphicsCounts");
+        var stage = (delegate* unmanaged<int>)NativeLibrary.GetExport(native, "ForgeFrameGen_PresentStage");
         new System.Threading.Thread(() =>
         {
-            int now;
-            while ((now = parked()) == 0 && state() >= 0) System.Threading.Thread.Sleep(1000);
-            if (now != 1) return;
-            // The bridge's failure lines; its developer lines are dropped, and counted in the closing line.
-            var buffer = stackalloc byte[1024];
-            int kind, length, dropped = 0;
-            while ((length = pop(buffer, 1024, &kind)) >= 0)
-                if (kind == 0) dropped++;
-                else log.LogWarning(System.Text.Encoding.UTF8.GetString(buffer, length));
-            log.LogWarning("The Forge FrameGen plugin did not load (see the errors above): frame generation is off and the game's frames pass through unchanged ("
-                + dropped + " developer lines of the bridge not written).");
+            // The bridge's queued lines; developer lines are dropped, and their number returned.
+            int Flush()
+            {
+                var buffer = stackalloc byte[1024];
+                int kind, length, dropped = 0;
+                while ((length = pop(buffer, 1024, &kind)) >= 0)
+                    if (kind == 0) dropped++;
+                    else log.LogWarning(System.Text.Encoding.UTF8.GetString(buffer, length));
+                return dropped;
+            }
+            bool parkSaid = false, stallSaid = false;
+            long last = -1;
+            int still = 0;
+            while (state() != -1)
+            {
+                System.Threading.Thread.Sleep(1000);
+                int plugin = parked();
+                if (plugin == 1 && !parkSaid)
+                {
+                    parkSaid = true;
+                    log.LogWarning("The Forge FrameGen plugin did not load (see the errors above): frame generation is off and the game's frames pass through unchanged ("
+                        + Flush() + " developer lines of the bridge not written).");
+                }
+                if (plugin == 0 || stallSaid) continue;
+                long presents;
+                counts(null, null, null, &presents);
+                if (presents <= 0) continue; // the stall timer starts with the first frame through the bridge: loading shows no frames
+                still = presents == last ? still + 1 : 0;
+                last = presents;
+                if (still < 10) continue;
+                stallSaid = true;
+                int at = stage();
+                string where = at switch
+                {
+                    1 => "waiting for the bridge's D3D12 queue to finish a frame",
+                    2 => "handing frame generation its inputs",
+                    3 => "inside the display swap chain's Present",
+                    4 => "resizing the swap chain",
+                    5 => "moving the display to another frame generation",
+                    6 => "handing the window back to the game's own swap chain",
+                    _ => "not in the bridge",
+                };
+                Flush();
+                log.LogWarning("No frame has gone through the Forge FrameGen present bridge for 10 seconds (" + presents + " frames so far, present bridge state "
+                    + state() + "; the game's render thread is " + where + "). If the game froze, send this log; removing Forge FrameGen gives the game its own rendering back.");
+            }
         })
         { IsBackground = true, Name = "ForgeFrameGen.Preloader" }.Start();
     }

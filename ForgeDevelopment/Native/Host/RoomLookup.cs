@@ -34,6 +34,12 @@ internal static class RoomLookup
         return rooms;
     }
 
+    /// <summary>Every room the landed level holds as <c>instanceId|prefab name</c>, comma separated (the prefab name is the game's own name of
+    /// the geomorph, without the clone suffix): the console turns a room's authored name (read from the installed package) into the one of
+    /// these ids that is loaded, and <c>room=@text</c> picks the room whose prefab name holds the text.</summary>
+    internal static string Loaded()
+        => string.Join(",", System.Linq.Enumerable.Select(Rooms(), pair => pair.Key + "|" + pair.Value.name.Replace("(Clone)", "").Replace(",", " ")));
+
     /// <summary>The world pose of a room-local point: <c>dimension;x,y,z</c>, the two things a teleport spec needs.</summary>
     internal static string WorldPoint(string roomId, float x, float y, float z)
     {

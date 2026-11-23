@@ -8,7 +8,7 @@ namespace ForgeDevelopment.Native;
 
 [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
 [BepInDependency("dev.gtfomodding.gtfo-api", ">=0.6.1")]
-[BepInDependency("NAinfini.ForgeCore", ">=1.0.4")]
+[BepInDependency("NAinfini.ForgeCore", ">=1.0.4")] // package-version: NAinfini-ForgeCore
 public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "NAinfini.ForgeDevelopment";
