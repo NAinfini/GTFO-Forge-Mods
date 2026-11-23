@@ -81,7 +81,7 @@ async function helpers() {
     mark(items) {
       D.unmark();
       const layer = Object.assign(document.createElement('div'), { id: 'docs-marks' });
-      layer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:100000';
+      layer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483647';
       for (const { el, n, side } of items) {
         if (!el) continue;
         const r = el.getBoundingClientRect();
@@ -300,7 +300,6 @@ const SHOTS = {
     await D.ai('select', { kind: 'part', id: 'front' });
     await D.ai('camera', { yaw: -120, pitch: 14, distance: 1.25, target: [0, 0, -0.15] });
     await D.tab('livery');
-    const top = document.querySelector('.topbar, header') ?? document.body;
     D.mark([
       { el: D.left(), n: 1 },
       { el: D.stage().querySelector('.stage-title'), n: 2 },
@@ -308,17 +307,18 @@ const SHOTS = {
       { el: D.right(), n: 4 },
       { el: [...document.querySelectorAll('.rail-tab')].pop()?.parentElement, n: 5, side: 'right' },
       { el: document.querySelector('[data-tour=export]'), n: 6 },
-      { el: D.find(D.t('works.apply')), n: 7 },
     ]);
-    void top;
     return { x: 0, y: 0, w: 1280, h: 800, max: 1200 };
   },
   gallery: async (D) => {
     await D.click(D.find(D.t('works.tab')), 500);
     const open = D.find(D.t('works.new'));
     await D.click(open, 700);
-    const g = [...document.querySelectorAll('.gallery')].find(D.visible);
-    return { ...D.union([D.rect(open), D.top(g, 520)]), max: 1000 };
+    // The cards' thumbnails are drawn one by one on first use: wait until none says Drawing (up to 2 minutes).
+    for (let i = 0; i < 120 && D.modal()?.textContent.includes(D.t('gallery.drawing')); i++) await D.sleep(1000);
+    document.activeElement?.blur?.();
+    await D.settle(300);
+    return { ...D.top(D.modal(), 600), max: 1000 };
   },
   'skins-panel': async (D) => {
     await D.click(D.find(D.t('works.tab')), 500);
@@ -389,7 +389,9 @@ const SHOTS = {
   'text-layer': async (D, { m }) => {
     const l = await D.layer(m.R, (l) => l.kind === 'text');
     await D.ai('select', { kind: 'livery', material: m.R, id: l.id });
-    return D.union([D.rect(document.querySelector('.insp-head')), D.rect(D.section(D.t('livery.text')))], 4);
+    for (const el of [D.right(), ...D.right().querySelectorAll('*')]) if (el.scrollTop) el.scrollTop = 0;
+    await D.settle(300);
+    return D.top(D.right(), 640);
   },
   'gradient-layer': async (D, { m }) => {
     const l = await D.layer(m.S, (l) => l.kind === 'gradient');
@@ -490,9 +492,11 @@ const SHOTS = {
   },
   'settings-menu': async (D) => {
     const box = await D.dropdown(D.t('topBar.settings'));
-    // The data folder line shows this computer's path; the picture shows the installed app's default instead.
+    // The folder lines show this computer's paths; the picture shows the usual ones instead (game folder first, then the data folder).
+    const shown = ['C:\\Steam\\steamapps\\common\\GTFO', '%USERPROFILE%\\Documents\\ForgeSkin'];
     const walk = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
-    for (let n = walk.nextNode(); n; n = walk.nextNode()) if (/^[A-Z]:\\/.test(n.textContent.trim())) n.textContent = '%USERPROFILE%\\Documents\\ForgeSkin';
+    let at = 0;
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) if (/^[A-Z]:\\/.test(n.textContent.trim())) n.textContent = shown[Math.min(at++, 1)];
     return D.union([D.rect(D.find(D.t('topBar.settings'))), D.rect(box)]);
   },
 };

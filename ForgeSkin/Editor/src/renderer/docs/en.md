@@ -32,14 +32,13 @@ ForgeSkin is two things:
 ![The editor with a part selected. The numbers match the list below.](shot:editor-map)
 
 1. **Left panel.** The **Parts** list of the open item: every part with its paint layers, animated layers, code effects and attachments underneath. The tick fits or leaves off a part, the eye hides a row (also in game), the **+** on a row adds anything to that part. **Works** on the left edge switches to the works list.
-2. **Item name.** Click it (or press <kbd>Ctrl</kbd>+<kbd>P</kbd>) to pick another weapon, tool or item.
+2. **Item name.** The gear the open skin is for. To make a skin for another gear, use **+ New** on the works list.
 3. **Event buttons.** Kill, Hit, Fire, Equip and the rest play the skin's effects, animated layers and sounds the way the game would.
 4. **Right panel.** Settings of whatever is selected. With nothing selected it shows the skin's **Overview**.
 5. **Right edge tabs.** The categories of the right panel. A part has **Textures**, **Livery**, **Layers**, **Attach**, **Place** and **Sounds**; an attachment has **Place**, **Look**, **Screen** (ammo screens only), **Effects** and **Sounds**. A small number on a tab says how many things it holds.
-6. **Publish.** Check, export a skin pack or a Thunderstore mod, export models and UV templates, write game files directly.
-7. **Apply.** On a work's card: builds the skin, installs it into the profile picked under **Apply to:** at the top of the left column and has your gear wear it in game.
+6. **Export.** Check, export a skin pack or a Thunderstore mod, export models and UV templates, write game files directly.
 
-This is the window with **Weapons** picked at the left of the top bar; for **Character**, see [Characters at a glance](#character).
+This is the window with **Weapon skins** picked at the top of the left column; for **Character**, see [Characters at a glance](#character).
 
 ## Moving around
 
@@ -58,9 +57,9 @@ This is the window with **Weapons** picked at the left of the top bar; for **Cha
 
 ## Pick an item
 
-1. Click the item name at the top left of the 3D view, or press <kbd>Ctrl</kbd>+<kbd>P</kbd>.
+1. Click **Works** on the left edge, then **+ New**. (The start screen's **Pick a gear** opens the same list.)
 2. Search at the top, or narrow the list with the slot chips (Primary, Special, Melee, Tools and so on).
-3. Click a card. The 3D view loads the item; opening one for the first time takes a few seconds.
+3. Click a card. A new work is made on that gear and the 3D view loads it; opening one for the first time takes a few seconds.
 
 ![The item gallery](shot:gallery)
 
@@ -73,6 +72,7 @@ Each item can have several skins. Click **Works** on the left edge to see the wo
 - Click a card to switch to that work.
 - **+ New** makes a new work on the gear you pick, and the left panel turns to its parts (to the steps once a character is imported); the arrow beside it holds **Copy the open one**, **Open project or old preset…** (<kbd>Ctrl</kbd>+<kbd>O</kbd>) and **Import a Skins skin group…**.
 - A card's **⋯** menu: **Put in profile**, **Copy**, **Rename**, **Export pack…**, **Snapshots**, **Save to file…**, **Clear current changes**, **Delete work**. Double-click a name to rename it.
+- **Apply** on a card builds the skin, installs it into the profile picked under **Apply to:** at the top of the works list and has your gear wear it in game.
 - A card says what the work is in the chosen profile (Only in the editor, In the profile, In use); see [Install](#save).
 
 ## Import a Skins skin group
@@ -155,14 +155,14 @@ Palette: white-grey `#949699`, grey `#5C6166`, black `#0D0E0F`, orange `#FF6B14`
 
 ## 8. Check and put it in the game
 
-1. **Publish** → **Check**: it should say there is nothing to fix.
+1. **Export** → **Check**: it should say there is nothing to fix.
 2. Click **Apply** on Ember Line's card. Start the game: the rifle already wears Ember Line, and a running game changes within seconds. More in [Save, snapshots and install](#save).
 3. Take a **Snapshot** (card **More** → **Snapshots**) before trying other ideas, such as a night colour variant.
 
 ## 9. Share it
 
-1. **Publish** → **Export as Thunderstore skin mod…**, tick Ember Line, fill in the mod name, version and description, and keep the **ForgeSkin** format.
-2. Upload the zip to Thunderstore yourself. Teammates see Ember Line on your gun once they install that mod. More in [Publish and share](#publish).
+1. **Export** → **Export as Thunderstore skin mod…**, tick Ember Line, fill in the mod name, version and description, and keep the **ForgeSkin** format.
+2. Upload the zip to Thunderstore yourself. Teammates see Ember Line on your gun once they install that mod. More in [Export and share](#publish).
 
 #! Make a character
 
@@ -479,7 +479,7 @@ Teammates see the lens on your gun; the zoom is only in your own view.
 
 ## Paint in another program
 
-The **Publish** menu has **Export OBJ model (by part)…**, **Export OBJ model (merged)…** and **Export UV templates…**. Paint on the OBJ in Substance Painter or Blender, or over the UV template in an image editor, then drop the result back in.
+The **Export** menu has **Export OBJ model (by part)…**, **Export OBJ model (merged)…** and **Export UV templates…**. Paint on the OBJ in Substance Painter or Blender, or over the UV template in an image editor, then drop the result back in.
 
 ## Formats and sizes
 
@@ -1101,11 +1101,11 @@ Packs by others in this profile are folded into one bar at the top of the list (
 **Apply automatically** in **Settings** (off by default): on, while the game runs, the work in use is applied 2 seconds after each change, speaking up only when something goes wrong.
 
 > [!WARNING]
-> Applying writes real files into that profile. Use a profile meant for testing; to give the skin to others, use **Publish**.
+> Applying writes real files into that profile. Use a profile meant for testing; to give the skin to others, use **Export**.
 
-# Publish and share {#publish}
+# Export and share {#publish}
 
-![The Publish menu](shot:publish-menu)
+![The Export menu](shot:publish-menu)
 
 - **Check**: goes through every skin before export and lists what to fix. Click a problem to go to it.
 - **Export skin pack…**: one `.forgeskin` file with everything in it.

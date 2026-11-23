@@ -230,7 +230,9 @@ public sealed class MapNativeLayoutTests
                 "wardenobjectivemanager-getwardenobjectivecountforlayer" or
                 "wardenobjectivemanager-trygetwardenobjectivedataforlayer" or
                 // The built room volume lookups: the native geomorph volume query and the voxel pillar read answer values and write nothing.
-                "aig-geomorphnodevolume-trygetgeomorphvolume" or "aig-voxelnodevolume-getpillar")
+                "aig-geomorphnodevolume-trygetgeomorphvolume" or "aig-voxelnodevolume-getpillar" or
+                // The expander's gate lookup answers the gate it owns and writes nothing.
+                "lg-zoneexpander-getgate")
             .Select(x => x.Row.GetProperty("signature").GetString()!).ToArray();
         string unresolvedWrites = string.Join(", ", declaredWrites.Where(x => x.Member == null)
             .Select(x => x.Row.GetProperty("id").GetString()));
@@ -376,7 +378,7 @@ public sealed class MapNativeLayoutTests
             .Select(x => x.Row.GetProperty("id").GetString()));
         var expectedReads = declaredReads.Where(x => x.Member != null && EvidenceRegenerator.GameRead(Member(x.Member!))).Select(x => Member(x.Member!)).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         Check("native.exact-player-reads", unresolved.Length == 0 && identityReads.SequenceEqual(expectedReads),
-            unresolved.Length == 0 ? string.Join(", ", identityReads) : "unresolved: " + unresolved);
+            unresolved.Length == 0 ? "missing=" + string.Join(", ", identityReads.Except(expectedReads)) + " extra=" + string.Join(", ", expectedReads.Except(identityReads)) : "unresolved: " + unresolved);
         // The map-object readers read the level's zone table and the objects in it, and the spec names every one
         // of those reads too: a coordinate or a member added without its evidence row fails here.
         var expectedMapReads = declaredReads.Where(x => x.Member != null && EvidenceRegenerator.MapObjectRead(Member(x.Member!)))

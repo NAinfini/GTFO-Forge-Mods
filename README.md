@@ -13,6 +13,12 @@ Source code and release notes for NAinfini's GTFO mods, published on Thunderstor
 | [ForgeSkin](ForgeSkin/README.md) | 1.0.2 | Applies ForgeSkin packs (textures, attachments, live ammo screens, animated layers) to your own weapons; includes the desktop skin editor. | [NAinfini/ForgeSkin](https://thunderstore.io/c/gtfo/p/NAinfini/ForgeSkin/) |
 | [ForgeFrameGen](ForgeFrameGen/README.md) | 1.0.1 | DLSS / FSR upscaling and frame generation: DLSS on RTX cards, FSR 4 or 3.1 on others; experimental DLSS Frame Generation with Reflex (RTX 40/50) and AMD FSR Frame Generation. Unofficial; not an NVIDIA or AMD product. | [NAinfini/ForgeFrameGen](https://thunderstore.io/c/gtfo/p/NAinfini/ForgeFrameGen/) |
 
+Map-maker runtime (not on Thunderstore in this first version):
+
+| Package | Version | What it is |
+|---|---|---|
+| [ForgeEngine](ForgeEngine/README.md) | 1.0.0 | Forge runtime for map makers: loads the behaviour plans that Rundown packages ship and runs them on the game's players, maps, enemies and weapons. Download the zip from this repository's releases and import it in r2modman, or let the Forge map workshop install it. Needs ForgeCore, BepInExPack_GTFO, GTFO-API and MTFO. |
+
 Development tool (not on Thunderstore, never part of a player modpack):
 
 | Package | Version | What it is |

@@ -226,6 +226,7 @@ public sealed partial class NativeLayoutTests
         "ForgeCore.GameAssets::ReadShard <- ForgeWeapon.Native.GearPartExtraAssets::Resolve",
         "ForgeCore.GameAssets::ReadShard <- ForgeWeapon.Native.GearPartExtraAssets::SettleForeign",
         "ForgeCore.GameAssets::UnloadShard <- ForgeWeapon.Native.GearPartExtraAssets::ReleasePin",
+        "Il2CppSystem.Collections.Generic.Dictionary`2::ContainsKey <- ForgeWeapon.Native.WeaponContentReadback/<>c__DisplayClass0_0::<Read>b__3",
         "Il2CppSystem.Collections.Generic.Dictionary`2::ContainsKey <- ForgeWeapon.Native.WeaponGearCatalogue::Register",
         "Il2CppSystem.Collections.Generic.Dictionary`2::ContainsKey <- ForgeWeapon.Native.WeaponGearCatalogue::State"
     };

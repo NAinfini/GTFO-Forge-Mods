@@ -16,8 +16,14 @@ namespace ForgeSkin.Tests;
 // data dir and refreshed when the game's file differs); the real install is only read. The copy has the real build id, so
 // it reads the catalog and prefab index the real install wrote (preview.weapon and project.load run first).
 [Collection("process state")]
-public class AssetPatchTests
+public class AssetPatchTests : IDisposable
 {
+    // The test patches a copy of the game files and only reads the real install, so a GTFO that happens to run on this machine (another
+    // lane in game, the owner playing) must not decide its result: the running-game probe is off for the test and put back after.
+    readonly Func<bool> probe = Game.RunningProbe;
+    public AssetPatchTests() => Game.RunningProbe = () => false;
+    public void Dispose() => Game.RunningProbe = probe;
+
     static JsonNode Call(string method, object? args = null) =>
         JsonSerializer.SerializeToNode(Methods.Call(method, JsonSerializer.SerializeToNode(args ?? new { }, Program.Json)!.AsObject(), 1), Program.Json)!;
 
